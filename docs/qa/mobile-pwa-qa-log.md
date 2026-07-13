@@ -8,6 +8,31 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-12
 
+## July 12 ShadowChat 2.0 ShadowPin Creator Studio - Local Implementation
+
+- Branch: `codex/shadowchat-2.0`; production `main` frontend remains
+  unchanged.
+- Candidate 3 uses one lazy four-stage Media/Details/Preview/Publish Studio
+  with owner-private recovery, staged media, honest progress, explicit public
+  confirmation, and exact Theater success handoff from ShadowPin, Chat, and DM
+  entry points.
+- Seven focused model, history, API, component, lazy/share-entry,
+  private-media, and SQL source contract suites pass locally with 32 tests.
+  This is code-level proof, not browser or linked-backend acceptance.
+- Required Pixel Chromium `412x915` and iPhone WebKit `390x844` proof must
+  cover home/category/Chat/DM/Edit entry prefills, image/video/URL preview,
+  category/tags, close-reload-offline recovery, upload retry/resume, keyboard
+  and safe areas, 130% text, large controls, reduced motion, Back/cold close,
+  and zero overflow or console/page errors.
+- Required two-account proof must keep Account A's draft/staged media invisible
+  to B, deliver one Pin/event only after publish, suppress repeat events on
+  edit/move/replacement, and keep old media visible until an atomic replacement
+  succeeds.
+- No Candidate 3 browser artifact, physical-device result, production Pin,
+  notification fanout, or test-data/media cleanup is claimed by this entry.
+  Evidence paths and cleanup counts will be added only after the runs finish.
+- Contract: [SHADOW_PIN_CREATOR_STUDIO.md](C:/repos/chat2.0/docs/SHADOW_PIN_CREATOR_STUDIO.md:1).
+
 ## July 12 ShadowChat 2.0 General Chat Threads Checkpoint
 
 - Branch: `codex/shadowchat-2.0`; production `main` frontend remains

@@ -162,6 +162,7 @@ const openPinFromCard = (card: Element) => {
 }
 
 beforeEach(() => {
+  window.history.replaceState({}, '', '/')
   mockShouldAutoplayMedia = true
   mockAuthUser = {
     id: 'user-1',
@@ -2286,7 +2287,7 @@ test('ShadowPin radial comment opens the existing comments conversation', () => 
   }
 })
 
-test('ShadowPin radial menu offers edit as a foreground action for image owners', () => {
+test('ShadowPin radial menu opens Creator Studio for image owners', async () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({
     category,
@@ -2348,11 +2349,14 @@ test('ShadowPin radial menu offers edit as a foreground action for image owners'
       clientX: 255,
       clientY: 362,
     })
-    act(() => {
+    await act(async () => {
       jest.advanceTimersByTime(90)
+      await Promise.resolve()
+      await Promise.resolve()
     })
 
-    expect(screen.getByRole('heading', { name: /edit pin/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /creator studio/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /choose your media/i })).toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }
@@ -2865,7 +2869,7 @@ test('ShadowPin edit category supports URL cover replacement', async () => {
   }
 })
 
-test('ShadowPin edit pin supports URL media replacement', async () => {
+test('ShadowPin edit pin stages URL media replacement in Creator Studio', async () => {
   jest.useFakeTimers()
   const updateImage = jest.fn().mockResolvedValue({ ...image('one', 1200, 900), creator_id: 'user-1' })
   mockUseShadowPinImages.mockReturnValue({
@@ -2915,24 +2919,23 @@ test('ShadowPin edit pin supports URL media replacement', async () => {
       jest.advanceTimersByTime(90)
     })
 
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(screen.getByRole('heading', { name: /creator studio/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^url$/i }))
-    fireEvent.change(screen.getByLabelText(/image or video url/i), {
+    fireEvent.change(screen.getByLabelText(/public media url/i), {
       target: { value: 'https://images.example/replacement.jpg' },
     })
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
-
-    await waitFor(() => {
-      expect(updateImage).toHaveBeenCalledWith('one', expect.objectContaining({
-        file: null,
-        url: 'https://images.example/replacement.jpg',
-      }))
-    })
+    expect(screen.getByLabelText(/public media url/i)).toHaveValue('https://images.example/replacement.jpg')
+    expect(updateImage).not.toHaveBeenCalled()
   } finally {
     jest.useRealTimers()
   }
 })
 
-test('ShadowPin edit image keeps delete visually secondary to save and cancel', () => {
+test('ShadowPin edit image keeps draft discard secondary to save and exit', async () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({
     category,
@@ -2977,19 +2980,17 @@ test('ShadowPin edit image keeps delete visually secondary to save and cancel', 
       clientX: 263,
       clientY: 331,
     })
-    act(() => {
+    await act(async () => {
       jest.advanceTimersByTime(90)
+      await Promise.resolve()
+      await Promise.resolve()
     })
 
-    expect(screen.getByRole('heading', { name: /edit pin/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^cancel$/i })).toHaveClass('w-full')
-    expect(screen.getByRole('button', { name: /^save$/i })).toHaveClass('w-full')
-
-    const deleteButton = screen.getByRole('button', { name: /delete shadowpin pin/i })
-    expect(deleteButton).toHaveTextContent(/delete pin/i)
-    expect(deleteButton).toHaveClass('text-red-300/65')
-    expect(deleteButton).not.toHaveClass('w-full')
-    expect(deleteButton).not.toHaveClass('text-white')
+    expect(screen.getByRole('heading', { name: /creator studio/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save & exit/i })).toBeInTheDocument()
+    const discardButton = screen.getByRole('button', { name: /^discard$/i })
+    expect(discardButton).toHaveClass('text-red-300/75')
+    expect(screen.queryByRole('button', { name: /delete shadowpin pin/i })).not.toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }

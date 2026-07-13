@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   CSSProperties,
   FormEvent,
@@ -10,6 +10,7 @@ import type {
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
+  ArrowRight,
   Copy,
   Edit3,
   ExternalLink,
@@ -26,6 +27,7 @@ import {
   Play,
   Plus,
   Search,
+  Save,
   Share2,
   Trash2,
   Upload,
@@ -60,6 +62,7 @@ import { buildViewerSequence, createShadowPinPermalink } from './immersiveViewer
 import { useModerationReport } from '../moderation/useModerationReport'
 import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
 import { rankShadowPinCategories } from './categorySearch'
+import { hasCreatorStudioQuery } from './creator/creatorHistory'
 import {
   useShadowPinActivityTracker,
   useShadowPinCategoryDwell,
@@ -71,6 +74,10 @@ import type {
   ShadowPinImage,
   ShadowPinImageFormValues,
 } from './types'
+
+const LazyShadowPinCreatorStudio = lazy(() => import('./creator').then(module => ({
+  default: module.ShadowPinCreatorStudio,
+})))
 
 type ShadowPinProps = {
   currentView?: AppView
@@ -86,7 +93,6 @@ type ModalMode =
   | { type: 'create-category' }
   | { type: 'edit-category'; category: ShadowPinCategory }
   | { type: 'category-details'; category: ShadowPinCategory }
-  | { type: 'add-image' }
   | { type: 'edit-image'; image: ShadowPinImage }
   | { type: 'image-viewer'; image: ShadowPinImage }
   | null
@@ -2693,11 +2699,15 @@ function ShadowPinHome({
   onViewChange,
   onOpenCategory,
   onOpenPin,
+  onPublishedPin,
+  initialCreatorOpen,
   categoryListScrollMemory,
   tracker,
 }: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & {
   onOpenCategory: (category: ShadowPinCategory) => void
   onOpenPin: (image: ShadowPinImage) => void
+  onPublishedPin: (image: ShadowPinImage) => void
+  initialCreatorOpen: boolean
   categoryListScrollMemory: MutableRefObject<CategoryListScrollMemory>
   tracker: ShadowPinActivityTracker
 }) {
@@ -2705,6 +2715,7 @@ function ShadowPinHome({
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
   const categoriesState = useShadowPinCategories()
   const [modal, setModal] = useState<ModalMode>(null)
+  const [creatorOpen, setCreatorOpen] = useState(initialCreatorOpen)
   const [categorySearchVisible, setCategorySearchVisible] = useState(false)
   const [categorySearchQuery, setCategorySearchQuery] = useState('')
   const [pinSearchResults, setPinSearchResults] = useState<ShadowPinImage[]>([])
@@ -3007,14 +3018,10 @@ function ShadowPinHome({
         logo
         className="hidden md:flex"
       />
-      <button
-        type="button"
-        onClick={() => setModal({ type: 'create-category' })}
-        className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4 md:top-[calc(env(safe-area-inset-top)_+_3.85rem)]"
-        aria-label="Create category"
-      >
-        <Plus className="h-5 w-5" />
-      </button>
+      <div className="absolute right-3 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-40 flex items-center gap-1.5 md:right-4 md:top-[calc(env(safe-area-inset-top)_+_3.85rem)]">
+        <button type="button" onClick={() => setCreatorOpen(true)} className="theme-floating-action inline-flex h-11 items-center justify-center gap-1.5 rounded-full px-3" aria-label="Create Pin"><Plus className="h-4 w-4" /><span className="text-xs font-semibold">Create</span></button>
+        <button type="button" onClick={() => setModal({ type: 'create-category' })} className="theme-floating-action inline-flex h-11 w-11 items-center justify-center rounded-full" aria-label="Create category"><ImageIcon className="h-4 w-4" /></button>
+      </div>
       {shouldShowCategorySearchTrigger && (
         <button
           type="button"
@@ -3038,6 +3045,16 @@ function ShadowPinHome({
         onClickCapture={handleCategoryClickCapture}
         className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6"
       >
+        <button
+          type="button"
+          onClick={() => setCreatorOpen(true)}
+          className="mb-3 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] px-4 text-left shadow-[var(--shadow-panel)]"
+          aria-label="Open ShadowPin drafts and items needing attention"
+        >
+          <Save className="h-4 w-4 shrink-0 text-[var(--theme-accent-readable)]" />
+          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--text-primary)]">Drafts &amp; needs attention</span><span className="block truncate text-xs text-[var(--text-muted)]">Resume uploads, processing, or unfinished Pins</span></span>
+          <ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+        </button>
         {shouldRenderCategorySearch && (
           <div
             className="mb-3 w-full overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ease-out will-change-[max-height,opacity,transform]"
@@ -3181,6 +3198,20 @@ function ShadowPinHome({
           </div>
         )}
       </main>
+      {creatorOpen && (
+        <Suspense fallback={<div className="fixed inset-0 z-[138] flex items-center justify-center bg-[var(--bg-app)]"><LoadingSpinner /></div>}>
+          <LazyShadowPinCreatorStudio
+            open
+            onClose={() => setCreatorOpen(false)}
+            onPublished={async image => {
+              await categoriesState.refresh()
+              tracker.recordPinMutation(image, 'pin_created', null)
+              toast.success('Pin published')
+              onPublishedPin(image)
+            }}
+          />
+        </Suspense>
+      )}
       {modal?.type === 'create-category' && (
         <CategoryFormModal
           mode="create"
@@ -3239,6 +3270,8 @@ function ShadowPinCategoryScreen({
   const messagesApi = useOptionalMessages()
   const imagesState = useShadowPinImages(categoryId)
   const [modal, setModal] = useState<ModalMode>(null)
+  const [creatorOpen, setCreatorOpen] = useState(false)
+  const [creatorTargetImage, setCreatorTargetImage] = useState<ShadowPinImage | null>(null)
   const [commentsImage, setCommentsImage] = useState<ShadowPinImage | null>(null)
   const [viewerSessionImages, setViewerSessionImages] = useState<ShadowPinImage[]>([])
   const [sharingToGroupImageId, setSharingToGroupImageId] = useState<string | null>(null)
@@ -3252,12 +3285,6 @@ function ShadowPinCategoryScreen({
   const openedInitialTargetRef = useRef<string | null>(null)
   const title = imagesState.category?.title || 'ShadowPin'
   useShadowPinCategoryDwell(imagesState.category, tracker)
-
-  const submitCreate = async (values: ShadowPinImageFormValues) => {
-    const image = await imagesState.createImage(values)
-    tracker.recordPinMutation(image, 'pin_created', imagesState.category)
-    toast.success('Pin added')
-  }
 
   const submitEdit = async (image: ShadowPinImage, values: ShadowPinImageFormValues) => {
     const updatedImage = await imagesState.updateImage(image.id, values)
@@ -3507,7 +3534,7 @@ function ShadowPinCategoryScreen({
       </button>
       <button
         type="button"
-        onClick={() => setModal({ type: 'add-image' })}
+        onClick={() => { setCreatorTargetImage(null); setCreatorOpen(true) }}
         className="theme-floating-action absolute right-3 top-[calc(env(safe-area-inset-top)_+_0.5rem)] z-40 inline-flex h-11 w-11 items-center justify-center rounded-full md:right-4 md:top-[calc(env(safe-area-inset-top)_+_3.85rem)]"
         aria-label="Add pin"
       >
@@ -3565,7 +3592,7 @@ function ShadowPinCategoryScreen({
                             setSoundVideoId(prev => prev === image.id ? null : image.id)
                           }}
                           onViewer={() => openImageViewer(image)}
-                          onEdit={() => setModal({ type: 'edit-image', image })}
+                          onEdit={() => { setCreatorTargetImage(image); setCreatorOpen(true) }}
                           onHeart={() => toggleImageHeart(image)}
                           onComments={() => openImageComments(image)}
                           onShare={() => tracker.recordShareTapped(image, imagesState.category)}
@@ -3587,13 +3614,23 @@ function ShadowPinCategoryScreen({
           </>
         )}
       </main>
-      {modal?.type === 'add-image' && (
-        <ImageFormModal
-          mode="create"
-          saving={imagesState.saving}
-          onClose={() => setModal(null)}
-          onSubmit={submitCreate}
-        />
+      {creatorOpen && (
+        <Suspense fallback={<div className="fixed inset-0 z-[138] flex items-center justify-center bg-[var(--bg-app)]"><LoadingSpinner /></div>}>
+          <LazyShadowPinCreatorStudio
+            open
+            initialCategoryId={categoryId}
+            targetImage={creatorTargetImage}
+            onClose={() => { setCreatorOpen(false); setCreatorTargetImage(null) }}
+            onPublished={async image => {
+              await imagesState.refresh()
+              tracker.recordPinMutation(image, 'pin_created', imagesState.category)
+              toast.success('Pin published')
+              setViewerSessionImages([image])
+              setModal({ type: 'image-viewer', image })
+              onPinRoute('replace-viewer', image.id)
+            }}
+          />
+        </Suspense>
       )}
       {modal?.type === 'edit-image' && (
         <ImageFormModal
@@ -3645,7 +3682,8 @@ function ShadowPinCategoryScreen({
           onShare={image => { void shareViewerImage(image) }}
           onEdit={image => {
             onPinRoute('close-viewer', image.id)
-            setModal({ type: 'edit-image', image })
+            setCreatorTargetImage(image)
+            setCreatorOpen(true)
           }}
           onClose={closeImageViewer}
         />
@@ -3688,6 +3726,9 @@ export function ShadowPin({
   const [initialImage, setInitialImage] = useState<ShadowPinImage | null>(null)
   const [initialNeighbors, setInitialNeighbors] = useState<ShadowPinImage[]>([])
   const [initialImageStatus, setInitialImageStatus] = useState<'idle' | 'loading' | 'unavailable'>('idle')
+  const [initialCreatorOpen] = useState(() => (
+    typeof window !== 'undefined' && hasCreatorStudioQuery(window)
+  ))
   const categoryListScrollMemory = useRef<CategoryListScrollMemory>({
     scrollTop: 0,
     shouldRestore: false,
@@ -3794,6 +3835,14 @@ export function ShadowPin({
         setActiveCategoryId(image.category_id)
         onPinRoute('push-viewer', image.id)
       }}
+      onPublishedPin={image => {
+        if (!image.category_id) return
+        setInitialImage(image)
+        setInitialNeighbors([])
+        setActiveCategoryId(image.category_id)
+        onPinRoute('replace-viewer', image.id)
+      }}
+      initialCreatorOpen={initialCreatorOpen}
       categoryListScrollMemory={categoryListScrollMemory}
       tracker={tracker}
     />

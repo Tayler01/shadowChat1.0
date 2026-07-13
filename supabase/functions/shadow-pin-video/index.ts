@@ -60,6 +60,10 @@ type VideoAction =
   | 'replace-upload'
   | 'replace-external'
   | 'delete-video-asset'
+  | 'create-draft-upload'
+  | 'complete-draft-upload'
+  | 'sync-draft-status'
+  | 'delete-draft-video-asset'
 
 type VideoPayload = {
   action?: VideoAction
@@ -79,6 +83,35 @@ type VideoPayload = {
   posterContentType?: string | null
   posterSizeBytes?: number | null
   bunnyVideoId?: string
+  draftId?: string
+  assetId?: string
+  expectedRevision?: number
+}
+
+type ShadowPinDraftRow = {
+  id: string
+  creator_id: string
+  category_id: string | null
+  source_kind: 'video_upload' | 'external_video' | string
+  state: string
+  revision: number
+  active_asset_id: string | null
+  publish_idempotency_key: string
+}
+
+type ShadowPinDraftAssetRow = {
+  id: string
+  draft_id: string
+  creator_id: string
+  asset_kind: string
+  provider: string
+  state: string
+  provider_asset_id: string | null
+  provider_payload: Record<string, unknown> | null
+  source_url: string | null
+  size_bytes?: number | null
+  duration_seconds?: number | null
+  deleted_at: string | null
 }
 
 type SupabaseAdmin = ReturnType<typeof getSupabaseAdmin>
@@ -1501,7 +1534,8 @@ const buildExternalRecord = async (
   titleInput: string,
   descriptionInput: string | null,
   sourceUrl: URL,
-  imageId: string = crypto.randomUUID()
+  imageId: string = crypto.randomUUID(),
+  draftMode = false
 ) => {
   const provider = detectProvider(sourceUrl)
   const [openGraph, oembed, providerVideo] = await Promise.all([
@@ -1531,7 +1565,7 @@ const buildExternalRecord = async (
           provider === 'instagram' ? 'Instagram Post' :
             'Video Pin'
   )
-  const storedPreviewImage = provider === 'instagram' || provider === 'x' || provider === 'pinterest'
+  const storedPreviewImage = !draftMode && (provider === 'instagram' || provider === 'x' || provider === 'pinterest')
     ? await storeExternalPreviewImage(supabase, userId, categoryId, imageId, preview?.image)
     : null
   const imageUrl = storedPreviewImage?.imageUrl || (provider === 'youtube' && youtubeId
@@ -1726,6 +1760,400 @@ const handleDeleteVideoAsset = async (req: Request, body: VideoPayload) => {
   return json({ ok: true, image: data })
 }
 
+const getCreatorDraft = async (
+  supabase: SupabaseAdmin,
+  userId: string,
+  draftId: string,
+  expectedRevision?: number,
+  allowTerminal = false,
+) => {
+  const { data, error } = await supabase
+    .from('shadow_pin_creator_drafts')
+    .select('*')
+    .eq('id', draftId)
+    .eq('creator_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('Creator draft is unavailable.')
+  const draft = data as ShadowPinDraftRow
+  if (!allowTerminal && (draft.state === 'published' || draft.state === 'abandoned')) {
+    throw new Error('Creator draft cannot accept new media.')
+  }
+  if (expectedRevision !== undefined && draft.revision !== expectedRevision) {
+    throw new Error('Creator draft changed on another device.')
+  }
+  return draft
+}
+
+const getDraftAsset = async (
+  supabase: SupabaseAdmin,
+  userId: string,
+  draftId: string,
+  assetId: string,
+) => {
+  const { data, error } = await supabase
+    .from('shadow_pin_draft_assets')
+    .select('*')
+    .eq('id', assetId)
+    .eq('draft_id', draftId)
+    .eq('creator_id', userId)
+    .maybeSingle()
+  if (error) throw error
+  return data as ShadowPinDraftAssetRow | null
+}
+
+const activateDraftAsset = async (
+  supabase: SupabaseAdmin,
+  draftId: string,
+  assetId: string,
+  state: string,
+) => {
+  const { data: currentDraft, error: currentError } = await supabase
+    .from('shadow_pin_creator_drafts').select('active_asset_id').eq('id', draftId).single()
+  if (currentError) throw currentError
+  if (currentDraft.active_asset_id && currentDraft.active_asset_id !== assetId) {
+    const { error: supersedeError } = await supabase.from('shadow_pin_draft_assets')
+      .update({ state: 'superseded' }).eq('id', currentDraft.active_asset_id)
+      .not('state', 'in', '(deleted,superseded)')
+    if (supersedeError) throw supersedeError
+  }
+  const { data, error } = await supabase
+    .from('shadow_pin_creator_drafts')
+    .update({
+      active_asset_id: assetId,
+      state,
+      last_error_code: null,
+      last_error_message: null,
+    })
+    .eq('id', draftId)
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
+}
+
+const nextDraftAssetGeneration = async (supabase: SupabaseAdmin, draftId: string) => {
+  const { data, error } = await supabase
+    .from('shadow_pin_draft_assets')
+    .select('generation')
+    .eq('draft_id', draftId)
+    .order('generation', { ascending: false })
+    .limit(1)
+  if (error) throw error
+  return Number(data?.[0]?.generation ?? 0) + 1
+}
+
+const finishDraftUploadSession = async (
+  draft: Record<string, unknown>,
+  asset: Record<string, unknown>,
+  bunnyVideoId: string,
+  libraryId: string,
+  apiKey: string,
+) => {
+  const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60
+  const authorizationSignature = await sha256Hex(`${libraryId}${apiKey}${expiresAt}${bunnyVideoId}`)
+  return json({
+    ok: true,
+    draft,
+    asset,
+    bunnyVideoId,
+    libraryId,
+    endpoint: 'https://video.bunnycdn.com/tusupload',
+    authorizationSignature,
+    authorizationExpire: expiresAt,
+    upload: {
+      bunnyVideoId,
+      libraryId,
+      endpoint: 'https://video.bunnycdn.com/tusupload',
+      authorizationSignature,
+      authorizationExpire: expiresAt,
+    },
+  })
+}
+
+const enforceDailyDraftNativeUploadLimit = async (supabase: SupabaseAdmin, userId: string) => {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const [canonicalResult, draftResult] = await Promise.all([
+    supabase.from('shadow_pin_images').select('id', { count: 'exact', head: true })
+      .eq('creator_id', userId).eq('media_type', 'video').is('deleted_at', null).gte('created_at', since),
+    supabase.from('shadow_pin_draft_assets').select('id', { count: 'exact', head: true })
+      .eq('creator_id', userId).eq('provider', 'bunny_stream').is('deleted_at', null).gte('created_at', since),
+  ])
+  if (canonicalResult.error) throw canonicalResult.error
+  if (draftResult.error) throw draftResult.error
+  if ((canonicalResult.count ?? 0) + (draftResult.count ?? 0) >= DAILY_NATIVE_UPLOAD_LIMIT) {
+    throw new Error(`You can prepare ${DAILY_NATIVE_UPLOAD_LIMIT} videos per day for now.`)
+  }
+}
+
+const handleCreateDraftUpload = async (req: Request, body: VideoPayload) => {
+  const auth = await authenticate(req)
+  if ('error' in auth) return auth.error
+  const draftId = normalizeUuid(body.draftId)
+  let assetId = normalizeUuid(body.assetId)
+  const expectedRevision = normalizePositiveInteger(body.expectedRevision)
+  if (!draftId || expectedRevision === null) {
+    return badRequest('draftId and expectedRevision are required.')
+  }
+
+  const currentDraft = await getCreatorDraft(auth.supabase, auth.userId, draftId)
+  if (!assetId && currentDraft.active_asset_id) assetId = currentDraft.active_asset_id
+  let existing = assetId
+    ? await getDraftAsset(auth.supabase, auth.userId, draftId, assetId)
+    : null
+  let normalizedRequestedUrl = ''
+  if (body.sourceUrl) normalizedRequestedUrl = normalizeUrl(body.sourceUrl).toString()
+  if (existing && body.sourceUrl && (
+    existing.asset_kind !== 'external_video'
+      || (
+        existing.source_url !== normalizedRequestedUrl
+        && existing.provider_payload?.requestedSourceUrl !== normalizedRequestedUrl
+      )
+  )) {
+    existing = null
+    assetId = ''
+  }
+  const existingUpload = existing?.provider_payload?.bunny_stream as Record<string, unknown> | undefined
+  const nativeFingerprintMatches = existing && !body.sourceUrl && existing.provider === 'bunny_stream'
+    && String(existingUpload?.fileName ?? '') === cleanText(body.fileName, 220)
+    && Number(existingUpload?.fileSize ?? -1) === Number(body.fileSize)
+    && String(existingUpload?.fileType ?? '') === (cleanText(body.fileType, 120) || 'video/mp4')
+    && Number(existing.duration_seconds ?? -1) === Number(body.durationSeconds)
+  if (existing && !body.sourceUrl && !nativeFingerprintMatches) {
+    existing = null
+    assetId = ''
+  }
+  if (existing) {
+    const draft = await getCreatorDraft(auth.supabase, auth.userId, draftId)
+    if (existing.provider === 'bunny_stream' && existing.provider_asset_id) {
+      const activeDraft = draft.active_asset_id === assetId
+        ? draft
+        : await activateDraftAsset(auth.supabase, draftId, assetId, existing.state)
+      const { libraryId, apiKey } = getBunnyEnv()
+      return finishDraftUploadSession(activeDraft, existing as unknown as Record<string, unknown>, existing.provider_asset_id, libraryId, apiKey)
+    }
+    return json({ ok: true, draft, asset: existing })
+  }
+
+  const draft = await getCreatorDraft(auth.supabase, auth.userId, draftId, expectedRevision)
+  assetId = normalizeUuid(body.assetId) || crypto.randomUUID()
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'create-draft-upload')
+  const generation = await nextDraftAssetGeneration(auth.supabase, draftId)
+
+  if (body.sourceUrl) {
+    if (draft.source_kind !== 'external_video') throw new Error('Draft source is not an external video.')
+    const sourceUrl = normalizeUrl(body.sourceUrl)
+    await assertPublicHost(sourceUrl)
+    const record = await buildExternalRecord(
+      auth.supabase, auth.userId, draft.category_id ?? '', '', null, sourceUrl, assetId, true,
+    )
+    const { data: asset, error: assetError } = await auth.supabase
+      .from('shadow_pin_draft_assets')
+      .insert({
+        id: assetId, draft_id: draftId, creator_id: auth.userId, generation,
+        asset_kind: 'external_video', provider: record.provider, state: 'publish_ready',
+        final_image_url: record.image_url, final_image_path: record.image_path,
+        final_thumbnail_url: record.thumbnail_url, final_thumbnail_path: record.thumbnail_path,
+        final_medium_url: record.medium_url, final_medium_path: record.medium_path,
+        content_type: record.image_content_type, size_bytes: record.image_size_bytes,
+        image_width: record.image_width, image_height: record.image_height,
+        duration_seconds: record.duration_seconds, source_url: record.source_url,
+        provider_asset_id: record.provider_asset_id,
+        provider_playback_id: record.provider_playback_id,
+        provider_payload: { ...record.provider_payload, requestedSourceUrl: normalizedRequestedUrl },
+        video_preview_url: record.video_preview_url,
+        video_playback_url: record.video_playback_url,
+        video_hls_url: record.video_hls_url, video_embed_url: record.video_embed_url,
+        ready_at: new Date().toISOString(),
+      })
+      .select('*').single()
+    if (assetError) throw assetError
+    const activeDraft = await activateDraftAsset(auth.supabase, draftId, assetId, 'publish_ready')
+    return json({ ok: true, draft: activeDraft, asset })
+  }
+
+  if (draft.source_kind !== 'video_upload') throw new Error('Draft source is not a native video.')
+  const upload = validateNativeUpload(body)
+  await enforceDailyDraftNativeUploadLimit(auth.supabase, auth.userId)
+  const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
+  const bunnyVideo = await createBunnyVideo(libraryId, apiKey, cleanText(body.title, 80) || 'ShadowPin draft')
+  const playback = buildBunnyPlaybackUrls(libraryId, bunnyVideo.guid, pullZoneUrl, bunnyVideo.raw.availableResolutions)
+  const providerPayload = {
+    bunny_stream: {
+      libraryId, videoId: bunnyVideo.guid, embedUrl: playback.embedUrl,
+      pullZoneConfigured: Boolean(pullZoneUrl), fileName: upload.fileName,
+      fileType: upload.fileType, fileSize: upload.fileSize,
+      createdAt: new Date().toISOString(), createdBy: auth.userId,
+      bunnyResponse: bunnyVideo.raw,
+    },
+  }
+  const posterUrl = upload.posterUrl || FALLBACK_VIDEO_POSTER_URL
+  const posterPath = upload.posterPath || `bunny:${bunnyVideo.guid}:poster`
+  const { data: asset, error: assetError } = await auth.supabase
+    .from('shadow_pin_draft_assets')
+    .insert({
+      id: assetId, draft_id: draftId, creator_id: auth.userId, generation,
+      asset_kind: 'video', provider: 'bunny_stream', state: 'uploading',
+      final_image_url: posterUrl, final_image_path: posterPath,
+      final_thumbnail_url: posterUrl, final_thumbnail_path: upload.posterPath,
+      final_medium_url: posterUrl, final_medium_path: upload.posterPath,
+      content_type: upload.posterContentType, size_bytes: upload.fileSize,
+      image_width: upload.mediaWidth, image_height: upload.mediaHeight,
+      duration_seconds: upload.durationSeconds, provider_asset_id: bunnyVideo.guid,
+      provider_playback_id: bunnyVideo.guid, provider_payload: providerPayload,
+      video_preview_url: playback.previewUrl, video_playback_url: playback.playbackUrl,
+      video_hls_url: playback.hlsUrl, video_embed_url: playback.embedUrl,
+    })
+    .select('*').single()
+  if (assetError) {
+    await deleteBunnyVideo(libraryId, apiKey, bunnyVideo.guid).catch(() => undefined)
+    throw assetError
+  }
+  const activeDraft = await activateDraftAsset(auth.supabase, draftId, assetId, 'uploading')
+  return finishDraftUploadSession(activeDraft, asset, bunnyVideo.guid, libraryId, apiKey)
+}
+
+const handleCompleteDraftUpload = async (req: Request, body: VideoPayload) => {
+  const auth = await authenticate(req)
+  if ('error' in auth) return auth.error
+  const draftId = normalizeUuid(body.draftId)
+  const expectedRevision = normalizePositiveInteger(body.expectedRevision)
+  const bunnyVideoId = cleanText(body.bunnyVideoId, 120)
+  if (!draftId || expectedRevision === null || !bunnyVideoId) {
+    return badRequest('draftId, expectedRevision, and bunnyVideoId are required.')
+  }
+  const currentDraft = await getCreatorDraft(auth.supabase, auth.userId, draftId)
+  const assetId = normalizeUuid(body.assetId) || currentDraft.active_asset_id || ''
+  if (!assetId) return badRequest('Draft does not have an active upload.')
+  const asset = await getDraftAsset(auth.supabase, auth.userId, draftId, assetId)
+  if (!asset) return notFound('Draft asset not found.')
+  if (asset.provider !== 'bunny_stream' || asset.provider_asset_id !== bunnyVideoId) {
+    return forbidden('Upload session does not match this draft asset.')
+  }
+  if (asset.state === 'processing' || asset.state === 'publish_ready') {
+    const draft = await getCreatorDraft(auth.supabase, auth.userId, draftId)
+    return json({ ok: true, draft, asset })
+  }
+  await getCreatorDraft(auth.supabase, auth.userId, draftId, expectedRevision)
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'complete-draft-upload')
+  const nextPayload = mergeProviderPayload(asset.provider_payload, {
+    upload: { completedAt: new Date().toISOString(), completedBy: auth.userId, bunnyVideoId },
+  })
+  const { data: updatedAsset, error } = await auth.supabase
+    .from('shadow_pin_draft_assets')
+    .update({ state: 'processing', provider_payload: nextPayload, error_code: null, error_message: null })
+    .eq('id', assetId).select('*').single()
+  if (error) throw error
+  const draft = await activateDraftAsset(auth.supabase, draftId, assetId, 'processing')
+  return json({ ok: true, draft, asset: updatedAsset })
+}
+
+const handleSyncDraftStatus = async (req: Request, body: VideoPayload) => {
+  const auth = await authenticate(req)
+  if ('error' in auth) return auth.error
+  const draftId = normalizeUuid(body.draftId)
+  if (!draftId) return badRequest('draftId is required.')
+  const draft = await getCreatorDraft(auth.supabase, auth.userId, draftId)
+  const assetId = normalizeUuid(body.assetId) || draft.active_asset_id || ''
+  if (!assetId) return badRequest('Draft does not have an active upload.')
+  const asset = await getDraftAsset(auth.supabase, auth.userId, draftId, assetId)
+  if (!asset) return notFound('Draft asset not found.')
+  if (asset.state === 'publish_ready' || asset.state === 'failed') {
+    return json({ ok: true, draft, asset })
+  }
+  if (asset.provider !== 'bunny_stream' || !asset.provider_asset_id) {
+    return badRequest('Draft asset does not have a Bunny Stream video id.')
+  }
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'sync-draft-status')
+  const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
+  const bunnyStatus = await getBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
+  const providerState = getBunnyReadyState(bunnyStatus)
+  const playback = buildBunnyPlaybackUrls(libraryId, asset.provider_asset_id, pullZoneUrl, bunnyStatus.availableResolutions)
+  const duration = normalizeNonNegativeInteger(bunnyStatus.length ?? bunnyStatus.duration ?? bunnyStatus.durationSeconds)
+  const tooLong = duration !== null && duration > MAX_VIDEO_SECONDS
+  const state = providerState.failed || tooLong ? 'failed' : providerState.ready ? 'publish_ready' : 'processing'
+  const errorMessage = tooLong
+    ? 'Video is longer than 60 seconds.'
+    : providerState.failed ? 'Bunny Stream could not process this video.' : null
+  const providerPayload = mergeProviderPayload(asset.provider_payload, {
+    bunny_status: { syncedAt: new Date().toISOString(), state: providerState, raw: bunnyStatus },
+  })
+  const { data: updatedAsset, error } = await auth.supabase
+    .from('shadow_pin_draft_assets')
+    .update({
+      state, provider_payload: providerPayload,
+      duration_seconds: duration !== null && duration <= MAX_VIDEO_SECONDS ? duration : undefined,
+      video_preview_url: playback.previewUrl,
+      video_playback_url: playback.playbackUrl,
+      video_hls_url: playback.hlsUrl,
+      video_embed_url: playback.embedUrl,
+      error_code: state === 'failed' ? 'provider_processing_failed' : null,
+      error_message: errorMessage,
+      ready_at: state === 'publish_ready' ? new Date().toISOString() : null,
+    })
+    .eq('id', assetId).select('*').single()
+  if (error) throw error
+  const updatedDraft = await activateDraftAsset(
+    auth.supabase, draftId, assetId, state === 'publish_ready' ? 'publish_ready' : state,
+  )
+  return json({ ok: true, draft: updatedDraft, asset: updatedAsset })
+}
+
+const handleDeleteDraftVideoAsset = async (req: Request, body: VideoPayload) => {
+  const auth = await authenticate(req)
+  if ('error' in auth) return auth.error
+  const draftId = normalizeUuid(body.draftId)
+  const assetId = normalizeUuid(body.assetId)
+  if (!draftId || !assetId) return badRequest('draftId and assetId are required.')
+  const draft = await getCreatorDraft(auth.supabase, auth.userId, draftId, undefined, true)
+  const asset = await getDraftAsset(auth.supabase, auth.userId, draftId, assetId)
+  if (!asset) return notFound('Draft asset not found.')
+  if (asset.state === 'deleted') return json({ ok: true, draft, asset })
+  if (!['failed', 'superseded'].includes(asset.state) && !['failed', 'abandoned'].includes(draft.state)) {
+    return forbidden('Only failed or superseded draft assets can be deleted.')
+  }
+  if (draft.state === 'published' && !['failed', 'superseded'].includes(asset.state)) {
+    return forbidden('Published canonical video assets cannot be deleted.')
+  }
+  if (asset.provider_asset_id) {
+    const { count, error: referenceError } = await auth.supabase
+      .from('shadow_pin_images')
+      .select('id', { count: 'exact', head: true })
+      .eq('provider', asset.provider)
+      .eq('provider_asset_id', asset.provider_asset_id)
+    if (referenceError) throw referenceError
+    if ((count ?? 0) > 0) return forbidden('This video asset is referenced by a canonical pin.')
+  }
+  await enforceProviderRequestLimit(auth.supabase, auth.userId, 'delete-draft-video-asset')
+  let cleanup: Record<string, unknown> | null = null
+  if (asset.provider === 'bunny_stream' && asset.provider_asset_id) {
+    const { libraryId, apiKey } = getBunnyEnv()
+    cleanup = await deleteBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
+  }
+  const { data: updatedAsset, error } = await auth.supabase
+    .from('shadow_pin_draft_assets')
+    .update({
+      state: 'deleted', deleted_at: new Date().toISOString(),
+      provider_asset_id: null, provider_playback_id: null,
+      video_preview_url: null, video_playback_url: null,
+      video_hls_url: null, video_embed_url: null,
+      provider_payload: mergeProviderPayload(asset.provider_payload, {
+        cleanup: { deletedAt: new Date().toISOString(), deletedBy: auth.userId, response: cleanup },
+      }),
+    })
+    .eq('id', assetId).select('*').single()
+  if (error) throw error
+  let updatedDraft: Record<string, unknown> = draft as unknown as Record<string, unknown>
+  if (draft.active_asset_id === assetId) {
+    const { data, error: draftError } = await auth.supabase.from('shadow_pin_creator_drafts')
+      .update({ active_asset_id: null, state: draft.state === 'abandoned' ? 'abandoned' : 'failed' })
+      .eq('id', draftId).select('*').single()
+    if (draftError) throw draftError
+    updatedDraft = data
+  }
+  return json({ ok: true, draft: updatedDraft, asset: updatedAsset })
+}
+
 serve(async (req): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -1752,6 +2180,14 @@ serve(async (req): Promise<Response> => {
         return ensureResponse(await handleReplaceExternal(req, body))
       case 'delete-video-asset':
         return ensureResponse(await handleDeleteVideoAsset(req, body))
+      case 'create-draft-upload':
+        return ensureResponse(await handleCreateDraftUpload(req, body))
+      case 'complete-draft-upload':
+        return ensureResponse(await handleCompleteDraftUpload(req, body))
+      case 'sync-draft-status':
+        return ensureResponse(await handleSyncDraftStatus(req, body))
+      case 'delete-draft-video-asset':
+        return ensureResponse(await handleDeleteDraftVideoAsset(req, body))
       default:
         return badRequest('Unsupported Shadow Pin video action.')
     }

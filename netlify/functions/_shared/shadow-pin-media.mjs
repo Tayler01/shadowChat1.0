@@ -666,3 +666,352 @@ export async function updateImportedShadowPinCategoryCover({
     return await markDerivativeFailure(admin, 'shadow_pin_categories', updated.id, error) || updated
   }
 }
+
+const SHADOW_PIN_DRAFT_BUCKET = 'shadow-pin-drafts'
+
+async function getCreatorDraftForWorker(admin, userId, draftId, expectedRevision, allowTerminal = false) {
+  const { data, error } = await admin.from('shadow_pin_creator_drafts').select('*')
+    .eq('id', draftId).eq('creator_id', userId).maybeSingle()
+  if (error) throw error
+  if (!data || (!allowTerminal && ['published', 'abandoned'].includes(data.state))) throw new Error('Creator draft is unavailable.')
+  if (!allowTerminal && data.expires_at && Date.parse(data.expires_at) <= Date.now()) {
+    throw new Error('Creator draft has expired.')
+  }
+  if (expectedRevision !== undefined && data.revision !== expectedRevision) {
+    throw new Error('Creator draft changed on another device.')
+  }
+  return data
+}
+
+async function activateCreatorDraftAsset(admin, draftId, assetId, state) {
+  const { data: current, error: currentError } = await admin.from('shadow_pin_creator_drafts')
+    .select('active_asset_id').eq('id', draftId).single()
+  if (currentError) throw currentError
+  if (current.active_asset_id && current.active_asset_id !== assetId) {
+    const { error: supersedeError } = await admin.from('shadow_pin_draft_assets')
+      .update({ state: 'superseded' }).eq('id', current.active_asset_id)
+      .not('state', 'in', '(deleted,superseded)')
+    if (supersedeError) throw supersedeError
+  }
+  const { data, error } = await admin.from('shadow_pin_creator_drafts').update({
+    active_asset_id: assetId,
+    state,
+    last_error_code: null,
+    last_error_message: null,
+  }).eq('id', draftId).select('*').single()
+  if (error) throw error
+  return data
+}
+
+async function nextCreatorAssetGeneration(admin, draftId) {
+  const { data, error } = await admin.from('shadow_pin_draft_assets').select('generation')
+    .eq('draft_id', draftId).order('generation', { ascending: false }).limit(1)
+  if (error) throw error
+  return Number(data?.[0]?.generation || 0) + 1
+}
+
+async function removeObjectsQuietly(admin, bucket, paths) {
+  const cleanPaths = paths.filter(Boolean)
+  if (cleanPaths.length) await admin.storage.from(bucket).remove(cleanPaths).catch(() => undefined)
+}
+
+async function findDraftImageAsset(admin, userId, draftId, column, value) {
+  if (!value) return null
+  const { data, error } = await admin.from('shadow_pin_draft_assets').select('*')
+    .eq('creator_id', userId).eq('draft_id', draftId).eq(column, value)
+    .eq('provider', 'shadow_pin_storage').is('deleted_at', null)
+    .order('generation', { ascending: false }).limit(1).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+async function processCreatorDraftImageBuffer({
+  admin, userId, draftId, expectedRevision, storagePath, buffer,
+  contentType, sizeBytes, sourceUrl = null,
+}) {
+  const pathPrefix = `${userId}/${draftId}/`
+  if (!storagePath?.startsWith(pathPrefix)) throw new Error('Draft storage path is invalid.')
+  const imageType = resolveImageType(contentType)
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > MAX_IMAGE_BYTES) {
+    throw new Error('Images must be 15MB or smaller.')
+  }
+
+  let asset = await findDraftImageAsset(admin, userId, draftId, 'original_path', storagePath)
+  if (asset && ['ready', 'publish_ready'].includes(asset.state)) {
+    const draft = await getCreatorDraftForWorker(admin, userId, draftId)
+    const activeDraft = draft.active_asset_id === asset.id
+      ? draft
+      : await activateCreatorDraftAsset(admin, draftId, asset.id, asset.state)
+    return { draft: activeDraft, asset }
+  }
+
+  const draft = await getCreatorDraftForWorker(admin, userId, draftId, expectedRevision)
+  if (!['image_upload', 'image_url'].includes(draft.source_kind)) {
+    throw new Error('Draft source is not an image.')
+  }
+  const { thumbnail, medium, width, height } = await createDerivatives(buffer)
+  const assetId = asset?.id || crypto.randomUUID()
+  const generation = asset?.generation || await nextCreatorAssetGeneration(admin, draftId)
+  const privateThumb = `${pathPrefix}${assetId}/thumbnail.webp`
+  const privateMedium = `${pathPrefix}${assetId}/medium.webp`
+
+  if (!asset) {
+    const { data, error } = await admin.from('shadow_pin_draft_assets').insert({
+      id: assetId, draft_id: draftId, creator_id: userId, generation,
+      asset_kind: 'image', provider: 'shadow_pin_storage', state: 'processing',
+      storage_bucket: SHADOW_PIN_DRAFT_BUCKET, original_path: storagePath,
+      content_type: imageType.contentType, size_bytes: sizeBytes, source_url: sourceUrl,
+      provider_payload: { stagedAt: new Date().toISOString(), sourceUrl },
+    }).select('*').single()
+    if (error) throw error
+    asset = data
+  } else {
+    await admin.from('shadow_pin_draft_assets').update({ state: 'processing', error_code: null, error_message: null })
+      .eq('id', assetId)
+  }
+  await activateCreatorDraftAsset(admin, draftId, assetId, 'processing')
+
+  const privatePaths = [privateThumb, privateMedium]
+  try {
+    const webpOptions = { contentType: 'image/webp', cacheControl: '31536000', upsert: true }
+    for (const [bucket, path, bytes, options] of [
+      [SHADOW_PIN_DRAFT_BUCKET, privateThumb, thumbnail, webpOptions],
+      [SHADOW_PIN_DRAFT_BUCKET, privateMedium, medium, webpOptions],
+    ]) {
+      const { error } = await admin.storage.from(bucket).upload(path, bytes, options)
+      if (error) throw error
+    }
+    const { data: readyAsset, error: readyError } = await admin.from('shadow_pin_draft_assets').update({
+      state: 'ready', thumbnail_path: privateThumb, medium_path: privateMedium,
+      final_image_url: null, final_image_path: null,
+      final_thumbnail_url: null, final_thumbnail_path: null,
+      final_medium_url: null, final_medium_path: null,
+      image_width: width, image_height: height, ready_at: new Date().toISOString(),
+      error_code: null, error_message: null,
+    }).eq('id', assetId).select('*').single()
+    if (readyError) throw readyError
+    const readyDraft = await activateCreatorDraftAsset(admin, draftId, assetId, 'ready')
+    return { draft: readyDraft, asset: readyAsset }
+  } catch (error) {
+    await removeObjectsQuietly(admin, SHADOW_PIN_DRAFT_BUCKET, privatePaths)
+    const message = error instanceof Error ? error.message : 'Draft image processing failed.'
+    await admin.from('shadow_pin_draft_assets').update({
+      state: 'failed', error_code: 'image_processing_failed', error_message: message.slice(0, 500),
+    }).eq('id', assetId)
+    await admin.from('shadow_pin_creator_drafts').update({
+      state: 'failed', last_error_code: 'image_processing_failed', last_error_message: message.slice(0, 500),
+    }).eq('id', draftId)
+    throw error
+  }
+}
+
+export async function processShadowPinDraftImage({
+  admin, userId, draftId, expectedRevision, storagePath, contentType, sizeBytes,
+}) {
+  const existing = await findDraftImageAsset(admin, userId, draftId, 'original_path', storagePath)
+  if (existing && ['ready', 'publish_ready'].includes(existing.state)) {
+    const draft = await getCreatorDraftForWorker(admin, userId, draftId)
+    const activeDraft = draft.active_asset_id === existing.id
+      ? draft
+      : await activateCreatorDraftAsset(admin, draftId, existing.id, existing.state)
+    return { draft: activeDraft, asset: existing }
+  }
+  const { data: blob, error } = await admin.storage.from(SHADOW_PIN_DRAFT_BUCKET).download(storagePath)
+  if (error) throw error
+  const buffer = Buffer.from(await blob.arrayBuffer())
+  return processCreatorDraftImageBuffer({
+    admin, userId, draftId, expectedRevision, storagePath, buffer,
+    contentType, sizeBytes: Number(sizeBytes) || buffer.byteLength,
+  })
+}
+
+export async function stageShadowPinDraftImageFromUrl({ admin, userId, draftId, expectedRevision, url }) {
+  const sourceUrl = normalizeImageUrl(url).toString()
+  const existing = await findDraftImageAsset(admin, userId, draftId, 'source_url', sourceUrl)
+  if (existing && ['ready', 'publish_ready'].includes(existing.state)) {
+    const draft = await getCreatorDraftForWorker(admin, userId, draftId)
+    const activeDraft = draft.active_asset_id === existing.id
+      ? draft
+      : await activateCreatorDraftAsset(admin, draftId, existing.id, existing.state)
+    return { draft: activeDraft, asset: existing }
+  }
+  await getCreatorDraftForWorker(admin, userId, draftId, expectedRevision)
+  const imported = await fetchRemoteImage(sourceUrl)
+  const assetToken = crypto.randomUUID()
+  const storagePath = `${userId}/${draftId}/${assetToken}/original.${imported.extension}`
+  const { error } = await admin.storage.from(SHADOW_PIN_DRAFT_BUCKET).upload(storagePath, imported.buffer, {
+    cacheControl: '3600', contentType: imported.contentType, upsert: false,
+  })
+  if (error) throw error
+  try {
+    return await processCreatorDraftImageBuffer({
+      admin, userId, draftId, expectedRevision, storagePath,
+      buffer: imported.buffer, contentType: imported.contentType,
+      sizeBytes: imported.sizeBytes, sourceUrl,
+    })
+  } catch (error) {
+    await removeObjectsQuietly(admin, SHADOW_PIN_DRAFT_BUCKET, [storagePath])
+    throw error
+  }
+}
+
+export async function prepareShadowPinDraftImagePublish({
+  admin, userId, draftId, expectedRevision, assetId = null,
+}) {
+  const draft = await getCreatorDraftForWorker(admin, userId, draftId, expectedRevision)
+  const resolvedAssetId = assetId || draft.active_asset_id
+  if (!resolvedAssetId) throw new Error('Draft does not have active image media.')
+  const { data: asset, error: assetError } = await admin.from('shadow_pin_draft_assets').select('*')
+    .eq('id', resolvedAssetId).eq('draft_id', draftId).eq('creator_id', userId)
+    .eq('provider', 'shadow_pin_storage').is('deleted_at', null).maybeSingle()
+  if (assetError) throw assetError
+  if (!asset) throw new Error('Draft image asset is unavailable.')
+  if (asset.state === 'publish_ready') {
+    const publishReadyDraft = draft.active_asset_id === asset.id && draft.state === 'publish_ready'
+      ? draft
+      : await activateCreatorDraftAsset(admin, draftId, asset.id, 'publish_ready')
+    return { draft: publishReadyDraft, asset }
+  }
+  if (asset.state !== 'ready') throw new Error('Draft image is not ready to publish.')
+  if (!asset.original_path || !asset.thumbnail_path || !asset.medium_path) {
+    throw new Error('Draft image manifest is incomplete.')
+  }
+
+  const [{ data: originalBlob, error: originalError }, { data: thumbBlob, error: thumbError }, { data: mediumBlob, error: mediumError }] = await Promise.all([
+    admin.storage.from(SHADOW_PIN_DRAFT_BUCKET).download(asset.original_path),
+    admin.storage.from(SHADOW_PIN_DRAFT_BUCKET).download(asset.thumbnail_path),
+    admin.storage.from(SHADOW_PIN_DRAFT_BUCKET).download(asset.medium_path),
+  ])
+  if (originalError) throw originalError
+  if (thumbError) throw thumbError
+  if (mediumError) throw mediumError
+  const imageType = resolveImageType(asset.content_type)
+  const publicBase = `${userId}/studio/${draftId}/${asset.id}`
+  const finalOriginal = `${publicBase}/original.${imageType.extension}`
+  const finalThumb = `${publicBase}/thumbnail.webp`
+  const finalMedium = `${publicBase}/medium.webp`
+  const publicPaths = [finalOriginal, finalThumb, finalMedium]
+  try {
+    await activateCreatorDraftAsset(admin, draftId, asset.id, 'preparing_publish')
+    for (const [path, blob, contentType] of [
+      [finalOriginal, originalBlob, imageType.contentType],
+      [finalThumb, thumbBlob, 'image/webp'],
+      [finalMedium, mediumBlob, 'image/webp'],
+    ]) {
+      const { error } = await admin.storage.from(SHADOW_PIN_BUCKET).upload(path, blob, {
+        cacheControl: '31536000', contentType, upsert: true,
+      })
+      if (error) throw error
+    }
+    const publicStore = admin.storage.from(SHADOW_PIN_BUCKET)
+    const { data: originalPublic } = publicStore.getPublicUrl(finalOriginal)
+    const { data: thumbPublic } = publicStore.getPublicUrl(finalThumb)
+    const { data: mediumPublic } = publicStore.getPublicUrl(finalMedium)
+    const { data: promotedAsset, error: promoteError } = await admin.from('shadow_pin_draft_assets').update({
+      state: 'publish_ready',
+      final_image_url: originalPublic.publicUrl, final_image_path: finalOriginal,
+      final_thumbnail_url: thumbPublic.publicUrl, final_thumbnail_path: finalThumb,
+      final_medium_url: mediumPublic.publicUrl, final_medium_path: finalMedium,
+      error_code: null, error_message: null,
+    }).eq('id', asset.id).select('*').single()
+    if (promoteError) throw promoteError
+    const promotedDraft = await activateCreatorDraftAsset(admin, draftId, asset.id, 'publish_ready')
+    return { draft: promotedDraft, asset: promotedAsset }
+  } catch (error) {
+    await removeObjectsQuietly(admin, SHADOW_PIN_BUCKET, publicPaths)
+    await admin.from('shadow_pin_draft_assets').update({
+      state: 'ready', final_image_url: null, final_image_path: null,
+      final_thumbnail_url: null, final_thumbnail_path: null,
+      final_medium_url: null, final_medium_path: null,
+    }).eq('id', asset.id)
+    await admin.from('shadow_pin_creator_drafts').update({ state: 'ready' }).eq('id', draftId)
+    throw error
+  }
+}
+
+export async function rollbackShadowPinDraftImagePublish({ admin, userId, draftId, assetId = null }) {
+  const draft = await getCreatorDraftForWorker(admin, userId, draftId, undefined, true)
+  const resolvedAssetId = assetId || draft.active_asset_id
+  if (!resolvedAssetId) throw new Error('Draft does not have active image media.')
+  const { data: asset, error: assetError } = await admin.from('shadow_pin_draft_assets').select('*')
+    .eq('id', resolvedAssetId).eq('draft_id', draftId).eq('creator_id', userId)
+    .eq('provider', 'shadow_pin_storage').maybeSingle()
+  if (assetError) throw assetError
+  if (!asset) throw new Error('Draft image asset is unavailable.')
+  if (asset.state !== 'publish_ready') return { draft, asset, canonicalReferenced: false }
+
+  const finalPaths = [asset.final_image_path, asset.final_thumbnail_path, asset.final_medium_path].filter(Boolean)
+  const { data: canonicalRows, error: canonicalError } = await admin.from('shadow_pin_images')
+    .select('id,image_path,thumbnail_path,medium_path').eq('creator_draft_id', draftId)
+  if (canonicalError) throw canonicalError
+  const referenced = (canonicalRows || []).some(row => (
+    finalPaths.includes(row.image_path) || finalPaths.includes(row.thumbnail_path) || finalPaths.includes(row.medium_path)
+  ))
+  if (referenced) return { draft, asset, canonicalReferenced: true }
+
+  await removeObjectsQuietly(admin, SHADOW_PIN_BUCKET, finalPaths)
+  const { data: readyAsset, error: resetError } = await admin.from('shadow_pin_draft_assets').update({
+    state: 'ready', final_image_url: null, final_image_path: null,
+    final_thumbnail_url: null, final_thumbnail_path: null,
+    final_medium_url: null, final_medium_path: null,
+  }).eq('id', asset.id).select('*').single()
+  if (resetError) throw resetError
+  const nextDraftState = ['published', 'abandoned'].includes(draft.state) ? draft.state : 'ready'
+  const { data: readyDraft, error: draftError } = await admin.from('shadow_pin_creator_drafts')
+    .update({ state: nextDraftState }).eq('id', draftId).select('*').single()
+  if (draftError) throw draftError
+  return { draft: readyDraft, asset: readyAsset, canonicalReferenced: false }
+}
+
+export async function deleteShadowPinDraftImageAssets({ admin, userId, draftId, assetId = null }) {
+  const draft = await getCreatorDraftForWorker(admin, userId, draftId, undefined, true)
+  let query = admin.from('shadow_pin_draft_assets').select('*')
+    .eq('draft_id', draftId).eq('creator_id', userId).eq('provider', 'shadow_pin_storage')
+    .is('deleted_at', null)
+  if (assetId) query = query.eq('id', assetId)
+  const { data: assets, error } = await query
+  if (error) throw error
+  const selected = assets || []
+  if (assetId) {
+    if (!selected[0]) throw new Error('Draft image asset is unavailable.')
+    if (!['superseded', 'failed'].includes(selected[0].state)
+      && !['abandoned', 'failed', 'published'].includes(draft.state)) {
+      throw new Error('Only failed or superseded draft image assets can be deleted.')
+    }
+  } else if (!['abandoned', 'failed', 'published'].includes(draft.state)) {
+    throw new Error('Discard the draft before deleting all staged image assets.')
+  }
+
+  const { data: canonicalRows, error: canonicalError } = await admin.from('shadow_pin_images')
+    .select('image_path,thumbnail_path,medium_path')
+  if (canonicalError) throw canonicalError
+  const referencedPaths = new Set((canonicalRows || []).flatMap(row => [
+    row.image_path, row.thumbnail_path, row.medium_path,
+  ]).filter(Boolean))
+
+  const cleaned = []
+  for (const asset of selected) {
+    await removeObjectsQuietly(admin, SHADOW_PIN_DRAFT_BUCKET, [
+      asset.original_path, asset.thumbnail_path, asset.medium_path,
+    ])
+    const publicPaths = [
+      asset.final_image_path, asset.final_thumbnail_path, asset.final_medium_path,
+    ].filter(path => path && !referencedPaths.has(path))
+    await removeObjectsQuietly(admin, SHADOW_PIN_BUCKET, publicPaths)
+    const { data: updated, error: updateError } = await admin.from('shadow_pin_draft_assets').update({
+      state: 'deleted', deleted_at: new Date().toISOString(),
+      provider_payload: {
+        ...(asset.provider_payload || {}),
+        cleanup: {
+          deletedAt: new Date().toISOString(), deletedBy: userId,
+          retainedReferencedPublicPaths: [
+            asset.final_image_path, asset.final_thumbnail_path, asset.final_medium_path,
+          ].filter(path => path && referencedPaths.has(path)),
+        },
+      },
+    }).eq('id', asset.id).select('*').single()
+    if (updateError) throw updateError
+    cleaned.push(updated)
+  }
+  return { draft, assets: cleaned }
+}

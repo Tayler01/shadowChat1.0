@@ -3,7 +3,12 @@ import {
   cleanText,
   createAdminClient,
   createImportedShadowPinItem,
+  deleteShadowPinDraftImageAssets,
+  prepareShadowPinDraftImagePublish,
   processShadowPinRowForUser,
+  processShadowPinDraftImage,
+  rollbackShadowPinDraftImagePublish,
+  stageShadowPinDraftImageFromUrl,
   updateImportedShadowPinCategoryCover,
   updateImportedShadowPinImage,
 } from './_shared/shadow-pin-media.mjs'
@@ -34,6 +39,61 @@ export async function handler(event) {
 
     const body = JSON.parse(event.body || '{}')
     const action = body?.action
+
+    if (action === 'process-draft-image') {
+      const result = await processShadowPinDraftImage({
+        admin,
+        userId: user.id,
+        draftId: body?.draftId,
+        expectedRevision: Number(body?.expectedRevision),
+        storagePath: body?.storagePath,
+        contentType: body?.contentType,
+        sizeBytes: Number(body?.sizeBytes),
+      })
+      return json({ ok: true, ...result })
+    }
+
+    if (action === 'stage-draft-image-from-url') {
+      const result = await stageShadowPinDraftImageFromUrl({
+        admin,
+        userId: user.id,
+        draftId: body?.draftId,
+        expectedRevision: Number(body?.expectedRevision),
+        url: body?.url,
+      })
+      return json({ ok: true, ...result })
+    }
+
+    if (action === 'prepare-draft-image-publish') {
+      const result = await prepareShadowPinDraftImagePublish({
+        admin,
+        userId: user.id,
+        draftId: body?.draftId,
+        expectedRevision: Number(body?.expectedRevision),
+        assetId: body?.assetId || null,
+      })
+      return json({ ok: true, ...result })
+    }
+
+    if (action === 'rollback-draft-image-publish') {
+      const result = await rollbackShadowPinDraftImagePublish({
+        admin,
+        userId: user.id,
+        draftId: body?.draftId,
+        assetId: body?.assetId || null,
+      })
+      return json({ ok: true, ...result })
+    }
+
+    if (action === 'delete-draft-image-assets') {
+      const result = await deleteShadowPinDraftImageAssets({
+        admin,
+        userId: user.id,
+        draftId: body?.draftId,
+        assetId: body?.assetId || null,
+      })
+      return json({ ok: true, ...result })
+    }
 
     if (action === 'process-existing') {
       const targetType = body?.targetType

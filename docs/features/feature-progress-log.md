@@ -40,7 +40,8 @@ Canonical detail and release gates live in:
   isolated `codex/shadowchat-2.0` branch without changing production `main`.
 - Started: 2026-07-12
 - Status: active. Candidates 1 and 2 are implemented, documented, remotely
-  aligned, and passed their local/mobile checkpoints. Candidate 3 is next.
+  aligned, and passed their local/mobile checkpoints. Candidate 3 strategy is
+  accepted; implementation and verification are in progress.
 - Backend boundary: shared Supabase changes are additive and backward
   compatible. Existing production RPC signatures and RLS remain authoritative.
 - Delivery boundary: four separate verified checkpoints, then a combined
@@ -75,6 +76,22 @@ Canonical detail and release gates live in:
   two-account Pixel Chromium/iPhone WebKit realtime, exact-route, geometry,
   root-anchor, console, and cleanup proof.
 - Candidate 2 contract: [GENERAL_CHAT_THREADS.md](C:/repos/chat2.0/docs/GENERAL_CHAT_THREADS.md:1)
+- Candidate 3: ShadowPin Creator Studio replaces direct publish with a lazy
+  Media/Details/Preview/Publish flow, autosaved recovery, real upload/process
+  progress, explicit confirmation, exact Theater success, and atomic safe
+  replacement.
+- Candidate 3 backend boundary: owner-private creator drafts, server-owned
+  staged-asset ledger, private staging bucket, idempotent finalization, and no
+  draft participation in public Pin reads/search/score/activity/engagement or
+  notifications.
+- Candidate 3 verification status: implementation and seven focused model/
+  history/API/component/entrypoint/media/SQL suites (32 tests) pass locally. Private image
+  derivatives now remain in owner storage until bounded publish preparation,
+  with rollback for unreferenced promoted objects. Fresh local database replay,
+  rollback verification, database lint, and security advisors pass. No linked
+  push, function deployment, full Jest/build, two-account Chromium/WebKit, or
+  media cleanup proof is claimed yet.
+- Candidate 3 contract: [SHADOW_PIN_CREATOR_STUDIO.md](C:/repos/chat2.0/docs/SHADOW_PIN_CREATOR_STUDIO.md:1)
 
 ## Prior Goal
 

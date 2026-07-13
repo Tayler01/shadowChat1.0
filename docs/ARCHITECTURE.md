@@ -337,6 +337,31 @@ Wave Two contract: [docs/UNIVERSAL_DISCOVERY_LIBRARY.md](C:/repos/chat2.0/docs/U
 
 Full contract: [docs/GENERAL_CHAT_THREADS.md](C:/repos/chat2.0/docs/GENERAL_CHAT_THREADS.md:1).
 
+### ShadowPin Creator Studio
+
+1. A lazy four-stage Studio autosaves metadata and workflow state into
+   owner-private `shadow_pin_creator_drafts`; it never uses a public Pin as a
+   draft.
+2. Server media actions own `shadow_pin_draft_assets` and private
+   `shadow-pin-drafts` objects/Bunny sessions. The client cannot forge ready,
+   provider, path, published, or cleanup state.
+3. Preview reads only the owner draft and short signed staged-media URL. Drafts
+   are absent from consumer Pin queries, Discovery/Library, scoring, activity,
+   engagement, public Realtime, and notifications.
+4. Image drafts remain private in `ready`; a bounded authenticated media action
+   promotes them immediately before publish and rolls back unreferenced public
+   objects if finalization fails. The idempotent finalizer then inserts a ready
+   canonical `shadow_pin_images` row or atomically swaps an edit replacement.
+   Repeat calls return the same Pin.
+5. The existing ready-state trigger remains new-post authority. Autosave,
+   preview, edit, move, replacement, and retry never fan out.
+6. Publish replaces the private Studio route with exact Theater
+   `?view=pins&pin=<id>`, including Chat/DM share entry. Failed work remains
+   recoverable without exposing titles, tags, source URLs, or errors in the
+   address bar.
+
+Full contract: [docs/SHADOW_PIN_CREATOR_STUDIO.md](C:/repos/chat2.0/docs/SHADOW_PIN_CREATOR_STUDIO.md:1).
+
 ### ShadowPin Social Notification
 
 1. A creator inserts/uploads a pin, which may begin in a processing state.

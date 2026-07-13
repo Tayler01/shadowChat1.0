@@ -4,7 +4,6 @@ import {
   getWorkingClient,
   uploadShadowPinImage,
 } from '../../../lib/supabase'
-import * as tus from 'tus-js-client'
 import type {
   ShadowPinCategory,
   ShadowPinCategoryFormValues,
@@ -494,8 +493,9 @@ async function uploadBunnyTusFile(
   file: File,
   onProgress?: (progress: number) => void
 ) {
+  const { Upload } = await import('tus-js-client')
   await new Promise<void>((resolve, reject) => {
-    const upload = new tus.Upload(file, {
+    const upload = new Upload(file, {
       endpoint: session.endpoint,
       retryDelays: [0, 1000, 3000, 5000],
       metadata: {

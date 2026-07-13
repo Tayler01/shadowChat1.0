@@ -158,6 +158,74 @@ run after all four candidates.
 Full contract:
 [docs/GENERAL_CHAT_THREADS.md](C:/repos/chat2.0/docs/GENERAL_CHAT_THREADS.md:1).
 
+## Candidate 3 Contract - ShadowPin Creator Studio
+
+### Product shape
+
+- Replace direct publication with one lazy, phone-first Studio entered from
+  ShadowPin home/category, Chat/DM image share, and owner/operator Edit.
+- Use four clear stages: Media, Details, Preview, and Publish. Autosave each
+  meaningful change, expose recovery/needs-attention state when Studio opens,
+  and restore safely after close, reload, or a failed upload.
+- Show real media preview, a visible category selector, normalized tag input
+  and limits, a ShadowPin-style card preview, explicit public confirmation,
+  and honest staged upload/processing progress.
+- Successful publish replaces the Studio route with the exact new Pin Theater.
+  Retry is idempotent; save-and-exit never loses staged work.
+- Stage and process a media replacement before atomically swapping it, so a
+  failed edit never damages the ready Pin other members are viewing.
+
+### Architecture decision
+
+- Add owner-private `shadow_pin_creator_drafts` outside canonical
+  `shadow_pin_images`, plus server-owned `shadow_pin_draft_assets` and private
+  `shadow-pin-drafts` Storage bucket.
+- Drafts and staged assets are excluded from every consumer feed, search,
+  Library, score, activity, engagement, Realtime fanout, and notification path.
+- Use authenticated server media actions for staged image/import/Bunny work
+  and one idempotent transaction for final insert or replacement swap. Repeat
+  finalization returns the same canonical Pin.
+- Keep existing production direct-create/read APIs backward compatible. The
+  current ready-state notification trigger remains the only new-post fanout
+  authority.
+- Use a typed four-stage client model with stale-autosave protection, explicit
+  progress and recoverable errors, lazy loading, private route state, and the
+  shared accessibility/Comfort providers.
+- Finalization requires a `publish_ready` active asset, expected draft
+  revision, and idempotency key; canonical Pins retain a nullable unique
+  `creator_draft_id` receipt.
+
+### Security boundaries
+
+- Draft rows are owner-private; asset state is server-owned; `PUBLIC`, `anon`,
+  and cross-owner access are denied.
+- Staged media is private and previewed only with short owner-authorized signed
+  URLs. Provider credentials, service-role keys, upload signatures, and raw
+  provider errors remain server-only.
+- Finalization rechecks auth, owner/operator authority, category availability,
+  target version, media readiness, limits, and rate budgets.
+- Autosave/preview/edit/replacement never create new-post events. Concurrent or
+  repeated publish calls converge on one Pin and one eligible event.
+
+### Verification gate
+
+- Focused model/API/component tests cover stages, prefill, validation,
+  autosave/recovery/conflict, progress, confirmation, retry, exact success
+  routing, accessibility/Comfort, and atomic edit/replace behavior.
+- Local SQL/server proof covers RLS, server-owned asset state, draft exclusion,
+  private Storage, idempotency, notification once-only, stale/deleted/blocked/
+  expired negatives, and asset cleanup.
+- Pixel Chromium and iPhone WebKit plus two accounts prove private drafts,
+  keyboard/safe-area geometry, upload recovery, exact Theater handoff,
+  recipient visibility/notification, replacement continuity, zero overflow/
+  console errors, and complete test-data/media cleanup.
+- Lint, TypeScript, build/paused chunks/budgets, targeted/full Jest, clean local
+  replay, advisors, linked history/dry run, and deployed media functions must
+  pass before Candidate 3 is accepted.
+
+Full contract:
+[docs/SHADOW_PIN_CREATOR_STUDIO.md](C:/repos/chat2.0/docs/SHADOW_PIN_CREATOR_STUDIO.md:1).
+
 ## Release Boundaries
 
 - Boards, News, Art Board, ESP Bridge, Activity, and member report intake stay
@@ -217,6 +285,15 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   console/page errors. All seven QA messages per run were deletion-confirmed;
   the final artifact is
   `output/playwright/wave2-candidate2-threads/summary.json`.
-- Candidate 3, ShadowPin Creator Studio, is next. Physical installed-PWA
+- Candidate 3 implementation is present locally. The contract uses
+  owner-private drafts, private image staging with signed owner previews,
+  server-owned staged assets, bounded publish promotion/rollback, idempotent
+  finalization, and one lazy four-stage Media/Details/Preview/Publish Studio.
+  Seven focused model, history, API, component, entrypoint, media, and SQL
+  contract suites pass with 32 tests. Fresh local database replay, rollback verifier, database lint,
+  and security advisors also pass. No Candidate 3 linked-backend,
+  cross-account browser, function-deploy, production notification, or full
+  test-data/media cleanup proof is claimed yet.
+- Physical installed-PWA
   keyboard, VoiceOver/TalkBack, and touch-comfort checks remain Wave Two
   release-gate follow-ups rather than automated-browser claims.

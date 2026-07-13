@@ -1,0 +1,252 @@
+# ShadowPin Creator Studio
+
+## Status
+
+Wave Two Candidate 3 is implemented locally on `codex/shadowchat-2.0` as of
+July 12, 2026. The production `main` frontend and production Netlify site
+remain unchanged. Seven focused model, history, API, component, lazy-entry,
+media, and SQL contract suites pass locally with 32 tests. A fresh local database replay, rollback
+verifier, database lint, and security-advisor pass also succeed; linked-backend,
+cross-account browser, deployment, and physical-device proof remain open.
+
+## Product Contract
+
+Creator Studio replaces ShadowPin's direct-publish form with one deliberate,
+recoverable workflow. It does not add another primary navigation tab.
+
+Entry points are:
+
+- a `Create Pin` action from ShadowPin home;
+- the existing category `+` action with that category preselected;
+- General Chat and DM `Add to Shado Pin` actions with the shared image and
+  preview prefilled;
+- owner/operator `Edit` from the grid, radial controls, or Theater.
+
+Opening Studio without a new share/edit prefill restores the newest matching
+unfinished owner draft. There is no separate primary navigation tab or draft
+inbox in this checkpoint.
+
+The phone-first Studio has four stages:
+
+1. **Media** - choose an image or short video, use a public URL, inspect the
+   real preview/poster, and replace or remove it. Validation is immediate and
+   retains the established image/video limits.
+2. **Details** - choose a visible category, add title and description, and
+   enter up to eight normalized comma-separated tags. Meaningful changes are
+   autosaved with visible saving, saved, recovery, or needs-attention state.
+3. **Preview** - inspect a phone-first ShadowPin-style media card with its
+   metadata before anything is public.
+4. **Publish** - explicitly confirm that the Pin becomes public and may notify
+   eligible members. Show honest `Preparing`, `Uploading`, `Processing`, and
+   `Publishing` progress; native video includes real resumable-upload percent.
+
+Step changes do not publish. Close/Back offers a clear save-and-exit path, and
+reopening restores the newest owner draft. Reduced motion removes large stage
+movement without hiding progress.
+
+## Success, Failure, And Edit Behavior
+
+Successful publish consumes the draft exactly once, refreshes ShadowPin
+caches, replaces the Studio route with `?view=pins&pin=<id>`, and opens the
+published Pin in Theater. Back then returns to the originating ShadowPin or
+conversation surface, not a completed form.
+
+A failed stage preserves the draft, selected category, metadata, staged asset,
+and resumable session. The Studio presents a safe stage-specific error with
+`Retry` and `Save draft and exit`. Retrying uses the same idempotency key so a
+timeout after server success cannot create another Pin, notification, Bunny
+asset, or Storage object.
+
+Metadata-only edits update the canonical Pin without new-post delivery. Media
+replacement is staged and processed before an atomic swap; other members keep
+seeing the old ready media until the replacement succeeds. A failed
+replacement leaves the public Pin unchanged. Category moves revalidate the
+destination at finalization. No edit, replacement, or move creates a second
+new-post event.
+
+## Architecture
+
+### Owner-private drafts
+
+Creator work lives outside `shadow_pin_images` in an additive
+`shadow_pin_creator_drafts` domain. A draft records its owner, create/edit
+mode, optional target Pin, category, metadata/tags, source kind, staged asset
+state, safe error details, idempotency key, optimistic version, and expiry.
+
+Drafts are private workflow state, not ShadowPin content. They never appear in
+the grid, exact Pin reads, Universal Discovery, Library, gold score, activity
+analytics, hearts/comments, public Realtime, or new-post notifications.
+
+### Server-owned staged assets
+
+`shadow_pin_draft_assets` is a server-owned ledger for one draft's staged
+image, imported URL result, Bunny upload session, or replacement candidate.
+Clients read an owner-filtered projection but cannot forge ready state,
+provider ids, storage paths, processing results, or publication links.
+
+Staged images and derivatives live in the private `shadow-pin-drafts` bucket
+and use ten-minute owner-authorized signed preview URLs. Immediately before an
+image finalization request, a bounded server action promotes its prepared
+objects to canonical public paths and marks the asset `publish_ready`; a failed
+finalization retries idempotently and then rolls back unreferenced promoted
+objects. Native video keeps the existing Bunny TUS limits and resume behavior,
+but its server-issued session and asset identity belong to the draft.
+Expiry/abandon cleanup removes private Storage objects and eligible Bunny
+assets without touching a published Pin.
+
+### Idempotent finalization
+
+An authenticated server path validates owner/operator authority, target
+version, category visibility, media readiness, normalized metadata, and the
+draft idempotency key. It then performs one transaction that:
+
+1. inserts a new canonical `shadow_pin_images` row or atomically swaps an
+   existing Pin's ready media/metadata;
+2. attaches its tags;
+3. records the published Pin on the draft/asset ledger; and
+4. makes repeat finalization return the same Pin.
+
+The existing ready-state notification trigger stays authoritative. A new Pin
+fans out only once when it first becomes ready; drafts and edits never fan out.
+The production frontend continues using its existing direct-create API and
+does not need to understand Creator Studio objects.
+
+The canonical Pin stores a nullable unique `creator_draft_id` receipt. Draft
+states are `editing`, `uploading`, `processing`, `ready`,
+`preparing_publish`, `publish_ready`, `published`, `failed`, and `abandoned`;
+asset states are `reserved`, `uploading`, `processing`, `ready`,
+`publish_ready`, `failed`, `superseded`, and `deleted`. Finalization requires
+the active asset to be `publish_ready`, the caller's expected draft revision,
+and the draft idempotency key.
+
+### Client model
+
+The Creator Studio feature is lazy-loaded. A typed reducer/model owns the four
+stages, validation, dirty/autosave state, upload progress, recoverable errors,
+and publish success. Request versions prevent late autosave responses from
+replacing newer local state. A device-local snapshot may provide immediate
+offline resilience, but the owner-private server draft is authoritative once
+synced. Browser `File` objects are never described as persistable; if an asset
+was not staged before reload, the Studio explicitly requests reselection.
+
+Studio history uses its own marker. An in-app open pushes one Studio entry and
+closing it uses Back. A cold `?studio=creator` route is replace-marked and
+closes by removing the Studio parameter. The current stage is recovered from
+the device-local snapshot rather than the URL. Private titles, descriptions,
+tags, and source URLs never enter the address bar.
+
+## Security And Privacy
+
+- Draft and asset rows are owner-private under RLS. `PUBLIC` and `anon` have no
+  table or function access; one member cannot read or mutate a guessed draft.
+- The asset ledger is server-owned. Authenticated members cannot set provider,
+  path, processing, ready, published, or cleanup fields directly.
+- The staging bucket is private, accepts only the established MIME/size limits,
+  and exposes previews through short owner-authorized signed URLs.
+- Server media paths recheck the authenticated user, draft ownership,
+  creator/operator edit authority, category availability, rate limits, and
+  target optimistic version at every sensitive transition.
+- Public URL import retains safe-fetch redirect, DNS/IP, MIME, and byte-limit
+  protections. Provider credentials and service-role keys remain server-only.
+- Autosave does not consume the public 12-per-minute or 100-per-day post
+  budget. Final publication does, and concurrent finalizers converge on the
+  same result.
+- Safe error codes may be stored for recovery; secrets, provider responses,
+  signed URLs, and private profile data must not be persisted as member-facing
+  error text.
+
+## Accessibility And Comfort
+
+- Render through a body portal with dialog semantics, focus trap, Escape,
+  focus restoration, body scroll lock, and visible labels for stage and save
+  state.
+- Use the shared visual-viewport height and safe-area insets. The active field
+  and fixed actions must remain reachable above iPhone and Android software
+  keyboards at 130% text.
+- Controls meet the shared phone touch baseline and Comfort large-control
+  setting. Progress and validation never rely on color alone.
+- Upload/publish status uses a polite live region; failure gets focus without
+  repeatedly interrupting assistive technology.
+- Stage and progress motion consumes `useComfortPreferences`; no new direct
+  media-query, vibration, audio, or autoplay checks are introduced.
+- Preview media follows the shared autoplay preference and remains fully
+  understandable when playback is disabled.
+
+## Verification Gate
+
+### Model And Component
+
+- Four-stage transitions, validation, dirty/save/error state, progress
+  normalization, and success handoff are deterministic.
+- Debounced autosave ignores stale responses, survives reload/offline state,
+  handles conflicts, and requests media reselection only when staging never
+  completed.
+- Every entry point prepopulates the same Studio model; the legacy mini share
+  dialog is not a second publisher.
+- File/URL exclusion, image/video boundaries, video duration, unsafe URL,
+  category disappearance, tag normalization/limits, preview, confirmation,
+  retry, cancel, edit, and replacement are covered.
+- Focus trap/restoration, keyboard operation, live progress, reduced motion,
+  130% text, and large controls have component assertions.
+
+### Database And Server
+
+- Clean local replay, database lint/advisors, least grants, and function
+  catalog checks pass.
+- Anonymous and cross-owner draft/asset access is denied; authenticated callers
+  cannot forge server-owned ledger state.
+- Drafts are absent from every consumer read/search/score/activity/notification
+  path. Ready-stage image assets remain private and use owner-signed previews;
+  any promoted public objects left unreferenced by a failed finalization are
+  rolled back.
+- Repeated/concurrent finalization returns one Pin and one eligible new-post
+  event. Autosave, preview, edit, move, replacement, and retry do not create an
+  event.
+- Stale target, deleted category, revoked auth, block boundary, expired draft,
+  invalid/failed media, and rate-limit cases fail safely.
+- Replacement failure leaves the old public media unchanged; successful swap
+  schedules old-asset cleanup only after commit.
+
+### Browser And Two-account
+
+- Pixel Chromium `412x915` and iPhone WebKit `390x844` cover all entry points,
+  draft recovery, image/short-video/URL preview, category and tags, publish
+  confirmation, progress, retry, success Theater handoff, Back/cold close,
+  safe areas, keyboard compression, reduced motion, and no horizontal overflow
+  or console/page errors.
+- Account A's draft, signed preview, and staged ids are invisible to Account B.
+  On publish, B receives exactly one visible Pin and one eligible notification;
+  exact routing opens it. A later edit/move/replacement produces no second
+  new-post event.
+- While A stages or retries replacement, B continuously sees the old media.
+  Failed replacement preserves it; successful replacement changes it once.
+- Test cleanup confirms removal of every draft, Pin, notification, private and
+  live Storage/derivative object, and Bunny asset created by the run.
+
+Physical installed-PWA checks remain required for the real camera/library
+picker, iPhone/Android keyboard and safe areas, background upload/resume,
+VoiceOver, and TalkBack. Automated WebKit is not that certification.
+
+## Operational Rules
+
+- Apply the additive draft/asset migration, create the private bucket, and
+  deploy the media functions before exposing the Studio frontend.
+- Do not deploy the Studio against a backend that lacks idempotent finalize or
+  owner-private draft enforcement.
+- Do not use production Pin publication as casual smoke data: a ready new Pin
+  can notify every eligible other member.
+- Keep old direct-create and read contracts intact until production adopts the
+  Studio.
+- Cleanup workers must distinguish abandoned staged assets from canonical live
+  assets and fail closed on uncertain ownership/publication state.
+
+Canonical backend migration:
+`supabase/migrations/20260713003323_shadow_pin_creator_studio_backend.sql`.
+
+Canonical member RPCs:
+
+- `create_shadow_pin_creator_draft`
+- `update_shadow_pin_creator_draft`
+- `list_my_shadow_pin_creator_drafts`
+- `delete_shadow_pin_creator_draft`
+- `finalize_shadow_pin_creator_draft`
