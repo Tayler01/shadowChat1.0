@@ -31,6 +31,7 @@ import {
   resolveDMRouteMutation,
   resolvePlayRouteMutation,
   resolvePinRouteMutation,
+  shouldPersistDMPanelInUrl,
   type AppLocationState as LocationState,
   type DMHistoryLayer,
   type DMRouteAction,
@@ -550,7 +551,7 @@ function App() {
       } else {
         url.searchParams.delete('message')
       }
-      if (currentView === 'dms' && dmTarget && dmPanel) {
+      if (dmPanel && shouldPersistDMPanelInUrl({ view: currentView, conversation: dmTarget, panel: dmPanel })) {
         url.searchParams.set('panel', dmPanel)
       } else if (currentView !== 'pins') {
         url.searchParams.delete('panel')

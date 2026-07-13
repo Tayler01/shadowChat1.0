@@ -14,6 +14,16 @@ export type AppLocationState = {
   playItem: string | null
 }
 
+export const shouldPersistDMPanelInUrl = ({
+  view,
+  conversation,
+  panel,
+}: {
+  view: AppView
+  conversation: string | null
+  panel: AppLocationState['dmPanel']
+}) => view === 'dms' && Boolean(panel) && (panel === 'connections' || Boolean(conversation))
+
 export type ChatThreadRouteAction = 'push-thread' | 'replace-thread' | 'close-thread'
 export type ChatThreadHistoryLayer = 'chat-thread' | null
 export type ChatThreadRouteMutation =

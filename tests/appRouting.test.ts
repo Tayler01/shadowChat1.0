@@ -6,6 +6,7 @@ import {
   resolveDMRouteMutation,
   resolvePinRouteMutation,
   resolvePlayRouteMutation,
+  shouldPersistDMPanelInUrl,
 } from '../src/lib/appRouting'
 
 test('paused board and legacy news routes fall back to chat', () => {
@@ -386,6 +387,13 @@ test('DM panel URL state is typed and ignores unknown panels', () => {
     conversation: null,
     dmPanel: 'connections',
   })
+})
+
+test('DM URL synchronization preserves the conversation-independent Connections panel', () => {
+  expect(shouldPersistDMPanelInUrl({ view: 'dms', conversation: null, panel: 'connections' })).toBe(true)
+  expect(shouldPersistDMPanelInUrl({ view: 'dms', conversation: 'dm-1', panel: 'search' })).toBe(true)
+  expect(shouldPersistDMPanelInUrl({ view: 'dms', conversation: null, panel: 'search' })).toBe(false)
+  expect(shouldPersistDMPanelInUrl({ view: 'chat', conversation: null, panel: 'connections' })).toBe(false)
 })
 
 test('ShadowPin viewer and comments layers are recovered from typed URL state', () => {

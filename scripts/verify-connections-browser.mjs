@@ -3,10 +3,11 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { createClient } from '@supabase/supabase-js'
-import { chromium, webkit } from 'playwright'
+import { chromium, devices, webkit } from 'playwright'
 
 const repoRoot = process.cwd()
 const artifactDir = path.join(repoRoot, 'output', 'playwright', 'wave3-connections')
+const npxCliPath = path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js')
 const connectionEventTypes = ['connection_request', 'connection_accepted', 'connection_changed']
 
 const parseEnvFile = async filePath => {
@@ -65,8 +66,7 @@ if (env.PLAYWRIGHT_EXPECTED_SUPABASE_PROJECT_REF) {
 const resolveServiceRoleKey = () => {
   const configured = env.PLAYWRIGHT_SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_SERVICE_ROLE_KEY
   if (configured) return configured
-  const executable = process.platform === 'win32' ? 'npx.cmd' : 'npx'
-  const raw = execFileSync(executable, ['supabase', 'projects', 'api-keys', '--project-ref', projectRef, '--output', 'json'], {
+  const raw = execFileSync(process.execPath, [npxCliPath, 'supabase', 'projects', 'api-keys', '--project-ref', projectRef, '--output', 'json'], {
     cwd: repoRoot,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
@@ -201,14 +201,12 @@ const browserProfiles = [
   {
     name: 'pixel-chromium',
     engine: chromium,
-    viewport: { width: 412, height: 915 },
-    userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 Chrome/126 Mobile Safari/537.36',
+    device: devices['Pixel 7'],
   },
   {
     name: 'iphone-webkit',
     engine: webkit,
-    viewport: { width: 390, height: 844 },
-    userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1',
+    device: devices['iPhone 13'],
   },
 ]
 
@@ -231,11 +229,7 @@ const dismissTransientUi = async page => {
 const launchControlledPage = async (browserProfile, accountIndex) => {
   const browser = await browserProfile.engine.launch({ headless: true })
   const context = await browser.newContext({
-    viewport: browserProfile.viewport,
-    userAgent: browserProfile.userAgent,
-    deviceScaleFactor: 1,
-    isMobile: true,
-    hasTouch: true,
+    ...browserProfile.device,
     serviceWorkers: 'block',
   })
   const page = await context.newPage()
@@ -272,10 +266,15 @@ const launchControlledPage = async (browserProfile, accountIndex) => {
   })
 
   await page.goto(`${baseUrl}/?view=dms`, { waitUntil: 'domcontentloaded' })
-  await page.waitForFunction(() => {
-    const text = document.body?.innerText || ''
-    return text.includes('Sign in') || text.includes('Search conversations')
-  }, null, { timeout: 30_000 })
+  try {
+    await page.waitForFunction(() => {
+      const text = document.body?.innerText || ''
+      return text.includes('Sign in') || text.includes('Search conversations')
+    }, null, { timeout: 30_000 })
+  } catch (error) {
+    const bodyText = (await page.locator('body').innerText().catch(() => '')).replace(/\s+/gu, ' ').trim().slice(0, 240)
+    throw new Error(`${browserProfile.name} app readiness timed out at ${page.url()}${bodyText ? `; visible text: ${bodyText}` : '; no visible text'}`, { cause: error })
+  }
   const signIn = page.locator('form').getByRole('button', { name: /^Sign in$/iu })
   if (await signIn.isVisible().catch(() => false)) {
     await page.locator('input[name="email"]').fill(credentials[accountIndex].email)
@@ -321,7 +320,11 @@ const openConnections = async page => {
   await button.click()
   const hub = page.getByTestId('connections-hub')
   await hub.waitFor({ timeout: 15_000 })
-  await page.waitForFunction(() => new URL(window.location.href).searchParams.get('panel') === 'connections')
+  try {
+    await page.waitForURL(url => url.searchParams.get('panel') === 'connections', { timeout: 10_000 })
+  } catch (error) {
+    throw new Error(`Connections hub opened without its exact route; current URL is ${page.url()}`, { cause: error })
+  }
   return hub
 }
 
