@@ -11,16 +11,19 @@ suites and 107 tests. The hardening backend gate also passes a fresh local
 reset, expanded rollback verifier, database lint/advisors, Deno/Node checks,
 and 3 focused suites with 21 tests.
 
-The final two-account image workflow passed against immutable isolated Netlify
-deploy `6a547e5dd6c68d5f16aba9da` on Pixel Chromium `412x915` and iPhone WebKit
-`390x844`. It proved viewport geometry, owner-private draft/asset reads,
-owner-signed private preview recovery after save/reload, idempotent one-Pin
-publication, one eligible recipient notification plus realtime toast, exact
-Pin Theater visibility, and return to the ShadowPin origin with zero
-console/page/media-API errors. Cleanup removed the one draft, one asset, one
-canonical Pin, all linked notifications/activity/analytics rows, three private
-objects, and three public objects; every scoped remaining count was zero.
-Evidence is in
+The expanded two-account workflow passed against final immutable isolated
+Netlify deploy `6a549b1e052c56307d851b7d` on Pixel Chromium `412x915` and
+iPhone WebKit `390x844`. Nineteen recorded checks cover every entry point,
+image and URL staging, local short-video selection/metadata, retry recovery,
+owner-private draft/asset reads, signed preview recovery, one idempotent Pin,
+one eligible recipient notification plus realtime toast, exact Theater
+routing, and atomic edit/category-move/media replacement. The run exposed and
+fixed a preview-order regression where an existing poster masked the newly
+selected replacement blob; the focused component regression and exact deploy
+both pass. Cleanup removed four drafts, five assets, one Pin, all linked
+notification/activity/analytics rows, nine private objects, seven public
+objects, the temporary Chat/DM rows, and two temporary categories; every scoped
+remaining count was zero. Evidence is in
 `output/playwright/wave2-candidate3-creator-studio/summary.json`.
 
 Linked history/dry-run and the combined Wave Two regression gate remain
@@ -256,6 +259,8 @@ tags, and source URLs never enter the address bar.
   new-post event.
 - While A stages or retries replacement, B continuously sees the old media.
   Failed replacement preserves it; successful replacement changes it once.
+- A newly selected replacement blob takes preview precedence over the existing
+  poster while the canonical public media remains unchanged until finalization.
 - Test cleanup confirms removal of every draft, Pin, notification, private and
   live Storage/derivative object, and Bunny asset created by the run.
 

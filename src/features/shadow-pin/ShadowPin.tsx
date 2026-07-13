@@ -3248,6 +3248,7 @@ function ShadowPinCategoryScreen({
   onBack,
   tracker,
   initialImage,
+  routedImageId,
   initialNeighbors,
   initialCommentId,
   initialPanel,
@@ -3260,6 +3261,7 @@ function ShadowPinCategoryScreen({
   onBack: () => void
   tracker: ShadowPinActivityTracker
   initialImage?: ShadowPinImage | null
+  routedImageId?: string
   initialNeighbors?: ShadowPinImage[]
   initialCommentId?: string
   initialPanel?: 'viewer' | 'comments'
@@ -3491,6 +3493,15 @@ function ShadowPinCategoryScreen({
     ),
     [coldExactViewer, imagesState.images, initialImage, initialNeighbors, viewerImage, viewerSessionImages]
   )
+
+  useEffect(() => {
+    if (routedImageId) return
+
+    openedInitialTargetRef.current = null
+    setCommentsImage(current => current ? null : current)
+    setViewerSessionImages(current => current.length > 0 ? [] : current)
+    setModal(current => current?.type === 'image-viewer' ? null : current)
+  }, [routedImageId])
 
   useEffect(() => {
     if (!initialImage) {
@@ -3822,6 +3833,7 @@ export function ShadowPin({
         }}
         tracker={tracker}
         initialImage={initialImage}
+        routedImageId={initialImageId}
         initialNeighbors={initialNeighbors}
         initialCommentId={initialCommentId}
         initialPanel={initialPanel}

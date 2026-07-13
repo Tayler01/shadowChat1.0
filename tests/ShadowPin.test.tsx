@@ -1,6 +1,7 @@
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ShadowPin } from '../src/features/shadow-pin/ShadowPin'
 import { ShadowPinGoldPinBadge } from '../src/features/shadow-pin/components/ShadowPinGoldPinBadge'
+import * as shadowPinApi from '../src/features/shadow-pin/api/shadowPinApi'
 
 const mockUseShadowPinCategories = jest.fn()
 const mockUseShadowPinImages = jest.fn()
@@ -2056,6 +2057,34 @@ test('ShadowPin image single tap opens Theater with accessible engagement contro
     expect(within(screen.getByTestId('shadow-pin-theater')).getByRole('button', { name: /heart pin two, 0 hearts/i })).toHaveAttribute('aria-pressed', 'false')
   } finally {
     jest.useRealTimers()
+  }
+})
+
+test('removing the routed Pin closes a locally opened Theater before route lookup resolves', async () => {
+  const onPinRoute = jest.fn()
+  const fetchSpy = jest.spyOn(shadowPinApi, 'fetchShadowPinImage')
+    .mockImplementation(() => new Promise(() => undefined))
+
+  try {
+    const { rerender } = render(<ShadowPin onBack={() => {}} onPinRoute={onPinRoute} />)
+
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+    openPinFromCard(imageCard!)
+    expect(screen.getByRole('dialog', { name: 'Pin one' })).toBeInTheDocument()
+    expect(onPinRoute).toHaveBeenCalledWith('push-viewer', 'one')
+
+    rerender(<ShadowPin onBack={() => {}} onPinRoute={onPinRoute} initialImageId="one" />)
+    rerender(<ShadowPin onBack={() => {}} onPinRoute={onPinRoute} />)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Pin one' })).not.toBeInTheDocument()
+    })
+    expect(screen.getByRole('list', { name: 'ShadowPin pin masonry grid' })).toBeInTheDocument()
+    expect(onPinRoute).toHaveBeenCalledTimes(1)
+  } finally {
+    fetchSpy.mockRestore()
   }
 })
 

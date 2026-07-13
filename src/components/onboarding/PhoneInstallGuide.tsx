@@ -30,10 +30,10 @@ interface PhoneInstallGuideProps {
 
 const SHADOCHAT_URL = 'https://shadochat.online'
 
-const tutorialVideos: Record<PhonePlatform, { label: string; src: string }> = {
+const tutorialVideos: Record<PhonePlatform, { label: string; src: string | null }> = {
   ios: {
-    label: 'Phone setup video',
-    src: '/tutorials/shadochat-setup-android.mp4',
+    label: 'iPhone setup steps',
+    src: null,
   },
   android: {
     label: 'Android setup video',
@@ -71,14 +71,14 @@ export function PhoneInstallGuide({
   onInstall,
 }: PhoneInstallGuideProps) {
   const [platform, setPlatform] = useState<PhonePlatform>(() => getDefaultPlatform())
-  const [videoUnavailable, setVideoUnavailable] = useState(false)
+  const [videoUnavailable, setVideoUnavailable] = useState(() => tutorialVideos[getDefaultPlatform()].src === null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const dialogRef = useDialogAccessibility({ open, onClose })
   const androidCanPrompt = platform === 'android' && canInstall
   const tutorial = tutorialVideos[platform]
 
   useEffect(() => {
-    setVideoUnavailable(false)
+    setVideoUnavailable(tutorialVideos[platform].src === null)
   }, [platform])
 
   useEffect(() => {
@@ -211,12 +211,16 @@ export function PhoneInstallGuide({
         <div className="flex min-h-0 flex-1 flex-col gap-3 px-4 pt-3 sm:px-6 sm:pt-5">
           <div
             data-testid="phone-install-video-stage"
-            className="flex min-h-0 flex-1 items-center justify-center"
+            className={tutorial.src
+              ? 'flex min-h-0 flex-1 items-center justify-center'
+              : 'shrink-0'}
           >
-            <div className="aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden rounded-[calc(var(--radius-lg)+4px)] border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(215,170,70,0.34),rgba(215,170,70,0.08))] p-1 shadow-[0_18px_46px_rgba(0,0,0,0.38),0_0_32px_rgba(215,170,70,0.12)]">
+            <div className={tutorial.src
+              ? 'aspect-[9/16] h-full max-h-full w-auto max-w-full overflow-hidden rounded-[calc(var(--radius-lg)+4px)] border border-[var(--border-glow)] bg-[linear-gradient(180deg,rgba(215,170,70,0.34),rgba(215,170,70,0.08))] p-1 shadow-[0_18px_46px_rgba(0,0,0,0.38),0_0_32px_rgba(215,170,70,0.12)]'
+              : 'w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--border-glow)] bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.16),rgba(5,6,7,0.95)_70%)]'}>
               <div className="h-full overflow-hidden rounded-[var(--radius-lg)] bg-black">
                 <div className="relative h-full">
-                  {!videoUnavailable ? (
+                  {!videoUnavailable && tutorial.src ? (
                     <video
                       key={platform}
                       ref={videoRef}
@@ -232,10 +236,10 @@ export function PhoneInstallGuide({
                       onError={() => setVideoUnavailable(true)}
                     />
                   ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.16),rgba(5,6,7,0.95)_44%,#000)] p-6 text-center">
+                    <div className={`flex h-full items-center justify-center gap-3 text-center ${tutorial.src ? 'flex-col bg-[radial-gradient(circle_at_top,rgba(215,170,70,0.16),rgba(5,6,7,0.95)_44%,#000)] p-6' : 'p-4'}`}>
                       <Smartphone className="h-10 w-10 text-[var(--text-gold)]" />
-                      <p className="text-sm font-semibold text-[var(--text-primary)]">Video preview is unavailable.</p>
-                      <p className="text-xs leading-5 text-[var(--text-muted)]">Use the setup steps below.</p>
+                      <div><p className="text-sm font-semibold text-[var(--text-primary)]">{platform === 'ios' ? 'Follow the iPhone steps below.' : 'Video preview is unavailable.'}</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{platform === 'ios' ? 'In Safari, use Share, then Add to Home Screen.' : 'Use the setup steps below.'}</p></div>
                     </div>
                   )}
                 </div>
@@ -243,7 +247,14 @@ export function PhoneInstallGuide({
             </div>
           </div>
 
-          <details className="shrink-0 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3 sm:hidden">
+          {!tutorial.src ? (
+            <div
+              data-testid="phone-install-scroll-details"
+              className="max-h-[42dvh] shrink-0 overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3 pr-1 sm:hidden"
+            >
+              {renderStepCards()}
+            </div>
+          ) : <details className="shrink-0 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-3 sm:hidden">
             <summary className="cursor-pointer text-sm font-semibold text-[var(--text-primary)]">
               Setup steps
             </summary>
@@ -253,7 +264,7 @@ export function PhoneInstallGuide({
             >
               {renderStepCards()}
             </div>
-          </details>
+          </details>}
 
           <div
             data-testid="phone-install-scroll-details-desktop"

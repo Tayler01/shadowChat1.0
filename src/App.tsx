@@ -45,6 +45,7 @@ import {
 import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
 import type { ActivityTarget } from './features/activity/activityModel'
+import { FirstRunActivationCoordinator } from './features/activation/FirstRunActivationCoordinator'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -141,6 +142,7 @@ function App() {
   useChannelBanExpirySweep()
   const { scheme, setScheme, mode } = useTheme()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
+  const [activationEnrollment, setActivationEnrollment] = useState<'checking' | 'enrolled' | 'unenrolled'>('checking')
   const [boardsResetKey, setBoardsResetKey] = useState(0)
   const [boardsChatFooterActive, setBoardsChatFooterActive] = useState(false)
   const [gameImmersive, setGameImmersive] = useState(false)
@@ -691,7 +693,12 @@ function App() {
     <WeatherProvider>
       <AppBadgeSync />
       <PushSubscriptionSync />
-      <PhoneInstallOnboarding />
+      <FirstRunActivationCoordinator
+        currentView={currentView}
+        onNavigate={handleViewChange}
+        onEnrollmentStateChange={setActivationEnrollment}
+      />
+      {activationEnrollment === 'unenrolled' && <PhoneInstallOnboarding />}
       <AppReleaseGate />
       <GoldenEggDiscoveryController />
       <HypeCelebrationController />

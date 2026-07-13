@@ -141,7 +141,7 @@ function MediaPreview({
     return <video src={previewUrl} poster={posterUrl || undefined} controls playsInline preload="metadata" className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black object-contain" aria-label={title || 'Draft video preview'} />
   }
 
-  return <img src={posterUrl || previewUrl} alt={title || 'Draft Pin preview'} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black/30 object-contain" />
+  return <img src={objectUrl || posterUrl || previewUrl} alt={title || 'Draft Pin preview'} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black/30 object-contain" />
 }
 
 export function ShadowPinCreatorStudio({

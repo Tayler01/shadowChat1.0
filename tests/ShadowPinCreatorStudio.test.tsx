@@ -179,6 +179,52 @@ test('locks media inputs until initial draft recovery finishes', async () => {
   await waitFor(() => expect(fileInput).toBeEnabled())
 })
 
+test('shows a newly selected replacement file instead of the existing Pin preview', async () => {
+  const originalCreateObjectURL = URL.createObjectURL
+  const originalRevokeObjectURL = URL.revokeObjectURL
+  let unmount: () => void = () => undefined
+  Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: jest.fn(() => 'blob:replacement-preview') })
+  Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: jest.fn() })
+  const targetImage = {
+    id: 'pin-to-replace',
+    creator_id: 'user-1',
+    category_id: 'category-1',
+    title: 'Existing Pin',
+    description: '',
+    tags: [],
+    image_url: 'https://example.com/existing.webp',
+    image_path: 'existing.webp',
+    medium_url: 'https://example.com/existing-medium.webp',
+    media_type: 'image',
+    source_type: 'upload',
+  } as unknown as ShadowPinImage
+
+  try {
+    const view = render(
+      <ShadowPinCreatorStudio
+        open
+        targetImage={targetImage}
+        onClose={jest.fn()}
+        onPublished={jest.fn()}
+      />
+    )
+    unmount = view.unmount
+    const { container } = view
+    const input = container.ownerDocument.querySelector<HTMLInputElement>('input[type="file"]')!
+    await waitFor(() => expect(input).toBeEnabled())
+
+    const replacement = new File(['replacement'], 'neon-nights.webp', { type: 'image/webp' })
+    fireEvent.change(input, { target: { files: [replacement] } })
+
+    await waitFor(() => expect(screen.getByRole('img', { name: 'Existing Pin' })).toHaveAttribute('src', 'blob:replacement-preview'))
+    expect(URL.createObjectURL).toHaveBeenCalledWith(replacement)
+  } finally {
+    unmount()
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: originalCreateObjectURL })
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: originalRevokeObjectURL })
+  }
+})
+
 test('moves through Preview and requires explicit confirmation before publishing', async () => {
   const onClose = jest.fn()
   const onPublished = jest.fn()
