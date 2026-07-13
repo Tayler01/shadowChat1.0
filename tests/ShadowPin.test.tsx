@@ -6,6 +6,8 @@ import * as shadowPinApi from '../src/features/shadow-pin/api/shadowPinApi'
 
 const mockUseShadowPinCategories = jest.fn()
 const mockUseShadowPinImages = jest.fn()
+const mockUseShadowPinFeedMode = jest.fn()
+const mockUseShadowPinConnectionFeed = jest.fn()
 const mockToggleCategoryHeart = jest.fn()
 const mockToggleImageHeart = jest.fn()
 const mockShadowPinActivityTracker = {
@@ -67,6 +69,14 @@ jest.mock('../src/features/shadow-pin/hooks/useShadowPinCategories', () => ({
 
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinImages', () => ({
   useShadowPinImages: () => mockUseShadowPinImages(),
+}))
+
+jest.mock('../src/features/shadow-pin/hooks/useShadowPinFeedMode', () => ({
+  useShadowPinFeedMode: () => mockUseShadowPinFeedMode(),
+}))
+
+jest.mock('../src/features/shadow-pin/hooks/useShadowPinConnectionFeed', () => ({
+  useShadowPinConnectionFeed: () => mockUseShadowPinConnectionFeed(),
 }))
 
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinActivityTracker', () => ({
@@ -182,6 +192,25 @@ beforeEach(() => {
     viewer_has_hearted: !fallback.viewer_has_hearted,
   } : undefined)
 
+  mockUseShadowPinFeedMode.mockReturnValue({
+    mode: 'discover',
+    loading: false,
+    saveError: null,
+    selectMode: jest.fn(),
+    retrySave: jest.fn(),
+  })
+  mockUseShadowPinConnectionFeed.mockReturnValue({
+    images: [],
+    loading: false,
+    error: null,
+    hasMore: false,
+    acceptedCount: 0,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    toggleHeart: jest.fn(),
+    setCommentCount: jest.fn(),
+  })
+
   mockUseShadowPinCategories.mockReturnValue({
     categories: [category],
     loading: false,
@@ -212,6 +241,152 @@ beforeEach(() => {
     removeImage: jest.fn(),
     toggleHeart: mockToggleImageHeart,
   })
+})
+
+test('Connections mode renders only the Connections feed and preserves its Theater route', () => {
+  const connectionPins = [
+    { ...image('connection-newer', 1200, 900), created_at: '2026-07-13T22:00:00Z' },
+    { ...image('connection-older', 900, 1200), created_at: '2026-07-13T21:00:00Z' },
+  ]
+  const onPinRoute = jest.fn()
+  mockUseShadowPinFeedMode.mockReturnValue({
+    mode: 'connections',
+    loading: false,
+    saveError: null,
+    selectMode: jest.fn(),
+    retrySave: jest.fn(),
+  })
+  mockUseShadowPinConnectionFeed.mockReturnValue({
+    images: connectionPins,
+    loading: false,
+    error: null,
+    hasMore: false,
+    acceptedCount: 1,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    toggleHeart: jest.fn(),
+    setCommentCount: jest.fn(),
+  })
+
+  render(<ShadowPin initialFeedMode="connections" onPinRoute={onPinRoute} />)
+
+  expect(screen.getByTestId('shadow-pin-connections-panel')).toBeInTheDocument()
+  expect(screen.queryByTestId('shadow-pin-discover-panel')).not.toBeInTheDocument()
+  expect(screen.queryByText('Fam & Friends')).not.toBeInTheDocument()
+  const feed = screen.getByRole('list', { name: 'Pins from your Connections' })
+  const firstCard = within(feed).getByAltText('Pin connection-newer').closest('article')
+  expect(firstCard).not.toBeNull()
+  openPinFromCard(firstCard!)
+
+  expect(screen.getByTestId('shadow-pin-theater')).toBeInTheDocument()
+  expect(onPinRoute).toHaveBeenCalledWith('push-viewer', 'connection-newer')
+  fireEvent.click(within(screen.getByTestId('shadow-pin-theater')).getByRole('button', { name: /0 comments\. open comments/i }))
+  expect(screen.getByLabelText('Add a ShadowPin comment')).toBeInTheDocument()
+  expect(onPinRoute).toHaveBeenCalledWith('push-comments', 'connection-newer')
+})
+
+test('Connections mode keeps universal ShadowPin search usable', async () => {
+  mockUseShadowPinFeedMode.mockReturnValue({
+    mode: 'connections',
+    loading: false,
+    saveError: null,
+    selectMode: jest.fn(),
+    retrySave: jest.fn(),
+  })
+
+  render(<ShadowPin initialFeedMode="connections" />)
+  fireEvent.click(screen.getByRole('button', { name: 'Open category search' }))
+
+  const searchInput = await screen.findByRole('searchbox', { name: 'Search all of ShadowPin' })
+  expect(searchInput).toBeVisible()
+  expect(screen.getByTestId('shadow-pin-connections-panel')).toBeInTheDocument()
+})
+
+test('Connections Theater fails closed when its creator is disconnected', () => {
+  const connectionPin = image('connection-revoked', 1200, 900)
+  const onFeedModeChange = jest.fn()
+  mockUseShadowPinFeedMode.mockReturnValue({
+    mode: 'connections',
+    loading: false,
+    saveError: null,
+    selectMode: jest.fn(),
+    retrySave: jest.fn(),
+  })
+  mockUseShadowPinConnectionFeed.mockReturnValue({
+    images: [connectionPin],
+    loading: false,
+    error: null,
+    hasMore: false,
+    acceptedCount: 1,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    toggleHeart: jest.fn(),
+    setCommentCount: jest.fn(),
+  })
+
+  render(<ShadowPin initialFeedMode="connections" onFeedModeChange={onFeedModeChange} />)
+  const card = screen.getByAltText('Pin connection-revoked').closest('article')
+  expect(card).not.toBeNull()
+  openPinFromCard(card!)
+  expect(screen.getByTestId('shadow-pin-theater')).toBeInTheDocument()
+
+  act(() => {
+    window.dispatchEvent(new CustomEvent('shadowchat:connections-changed', {
+      detail: { targetUserId: 'user-2', state: 'none' },
+    }))
+  })
+
+  expect(screen.queryByTestId('shadow-pin-theater')).not.toBeInTheDocument()
+  expect(onFeedModeChange).toHaveBeenCalledWith('discover')
+})
+
+test('a cold ineligible Connections target falls back to its normal RLS-visible Pin route', async () => {
+  const fallbackPin = image('connection-fallback', 1200, 900)
+  const onFeedModeChange = jest.fn()
+  const windowSpy = jest.spyOn(shadowPinApi, 'fetchMyShadowPinConnectionFeedWindow')
+    .mockResolvedValue({ target: null, images: [] })
+  const exactSpy = jest.spyOn(shadowPinApi, 'fetchShadowPinImage').mockResolvedValue(fallbackPin)
+
+  try {
+    render(
+      <ShadowPin
+        initialFeedMode="connections"
+        initialImageId={fallbackPin.id}
+        onFeedModeChange={onFeedModeChange}
+      />
+    )
+
+    await waitFor(() => expect(onFeedModeChange).toHaveBeenCalledWith('discover'))
+    await waitFor(() => expect(screen.getByTestId('shadow-pin-theater')).toBeInTheDocument())
+    expect(windowSpy).toHaveBeenCalledWith(fallbackPin.id)
+    expect(exactSpy).toHaveBeenCalledWith(fallbackPin.id)
+  } finally {
+    windowSpy.mockRestore()
+    exactSpy.mockRestore()
+  }
+})
+
+test('Connections empty states distinguish no relationships from no eligible Pins', () => {
+  const selectMode = jest.fn()
+  mockUseShadowPinFeedMode.mockReturnValue({
+    mode: 'connections',
+    loading: false,
+    saveError: null,
+    selectMode,
+    retrySave: jest.fn(),
+  })
+
+  const { rerender } = render(<ShadowPin initialFeedMode="connections" />)
+  expect(screen.getByText('Your Connections feed is waiting')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'View Discover' }))
+  expect(selectMode).toHaveBeenCalledWith('discover')
+
+  mockUseShadowPinConnectionFeed.mockReturnValue({
+    ...mockUseShadowPinConnectionFeed(),
+    acceptedCount: 2,
+  })
+  rerender(<ShadowPin initialFeedMode="connections" />)
+  expect(screen.getByText('No new Pins from your Connections')).toBeInTheDocument()
 })
 
 test('shows an exploding heart burst when liking a ShadowPin category', async () => {

@@ -31,11 +31,13 @@ import {
   resolveDMRouteMutation,
   resolvePlayRouteMutation,
   resolvePinRouteMutation,
+  resolvePinFeedModeMutation,
   shouldPersistDMPanelInUrl,
   type AppLocationState as LocationState,
   type DMHistoryLayer,
   type DMRouteAction,
   type PinHistoryLayer,
+  type PinFeedMode,
   type PinRouteAction,
   type PlayExperience,
   type PlayHistoryLayer,
@@ -116,6 +118,7 @@ const getInitialLocationState = (): LocationState => {
       pin: null,
       comment: null,
       pinPanel: null,
+      pinFeed: null,
       playExperience: null,
       playItem: null,
     }
@@ -159,6 +162,7 @@ function App() {
   const [pinTarget, setPinTarget] = useState<string | null>(() => getInitialLocationState().pin)
   const [commentTarget, setCommentTarget] = useState<string | null>(() => getInitialLocationState().comment)
   const [pinPanel, setPinPanel] = useState<'viewer' | 'comments' | null>(() => getInitialLocationState().pinPanel)
+  const [pinFeed, setPinFeed] = useState<'connections' | null>(() => getInitialLocationState().pinFeed)
   const [playExperience, setPlayExperience] = useState<PlayExperience | null>(() => getInitialLocationState().playExperience)
   const [playItem, setPlayItem] = useState<string | null>(() => getInitialLocationState().playItem)
   const isDarkMode = mode === 'dark'
@@ -280,6 +284,7 @@ function App() {
     setPinTarget(locationState.pin)
     setCommentTarget(locationState.comment)
     setPinPanel(locationState.pinPanel)
+    setPinFeed(locationState.pinFeed)
     setPlayExperience(locationState.playExperience)
     setPlayItem(locationState.playItem)
   }, [])
@@ -375,6 +380,16 @@ function App() {
     }
     applyLocationState(getLocationStateFromUrl(mutation.url))
   }
+
+  const handlePinFeedModeChange = useCallback((mode: PinFeedMode) => {
+    if (typeof window === 'undefined') return
+    const mutation = resolvePinFeedModeMutation({
+      currentUrl: new URL(window.location.href),
+      mode,
+    })
+    window.history.replaceState(window.history.state ?? {}, '', mutation.url)
+    applyLocationState(getLocationStateFromUrl(mutation.url))
+  }, [applyLocationState])
 
   const handleChatThreadRoute = (
     action: ChatThreadRouteAction,
@@ -538,6 +553,7 @@ function App() {
       url.searchParams.delete('panel')
       url.searchParams.delete('experience')
       url.searchParams.delete('item')
+      url.searchParams.delete('feed')
     } else {
       url.searchParams.set('view', currentView)
       url.searchParams.delete('thread')
@@ -571,6 +587,11 @@ function App() {
       } else if (currentView !== 'dms') {
         url.searchParams.delete('panel')
       }
+      if (currentView === 'pins' && pinFeed === 'connections') {
+        url.searchParams.set('feed', 'connections')
+      } else {
+        url.searchParams.delete('feed')
+      }
       if (currentView === 'games' && playExperience) {
         url.searchParams.set('experience', playExperience)
         if (playItem) url.searchParams.set('item', playItem)
@@ -582,7 +603,7 @@ function App() {
     }
 
     window.history.replaceState(window.history.state ?? {}, '', url)
-  }, [currentView, dmTarget, dmPanel, messageTarget, threadTarget, pinTarget, commentTarget, pinPanel, playExperience, playItem])
+  }, [currentView, dmTarget, dmPanel, messageTarget, threadTarget, pinTarget, commentTarget, pinPanel, pinFeed, playExperience, playItem])
 
   useEffect(() => {
     if (currentView !== 'boards') {
@@ -668,7 +689,9 @@ function App() {
             initialImageId={pinTarget || undefined}
             initialCommentId={commentTarget || undefined}
             initialPanel={pinPanel || undefined}
+            initialFeedMode={pinFeed || undefined}
             onPinRoute={handlePinRoute}
+            onFeedModeChange={handlePinFeedModeChange}
           />
         )
       case 'settings':

@@ -139,13 +139,14 @@ Full contract:
 
 ## Candidate 2 Direction - ShadowPin Feed Modes
 
-Candidate 2 begins only after the Connections contract is implemented and
-accepted. Feed Modes will use accepted, unblocked Connections through the
-canonical pair predicate. It must preserve current ShadowPin RLS, blocks,
-ready/deleted visibility, search, Theater routing, engagement, Creator Studio,
-notification, and ranking contracts. Its exact modes, ordering, fallback,
-empty-state, pagination, and preference persistence receive a separate
-approved contract before implementation.
+Candidate 2 is active after the accepted Connections checkpoint. Feed Modes
+uses accepted, unblocked Connections through the canonical pair predicate and
+preserves current ShadowPin RLS, blocks, ready/deleted visibility, search,
+engagement, Creator Studio, notification, and Discover behavior. The exact
+two-mode, chronological ordering, no-fallback empty state, keyset pagination,
+account preference, Connections-scoped Theater, accessibility, and cleanup
+contract is locked in
+[docs/SHADOW_PIN_FEED_MODES.md](C:/repos/chat2.0/docs/SHADOW_PIN_FEED_MODES.md:1).
 
 ## Candidate 3 Direction - Inner Circles
 

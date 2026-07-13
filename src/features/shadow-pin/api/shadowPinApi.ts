@@ -10,6 +10,10 @@ import type {
   ShadowPinComment,
   ShadowPinImage,
   ShadowPinImageFormValues,
+  ShadowPinFeedCursor,
+  ShadowPinFeedMode,
+  ShadowPinFeedPage,
+  ShadowPinFeedPreference,
 } from '../types'
 import { embedPublicProfile } from '../../../../supabase/functions/_shared/public-profile'
 import {
@@ -265,6 +269,134 @@ export async function fetchShadowPinImages(categoryId: string, page = 0) {
   return {
     images: attachImageHearts(images, hearts ?? []),
     hasMore: images.length === SHADOW_PIN_PAGE_SIZE,
+  }
+}
+
+type ShadowPinFeedIdRow = {
+  image_id: string
+  created_at: string
+  viewer_has_hearted: boolean
+  has_more?: boolean
+  window_position?: 'newer' | 'target' | 'older'
+}
+
+const normalizeShadowPinFeedMode = (value: unknown): ShadowPinFeedMode => (
+  value === 'connections' ? 'connections' : 'discover'
+)
+
+const fetchShadowPinImagesByIds = async (
+  imageIds: string[],
+  heartState?: ReadonlyMap<string, boolean>
+) => {
+  if (imageIds.length === 0) return []
+
+  const client = await getWorkingClient()
+  const { data, error } = await client
+    .from('shadow_pin_images')
+    .select(SHADOW_PIN_IMAGE_SELECT)
+    .in('id', imageIds)
+    .is('deleted_at', null)
+  if (error) throw error
+
+  const normalizedById = new Map(
+    ((data ?? []) as unknown as ShadowPinImageRecord[])
+      .map(record => normalizeShadowPinImageRecord(record))
+      .map(image => [image.id, {
+        ...image,
+        viewer_has_hearted: heartState?.get(image.id) ?? Boolean(image.viewer_has_hearted),
+      }])
+  )
+
+  const ordered: ShadowPinImage[] = []
+  imageIds.forEach(imageId => {
+    const image = normalizedById.get(imageId)
+    if (image) ordered.push(image)
+  })
+  return ordered
+}
+
+export async function getMyShadowPinFeedMode(): Promise<ShadowPinFeedPreference> {
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('get_my_shadow_pin_feed_mode')
+  if (error) throw error
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    feed_mode?: unknown
+    revision?: unknown
+    updated_at?: unknown
+  } | null
+
+  return {
+    mode: normalizeShadowPinFeedMode(row?.feed_mode),
+    revision: Math.max(0, Math.trunc(Number(row?.revision) || 0)),
+    updatedAt: typeof row?.updated_at === 'string' ? row.updated_at : null,
+  }
+}
+
+export async function setMyShadowPinFeedMode(mode: ShadowPinFeedMode): Promise<ShadowPinFeedPreference> {
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('set_my_shadow_pin_feed_mode', {
+    target_mode: mode,
+  })
+  if (error) throw error
+  const row = (Array.isArray(data) ? data[0] : data) as {
+    feed_mode?: unknown
+    revision?: unknown
+    updated_at?: unknown
+  } | null
+
+  return {
+    mode: normalizeShadowPinFeedMode(row?.feed_mode),
+    revision: Math.max(0, Math.trunc(Number(row?.revision) || 0)),
+    updatedAt: typeof row?.updated_at === 'string' ? row.updated_at : null,
+  }
+}
+
+export async function fetchMyShadowPinConnectionFeed(
+  cursor?: ShadowPinFeedCursor | null,
+  limit = SHADOW_PIN_PAGE_SIZE
+): Promise<ShadowPinFeedPage> {
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('list_my_shadow_pin_connection_feed', {
+    result_limit: Math.max(1, Math.min(Math.trunc(limit) || SHADOW_PIN_PAGE_SIZE, 60)),
+    before_created_at: cursor?.createdAt ?? null,
+    before_id: cursor?.id ?? null,
+  })
+  if (error) throw error
+
+  const rows = (data ?? []) as ShadowPinFeedIdRow[]
+  const heartState = new Map(rows.map(row => [row.image_id, Boolean(row.viewer_has_hearted)]))
+  const images = await fetchShadowPinImagesByIds(rows.map(row => row.image_id), heartState)
+  const lastRow = rows.length > 0 ? rows[rows.length - 1] : undefined
+
+  return {
+    images,
+    hasMore: Boolean(rows[0]?.has_more),
+    nextCursor: lastRow ? { createdAt: lastRow.created_at, id: lastRow.image_id } : null,
+  }
+}
+
+export async function fetchMyShadowPinConnectionFeedWindow(imageId: string) {
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('get_my_shadow_pin_connection_feed_window', {
+    target_image_id: imageId,
+  })
+  if (error) throw error
+
+  const rows = (data ?? []) as ShadowPinFeedIdRow[]
+  const heartState = new Map(rows.map(row => [row.image_id, Boolean(row.viewer_has_hearted)]))
+  const images = await fetchShadowPinImagesByIds(rows.map(row => row.image_id), heartState)
+  const byId = new Map(images.map(image => [image.id, image]))
+  const targetRow = rows.find(row => row.window_position === 'target')
+
+  const ordered: ShadowPinImage[] = []
+  rows.forEach(row => {
+    const image = byId.get(row.image_id)
+    if (image) ordered.push(image)
+  })
+
+  return {
+    target: targetRow ? byId.get(targetRow.image_id) ?? null : null,
+    images: ordered,
   }
 }
 

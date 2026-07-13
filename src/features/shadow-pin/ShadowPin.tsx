@@ -49,19 +49,29 @@ import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { useComfortPreferences } from '../../hooks/useComfortPreferences'
 import { useOptionalMessages } from '../../hooks/MessagesContext'
 import { getBlockedActionMessage } from '../../lib/moderation'
+import { PERSONAL_BLOCKS_CHANGED_EVENT } from '../../lib/personalBlocking'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { cn } from '../../lib/utils'
 import type { AppView } from '../../types/navigation'
 import type { PinRouteAction } from '../../lib/appRouting'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
-import { fetchShadowPinImage, fetchShadowPinImageNeighbors, searchShadowPinImages } from './api/shadowPinApi'
+import {
+  fetchMyShadowPinConnectionFeedWindow,
+  fetchShadowPinImage,
+  fetchShadowPinImageNeighbors,
+  searchShadowPinImages,
+} from './api/shadowPinApi'
 import { ShadowPinCommentsDialog } from './components/ShadowPinCommentsDialog'
 import { ShadowPinImmersiveViewer } from './components/ShadowPinImmersiveViewer'
 import { buildViewerSequence, createShadowPinPermalink } from './immersiveViewerModel'
 import { useModerationReport } from '../moderation/useModerationReport'
 import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
 import { rankShadowPinCategories } from './categorySearch'
+import { ShadowPinFeedModeTabs } from './components/ShadowPinFeedModeTabs'
+import { useShadowPinConnectionFeed } from './hooks/useShadowPinConnectionFeed'
+import { useShadowPinFeedMode } from './hooks/useShadowPinFeedMode'
+import { CONNECTIONS_CHANGED_EVENT } from '../connections/connectionModel'
 import { hasCreatorStudioQuery } from './creator/creatorHistory'
 import {
   useShadowPinActivityTracker,
@@ -73,11 +83,14 @@ import type {
   ShadowPinCategoryFormValues,
   ShadowPinImage,
   ShadowPinImageFormValues,
+  ShadowPinFeedMode,
 } from './types'
 
 const LazyShadowPinCreatorStudio = lazy(() => import('./creator').then(module => ({
   default: module.ShadowPinCreatorStudio,
 })))
+
+const NOOP_SHADOW_PIN_FEED_MODE_CHANGE = () => {}
 
 type ShadowPinProps = {
   currentView?: AppView
@@ -86,7 +99,9 @@ type ShadowPinProps = {
   initialImageId?: string
   initialCommentId?: string
   initialPanel?: 'viewer' | 'comments'
+  initialFeedMode?: Extract<ShadowPinFeedMode, 'connections'>
   onPinRoute?: (action: PinRouteAction, imageId?: string, commentId?: string) => void
+  onFeedModeChange?: (mode: ShadowPinFeedMode) => void
 }
 
 type ModalMode =
@@ -97,9 +112,10 @@ type ModalMode =
   | { type: 'image-viewer'; image: ShadowPinImage }
   | null
 
-type CategoryListScrollMemory = {
-  scrollTop: number
-  shouldRestore: boolean
+type ShadowPinHomeScrollMemory = {
+  discover: number
+  connections: number
+  restoreMode: ShadowPinFeedMode | null
 }
 
 const getDisplayName = (item: { creator?: ShadowPinCategory['creator'] }) =>
@@ -2527,6 +2543,175 @@ function PinShareSheet({
   )
 }
 
+function ShadowPinMasonryGrid({
+  images,
+  label,
+  testId = 'shadow-pin-feed',
+  onViewer,
+  onEdit,
+  onHeart,
+  onComments,
+  onShare,
+  onShareToGroupChat,
+  onVisible,
+}: {
+  images: ShadowPinImage[]
+  label: string
+  testId?: string
+  onViewer: (image: ShadowPinImage) => void
+  onEdit: (image: ShadowPinImage) => void
+  onHeart: (image: ShadowPinImage) => void
+  onComments: (image: ShadowPinImage) => void
+  onShare: (image: ShadowPinImage) => void
+  onShareToGroupChat?: (image: ShadowPinImage) => Promise<void>
+  onVisible: (image: ShadowPinImage) => void
+}) {
+  const { user } = useAuth()
+  const { role: adminRole } = useAdminAccess({ includeUsers: false })
+  const { shouldAutoplayMedia } = useComfortPreferences()
+  const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
+  const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
+  const [soundVideoId, setSoundVideoId] = useState<string | null>(null)
+  const [playableVisibleVideoCount, setPlayableVisibleVideoCount] = useState(0)
+  const [sharingImageId, setSharingImageId] = useState<string | null>(null)
+  const soundVideoIdRef = useRef<string | null>(null)
+  const videoVisibilityRef = useRef(new Map<string, VideoVisibilitySnapshot>())
+  const skippedVideoIdsRef = useRef(new Set<string>())
+
+  const syncVideoPlaybackState = useCallback((preferOrderedStart: boolean) => {
+    const visibilityMap = videoVisibilityRef.current
+    const playableVideos = getOrderedVisibleVideos(visibilityMap.values(), skippedVideoIdsRef.current)
+    if (!shouldAutoplayMedia) {
+      setPlayableVisibleVideoCount(0)
+      setActiveVideoId(current => current && current === soundVideoIdRef.current ? current : null)
+      return
+    }
+    const nextVideoId = playableVideos[0]?.id ?? null
+    setPlayableVisibleVideoCount(playableVideos.length)
+    setActiveVideoId(current => {
+      if (!nextVideoId) return null
+      const currentPlayable = Boolean(current && playableVideos.some(video => video.id === current))
+      if (!currentPlayable || preferOrderedStart) return nextVideoId
+      return current
+    })
+  }, [shouldAutoplayMedia])
+
+  useEffect(() => {
+    syncVideoPlaybackState(false)
+  }, [shouldAutoplayMedia, syncVideoPlaybackState])
+
+  const updateVideoVisibility = useCallback((visibility: VideoVisibilitySnapshot) => {
+    const visibilityMap = videoVisibilityRef.current
+    const wasVisible = visibilityMap.has(visibility.id)
+    if (visibility.visible) {
+      visibilityMap.set(visibility.id, visibility)
+    } else {
+      visibilityMap.delete(visibility.id)
+      skippedVideoIdsRef.current.delete(visibility.id)
+    }
+    syncVideoPlaybackState(visibility.visible && visibility.playable && !wasVisible)
+  }, [syncVideoPlaybackState])
+
+  const markVideoPlaybackStarted = useCallback((imageId: string) => {
+    if (!skippedVideoIdsRef.current.delete(imageId)) return
+    syncVideoPlaybackState(false)
+  }, [syncVideoPlaybackState])
+
+  const advanceVisibleVideo = useCallback((imageId: string, skipCurrent: boolean) => {
+    const visibilityMap = videoVisibilityRef.current
+    if (skipCurrent && visibilityMap.has(imageId)) skippedVideoIdsRef.current.add(imageId)
+    const skippedVideoIds = skippedVideoIdsRef.current
+    setPlayableVisibleVideoCount(getOrderedVisibleVideos(visibilityMap.values(), skippedVideoIds).length)
+    const nextVideoId = getNextOrderedVisibleVideoId(visibilityMap.values(), imageId, skippedVideoIds)
+    setActiveVideoId(current => current === imageId ? nextVideoId : current)
+  }, [])
+
+  useEffect(() => {
+    soundVideoIdRef.current = soundVideoId
+    setSoundVideoId(current => current && current !== activeVideoId ? null : current)
+  }, [activeVideoId, soundVideoId])
+
+  useEffect(() => {
+    const imageIds = new Set(images.map(image => image.id))
+    for (const imageId of videoVisibilityRef.current.keys()) {
+      if (!imageIds.has(imageId)) videoVisibilityRef.current.delete(imageId)
+    }
+    for (const imageId of skippedVideoIdsRef.current) {
+      if (!imageIds.has(imageId)) skippedVideoIdsRef.current.delete(imageId)
+    }
+    setOverlayImageId(current => current && imageIds.has(current) ? current : null)
+    setActiveVideoId(current => current && imageIds.has(current) ? current : null)
+    setSoundVideoId(current => current && imageIds.has(current) ? current : null)
+  }, [images])
+
+  const masonryColumnCount = useShadowPinMasonryColumnCount()
+  const masonryColumns = useMemo(
+    () => distributeMasonryColumns(images, masonryColumnCount),
+    [images, masonryColumnCount]
+  )
+
+  const shareToGroupChat = async (image: ShadowPinImage) => {
+    if (!onShareToGroupChat) return
+    setSharingImageId(image.id)
+    try {
+      await onShareToGroupChat(image)
+    } finally {
+      setSharingImageId(current => current === image.id ? null : current)
+    }
+  }
+
+  return (
+    <div
+      role="list"
+      aria-label={label}
+      className="grid items-start gap-3"
+      style={{ gridTemplateColumns: `repeat(${masonryColumnCount}, minmax(0, 1fr))` }}
+      data-testid={testId}
+    >
+      {masonryColumns.map((column, columnIndex) => (
+        <div key={columnIndex} className="flex min-w-0 flex-col gap-3">
+          {column.map(image => (
+            <div
+              key={image.id}
+              role="listitem"
+              className="min-w-0"
+              data-testid={`${testId}-card-${image.id}`}
+            >
+              <ImageCard
+                image={image}
+                canManageImage={canManage(image, user?.id, adminRole)}
+                columnSide={getPinColumnSide(columnIndex, masonryColumnCount)}
+                activeVideoId={activeVideoId}
+                soundEnabled={soundVideoId === image.id}
+                loopNativeVideo={playableVisibleVideoCount <= 1}
+                cycleIframeVideo={playableVisibleVideoCount > 1}
+                overlayOpen={overlayImageId === image.id}
+                onToggleOverlay={() => setOverlayImageId(previous => previous === image.id ? null : image.id)}
+                onVideoVisibilityChange={updateVideoVisibility}
+                onVideoPlaybackStarted={markVideoPlaybackStarted}
+                onVideoPlaybackComplete={imageId => advanceVisibleVideo(imageId, false)}
+                onVideoPlaybackUnavailable={imageId => advanceVisibleVideo(imageId, true)}
+                onToggleSound={() => {
+                  setActiveVideoId(image.id)
+                  setSoundVideoId(previous => previous === image.id ? null : image.id)
+                }}
+                onViewer={() => onViewer(image)}
+                onEdit={() => onEdit(image)}
+                onHeart={() => onHeart(image)}
+                onComments={() => onComments(image)}
+                onShare={() => onShare(image)}
+                onShareToGroupChat={onShareToGroupChat ? () => shareToGroupChat(image) : undefined}
+                sharingToGroupChat={sharingImageId === image.id}
+                onVisible={() => onVisible(image)}
+              />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function ImageViewerMedia({
   image,
   muted,
@@ -2701,21 +2886,47 @@ function ShadowPinHome({
   onOpenPin,
   onPublishedPin,
   initialCreatorOpen,
-  categoryListScrollMemory,
+  homeScrollMemory,
+  initialFeedMode,
+  initialImage,
+  initialNeighbors,
+  routedImageId,
+  initialCommentId,
+  initialPanel,
+  onPinRoute,
+  onViewerImageResolved,
+  onFeedModeChange,
   tracker,
 }: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & {
   onOpenCategory: (category: ShadowPinCategory) => void
   onOpenPin: (image: ShadowPinImage) => void
   onPublishedPin: (image: ShadowPinImage) => void
   initialCreatorOpen: boolean
-  categoryListScrollMemory: MutableRefObject<CategoryListScrollMemory>
+  homeScrollMemory: MutableRefObject<ShadowPinHomeScrollMemory>
+  initialFeedMode?: 'connections'
+  initialImage?: ShadowPinImage | null
+  initialNeighbors?: ShadowPinImage[]
+  routedImageId?: string
+  initialCommentId?: string
+  initialPanel?: 'viewer' | 'comments'
+  onPinRoute: (action: PinRouteAction, imageId?: string, commentId?: string) => void
+  onViewerImageResolved: (image: ShadowPinImage) => void
+  onFeedModeChange: (mode: ShadowPinFeedMode) => void
   tracker: ShadowPinActivityTracker
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
+  const messagesApi = useOptionalMessages()
   const categoriesState = useShadowPinCategories()
+  const feedModeState = useShadowPinFeedMode(initialFeedMode ?? null, onFeedModeChange)
+  const connectionsState = useShadowPinConnectionFeed(feedModeState.mode === 'connections')
   const [modal, setModal] = useState<ModalMode>(null)
   const [creatorOpen, setCreatorOpen] = useState(initialCreatorOpen)
+  const [creatorTargetImage, setCreatorTargetImage] = useState<ShadowPinImage | null>(null)
+  const [commentsImage, setCommentsImage] = useState<ShadowPinImage | null>(null)
+  const [viewerSessionImages, setViewerSessionImages] = useState<ShadowPinImage[]>([])
+  const openedInitialTargetRef = useRef<string | null>(null)
+  const viewerEligibilityGenerationRef = useRef(0)
   const [categorySearchVisible, setCategorySearchVisible] = useState(false)
   const [categorySearchQuery, setCategorySearchQuery] = useState('')
   const [pinSearchResults, setPinSearchResults] = useState<ShadowPinImage[]>([])
@@ -2765,8 +2976,210 @@ function ShadowPinHome({
       .catch(err => toast.error(err instanceof Error ? err.message : 'Heart failed'))
   }
 
-  const rememberCategoryScroll = (scrollTop?: number) => {
-    categoryListScrollMemory.current.scrollTop = Math.max(0, scrollTop ?? categoryScrollRef.current?.scrollTop ?? 0)
+  const connectionsViewerImage = modal?.type === 'image-viewer'
+    ? connectionsState.images.find(image => image.id === modal.image.id) ?? modal.image
+    : null
+  const connectionsViewerImages = useMemo(
+    () => buildViewerSequence(
+      [...connectionsState.images, ...(initialNeighbors ?? []), ...viewerSessionImages],
+      connectionsViewerImage ?? initialImage
+    ),
+    [connectionsState.images, connectionsViewerImage, initialImage, initialNeighbors, viewerSessionImages]
+  )
+
+  const toggleConnectionImageHeart = (image: ShadowPinImage) => {
+    const added = !image.viewer_has_hearted
+    const optimisticImage = {
+      ...image,
+      viewer_has_hearted: added,
+      heart_count: Math.max(0, image.heart_count + (added ? 1 : -1)),
+    }
+    setModal(current => current?.type === 'image-viewer' && current.image.id === image.id
+      ? { type: 'image-viewer', image: optimisticImage }
+      : current)
+    setCommentsImage(current => current?.id === image.id ? optimisticImage : current)
+    setViewerSessionImages(current => current.map(item => item.id === image.id ? optimisticImage : item))
+    void connectionsState.toggleHeart(image)
+      .then(updatedImage => {
+        setModal(current => current?.type === 'image-viewer' && current.image.id === image.id
+          ? { type: 'image-viewer', image: updatedImage }
+          : current)
+        setCommentsImage(current => current?.id === image.id ? updatedImage : current)
+        setViewerSessionImages(current => current.map(item => item.id === image.id ? updatedImage : item))
+        tracker.recordPinHeart(image, added, null)
+      })
+      .catch(error => {
+        setModal(current => current?.type === 'image-viewer' && current.image.id === image.id
+          ? { type: 'image-viewer', image }
+          : current)
+        setCommentsImage(current => current?.id === image.id ? image : current)
+        setViewerSessionImages(current => current.map(item => item.id === image.id ? image : item))
+        toast.error(error instanceof Error ? error.message : 'Heart failed')
+      })
+  }
+
+  const openConnectionImageViewer = (image: ShadowPinImage, pushRoute = true) => {
+    setCommentsImage(null)
+    setViewerSessionImages([image])
+    setModal({ type: 'image-viewer', image })
+    onViewerImageResolved(image)
+    if (pushRoute) onPinRoute('push-viewer', image.id)
+  }
+
+  const openConnectionImageComments = (image: ShadowPinImage, viewerAlreadyOpen = false) => {
+    if (!viewerAlreadyOpen) {
+      openConnectionImageViewer(image)
+    }
+    setCommentsImage(image)
+    onPinRoute('push-comments', image.id)
+  }
+
+  const closeConnectionImageViewer = () => {
+    setCommentsImage(null)
+    setModal(null)
+    setViewerSessionImages([])
+    onPinRoute('close-viewer', connectionsViewerImage?.id)
+  }
+
+  const leaveIneligibleConnectionViewer = useCallback(() => {
+    setCommentsImage(null)
+    setModal(null)
+    setViewerSessionImages([])
+    toast('This Pin is no longer in your Connections feed')
+    onFeedModeChange('discover')
+  }, [onFeedModeChange])
+
+  const validateConnectionViewerEligibility = useCallback(async () => {
+    if (feedModeState.mode !== 'connections' || !connectionsViewerImage) return
+    const generation = ++viewerEligibilityGenerationRef.current
+    try {
+      const result = await fetchMyShadowPinConnectionFeedWindow(connectionsViewerImage.id)
+      if (viewerEligibilityGenerationRef.current !== generation) return
+      if (!result.target) leaveIneligibleConnectionViewer()
+    } catch {
+      // A transient resume check must not close an otherwise valid Theater.
+    }
+  }, [connectionsViewerImage, feedModeState.mode, leaveIneligibleConnectionViewer])
+
+  const shareConnectionImage = async (image: ShadowPinImage) => {
+    tracker.recordShareTapped(image, null)
+    const url = createShadowPinPermalink(image.id)
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        await navigator.share({
+          title: image.title,
+          text: image.description || 'ShadowPin Pin',
+          url,
+        })
+        return
+      } catch {
+        // A cancelled or unavailable native sheet falls back to a copy action.
+      }
+    }
+    await copyShadowPinImageLink(url)
+  }
+
+  const shareConnectionImageToGroupChat = async (image: ShadowPinImage) => {
+    if (!messagesApi) {
+      toast.error('Group Chat is not ready yet')
+      return
+    }
+    const imageUrl = getPinImageUrl(image, 'full') || image.image_url || image.medium_url || image.thumbnail_url
+    if (!imageUrl) {
+      toast.error('This pin does not have a shareable image yet')
+      return
+    }
+    try {
+      const sent = await messagesApi.sendMessage(
+        '',
+        'image',
+        imageUrl,
+        undefined,
+        image.thumbnail_url || image.medium_url || null
+      )
+      if (sent) toast.success('Shared to Group Chat')
+    } catch (error) {
+      const notice = await getBlockedActionMessage('general_chat', error, 'Failed to share to Group Chat')
+      showActionErrorToast(notice)
+    }
+  }
+
+  useEffect(() => {
+    if (feedModeState.mode !== 'connections' || !routedImageId) {
+      openedInitialTargetRef.current = null
+      if (!routedImageId) {
+        setCommentsImage(current => current ? null : current)
+        setViewerSessionImages(current => current.length > 0 ? [] : current)
+        setModal(current => current?.type === 'image-viewer' ? null : current)
+      }
+      return
+    }
+    if (!initialImage) return
+
+    const targetKey = `${initialImage.id}:${initialPanel || (initialCommentId ? 'comments' : 'viewer')}:${initialCommentId || ''}`
+    if (openedInitialTargetRef.current === targetKey) return
+    openedInitialTargetRef.current = targetKey
+    const currentImage = connectionsState.images.find(image => image.id === initialImage.id) ?? initialImage
+    setViewerSessionImages(current => current.some(image => image.id === currentImage.id)
+      ? current.map(image => image.id === currentImage.id ? currentImage : image)
+      : [...current, currentImage])
+    setModal({ type: 'image-viewer', image: currentImage })
+    setCommentsImage(initialPanel === 'comments' || initialCommentId ? currentImage : null)
+  }, [
+    connectionsState.images,
+    feedModeState.mode,
+    initialCommentId,
+    initialImage,
+    initialPanel,
+    routedImageId,
+  ])
+
+  useEffect(() => {
+    if (feedModeState.mode !== 'connections' || !connectionsViewerImage) return
+    const handleConnectionsChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ targetUserId?: string | null; state?: string }>).detail
+      if (detail?.targetUserId === connectionsViewerImage.creator_id && detail.state !== 'connected') {
+        leaveIneligibleConnectionViewer()
+        return
+      }
+      void validateConnectionViewerEligibility()
+    }
+    const handleBlocksChanged = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId?: string; blocked?: boolean }>).detail
+      if (detail?.userId === connectionsViewerImage.creator_id && detail.blocked) {
+        leaveIneligibleConnectionViewer()
+        return
+      }
+      void validateConnectionViewerEligibility()
+    }
+    const handleFocus = () => { void validateConnectionViewerEligibility() }
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void validateConnectionViewerEligibility()
+    }
+
+    window.addEventListener(CONNECTIONS_CHANGED_EVENT, handleConnectionsChanged)
+    window.addEventListener(PERSONAL_BLOCKS_CHANGED_EVENT, handleBlocksChanged)
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      viewerEligibilityGenerationRef.current += 1
+      window.removeEventListener(CONNECTIONS_CHANGED_EVENT, handleConnectionsChanged)
+      window.removeEventListener(PERSONAL_BLOCKS_CHANGED_EVENT, handleBlocksChanged)
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [
+    connectionsViewerImage,
+    feedModeState.mode,
+    leaveIneligibleConnectionViewer,
+    validateConnectionViewerEligibility,
+  ])
+
+  const rememberHomeScroll = (scrollTop?: number) => {
+    homeScrollMemory.current[feedModeState.mode] = Math.max(
+      0,
+      scrollTop ?? categoryScrollRef.current?.scrollTop ?? 0
+    )
   }
 
   const focusCategorySearch = useCallback(() => {
@@ -2821,12 +3234,12 @@ function ShadowPinHome({
     if (scrollNode && scrollNode.scrollTop > 0) {
       scrollNode.scrollTop = 0
     }
-    rememberCategoryScroll(0)
+    rememberHomeScroll(0)
     revealCategorySearch()
   }
 
   const handleCategoryScroll = (event: UIEvent<HTMLElement>) => {
-    rememberCategoryScroll(event.currentTarget.scrollTop)
+    rememberHomeScroll(event.currentTarget.scrollTop)
     if (event.currentTarget.scrollTop > CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX) {
       categoryPullRef.current = null
       hideCategorySearch()
@@ -2927,8 +3340,8 @@ function ShadowPinHome({
 
   const openCategory = (category: ShadowPinCategory) => {
     hideCategorySearch()
-    rememberCategoryScroll()
-    categoryListScrollMemory.current.shouldRestore = true
+    rememberHomeScroll()
+    homeScrollMemory.current.restoreMode = 'discover'
     onOpenCategory(category)
   }
 
@@ -2971,9 +3384,11 @@ function ShadowPinHome({
     ? 1
     : Math.min(1, categorySearchPullDistance / CATEGORY_SEARCH_PULL_DISTANCE_PX)
   const shouldRenderCategorySearch =
+    !feedModeState.loading &&
     !categoriesState.loading &&
     categoriesState.categories.length > 0
   const shouldShowCategorySearchTrigger =
+    !feedModeState.loading &&
     !categoriesState.loading &&
     categoriesState.categories.length > 0 &&
     !categorySearchVisible
@@ -2989,19 +3404,28 @@ function ShadowPinHome({
   }
 
   useEffect(() => {
-    if (categoriesState.loading || !categoryListScrollMemory.current.shouldRestore) return
+    if (homeScrollMemory.current.restoreMode !== feedModeState.mode) return
+    if (feedModeState.mode === 'discover' && categoriesState.loading) return
+    if (feedModeState.mode === 'connections' && connectionsState.loading && connectionsState.images.length === 0) return
 
     const scrollNode = categoryScrollRef.current
     if (!scrollNode) return
 
-    const targetScrollTop = categoryListScrollMemory.current.scrollTop
+    const targetScrollTop = homeScrollMemory.current[feedModeState.mode]
     const frameId = window.requestAnimationFrame(() => {
       scrollNode.scrollTop = targetScrollTop
-      categoryListScrollMemory.current.shouldRestore = false
+      homeScrollMemory.current.restoreMode = null
     })
 
     return () => window.cancelAnimationFrame(frameId)
-  }, [categoriesState.categories.length, categoriesState.loading, categoryListScrollMemory])
+  }, [
+    categoriesState.categories.length,
+    categoriesState.loading,
+    connectionsState.images.length,
+    connectionsState.loading,
+    feedModeState.mode,
+    homeScrollMemory,
+  ])
 
   useEffect(() => () => {
     if (categoryPullClickBlockTimerRef.current) {
@@ -3009,8 +3433,32 @@ function ShadowPinHome({
     }
   }, [])
 
+  const selectFeedMode = (nextMode: ShadowPinFeedMode) => {
+    if (nextMode === feedModeState.mode) return
+    rememberHomeScroll()
+    homeScrollMemory.current.restoreMode = nextMode
+    hideCategorySearch()
+    feedModeState.selectMode(nextMode)
+  }
+
+  const openConnectionsHub = () => {
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    url.searchParams.set('view', 'dms')
+    url.searchParams.set('panel', 'connections')
+    url.searchParams.delete('feed')
+    url.searchParams.delete('pin')
+    url.searchParams.delete('comment')
+    window.history.pushState({ ...(window.history.state ?? {}), shadowchatLayer: 'dm-panel-cold' }, '', url)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+
   return (
-    <div className="theme-image-surface relative flex h-full min-h-0 flex-col overflow-hidden overscroll-contain">
+    <div
+      className="theme-image-surface relative flex h-full min-h-0 flex-col overflow-hidden overscroll-contain"
+      data-feed-mode={feedModeState.mode}
+      aria-busy={feedModeState.loading || (feedModeState.mode === 'connections' && connectionsState.loading)}
+    >
       <MobileAppHeader
         currentView={currentView}
         onViewChange={onViewChange}
@@ -3045,6 +3493,19 @@ function ShadowPinHome({
         onClickCapture={handleCategoryClickCapture}
         className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)_+_5.4rem)] pt-16 md:pb-6"
       >
+        <div className="mb-3">
+          <ShadowPinFeedModeTabs
+            mode={feedModeState.mode}
+            onChange={selectFeedMode}
+            disabled={feedModeState.loading}
+          />
+        </div>
+        {feedModeState.saveError && (
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-amber-300/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100" role="status" data-testid="shadow-pin-feed-save-error">
+            <span>{feedModeState.saveError}</span>
+            <button type="button" className="min-h-9 shrink-0 font-semibold text-[var(--theme-accent-readable)]" onClick={feedModeState.retrySave}>Retry</button>
+          </div>
+        )}
         <button
           type="button"
           onClick={() => setCreatorOpen(true)}
@@ -3166,6 +3627,17 @@ function ShadowPinHome({
             )}
           </div>
         )}
+        {feedModeState.loading ? (
+          <div className="flex min-h-48 items-center justify-center" role="status" aria-label="Loading your preferred ShadowPin feed">
+            <LoadingSpinner />
+          </div>
+        ) : feedModeState.mode === 'discover' ? (
+          <div
+            id="shadow-pin-feed-panel-discover"
+            role="tabpanel"
+            aria-labelledby="shadow-pin-feed-mode-discover"
+            data-testid="shadow-pin-discover-panel"
+          >
         {categoriesState.loading ? (
           <div className="flex h-full items-center justify-center"><LoadingSpinner /></div>
         ) : categoriesState.error ? (
@@ -3197,17 +3669,111 @@ function ShadowPinHome({
             })}
           </div>
         )}
+          </div>
+        ) : (
+          <section
+            id="shadow-pin-feed-panel-connections"
+            role="tabpanel"
+            aria-labelledby="shadow-pin-feed-mode-connections"
+            data-testid="shadow-pin-connections-panel"
+          >
+            <div className="sr-only" role="status" aria-live="polite">
+              {connectionsState.loading
+                ? 'Loading Pins from your Connections'
+                : `${connectionsState.images.length} Pins from your Connections loaded`}
+            </div>
+            {connectionsState.loading && connectionsState.images.length === 0 ? (
+              <div className="grid grid-cols-2 gap-3" data-testid="shadow-pin-feed-skeleton" aria-hidden="true">
+                {[0, 1, 2, 3, 4, 5].map(index => (
+                  <div
+                    key={index}
+                    className="animate-pulse rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(255,255,255,0.055)]"
+                    style={{ aspectRatio: index % 3 === 1 ? '4 / 5' : '1 / 1' }}
+                  />
+                ))}
+              </div>
+            ) : connectionsState.error && connectionsState.images.length === 0 ? (
+              <div className="mx-auto max-w-md rounded-[var(--radius-lg)] border border-red-400/30 bg-red-500/10 p-5 text-center text-red-100" data-testid="shadow-pin-feed-error">
+                <h2 className="text-lg font-semibold">Your Connections feed could not load</h2>
+                <p className="mt-1 text-sm text-red-100/75">{connectionsState.error}</p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button variant="secondary" onClick={() => selectFeedMode('discover')}>View Discover</Button>
+                  <Button onClick={connectionsState.refresh}>Retry</Button>
+                </div>
+              </div>
+            ) : connectionsState.images.length === 0 ? (
+              <div className="mx-auto max-w-md rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.58)] p-5 text-center" data-testid="shadow-pin-feed-empty">
+                <Pin className="mx-auto mb-3 h-8 w-8 text-[var(--theme-accent-readable)]" />
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                  {connectionsState.acceptedCount === 0
+                    ? 'Your Connections feed is waiting'
+                    : 'No new Pins from your Connections'}
+                </h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
+                  {connectionsState.acceptedCount === 0
+                    ? 'Connect with people you trust to see their new Pins here.'
+                    : 'When your Connections publish something new, it will appear here.'}
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Button variant="secondary" onClick={() => selectFeedMode('discover')}>View Discover</Button>
+                  <Button onClick={openConnectionsHub}>{connectionsState.acceptedCount === 0 ? 'Find Connections' : 'Manage Connections'}</Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {connectionsState.error && (
+                  <div className="mb-3 flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-amber-300/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100" role="status" data-testid="shadow-pin-feed-refresh-error">
+                    <span>Some Pins may be out of date.</span>
+                    <button type="button" className="min-h-9 shrink-0 font-semibold text-[var(--theme-accent-readable)]" onClick={connectionsState.refresh}>Retry</button>
+                  </div>
+                )}
+                <ShadowPinMasonryGrid
+                  images={connectionsState.images}
+                  label="Pins from your Connections"
+                  testId="shadow-pin-feed"
+                  onViewer={openConnectionImageViewer}
+                  onEdit={image => { setCreatorTargetImage(image); setCreatorOpen(true) }}
+                  onHeart={toggleConnectionImageHeart}
+                  onComments={openConnectionImageComments}
+                  onShare={image => tracker.recordShareTapped(image, null)}
+                  onShareToGroupChat={messagesApi ? shareConnectionImageToGroupChat : undefined}
+                  onVisible={image => tracker.recordPinViewed(image, null)}
+                />
+                {connectionsState.hasMore && (
+                  <div className="mt-4 flex justify-center">
+                    <Button
+                      variant="secondary"
+                      onClick={connectionsState.loadMore}
+                      loading={connectionsState.loading}
+                      data-testid="shadow-pin-feed-load-more"
+                    >
+                      Load More
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        )}
       </main>
       {creatorOpen && (
         <Suspense fallback={<div className="fixed inset-0 z-[138] flex items-center justify-center bg-[var(--bg-app)]"><LoadingSpinner /></div>}>
           <LazyShadowPinCreatorStudio
             open
-            onClose={() => setCreatorOpen(false)}
+            targetImage={creatorTargetImage}
+            onClose={() => { setCreatorOpen(false); setCreatorTargetImage(null) }}
             onPublished={async image => {
               await categoriesState.refresh()
+              if (feedModeState.mode === 'connections') await connectionsState.refresh()
               tracker.recordPinMutation(image, 'pin_created', null)
-              toast.success('Pin published')
-              onPublishedPin(image)
+              if (feedModeState.mode === 'connections') {
+                toast.success('Published to Discover')
+                onFeedModeChange('discover')
+                onPublishedPin(image)
+              } else {
+                toast.success('Pin published')
+                onPublishedPin(image)
+              }
             }}
           />
         </Suspense>
@@ -3235,6 +3801,73 @@ function ShadowPinHome({
           category={detailsCategory}
           onClose={() => setModal(null)}
           onHeart={() => toggleCategoryHeart(detailsCategory)}
+        />
+      )}
+      {connectionsViewerImage && feedModeState.mode === 'connections' && (
+        <ShadowPinImmersiveViewer
+          images={connectionsViewerImages}
+          activeImageId={connectionsViewerImage.id}
+          categoryTitle="Connections"
+          hasMore={connectionsState.hasMore}
+          loadingMore={connectionsState.loading}
+          commentsOpen={Boolean(commentsImage)}
+          canManageImage={image => canManage(image, user?.id, adminRole)}
+          getPosterUrl={image => getPinImageUrl(image, 'medium')}
+          getTransitionUrl={image => isVideoPin(image)
+            ? getPinImageUrl(image, 'medium')
+            : getPinImageSources(image, 'full')[0] || getPinImageUrl(image, 'medium')}
+          getSourceUrl={getPinSourceUrl}
+          getProviderLabel={getPinProviderLabel}
+          requiresExternalConsent={requiresViewerExternalConsent}
+          renderActiveMedia={(image, controls) => (
+            <ImageViewerMedia
+              image={image}
+              muted={controls.muted}
+              reducedMotion={controls.reducedMotion}
+              autoplayMedia={controls.autoplayMedia}
+              onMutedChange={controls.onMutedChange}
+              onZoomChange={controls.onZoomChange}
+            />
+          )}
+          onActiveImageChange={image => {
+            setViewerSessionImages(current => current.some(item => item.id === image.id)
+              ? current.map(item => item.id === image.id ? image : item)
+              : [...current, image])
+            setModal({ type: 'image-viewer', image })
+            onViewerImageResolved(image)
+            onPinRoute('replace-viewer', image.id)
+          }}
+          onLoadMore={connectionsState.loadMore}
+          onSettled={image => tracker.recordPinOpened(image, null)}
+          onHeart={toggleConnectionImageHeart}
+          onComments={image => openConnectionImageComments(image, true)}
+          onShare={image => { void shareConnectionImage(image) }}
+          onEdit={image => {
+            onPinRoute('close-viewer', image.id)
+            setCreatorTargetImage(image)
+            setCreatorOpen(true)
+          }}
+          onClose={closeConnectionImageViewer}
+        />
+      )}
+      {commentsImage && feedModeState.mode === 'connections' && (
+        <ShadowPinCommentsDialog
+          image={commentsImage}
+          initialCommentId={initialCommentId}
+          open
+          onClose={() => {
+            setCommentsImage(null)
+            onPinRoute('close-comments', connectionsViewerImage?.id || commentsImage.id)
+          }}
+          onCountChange={count => {
+            connectionsState.setCommentCount(commentsImage.id, count)
+            setCommentsImage(current => current?.id === commentsImage.id
+              ? { ...current, comment_count: count }
+              : current)
+            setModal(current => current?.type === 'image-viewer' && current.image.id === commentsImage.id
+              ? { ...current, image: { ...current.image, comment_count: count } }
+              : current)
+          }}
         />
       )}
     </div>
@@ -3272,7 +3905,6 @@ function ShadowPinCategoryScreen({
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
-  const { shouldAutoplayMedia } = useComfortPreferences()
   const messagesApi = useOptionalMessages()
   const imagesState = useShadowPinImages(categoryId)
   const [modal, setModal] = useState<ModalMode>(null)
@@ -3280,14 +3912,6 @@ function ShadowPinCategoryScreen({
   const [creatorTargetImage, setCreatorTargetImage] = useState<ShadowPinImage | null>(null)
   const [commentsImage, setCommentsImage] = useState<ShadowPinImage | null>(null)
   const [viewerSessionImages, setViewerSessionImages] = useState<ShadowPinImage[]>([])
-  const [sharingToGroupImageId, setSharingToGroupImageId] = useState<string | null>(null)
-  const [overlayImageId, setOverlayImageId] = useState<string | null>(null)
-  const [activeVideoId, setActiveVideoId] = useState<string | null>(null)
-  const [soundVideoId, setSoundVideoId] = useState<string | null>(null)
-  const soundVideoIdRef = useRef<string | null>(null)
-  const [playableVisibleVideoCount, setPlayableVisibleVideoCount] = useState(0)
-  const videoVisibilityRef = useRef(new Map<string, VideoVisibilitySnapshot>())
-  const skippedVideoIdsRef = useRef(new Set<string>())
   const openedInitialTargetRef = useRef<string | null>(null)
   const title = imagesState.category?.title || 'ShadowPin'
   useShadowPinCategoryDwell(imagesState.category, tracker)
@@ -3396,7 +4020,6 @@ function ShadowPinCategoryScreen({
       return
     }
 
-    setSharingToGroupImageId(image.id)
     try {
       const sent = await messagesApi.sendMessage(
         '',
@@ -3411,81 +4034,8 @@ function ShadowPinCategoryScreen({
     } catch (error) {
       const notice = await getBlockedActionMessage('general_chat', error, 'Failed to share to Group Chat')
       showActionErrorToast(notice)
-    } finally {
-      setSharingToGroupImageId(current => current === image.id ? null : current)
     }
   }
-
-  const syncVideoPlaybackState = useCallback((preferOrderedStart: boolean) => {
-    const visibilityMap = videoVisibilityRef.current
-    const playableVideos = getOrderedVisibleVideos(visibilityMap.values(), skippedVideoIdsRef.current)
-    if (!shouldAutoplayMedia) {
-      setPlayableVisibleVideoCount(0)
-      setActiveVideoId(current => current && current === soundVideoIdRef.current ? current : null)
-      return
-    }
-    const nextVideoId = playableVideos[0]?.id ?? null
-    setPlayableVisibleVideoCount(playableVideos.length)
-    setActiveVideoId(current => {
-      if (!nextVideoId) return null
-      const currentPlayable = Boolean(current && playableVideos.some(video => video.id === current))
-      if (!currentPlayable || preferOrderedStart) return nextVideoId
-      return current
-    })
-  }, [shouldAutoplayMedia])
-
-  useEffect(() => {
-    syncVideoPlaybackState(false)
-  }, [shouldAutoplayMedia, syncVideoPlaybackState])
-
-  const updateVideoVisibility = useCallback((visibility: VideoVisibilitySnapshot) => {
-    const visibilityMap = videoVisibilityRef.current
-    const wasVisible = visibilityMap.has(visibility.id)
-    if (visibility.visible) {
-      visibilityMap.set(visibility.id, visibility)
-    } else {
-      visibilityMap.delete(visibility.id)
-      skippedVideoIdsRef.current.delete(visibility.id)
-    }
-
-    syncVideoPlaybackState(visibility.visible && visibility.playable && !wasVisible)
-  }, [syncVideoPlaybackState])
-
-  const markVideoPlaybackStarted = useCallback((imageId: string) => {
-    if (!skippedVideoIdsRef.current.delete(imageId)) return
-    syncVideoPlaybackState(false)
-  }, [syncVideoPlaybackState])
-
-  const advanceVisibleVideo = useCallback((imageId: string, skipCurrent: boolean) => {
-    const visibilityMap = videoVisibilityRef.current
-    if (skipCurrent && visibilityMap.has(imageId)) {
-      skippedVideoIdsRef.current.add(imageId)
-    }
-
-    const skippedVideoIds = skippedVideoIdsRef.current
-    setPlayableVisibleVideoCount(getOrderedVisibleVideos(visibilityMap.values(), skippedVideoIds).length)
-    const nextVideoId = getNextOrderedVisibleVideoId(visibilityMap.values(), imageId, skippedVideoIds)
-    setActiveVideoId(current => current === imageId ? nextVideoId : current)
-  }, [])
-
-  const completeVideoPlayback = useCallback((imageId: string) => {
-    advanceVisibleVideo(imageId, false)
-  }, [advanceVisibleVideo])
-
-  const skipUnavailableVideo = useCallback((imageId: string) => {
-    advanceVisibleVideo(imageId, true)
-  }, [advanceVisibleVideo])
-
-  useEffect(() => {
-    soundVideoIdRef.current = soundVideoId
-    setSoundVideoId(current => current && current !== activeVideoId ? null : current)
-  }, [activeVideoId, soundVideoId])
-
-  const masonryColumnCount = useShadowPinMasonryColumnCount()
-  const masonryColumns = useMemo(
-    () => distributeMasonryColumns(imagesState.images, masonryColumnCount),
-    [imagesState.images, masonryColumnCount]
-  )
   const viewerImage = modal?.type === 'image-viewer'
     ? imagesState.images.find(image => image.id === modal.image.id) ?? modal.image
     : null
@@ -3580,52 +4130,17 @@ function ShadowPinCategoryScreen({
           </div>
         ) : (
           <>
-            <div
-              role="list"
-              aria-label="ShadowPin pin masonry grid"
-              className="grid items-start gap-3"
-              style={{ gridTemplateColumns: `repeat(${masonryColumnCount}, minmax(0, 1fr))` }}
-            >
-              {masonryColumns.map((column, columnIndex) => (
-                <div key={columnIndex} className="flex min-w-0 flex-col gap-3">
-                  {column.map(image => {
-                    const manage = canManage(image, user?.id, adminRole)
-                    const columnSide = getPinColumnSide(columnIndex, masonryColumnCount)
-                    return (
-                      <div key={image.id} role="listitem" className="min-w-0">
-                        <ImageCard
-                          image={image}
-                          canManageImage={manage}
-                          columnSide={columnSide}
-                          activeVideoId={activeVideoId}
-                          soundEnabled={soundVideoId === image.id}
-                          loopNativeVideo={playableVisibleVideoCount <= 1}
-                          cycleIframeVideo={playableVisibleVideoCount > 1}
-                          overlayOpen={overlayImageId === image.id}
-                          onToggleOverlay={() => setOverlayImageId(prev => prev === image.id ? null : image.id)}
-                          onVideoVisibilityChange={updateVideoVisibility}
-                          onVideoPlaybackStarted={markVideoPlaybackStarted}
-                          onVideoPlaybackComplete={completeVideoPlayback}
-                          onVideoPlaybackUnavailable={skipUnavailableVideo}
-                          onToggleSound={() => {
-                            setActiveVideoId(image.id)
-                            setSoundVideoId(prev => prev === image.id ? null : image.id)
-                          }}
-                          onViewer={() => openImageViewer(image)}
-                          onEdit={() => { setCreatorTargetImage(image); setCreatorOpen(true) }}
-                          onHeart={() => toggleImageHeart(image)}
-                          onComments={() => openImageComments(image)}
-                          onShare={() => tracker.recordShareTapped(image, imagesState.category)}
-                          onShareToGroupChat={messagesApi ? () => shareImageToGroupChat(image) : undefined}
-                          sharingToGroupChat={sharingToGroupImageId === image.id}
-                          onVisible={() => tracker.recordPinViewed(image, imagesState.category)}
-                        />
-                      </div>
-                    )
-                  })}
-                </div>
-              ))}
-            </div>
+            <ShadowPinMasonryGrid
+              images={imagesState.images}
+              label="ShadowPin pin masonry grid"
+              onViewer={openImageViewer}
+              onEdit={image => { setCreatorTargetImage(image); setCreatorOpen(true) }}
+              onHeart={toggleImageHeart}
+              onComments={openImageComments}
+              onShare={image => tracker.recordShareTapped(image, imagesState.category)}
+              onShareToGroupChat={messagesApi ? shareImageToGroupChat : undefined}
+              onVisible={image => tracker.recordPinViewed(image, imagesState.category)}
+            />
             {imagesState.hasMore && (
               <div className="mt-4 flex justify-center">
                 <Button variant="secondary" onClick={imagesState.loadMore} loading={imagesState.loading}>Load More</Button>
@@ -3742,7 +4257,9 @@ export function ShadowPin({
   initialImageId,
   initialCommentId,
   initialPanel,
+  initialFeedMode,
   onPinRoute = () => {},
+  onFeedModeChange = NOOP_SHADOW_PIN_FEED_MODE_CHANGE,
 }: ShadowPinProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [returnHomeAfterViewerClose, setReturnHomeAfterViewerClose] = useState(false)
@@ -3753,9 +4270,10 @@ export function ShadowPin({
   const [initialCreatorOpen] = useState(() => (
     typeof window !== 'undefined' && hasCreatorStudioQuery(window)
   ))
-  const categoryListScrollMemory = useRef<CategoryListScrollMemory>({
-    scrollTop: 0,
-    shouldRestore: false,
+  const homeScrollMemory = useRef<ShadowPinHomeScrollMemory>({
+    discover: 0,
+    connections: 0,
+    restoreMode: null,
   })
   const tracker = useShadowPinActivityTracker()
 
@@ -3773,11 +4291,45 @@ export function ShadowPin({
       setInitialImage(locallyResolved)
       setInitialNeighbors([])
       setInitialImageStatus('idle')
-      setActiveCategoryId(locallyResolved.category_id)
+      setActiveCategoryId(initialFeedMode === 'connections' ? null : locallyResolved.category_id)
       return
     }
 
     setInitialImageStatus('loading')
+
+    if (initialFeedMode === 'connections') {
+      void fetchMyShadowPinConnectionFeedWindow(initialImageId)
+        .then(windowResult => {
+          if (cancelled) return
+          if (!windowResult.target) {
+            return fetchShadowPinImage(initialImageId).then(image => {
+              if (cancelled) return
+              if (!image?.category_id) {
+                setInitialImage(null)
+                setInitialImageStatus('unavailable')
+                return
+              }
+              toast('This Pin is no longer in your Connections feed')
+              onFeedModeChange('discover')
+              setInitialImage(image)
+              setInitialNeighbors([])
+              setInitialImageStatus('idle')
+              setActiveCategoryId(image.category_id)
+            })
+          }
+          setInitialImage(windowResult.target)
+          setInitialNeighbors(windowResult.images.filter(image => image.id !== windowResult.target?.id))
+          setInitialImageStatus('idle')
+          setActiveCategoryId(null)
+        })
+        .catch(() => {
+          if (!cancelled) setInitialImageStatus('unavailable')
+        })
+
+      return () => {
+        cancelled = true
+      }
+    }
 
     void fetchShadowPinImage(initialImageId)
       .then(image => {
@@ -3806,7 +4358,7 @@ export function ShadowPin({
     return () => {
       cancelled = true
     }
-  }, [initialImageId])
+  }, [initialFeedMode, initialImageId, onFeedModeChange])
 
   if (initialImageId && !activeCategoryId && initialImageStatus !== 'idle') {
     return (
@@ -3879,7 +4431,7 @@ export function ShadowPin({
       }}
       onOpenPin={image => {
         if (!image.category_id) return
-        setReturnHomeAfterViewerClose(false)
+        setReturnHomeAfterViewerClose(initialFeedMode === 'connections')
         routedViewerImagesRef.current.set(image.id, image)
         setInitialImage(image)
         setInitialNeighbors([])
@@ -3896,7 +4448,18 @@ export function ShadowPin({
         onPinRoute('replace-viewer', image.id)
       }}
       initialCreatorOpen={initialCreatorOpen}
-      categoryListScrollMemory={categoryListScrollMemory}
+      homeScrollMemory={homeScrollMemory}
+      initialFeedMode={initialFeedMode}
+      initialImage={initialImage}
+      initialNeighbors={initialNeighbors}
+      routedImageId={initialImageId}
+      initialCommentId={initialCommentId}
+      initialPanel={initialPanel}
+      onPinRoute={onPinRoute}
+      onViewerImageResolved={image => {
+        routedViewerImagesRef.current.set(image.id, image)
+      }}
+      onFeedModeChange={onFeedModeChange}
       tracker={tracker}
     />
   )

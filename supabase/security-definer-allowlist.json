@@ -1,5 +1,5 @@
 {
-  "reviewed_on": "2026-07-11",
+  "reviewed_on": "2026-07-13",
   "expected_total_security_definers": 119,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
@@ -48,7 +48,11 @@
     "connections_private.get_my_connection_summary_impl()",
     "connections_private.list_my_connections_impl(text,integer,timestamp with time zone,uuid)",
     "connections_private.mutate_connection_impl(uuid,text)",
-    "connections_private.remove_connection_on_block()"
+    "connections_private.remove_connection_on_block()",
+    "shadow_pin_private.get_my_connection_feed_window_impl(uuid)",
+    "shadow_pin_private.get_my_feed_mode_impl()",
+    "shadow_pin_private.list_my_connection_feed_impl(integer,timestamp with time zone,uuid)",
+    "shadow_pin_private.set_my_feed_mode_impl(text)"
   ],
   "anon_signatures": [
     "is_username_available(text)"

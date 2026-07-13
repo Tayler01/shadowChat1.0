@@ -12,6 +12,24 @@ export type ShadowPinProvider =
   | 'instagram'
   | 'external'
 export type ShadowPinPinSourceType = 'file_upload' | 'url_import' | 'external_embed'
+export type ShadowPinFeedMode = 'discover' | 'connections'
+
+export interface ShadowPinFeedPreference {
+  mode: ShadowPinFeedMode
+  revision: number
+  updatedAt: string | null
+}
+
+export interface ShadowPinFeedCursor {
+  createdAt: string
+  id: string
+}
+
+export interface ShadowPinFeedPage {
+  images: ShadowPinImage[]
+  hasMore: boolean
+  nextCursor: ShadowPinFeedCursor | null
+}
 
 export interface ShadowPinCategory {
   id: string

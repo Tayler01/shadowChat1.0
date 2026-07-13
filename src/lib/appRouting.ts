@@ -10,6 +10,7 @@ export type AppLocationState = {
   pin: string | null
   comment: string | null
   pinPanel: 'viewer' | 'comments' | null
+  pinFeed: 'connections' | null
   playExperience: PlayExperience | null
   playItem: string | null
 }
@@ -292,6 +293,22 @@ export type PinRouteAction =
 
 export type PinHistoryLayer = 'pin-viewer' | 'pin-comments' | null
 
+export type PinFeedMode = 'discover' | 'connections'
+
+export const resolvePinFeedModeMutation = ({
+  currentUrl,
+  mode,
+}: {
+  currentUrl: URL
+  mode: PinFeedMode
+}) => {
+  const url = new URL(currentUrl)
+  url.searchParams.set('view', 'pins')
+  if (mode === 'connections') url.searchParams.set('feed', 'connections')
+  else url.searchParams.delete('feed')
+  return { method: 'replace' as const, url }
+}
+
 export type PinRouteMutation =
   | { method: 'back' }
   | { method: 'push' | 'replace'; url: URL; layer: PinHistoryLayer }
@@ -405,6 +422,7 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
     pin,
     comment,
     pinPanel: pin ? (comment || panel === 'comments' ? 'comments' : 'viewer') : null,
+    pinFeed: view === 'pins' && params.get('feed') === 'connections' ? 'connections' : null,
     playExperience,
     playItem,
   }

@@ -5,6 +5,7 @@ import {
   resolveChatThreadRouteMutation,
   resolveDMRouteMutation,
   resolvePinRouteMutation,
+  resolvePinFeedModeMutation,
   resolvePlayRouteMutation,
   shouldPersistDMPanelInUrl,
 } from '../src/lib/appRouting'
@@ -22,6 +23,7 @@ test('paused board and legacy news routes fall back to chat', () => {
     pin: null,
     comment: null,
     pinPanel: null,
+    pinFeed: null,
     playExperience: null,
     playItem: null,
   })
@@ -35,6 +37,7 @@ test('paused board and legacy news routes fall back to chat', () => {
     pin: null,
     comment: null,
     pinPanel: null,
+    pinFeed: null,
     playExperience: null,
     playItem: null,
   })
@@ -50,6 +53,7 @@ test('active routes and message targets keep their expected shape', () => {
     pin: null,
     comment: null,
     pinPanel: null,
+    pinFeed: null,
     playExperience: null,
     playItem: null,
   })
@@ -63,6 +67,7 @@ test('active routes and message targets keep their expected shape', () => {
     pin: null,
     comment: null,
     pinPanel: null,
+    pinFeed: null,
     playExperience: null,
     playItem: null,
   })
@@ -78,6 +83,7 @@ test('paused Activity routes fall back to Chat without leaking Activity targets'
     pin: null,
     comment: null,
     pinPanel: null,
+    pinFeed: null,
     playExperience: null,
     playItem: null,
   })
@@ -91,9 +97,33 @@ test('paused Activity routes fall back to Chat without leaking Activity targets'
     pin: 'pin-1',
     comment: 'comment-2',
     pinPanel: 'comments',
+    pinFeed: null,
     playExperience: null,
     playItem: null,
   })
+})
+
+test('ShadowPin Connections feed routes are normalized and replaced without polluting history', () => {
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=pins&feed=connections'))).toMatchObject({
+    view: 'pins',
+    pinFeed: 'connections',
+  })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=pins&feed=unknown'))).toMatchObject({
+    pinFeed: null,
+  })
+
+  const connections = resolvePinFeedModeMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-1'),
+    mode: 'connections',
+  })
+  expect(connections.method).toBe('replace')
+  expect(connections.url.searchParams.get('feed')).toBe('connections')
+  expect(connections.url.searchParams.get('pin')).toBe('pin-1')
+
+  const discover = resolvePinFeedModeMutation({ currentUrl: connections.url, mode: 'discover' })
+  expect(discover.method).toBe('replace')
+  expect(discover.url.searchParams.has('feed')).toBe(false)
+  expect(discover.url.searchParams.get('pin')).toBe('pin-1')
 })
 
 test('General Chat thread URLs preserve a root and exact reply target', () => {
@@ -450,6 +480,24 @@ test('ShadowPin history mutations push layers, replace slides, and unwind with B
     action: 'close-viewer',
     imageId: 'pin-2',
   })).toEqual({ method: 'back' })
+})
+
+test('ShadowPin Connections viewer and comments preserve the private feed context', () => {
+  const viewer = resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&feed=connections'),
+    currentLayer: null,
+    action: 'push-viewer',
+    imageId: 'pin-1',
+  })
+  expect(viewer && viewer.method !== 'back' ? viewer.url.search : '').toBe('?view=pins&feed=connections&pin=pin-1')
+
+  const comments = resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&feed=connections&pin=pin-1'),
+    currentLayer: 'pin-viewer',
+    action: 'push-comments',
+    imageId: 'pin-1',
+  })
+  expect(comments && comments.method !== 'back' ? comments.url.search : '').toBe('?view=pins&feed=connections&pin=pin-1&panel=comments')
 })
 
 test('direct ShadowPin links close by replacement when no layer marker exists', () => {
