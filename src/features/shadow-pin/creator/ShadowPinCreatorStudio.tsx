@@ -787,7 +787,7 @@ export function ShadowPinCreatorStudio({
 
   const studio = (
     <div className="fixed inset-0 z-[138] bg-[var(--bg-app)] text-[var(--text-primary)]" data-testid="shadow-pin-creator-studio">
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex h-[var(--shadowchat-visual-viewport-height,100dvh)] w-full flex-col overflow-hidden">
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className="flex h-[var(--shadowchat-app-height,var(--shadowchat-visual-viewport-height,100dvh))] w-full flex-col overflow-hidden pb-[var(--shadowchat-mobile-scroll-keyboard-inset,0px)]">
         <header className="shrink-0 border-b border-[var(--border-panel)] bg-[rgba(5,6,8,0.96)] px-2 pb-2 pt-[calc(env(safe-area-inset-top)_+_0.35rem)] backdrop-blur-md sm:px-4 sm:pt-3">
           <div className="mx-auto flex max-w-5xl items-center gap-2">
             <button ref={closeRef} type="button" onClick={() => void saveAndExit()} className="inline-flex h-12 w-12 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-white/5" aria-label="Save draft and exit Creator Studio"><X className="h-5 w-5" /></button>

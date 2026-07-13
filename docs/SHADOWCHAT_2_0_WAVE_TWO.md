@@ -411,14 +411,16 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   entry-script hashes match; General Chat threads and rapid Theater swipes also
   passed directly on the stable URL. This promotion did not touch production
   ShadowChat or `main`.
-- July 13 Creator Studio keyboard-spacing follow-up: the focused field now uses
-  the Studio scroll region and measured visual-viewport bottom rather than
-  browser-dependent page scrolling. Immutable deploy
-  `6a5541b45d9cfad72331beac` passed all 19 lifecycle checks, measured a
-  `12.21875px` field-to-footer gap in the `620px` compressed Pixel viewport,
-  and verified every generated database/Storage counter back at zero. The
-  identical build is published to the stable isolated test URL as deploy
-  `6a5542e1bc2a1171f1b4073c`; production and `main` were not touched.
+- July 13 physical-iPhone screenshots showed that the Studio frame itself ended
+  above the keyboard, leaving a large black band below its footer. Studio now
+  keeps the stable app-height frame and reserves the iOS keyboard inset inside
+  that frame instead of sizing the dialog from visual-viewport height alone.
+  Immutable deploy `6a5547c57eceb4541037f4b3` passed all 19 lifecycle checks;
+  its non-zero iOS visual-offset simulation measured a `0px`
+  footer-to-keyboard gap and a `12.21875px` field-to-footer gap, with every
+  generated database/Storage counter back at zero. The identical build is
+  published to the stable isolated test URL as deploy
+  `6a5548df38b181c08f7c4122`; production and `main` were not touched.
 - ShadowPin Theater now coalesces drag rendering to animation frames, accepts
   up to three queued swipes during the 220ms handoff, preloads two Pins on each
   side, and reuses locally resolved routed Pins instead of refetching exact and

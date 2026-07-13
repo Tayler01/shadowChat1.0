@@ -12,7 +12,7 @@ reset, expanded rollback verifier, database lint/advisors, Deno/Node checks,
 and 3 focused suites with 21 tests.
 
 The expanded two-account workflow passed against final immutable isolated
-Netlify deploy `6a5541b45d9cfad72331beac` on Pixel Chromium `412x915` and
+Netlify deploy `6a5547c57eceb4541037f4b3` on Pixel Chromium `412x915` and
 iPhone WebKit `390x844`. Nineteen recorded checks cover every entry point,
 image and URL staging, local short-video selection/metadata, retry recovery,
 owner-private draft/asset reads, signed preview recovery, one idempotent Pin,
@@ -26,13 +26,15 @@ objects, the temporary Chat/DM rows, and two temporary categories; every scoped
 remaining count was zero. Evidence is in
 `output/playwright/wave2-candidate3-creator-studio/summary.json`.
 
-The July 13 keyboard-spacing follow-up gives the Studio scroll region an
-in-flow mobile keyboard anchor and positions the focused editor from measured
-visual-viewport geometry instead of browser-dependent page scrolling. The
-compressed Pixel gate measured a `12.21875px` field-to-footer gap (within the
-`28px` ceiling), with the field fully visible. The identical build is published
-to the isolated stable test frontend as deploy `6a5542e1bc2a1171f1b4073c`;
-production `main` remains unchanged.
+The July 13 physical-iPhone screenshots exposed a different keyboard defect
+than the first automated gate: the whole Studio frame ended above the keyboard,
+leaving a large black band below its action footer. Studio now keeps the stable
+app-height frame and reserves the iOS keyboard inset inside it instead of sizing
+the dialog from visual-viewport height alone. The replacement gate simulates a
+non-zero iOS visual-viewport offset and measures a `0px` footer-to-keyboard gap
+plus a `12.21875px` focused-field-to-footer gap. The identical build is
+published to the isolated stable test frontend as deploy
+`6a5548df38b181c08f7c4122`; production `main` remains unchanged.
 
 Linked history/dry-run and the combined Wave Two regression gate remain
 separate release checks. Physical installed-PWA camera/library, keyboard,
