@@ -40,8 +40,8 @@ Canonical detail and release gates live in:
   and deterministic source-linked Catch-Up track without changing production
   `main`.
 - Started: 2026-07-13
-- Status: Candidate 1 Connections accepted; Candidate 2 ShadowPin Feed Modes
-  is active.
+- Status: Candidate 1 Connections and Candidate 2 ShadowPin Feed Modes
+  accepted; Candidate 3 Inner Circles is active.
 - Backend boundary: reciprocal caller-private relationships, no public graph or
   counts, personal-block teardown with no restore, and compatibility with the
   unchanged production frontend sharing Supabase.
@@ -55,6 +55,14 @@ Canonical detail and release gates live in:
   tests, clean lint/typecheck/build/budgets, and repeat two-account Pixel
   Chromium/iPhone WebKit proof against immutable deploy
   `6a556190a9c126b4758b29f1` with unchanged DM history and zero residue.
+- Candidate 2 contract: [SHADOW_PIN_FEED_MODES.md](C:/repos/chat2.0/docs/SHADOW_PIN_FEED_MODES.md:1)
+- Candidate 2 proof: linked migration `20260713223200`, clean unchanged-
+  production auth/resume-send smoke, local SQL/security/build/full-regression
+  gates, and repeat two-account Pixel Chromium/iPhone WebKit proof against
+  immutable deploy `6a5575bcbc2a1131aab40695` and the stable isolated URL.
+  The browser gate covered persistence, universal Search, ordered feeds,
+  Theater, hearts/comments, Back routes, relationship teardown/reconnect,
+  geometry/diagnostics, exact preference restoration, and zero residue.
 - Production `main` and the production Netlify frontend remain unchanged.
 
 ### ShadowChat 2.0 Wave Two

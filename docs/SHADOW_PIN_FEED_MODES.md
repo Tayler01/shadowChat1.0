@@ -7,6 +7,11 @@ ShadowChat 2.0 Wave Three Candidate 2. The implementation lives only on
 `codex/shadowchat-2.0` during the trial. Production `main` and the production
 Netlify frontend remain unchanged.
 
+Candidate 2 is accepted on the isolated branch. Additive migration
+`20260713223200` is linked, and immutable Netlify deploy
+`6a5575bcbc2a1131aab40695` plus the stable isolated URL passed the complete
+Pixel Chromium/iPhone WebKit verifier with zero test-data residue.
+
 ## Product Contract
 
 ShadowPin has two member-controlled home modes:
@@ -152,6 +157,21 @@ Acceptance requires:
 - unchanged production frontend smoke after the additive migration
 - cleanup by exact IDs with zero Pin, heart, comment, tag, activity,
   notification, Connection, block, preference, Storage, or media residue
+
+Recorded acceptance evidence:
+
+- `npm run qa:shadow-pin-feed-modes -- --base-url=<isolated-origin>` passed on
+  both the immutable deploy and `https://shadowchat-2-0-wave-one.netlify.app`
+- the two-account run covered keyboard and touch mode selection, account-sync
+  and reload persistence, universal Search, both empty states, exact
+  chronological order, Connections-scoped Theater, hearts, comments, Browser
+  Back, removal/block fail-closed behavior, and explicit reconnect recovery
+- both engines stayed within `412x839` and `390x664` visual viewports with no
+  horizontal overflow, console/page/request/HTTP errors, or unexpected
+  Supabase hosts; expected report-only WebKit CSP diagnostics were isolated
+- cleanup restored both account preferences and proved zero scoped
+  Connection, block, Pin, category, heart, comment, notification, activity,
+  analytics, or preference residue
 
 ## Explicit V1 Exclusions
 

@@ -8,6 +8,20 @@ and Expo checks do not replace fresh viewport/physical-device proof.
 
 Last updated: 2026-07-13
 
+## July 13 Wave Three ShadowPin Feed Modes Checkpoint
+
+The Connections feed, empty states, Theater, and comments passed authenticated
+Pixel Chromium and iPhone WebKit proof on immutable deploy
+`6a5575bcbc2a1131aab40695` and the stable isolated URL. Measured feed surfaces
+remained within `412x839` and `390x664` visual viewports with no page/feed/
+Theater/comments horizontal overflow. Touch mode switching, engagement,
+Browser Back, and relationship teardown/recovery also passed with clean
+runtime diagnostics and zero scoped data residue.
+
+This remains automated browser evidence. Physical installed-PWA safe areas,
+browser chrome, touch feel, resume behavior, and hardware keyboard animation
+remain part of Tayler's final phone acceptance.
+
 ## July 13 Wave Three Connections Checkpoint
 
 The phone-first Connections bottom sheet passed repeat authenticated Pixel

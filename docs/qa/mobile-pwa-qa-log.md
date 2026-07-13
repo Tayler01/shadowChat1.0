@@ -8,6 +8,26 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-13
 
+## July 13 Wave Three ShadowPin Feed Modes Automated Checkpoint
+
+- Immutable deploy `6a5575bcbc2a1131aab40695` and the stable isolated URL
+  passed the exact same two-account Pixel Chromium/iPhone WebKit verifier.
+- The run covered keyboard and touch mode selection, account-synced reload
+  persistence, universal Search, waiting and accepted-empty states, exact
+  cross-category chronological ordering, Connections-scoped Theater, hearts,
+  comments, Browser Back, removal/block fail-closed behavior, and explicit
+  reconnect recovery.
+- Feed and Theater surfaces remained inside `412x839` and `390x664` visual
+  viewports with zero horizontal overflow, runtime errors, failed requests,
+  HTTP errors, or unexpected Supabase hosts. Expected report-only WebKit CSP
+  messages remained diagnostics only.
+- Exact cleanup restored both feed preferences and proved zero scoped
+  Connection, block, Pin, category, heart, comment, notification, activity,
+  analytics, or preference residue. Evidence:
+  `output/playwright/wave3-shadow-pin-feed-modes/summary.json`.
+- Production ShadowChat and `main` remain unchanged. Installed iPhone/Android
+  PWA touch, browser-chrome, and resume acceptance remains a real-device gate.
+
 ## July 13 Wave Three Connections Automated Checkpoint
 
 - Immutable deploy `6a556190a9c126b4758b29f1` passed twice with two

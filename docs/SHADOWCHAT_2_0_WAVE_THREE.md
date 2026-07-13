@@ -137,9 +137,9 @@ Full contract:
   migration parity/dry run, old-frontend compatibility smoke, and the isolated
   Netlify trial must pass before Candidate 1 is accepted.
 
-## Candidate 2 Direction - ShadowPin Feed Modes
+## Candidate 2 Contract - ShadowPin Feed Modes
 
-Candidate 2 is active after the accepted Connections checkpoint. Feed Modes
+Candidate 2 is accepted after the Connections checkpoint. Feed Modes
 uses accepted, unblocked Connections through the canonical pair predicate and
 preserves current ShadowPin RLS, blocks, ready/deleted visibility, search,
 engagement, Creator Studio, notification, and Discover behavior. The exact
@@ -148,14 +148,30 @@ account preference, Connections-scoped Theater, accessibility, and cleanup
 contract is locked in
 [docs/SHADOW_PIN_FEED_MODES.md](C:/repos/chat2.0/docs/SHADOW_PIN_FEED_MODES.md:1).
 
-## Candidate 3 Direction - Inner Circles
+## Candidate 3 Contract - Inner Circles
 
-Candidate 3 begins only after Connections and Feed Modes are stable. Inner
-Circles will be private, owner-curated groupings of accepted Connections. It
-must not create a public social graph, silently reconnect removed members, or
-turn circle membership into an implicit DM or content-visibility bypass. Its
-audience semantics, limits, membership lifecycle, and future sharing behavior
-receive a separate approved contract before implementation.
+Candidate 3 is active after Connections and Feed Modes passed their independent
+gates. Inner Circles are private, owner-curated lists of accepted Connections.
+V1 supports up to 10 circles per owner and 50 members per circle. Circle names,
+membership, and counts are visible only to the owner; adding or removing a
+member creates no notification and no new relationship, DM, group chat, badge,
+or public graph signal.
+
+Membership is keyed to the member and revalidates the canonical accepted,
+unblocked Connection on every mutation and read. Disconnecting or blocking
+hard-deletes memberships in both directions. Unblocking or reconnecting never
+restores prior circle membership.
+
+Inside `feed=connections`, a transient owner-private circle filter may narrow
+the already eligible Connections feed. It is route state, not a third persisted
+feed mode, and it never grants visibility or creates a circle publishing
+audience. Search stays universal. Circle-scoped Theater must preserve the
+filter and use server-side keyset/window APIs; it must never client-filter broad
+pages or paint broader Connections content under a circle label.
+
+Circle-only publishing, sharing/audience permissions, group DMs, live rooms,
+member invitations, public counts, and member-facing Activity/reporting remain
+explicitly excluded from v1.
 
 ## Final Flagship Track
 
@@ -202,8 +218,11 @@ receive a separate approved contract before implementation.
   compatibility smoke, and immutable deploy `6a556190a9c126b4758b29f1`
   passed repeat Pixel Chromium/iPhone WebKit lifecycle, realtime, routing,
   focus, geometry, DM-independence, and zero-residue proof.
-- ShadowPin Feed Modes is the active Candidate 2 checkpoint. Inner Circles has
-  not started.
+- ShadowPin Feed Modes is accepted. Additive migration `20260713223200` is
+  linked; immutable deploy `6a5575bcbc2a1131aab40695` and the stable isolated
+  URL passed the complete two-account Pixel Chromium/iPhone WebKit feed,
+  Theater, engagement, lifecycle, routing, geometry, diagnostics, and
+  zero-residue verifier. Candidate 3 Inner Circles is active.
 - Shado Live is limited to specification/prototype work while its Activity and
   reporting dependencies remain paused.
 - Catch-Up remains queued behind a deterministic, source-linked contract; no
