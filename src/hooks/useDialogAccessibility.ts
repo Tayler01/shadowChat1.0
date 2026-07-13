@@ -61,10 +61,12 @@ export function useDialogAccessibility<TElement extends HTMLElement = HTMLDivEle
   const onCloseRef = useRef(onClose)
   const dismissibleRef = useRef(dismissible)
   const initialFocusRefRef = useRef(initialFocusRef)
+  const restoreFocusRef = useRef(restoreFocus)
 
   onCloseRef.current = onClose
   dismissibleRef.current = dismissible
   initialFocusRefRef.current = initialFocusRef
+  restoreFocusRef.current = restoreFocus
 
   useEffect(() => {
     if (!open || typeof document === 'undefined') return
@@ -132,7 +134,7 @@ export function useDialogAccessibility<TElement extends HTMLElement = HTMLDivEle
       if (lockScroll) {
         unlockBodyScroll()
       }
-      if (restoreFocus && previouslyFocused?.isConnected) {
+      if (restoreFocusRef.current && previouslyFocused?.isConnected) {
         previouslyFocused.focus({ preventScroll: true })
       }
     }

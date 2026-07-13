@@ -5,10 +5,12 @@ import { useDialogAccessibility } from '../src/hooks/useDialogAccessibility'
 function Harness({
   open,
   dismissible = true,
+  restoreFocus = true,
   onClose,
 }: {
   open: boolean
   dismissible?: boolean
+  restoreFocus?: boolean
   onClose: () => void
 }) {
   const firstRef = useRef<HTMLButtonElement>(null)
@@ -17,6 +19,7 @@ function Harness({
     onClose,
     dismissible,
     initialFocusRef: firstRef,
+    restoreFocus,
   })
 
   if (!open) return null
@@ -69,4 +72,22 @@ test('non-dismissible dialog contains Escape without closing', async () => {
 
   expect(onClose).not.toHaveBeenCalled()
   expect(screen.getByRole('dialog', { name: 'Test dialog' })).toBeInTheDocument()
+})
+
+test('suspending a parent dialog does not steal focus from the nested dialog', async () => {
+  const onClose = jest.fn()
+  const opener = document.createElement('button')
+  const nestedFocus = document.createElement('button')
+  document.body.append(opener, nestedFocus)
+  opener.focus()
+
+  const view = render(<Harness open onClose={onClose} />)
+  await waitFor(() => expect(screen.getByRole('button', { name: 'First action' })).toHaveFocus())
+
+  nestedFocus.focus()
+  view.rerender(<Harness open={false} restoreFocus={false} onClose={onClose} />)
+
+  expect(nestedFocus).toHaveFocus()
+  opener.remove()
+  nestedFocus.remove()
 })

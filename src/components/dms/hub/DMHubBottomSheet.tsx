@@ -34,6 +34,7 @@ export function DMHubBottomSheet({
     open: open && !suspended,
     onClose,
     initialFocusRef: closeRef,
+    restoreFocus: !suspended,
   })
 
   if (!open) return null
