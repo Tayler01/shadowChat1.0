@@ -28,7 +28,13 @@ type RefreshSessionResponse = {
 }
 
 const loggingFetch: typeof fetch = async (input, init) => {
-  return fetch(input, init)
+  const requestUrl = typeof input === 'string'
+    ? input
+    : input instanceof URL
+      ? input.href
+      : input.url
+  const keepalive = requestUrl.includes('/rest/v1/rpc/finish_shadow_pin_activity_session')
+  return fetch(input, keepalive ? { ...init, keepalive: true } : init)
 }
 
 const shouldUseRealtimeWorker =

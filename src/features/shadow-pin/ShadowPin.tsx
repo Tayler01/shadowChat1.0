@@ -3252,6 +3252,7 @@ function ShadowPinCategoryScreen({
   initialCommentId,
   initialPanel,
   onPinRoute,
+  onViewerClose,
 }: {
   currentView: AppView
   onViewChange: (view: AppView) => void
@@ -3263,6 +3264,7 @@ function ShadowPinCategoryScreen({
   initialCommentId?: string
   initialPanel?: 'viewer' | 'comments'
   onPinRoute: (action: PinRouteAction, imageId?: string, commentId?: string) => void
+  onViewerClose?: () => void
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
@@ -3353,6 +3355,7 @@ function ShadowPinCategoryScreen({
     setModal(null)
     setViewerSessionImages([])
     onPinRoute('close-viewer', viewerImage?.id)
+    onViewerClose?.()
   }
 
   const shareViewerImage = async (image: ShadowPinImage) => {
@@ -3723,6 +3726,7 @@ export function ShadowPin({
   onPinRoute = () => {},
 }: ShadowPinProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
+  const [returnHomeAfterViewerClose, setReturnHomeAfterViewerClose] = useState(false)
   const [initialImage, setInitialImage] = useState<ShadowPinImage | null>(null)
   const [initialNeighbors, setInitialNeighbors] = useState<ShadowPinImage[]>([])
   const [initialImageStatus, setInitialImageStatus] = useState<'idle' | 'loading' | 'unavailable'>('idle')
@@ -3812,13 +3816,22 @@ export function ShadowPin({
         currentView={currentView}
         onViewChange={onViewChange}
         categoryId={activeCategoryId}
-        onBack={() => setActiveCategoryId(null)}
+        onBack={() => {
+          setReturnHomeAfterViewerClose(false)
+          setActiveCategoryId(null)
+        }}
         tracker={tracker}
         initialImage={initialImage}
         initialNeighbors={initialNeighbors}
         initialCommentId={initialCommentId}
         initialPanel={initialPanel}
         onPinRoute={onPinRoute}
+        onViewerClose={returnHomeAfterViewerClose ? () => {
+          setReturnHomeAfterViewerClose(false)
+          setInitialImage(null)
+          setInitialNeighbors([])
+          setActiveCategoryId(null)
+        } : undefined}
       />
     )
   }
@@ -3827,9 +3840,13 @@ export function ShadowPin({
     <ShadowPinHome
       currentView={currentView}
       onViewChange={onViewChange}
-      onOpenCategory={category => setActiveCategoryId(category.id)}
+      onOpenCategory={category => {
+        setReturnHomeAfterViewerClose(false)
+        setActiveCategoryId(category.id)
+      }}
       onOpenPin={image => {
         if (!image.category_id) return
+        setReturnHomeAfterViewerClose(false)
         setInitialImage(image)
         setInitialNeighbors([])
         setActiveCategoryId(image.category_id)
@@ -3837,6 +3854,7 @@ export function ShadowPin({
       }}
       onPublishedPin={image => {
         if (!image.category_id) return
+        setReturnHomeAfterViewerClose(true)
         setInitialImage(image)
         setInitialNeighbors([])
         setActiveCategoryId(image.category_id)

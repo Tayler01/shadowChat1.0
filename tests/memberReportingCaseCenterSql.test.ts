@@ -6,6 +6,10 @@ const migration = readFileSync(
   'utf8'
 )
 const sql = migration.replace(/\s+/g, ' ').toLowerCase()
+const storagePolicyRepair = readFileSync(
+  join(process.cwd(), 'supabase/migrations/20260713051830_restore_moderation_storage_policy_helper_execution.sql'),
+  'utf8'
+).replace(/\s+/g, ' ').toLowerCase()
 
 describe('member reporting and Safety Case Center migration', () => {
   test('keeps reporting additive and limited to active production surfaces', () => {
@@ -84,5 +88,15 @@ describe('member reporting and Safety Case Center migration', () => {
     expect(sql).toContain('alter publication supabase_realtime add table public.moderation_report_updates')
     expect(sql).not.toContain('alter publication supabase_realtime add table public.moderation_evidence')
     expect(sql).not.toContain('alter publication supabase_realtime add table public.member_reports')
+  })
+
+  test('keeps authenticated Storage policy helpers executable without exposing the private schema', () => {
+    expect(storagePolicyRepair).toContain(
+      'grant execute on function private.can_read_moderation_attachment(uuid, text) to authenticated'
+    )
+    expect(storagePolicyRepair).toContain(
+      'grant execute on function private.is_submitted_moderation_attachment(text) to authenticated'
+    )
+    expect(storagePolicyRepair).not.toContain('grant usage on schema private to authenticated')
   })
 })

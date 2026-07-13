@@ -156,6 +156,29 @@ test('renders the URL prefill and blocks Details until a category is chosen', as
   expect(mockStageCreatorDraftMedia).not.toHaveBeenCalled()
 })
 
+test('locks media inputs until initial draft recovery finishes', async () => {
+  let resolveDrafts!: (value: ShadowPinCreatorDraftBundle[]) => void
+  mockListCreatorDrafts.mockReturnValue(new Promise(resolve => {
+    resolveDrafts = resolve
+  }))
+
+  const { container } = render(
+    <ShadowPinCreatorStudio
+      open
+      onClose={jest.fn()}
+      onPublished={jest.fn()}
+    />
+  )
+
+  const fileInput = container.ownerDocument.querySelector<HTMLInputElement>('input[type="file"]')
+  expect(fileInput).toBeDisabled()
+
+  await act(async () => {
+    resolveDrafts([])
+  })
+  await waitFor(() => expect(fileInput).toBeEnabled())
+})
+
 test('moves through Preview and requires explicit confirmation before publishing', async () => {
   const onClose = jest.fn()
   const onPublished = jest.fn()

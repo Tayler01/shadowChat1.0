@@ -2,16 +2,31 @@
 
 ## Status
 
-Wave Two Candidate 3 is implemented and locally hardened on
-`codex/shadowchat-2.0` as of July 13, 2026. The production `main` frontend and
-production Netlify site remain unchanged. Seven focused model, history, API,
-component, lazy-entry, media, and SQL contract suites pass locally with 46
-tests; the broader Candidate 3 route/ShadowPin set passes 9 suites and 107
-tests. The hardening backend gate also passes a fresh local reset, expanded
-rollback verifier, database lint/advisors, Deno/Node checks, and 3 focused
-suites with 21 tests. Linked-backend alignment, cross-account browser,
-deployment, and physical-device proof remain release-gate checks until
-separately recorded.
+Wave Two Candidate 3 is implemented, locally hardened, and authenticated-live
+verified on `codex/shadowchat-2.0` as of July 13, 2026. The production `main`
+frontend and production Netlify site remain unchanged. Seven focused model,
+history, API, component, lazy-entry, media, and SQL contract suites pass
+locally with 46 tests; the broader Candidate 3 route/ShadowPin set passes 9
+suites and 107 tests. The hardening backend gate also passes a fresh local
+reset, expanded rollback verifier, database lint/advisors, Deno/Node checks,
+and 3 focused suites with 21 tests.
+
+The final two-account image workflow passed against immutable isolated Netlify
+deploy `6a547e5dd6c68d5f16aba9da` on Pixel Chromium `412x915` and iPhone WebKit
+`390x844`. It proved viewport geometry, owner-private draft/asset reads,
+owner-signed private preview recovery after save/reload, idempotent one-Pin
+publication, one eligible recipient notification plus realtime toast, exact
+Pin Theater visibility, and return to the ShadowPin origin with zero
+console/page/media-API errors. Cleanup removed the one draft, one asset, one
+canonical Pin, all linked notifications/activity/analytics rows, three private
+objects, and three public objects; every scoped remaining count was zero.
+Evidence is in
+`output/playwright/wave2-candidate3-creator-studio/summary.json`.
+
+Linked history/dry-run and the combined Wave Two regression gate remain
+separate release checks. Physical installed-PWA camera/library, keyboard,
+safe-area, background upload/resume, VoiceOver, and TalkBack proof also remains
+required and is not claimed by automated WebKit.
 
 ## Product Contract
 

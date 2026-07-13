@@ -8,6 +8,36 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-13
 
+## July 13 ShadowChat 2.0 ShadowPin Creator Studio - Authenticated Checkpoint
+
+- Immutable isolated deploy only:
+  `https://6a547e5dd6c68d5f16aba9da--shadowchat-2-0-wave-one.netlify.app`.
+  The verifier rejected mutable/unexpected origins and blocked any unexpected
+  Supabase project host; production was not used.
+- Two controlled accounts passed Pixel Chromium `412x915` and iPhone WebKit
+  `390x844`. Studio and Theater matched the visual viewport with no horizontal
+  overflow.
+- Account A staged an image in the owner-private draft bucket, saved/exited,
+  reloaded, recovered it through an owner-signed URL, and published exactly one
+  canonical Pin. Repeating finalization returned the same Pin.
+- Account B could not read A's draft/asset or mint its signed URL. After
+  publication B saw the exact Pin and received exactly one eligible
+  notification plus its realtime toast.
+- Exact Theater routing and close-to-ShadowPin-origin behavior passed. Both
+  engines had zero console errors, page errors, unexpected Supabase hosts, and
+  critical media/RPC/Storage responses; report-only CSP diagnostics were
+  recorded separately.
+- Cleanup removed 1 draft, 1 staged asset, 1 Pin, 24 notification rows, 24
+  mirrored activity rows, 26 analytics events, 4 analytics sessions, 3 private
+  Storage objects, and 3 public Storage objects. Post-cleanup checks reported
+  zero remaining scoped rows and objects.
+- Evidence:
+  `output/playwright/wave2-candidate3-creator-studio/summary.json` and the paired
+  Pixel/iPhone Studio, recovery, and Theater screenshots in that directory.
+- Remaining real-device scope: installed-PWA camera/library picker, native
+  keyboard and safe areas, background upload/resume, VoiceOver, TalkBack, and
+  touch comfort. Automated WebKit is not physical-device certification.
+
 ## July 12 ShadowChat 2.0 ShadowPin Creator Studio - Local Implementation
 
 - Branch: `codex/shadowchat-2.0`; production `main` frontend remains

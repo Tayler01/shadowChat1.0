@@ -59,4 +59,16 @@ describe('ShadowPin Creator Studio entrypoint contracts', () => {
     expect(studio).toMatch(/Creator Studio steps[\s\S]*?className=\{cn\('min-h-(?:11|12)\b/)
     expect(studio).toMatch(/className="[^"]*min-h-(?:11|12)\b[^"]*"[^>]*>Use different media/)
   })
+
+  test('drains metadata autosaves before revision-guarded media staging', () => {
+    const studio = source('src/features/shadow-pin/creator/ShadowPinCreatorStudio.tsx')
+    const stageStart = studio.indexOf('const stageMedia = useCallback')
+    const stageEnd = studio.indexOf('const openAvailableDraft', stageStart)
+    const stageBody = studio.slice(stageStart, stageEnd)
+
+    expect(stageBody).toContain('await flushCurrentDraft()')
+    expect(stageBody).toContain('const current = stateRef.current')
+    expect(stageBody).toContain('stageCreatorDraftMedia(bundle.draft, currentValues')
+    expect(stageBody).not.toContain('const bundle = await saveNow()')
+  })
 })

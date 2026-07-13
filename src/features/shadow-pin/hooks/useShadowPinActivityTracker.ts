@@ -40,6 +40,7 @@ const reportAnalyticsError = (error: unknown) => {
 export function useShadowPinActivityTracker() {
   const { user } = useAuth()
   const sessionIdRef = useRef<string | null>(null)
+  const finishingSessionRef = useRef<string | null>(null)
   const startedRef = useRef(false)
   const visibleSinceRef = useRef<number | null>(null)
   const visibleMsRef = useRef(0)
@@ -77,8 +78,9 @@ export function useShadowPinActivityTracker() {
 
   const flushSession = useCallback(() => {
     const sessionId = sessionIdRef.current
-    if (!sessionId) return
+    if (!sessionId || finishingSessionRef.current === sessionId) return
 
+    finishingSessionRef.current = sessionId
     const durationSeconds = getVisibleDurationSeconds()
     void finishShadowPinActivitySession(sessionId, durationSeconds).catch(reportAnalyticsError)
   }, [getVisibleDurationSeconds])
@@ -97,6 +99,7 @@ export function useShadowPinActivityTracker() {
       .then(sessionId => {
         if (active) {
           sessionIdRef.current = sessionId
+          finishingSessionRef.current = null
         }
       })
       .catch(reportAnalyticsError)
@@ -117,6 +120,7 @@ export function useShadowPinActivityTracker() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        finishingSessionRef.current = null
         visibleSinceRef.current = Date.now()
         return
       }

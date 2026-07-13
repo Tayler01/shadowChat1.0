@@ -478,9 +478,18 @@ export function ShadowPinCreatorStudio({
   }, [draftSwitching, open, recoveryPending, saveNow, state.dirtyRevision, state.operation, state.savedRevision, state.values.categoryId, state.values.fileFingerprint, state.values.keepExistingMedia, state.values.sourceMode, state.values.sourceUrl])
 
   const stageMedia = useCallback(async () => {
-    const bundle = await saveNow()
-    const currentKey = sourceKey(state.values)
-    if (state.values.keepExistingMedia && asset) {
+    // Staging is revision guarded on the server. Drain any in-flight or
+    // scheduled metadata save first so the media request cannot race a newer
+    // draft revision and fail after the user presses Continue.
+    const flushed = await flushCurrentDraft()
+    const current = stateRef.current
+    if (!flushed || !current.draft) {
+      throw new Error('Save this draft before staging its media.')
+    }
+    const bundle = { draft: current.draft, asset }
+    const currentValues = current.values
+    const currentKey = sourceKey(currentValues)
+    if (currentValues.keepExistingMedia && asset) {
       if (isAssetReady(asset)) return { draft: bundle.draft, asset: bundle.asset ?? asset }
       const synced = await syncCreatorDraftStatus(bundle.draft)
       setAsset(current => synced.asset ?? current)
@@ -490,15 +499,15 @@ export function ShadowPinCreatorStudio({
     uploadAbortRef.current?.abort()
     const controller = new AbortController()
     uploadAbortRef.current = controller
-    dispatch({ type: 'operation', operation: inferCreatorSourceKind(state.values).includes('upload') ? 'uploading' : 'processing', progress: 0, error: null })
+    dispatch({ type: 'operation', operation: inferCreatorSourceKind(currentValues).includes('upload') ? 'uploading' : 'processing', progress: 0, error: null })
     try {
-      const staged = await stageCreatorDraftMedia(bundle.draft, state.values, {
+      const staged = await stageCreatorDraftMedia(bundle.draft, currentValues, {
         signal: controller.signal,
         onProgress: progress => dispatch({ type: 'operation', operation: 'uploading', progress }),
       })
       setAsset(current => staged.asset ?? current)
       stagedSourceKeyRef.current = currentKey
-      applyAsyncAction({ type: 'draft-saved', draft: staged.draft, savedRevision: state.dirtyRevision })
+      applyAsyncAction({ type: 'draft-saved', draft: staged.draft, savedRevision: current.dirtyRevision })
       return staged
     } catch (error) {
       if ((error as { name?: string })?.name !== 'AbortError') {
@@ -508,7 +517,7 @@ export function ShadowPinCreatorStudio({
     } finally {
       if (uploadAbortRef.current === controller) uploadAbortRef.current = null
     }
-  }, [applyAsyncAction, asset, saveNow, state.dirtyRevision, state.values])
+  }, [applyAsyncAction, asset, flushCurrentDraft])
 
   const openAvailableDraft = async (bundle: ShadowPinCreatorDraftBundle) => {
     if (bundle.draft.id === stateRef.current.draft?.id || draftSwitching) return
@@ -682,6 +691,7 @@ export function ShadowPinCreatorStudio({
 
         <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-[calc(env(safe-area-inset-bottom)_+_6rem)] sm:px-5" data-testid={`creator-step-${state.step}`}>
           <div className="mx-auto max-w-3xl">
+            <fieldset disabled={busy} className="contents" aria-label="Creator Studio editor" aria-busy={busy}>
             {state.step === 'media' && availableDrafts.length > 1 && (
               <section className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-white/[0.025] p-3" aria-labelledby="creator-drafts-title">
                 <div className="flex items-center justify-between gap-3">
@@ -792,6 +802,7 @@ export function ShadowPinCreatorStudio({
                 <Button type="button" size="lg" className="w-full" loading={state.operation === 'publishing'} disabled={!state.publishConfirmed || busy} onClick={() => void publish()}><Check className="mr-2 h-5 w-5" /> Publish Pin</Button>
               </section>
             )}
+            </fieldset>
 
             {state.error && <div className="mt-5 rounded-[var(--radius-md)] border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-100" role="alert">{state.error}</div>}
           </div>
