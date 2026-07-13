@@ -2,7 +2,7 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
-## Documentation Status - July 12, 2026
+## Documentation Status - July 13, 2026
 
 This handbook is current through the July 10 production-alignment and Release A
 deployment: the paused-domain contract, Supabase
@@ -21,9 +21,11 @@ read
 
 On `codex/shadowchat-2.0`, all five Wave One candidate implementations remain
 preserved. Activity and member-facing report intake stay paused, while the
-operator Safety Case Center remains available. Wave Two is now active in the
-fixed sequence Universal Discovery & Library, True General Chat Threads,
-ShadowPin Creator Studio, then First-Run Activation Journey. Read
+operator Safety Case Center remains available. All four Wave Two candidates
+are implemented and passed their local, shared-backend, immutable-Netlify, and
+automated Pixel Chromium/iPhone WebKit gates. The exact trial deploy is
+`6a549b1e052c56307d851b7d`; production `main` remains unchanged while Tayler's
+installed-phone acceptance is pending. Read
 [docs/SHADOWCHAT_2_0_WAVE_TWO.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_TWO.md:1)
 before changing that branch track; use
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)

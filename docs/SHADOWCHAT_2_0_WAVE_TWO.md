@@ -226,6 +226,74 @@ Full contract:
 Full contract:
 [docs/SHADOW_PIN_CREATOR_STUDIO.md](C:/repos/chat2.0/docs/SHADOW_PIN_CREATOR_STUDIO.md:1).
 
+## Candidate 4 Contract - First-Run Activation Journey
+
+### Product shape
+
+- Enroll only genuine invite signups created after the activation rollout.
+  Existing members and non-invite profiles retain the current app and legacy
+  install guidance without receiving a synthetic journey.
+- Keep setup non-blocking and resumable. Close/minimize preserves server
+  progress; reload and another device recover the authoritative revision.
+- Guide identity review, notification choice, device-local Comfort review, and
+  one selected first action: General Chat message, direct message, or
+  ShadowPin image heart.
+- Let the canonical action complete the core journey server-side, then restore
+  a compact success card. PWA installation stays optional and never gates core
+  completion.
+- Use truthful device-specific install help. iPhone receives Safari steps and
+  Android retains its matching video/native prompt path.
+
+### Architecture decision
+
+- Add owner-private `user_activation_journeys` plus a fixed rollout marker.
+  An `AFTER INSERT` profile trigger enrolls only a post-rollout Auth user with
+  a matching post-rollout private invite-redemption receipt; there is no
+  backfill.
+- Keep the read RPC `SECURITY INVOKER`. The exact public mutation signature is
+  also `SECURITY INVOKER` and delegates to an owner-checking, revision-guarded
+  definer in the unexposed `activation_private` schema.
+- Record immutable completion from canonical message, DM, and ShadowPin-heart
+  insert triggers only when the action matches the member's selected intent.
+- Enforce identity-before-preferences, preferences-before-action, and
+  completion-before-install in validated database constraints, not only in the
+  React flow.
+- Revoke PostgreSQL's global default function execution for future
+  postgres-owned functions. Every future API function must grant intended
+  roles explicitly.
+
+### Security boundaries
+
+- Force RLS, grant authenticated members owner-only `SELECT`, and deny direct
+  member `INSERT`, `UPDATE`, and `DELETE`.
+- Reject anonymous RPC execution, missing enrollment, stale revisions,
+  out-of-order receipts, unsupported choices, and attempts to change a
+  completed first-action kind.
+- Keep `activation_private` out of PostgREST exposed schemas. Direct public
+  helper lookup and explicit private-schema requests must both fail.
+- Keep shared-backend changes additive: no production RPC, table-column, or
+  legacy frontend contract is removed or changed.
+
+### Verification gate
+
+- Fresh local replay and transactional SQL proof must cover future-only invite
+  enrollment, non-invite/pre-rollout negatives, forced-RLS isolation, denied
+  direct writes, stale revisions, receipt ordering, minimize/resume, all three
+  canonical action routes, idempotency, optional install, and rollback cleanup.
+- Catalog and hosted REST proof must show invoker-only public RPC, unexposed
+  owner-checked definer, explicit ACLs, fail-closed future function defaults,
+  and no activation security-advisor finding.
+- Pixel Chromium and iPhone WebKit must prove signup enrollment, Back/Escape/
+  reload recovery, keyboard/footer geometry, Chat/DM/Pin handoffs, first-action
+  completion, install outcomes, text scaling, cross-account isolation, zero
+  unexpected browser/network errors, and complete disposable-data cleanup.
+- Lint, TypeScript, build/paused chunks/budgets, focused/full Jest, linked
+  history/dry run, and the immutable isolated Netlify deploy must pass before
+  Candidate 4 is accepted.
+
+Full contract:
+[docs/FIRST_RUN_ACTIVATION_JOURNEY.md](C:/repos/chat2.0/docs/FIRST_RUN_ACTIVATION_JOURNEY.md:1).
+
 ## Release Boundaries
 
 - Boards, News, Art Board, ESP Bridge, Activity, and member report intake stay
@@ -246,7 +314,7 @@ compatibility verification, authenticated short mobile probes, and a separate
 Netlify deploy/health-manifest check. The trial is then handed to Tayler for
 installed-phone acceptance. Nothing merges to `main` before that approval.
 
-## Progress - July 12, 2026
+## Progress - July 13, 2026
 
 - Wave Two scope recovered and locked to the four candidates above.
 - GitHub, Netlify, linked Supabase, Node/npm/npx, and Playwright checks are
@@ -298,9 +366,54 @@ installed-phone acceptance. Nothing merges to `main` before that approval.
   contract suites pass with 46 tests; the broader Candidate 3 route/ShadowPin
   set passes 9 suites and 107 tests. The hardening backend gate passes a fresh
   local reset, expanded rollback verifier, database lint/advisors, Deno/Node
-  checks, and 3 focused suites with 21 tests. Linked history/dry-run,
-  cross-account browser, function-deploy, production notification, and full
-  test-data/media cleanup proof remain open.
+  checks, and 3 focused suites with 21 tests.
+- Candidate 3's expanded final checkpoint passed against immutable isolated
+  Netlify deploy `6a549b1e052c56307d851b7d`, not production or the mutable
+  site alias. Nineteen recorded checks across Pixel Chromium `412x915` and
+  iPhone WebKit `390x844` proved every Studio entry point, image/local-video/
+  external-video/image-URL selection, private draft/asset isolation, signed
+  recovery, injected retry recovery, one idempotent Pin/event, exact Theater
+  routing, and atomic edit/category-move/media replacement. The expanded run
+  found and fixed an existing-poster preview ordering regression; replacement
+  selection now shows the new blob immediately while public media remains
+  unchanged until finalization. Cleanup removed all scoped database and Storage
+  artifacts and verified zero remaining rows and objects. Evidence:
+  `output/playwright/wave2-candidate3-creator-studio/summary.json`.
+- Candidate 3 linked history/dry-run and the combined Wave Two regression gate
+  are clean. The authenticated checkpoint does not claim production
+  publication or physical installed-PWA certification.
+- Candidate 4 is implemented and remotely aligned. Its activation table is
+  future-invite-only and owner-private; validated constraints enforce receipt
+  order; canonical message/DM/Pin triggers own completion; the public mutation
+  RPC is invoker-only over an unexposed owner-checking definer; and future
+  postgres-owned functions now default to no role execution.
+- Candidate 4 passed a fresh local replay, rollback-only transactional
+  verifier, local/linked lint, local advisors, hosted activation-advisor filter,
+  catalog/REST privilege negatives, linked migration parity, and exact remote
+  no-pending proof.
+- Candidate 4's expanded authenticated checkpoint passed on immutable deploy
+  `6a549b1e052c56307d851b7d`: six Pixel Chromium/iPhone WebKit profiles, 139
+  checks, and 47 screenshots across General Chat, DM, and ShadowPin action
+  choices. It proves future-invite enrollment, Escape/Back/reload resume,
+  focused footer geometry, nested DM and Pin raw-Back restoration, all three
+  canonical actions in both engines, cross-owner denial, optional install
+  contracts, zero browser/network/origin/backend errors, and zero live push
+  delivery. Cleanup removed all six users/invites, four messages, two DM
+  conversations, and two Pin hearts and proved all 14 scoped counters zero.
+  Evidence:
+  `output/playwright/wave2-candidate4-activation/activation-1783930103447-a91d2b7f0b9c/summary.json`.
+- The expanded Pin action found and fixed a URL/local-state race where Browser
+  Back before exact-image lookup completion could leave Theater open after
+  `?pin=` disappeared. Route absence now closes only the route-owned viewer and
+  preserves the category grid; focused Jest plus Pixel/WebKit live proof pass.
+- The combined repository gate passed 188 Jest suites / 972 tests / 16
+  intentional todos, zero-warning lint, TypeScript, warning-free production build, paused
+  feature verification, and bundle budgets. The exact deploy health endpoint
+  returned directly with HTTP 200. Its optional build identity fields were
+  null, so verification bound the Netlify API deploy ID, immutable hostname,
+  and all deployed JavaScript chunks instead.
+- All four Wave Two candidates are ready for Tayler's installed-phone trial.
+  Production `main` and the production Netlify frontend remain unchanged.
 - Physical installed-PWA
   keyboard, VoiceOver/TalkBack, and touch-comfort checks remain Wave Two
   release-gate follow-ups rather than automated-browser claims.

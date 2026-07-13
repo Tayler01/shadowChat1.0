@@ -8,18 +8,55 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-13
 
+## July 13 ShadowChat 2.0 First-Run Activation - Authenticated Checkpoint
+
+- Exact immutable deploy only:
+  `https://6a549b1e052c56307d851b7d--shadowchat-2-0-wave-one.netlify.app`.
+  The verifier bound the API deploy ID, immutable origin, all 53 JavaScript
+  chunks, and expected Supabase project before writes. Production and the
+  mutable alias were not used.
+- Six future-invite profiles passed 139 checks with 47 screenshots across Pixel
+  Chromium and iPhone WebKit. General Chat, DM, and ShadowPin choices each pass
+  in both engines with exact invite-hook enrollment, Escape/Browser-Back/reload
+  resume, nested DM/Pin Back, focused footer geometry, 130% Comfort, canonical
+  receipt completion, foreground success, and optional install behavior.
+- Both engines had zero console, page, HTTP, request, navigation, unexpected
+  origin/backend, or horizontal-overflow errors. Four exact Chat/DM push
+  requests were intercepted and validated; no live push was delivered. Expected
+  report-only WebKit CSP messages were recorded separately as diagnostics.
+- The Pin flow exposed and fixed a real prefetch race: raw Browser Back could
+  remove `?pin=` while locally opened Theater stayed mounted. Route absence now
+  closes only the route-owned viewer and leaves the category masonry intact;
+  focused Jest and both live engines pass.
+- Strict cleanup removed 6 disposable Auth users, 6 invites, 2 Chat messages,
+  2 DM messages, 2 conversations, and 2 Pin hearts. All 14 scoped remaining
+  counters were zero and no recovery journal remained.
+- Evidence:
+  `output/playwright/wave2-candidate4-activation/activation-1783930103447-a91d2b7f0b9c/summary.json`.
+- The official Supabase generated signup-link path created canonical invited
+  users without sending email, so invite redemption/enrollment is proved but
+  email delivery is explicitly not claimed. Native OS install-sheet acceptance,
+  installed Home Screen launch, VoiceOver, TalkBack, and physical touch comfort
+  remain the phone-acceptance scope.
+
 ## July 13 ShadowChat 2.0 ShadowPin Creator Studio - Authenticated Checkpoint
 
 - Immutable isolated deploy only:
-  `https://6a547e5dd6c68d5f16aba9da--shadowchat-2-0-wave-one.netlify.app`.
+  `https://6a549b1e052c56307d851b7d--shadowchat-2-0-wave-one.netlify.app`.
   The verifier rejected mutable/unexpected origins and blocked any unexpected
   Supabase project host; production was not used.
-- Two controlled accounts passed Pixel Chromium `412x915` and iPhone WebKit
-  `390x844`. Studio and Theater matched the visual viewport with no horizontal
-  overflow.
+- Two controlled accounts passed 19 recorded checks across Pixel Chromium
+  `412x915` and iPhone WebKit `390x844`. Studio and Theater matched the visual
+  viewport with no horizontal overflow; 130% text, reduced motion, and
+  simulated keyboard compression also passed.
+- Home, category, General Chat, DM, and existing-Pin edit entry points passed.
+  Image upload, local short-video selection/metadata, external-video URL, and
+  image URL passed, including one injected media retry and idempotent Storage
+  duplicate recovery.
 - Account A staged an image in the owner-private draft bucket, saved/exited,
   reloaded, recovered it through an owner-signed URL, and published exactly one
-  canonical Pin. Repeating finalization returned the same Pin.
+  canonical Pin. Repeating finalization returned the same Pin. Edit, category
+  move, and media replacement retained the same Pin and emitted no new event.
 - Account B could not read A's draft/asset or mint its signed URL. After
   publication B saw the exact Pin and received exactly one eligible
   notification plus its realtime toast.
@@ -27,18 +64,27 @@ Last updated: 2026-07-13
   engines had zero console errors, page errors, unexpected Supabase hosts, and
   critical media/RPC/Storage responses; report-only CSP diagnostics were
   recorded separately.
-- Cleanup removed 1 draft, 1 staged asset, 1 Pin, 24 notification rows, 24
-  mirrored activity rows, 26 analytics events, 4 analytics sessions, 3 private
-  Storage objects, and 3 public Storage objects. Post-cleanup checks reported
-  zero remaining scoped rows and objects.
+- The expanded run found and fixed a real preview-order bug where an existing
+  poster masked a newly selected replacement blob. The focused component test
+  and exact deploy prove the replacement is visible immediately while the old
+  public media remains canonical until finalization.
+- Cleanup removed 4 drafts, 5 staged assets, 1 Pin, 24 notification rows, 24
+  mirrored activity rows, 13 analytics events, 9 analytics sessions, 9 private
+  Storage objects, 7 public objects, 1 Chat row, 1 DM row, and 2 temporary
+  categories. Post-cleanup checks reported zero remaining scoped rows/objects.
 - Evidence:
   `output/playwright/wave2-candidate3-creator-studio/summary.json` and the paired
   Pixel/iPhone Studio, recovery, and Theater screenshots in that directory.
 - Remaining real-device scope: installed-PWA camera/library picker, native
   keyboard and safe areas, background upload/resume, VoiceOver, TalkBack, and
-  touch comfort. Automated WebKit is not physical-device certification.
+  touch comfort. Native Bunny/TUS provider upload was intentionally not spent
+  by browser QA and remains covered by lifecycle/source tests. Automated WebKit
+  is not physical-device certification.
 
-## July 12 ShadowChat 2.0 ShadowPin Creator Studio - Local Implementation
+## July 12 ShadowChat 2.0 ShadowPin Creator Studio - Historical Local Implementation
+
+This entry records the implementation state before the authenticated checkpoint
+above and is retained as historical evidence.
 
 - Branch: `codex/shadowchat-2.0`; production `main` frontend remains
   unchanged.
@@ -54,18 +100,19 @@ Last updated: 2026-07-13
   target-version rejection, atomic promotion recovery, private Bunny drafts,
   rate budgets, and asset caps. This is code-level proof, not browser or
   linked-backend acceptance.
-- Required Pixel Chromium `412x915` and iPhone WebKit `390x844` proof must
-  cover home/category/Chat/DM/Edit entry prefills, image/video/URL preview,
+- At this checkpoint, the required Pixel Chromium `412x915` and iPhone WebKit
+  `390x844` proof still needed to cover home/category/Chat/DM/Edit entry prefills, image/video/URL preview,
   category/tags, close-reload-offline recovery, upload retry/resume, keyboard
   and safe areas, 130% text, large controls, reduced motion, Back/cold close,
   and zero overflow or console/page errors.
-- Required two-account proof must keep Account A's draft/staged media invisible
+- At this checkpoint, required two-account proof still needed to keep Account A's draft/staged media invisible
   to B, deliver one Pin/event only after publish, suppress repeat events on
   edit/move/replacement, and keep old media visible until an atomic replacement
   succeeds.
-- No Candidate 3 browser artifact, physical-device result, production Pin,
-  notification fanout, or test-data/media cleanup is claimed by this entry.
-  Evidence paths and cleanup counts will be added only after the runs finish.
+- This historical entry did not claim a Candidate 3 browser artifact,
+  physical-device result, production Pin, notification fanout, or
+  test-data/media cleanup. The authenticated checkpoint above now records the
+  later browser evidence and cleanup counts.
 - Contract: [SHADOW_PIN_CREATOR_STUDIO.md](C:/repos/chat2.0/docs/SHADOW_PIN_CREATOR_STUDIO.md:1).
 
 ## July 12 ShadowChat 2.0 General Chat Threads Checkpoint

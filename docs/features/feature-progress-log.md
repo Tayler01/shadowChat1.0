@@ -1,6 +1,6 @@
 # Feature Progress Log
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 13, 2026
 
 Refreshed for the July 10 Release A deployment. Historical feature entries
 remain below; current shipped-versus-candidate status and follow-ups are tracked
@@ -39,9 +39,10 @@ Canonical detail and release gates live in:
   ShadowPin Creator Studio, and the First-Run Activation Journey on the
   isolated `codex/shadowchat-2.0` branch without changing production `main`.
 - Started: 2026-07-12
-- Status: active. Candidates 1 and 2 are implemented, documented, remotely
-  aligned, and passed their local/mobile checkpoints. Candidate 3 strategy is
-  accepted; implementation and verification are in progress.
+- Status: automated Wave Two gate complete. All four candidates are
+  implemented, documented, remotely aligned, and passed their local plus
+  authenticated immutable-deploy checkpoints. The isolated trial is ready for
+  Tayler's installed-phone acceptance; production `main` remains unchanged.
 - Backend boundary: shared Supabase changes are additive and backward
   compatible. Existing production RPC signatures and RLS remain authoritative.
 - Delivery boundary: four separate verified checkpoints, then a combined
@@ -92,10 +93,39 @@ Canonical detail and release gates live in:
   with scheduled orphan recovery, private-until-publish Bunny delivery, and
   bounded media work. The hardening backend gate passes a fresh local reset,
   expanded rollback verifier, database lint/advisors, Deno/Node checks, and 3
-  focused suites with 21 tests. Linked history/dry-run, function deployment,
-  full Jest/build, two-account Chromium/WebKit, and media cleanup proof remain
-  open.
+  focused suites with 21 tests. The expanded authenticated workflow passed on
+  final immutable Netlify deploy `6a549b1e052c56307d851b7d` with two controlled
+  accounts, Pixel Chromium `412x915`, and iPhone WebKit `390x844`. Nineteen
+  recorded checks cover every entry path, image/local-video/URL selection,
+  retry, private recovery, one Pin/event, Theater routing, and atomic edit/move/
+  replacement. It found and fixed an existing-poster preview ordering bug; the
+  exact deploy and focused regression now pass. Cleanup proved zero remaining
+  scoped database/Storage artifacts. Linked history/dry-run and the combined
+  Wave Two regression gate are clean.
+  Physical installed-PWA proof remains Tayler's separate acceptance gate.
 - Candidate 3 contract: [SHADOW_PIN_CREATOR_STUDIO.md](C:/repos/chat2.0/docs/SHADOW_PIN_CREATOR_STUDIO.md:1)
+- Candidate 4: a future-invite-only First-Run Activation Journey with
+  resumable identity, notification/Comfort review, one server-confirmed first
+  action, and optional install guidance.
+- Candidate 4 backend proof: additive linked migrations, future-only genuine
+  invite enrollment with no backfill, forced owner-private RLS, validated step
+  order, revision conflicts, canonical Chat/DM/Pin completion, invoker-only
+  public RPC over an unexposed owner-checking definer, fail-closed future
+  function defaults, clean local replay, transactional rollback verifier,
+  zero linked lint findings, zero activation advisor findings, and linked
+  no-pending proof.
+- Candidate 4 product proof: immutable deploy `6a549b1e052c56307d851b7d`,
+  six Pixel Chromium/iPhone WebKit profiles, 139 checks, and 47 screenshots.
+  General Chat, DM, and ShadowPin actions pass in both engines with exact server
+  enrollment, Escape/Back/reload resume, focused footer geometry, nested-route
+  restoration, cross-owner denial, optional install contracts, zero browser/
+  network/backend errors, and four exact intercepted push requests with zero
+  live delivery. The run also found and fixed a Pin Browser-Back lookup race.
+  Cleanup removed six users/invites, four messages, two conversations, and two
+  hearts and proved all 14 counters zero. Email delivery was intentionally
+  excluded; the official generated signup-link path created canonical Auth
+  users without sending email.
+- Candidate 4 contract: [FIRST_RUN_ACTIVATION_JOURNEY.md](C:/repos/chat2.0/docs/FIRST_RUN_ACTIVATION_JOURNEY.md:1)
 
 ## Prior Goal
 
