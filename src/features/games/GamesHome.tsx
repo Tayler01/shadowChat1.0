@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Film, Gamepad2, Volume2, VolumeX } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { Film, Gamepad2, Radio, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { createGameSoundtrackController, type GameSoundtrackController } from './gameSoundtrack'
 import { ShadowWarScreen } from './shadow-war/ShadowWarScreen'
@@ -18,6 +18,7 @@ import { ShadowMysteryScreen } from '../entertainment/shadow-mystery/ShadowMyste
 import { SHADOW_MYSTERY_ASSETS } from '../entertainment/shadow-mystery/assets/manifest'
 import { WillKirkScreen } from '../entertainment/will-kirk/WillKirkScreen'
 import { WILL_KIRK_ASSETS } from '../entertainment/will-kirk/assets/manifest'
+import { SHADO_LIVE_PROTOTYPE_ENABLED } from '../../config/featureFlags'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import type { AppView } from '../../types/navigation'
 import type { PlayExperience, PlayRouteAction } from '../../lib/appRouting'
@@ -32,6 +33,10 @@ interface GamesHomeProps {
 }
 
 type SelectedEntertainment = PlayExperience | null
+
+const LazyShadoLivePrototype = SHADO_LIVE_PROTOTYPE_ENABLED
+  ? lazy(() => import('../entertainment/shado-live/ShadoLivePrototype').then(module => ({ default: module.ShadoLivePrototype })))
+  : null
 
 type ShadowRunnerOrientationLock =
   | 'any'
@@ -62,7 +67,7 @@ function readLocalPreviewEntertainment(): SelectedEntertainment {
   if (!isLocalHost) return null
 
   const localPreview = new URLSearchParams(window.location.search).get('localPreview')
-  if (localPreview === 'shadow-runner' || localPreview === 'shado-tv' || localPreview === 'shadow-mystery') {
+  if (localPreview === 'shadow-runner' || localPreview === 'shado-tv' || localPreview === 'shadow-mystery' || (SHADO_LIVE_PROTOTYPE_ENABLED && localPreview === 'shado-live')) {
     return localPreview
   }
 
@@ -245,6 +250,17 @@ export function GamesHome({
     closeExperience('will-kirk')
   }
 
+  const enterShadoLive = () => {
+    pauseMusic()
+    setAudioBlocked(false)
+    openExperience('shado-live')
+  }
+
+  const exitShadoLive = () => {
+    setAudioBlocked(false)
+    closeExperience('shado-live')
+  }
+
   const toggleMusic = () => {
     if (musicPlaying) {
       pauseMusic()
@@ -347,6 +363,12 @@ export function GamesHome({
         <div className="h-full min-h-0 overflow-hidden bg-black">
           <WillKirkScreen onExit={exitWillKirk} />
         </div>
+      ) : selectedEntertainment === 'shado-live' && SHADO_LIVE_PROTOTYPE_ENABLED && LazyShadoLivePrototype ? (
+        <div className="h-full min-h-0 overflow-hidden bg-black">
+          <Suspense fallback={<div className="grid h-full place-items-center bg-black text-sm text-[var(--text-muted)]">Opening Shado Live preview...</div>}>
+            <LazyShadoLivePrototype onExit={exitShadoLive} />
+          </Suspense>
+        </div>
       ) : (
         <motion.div
       initial={{ opacity: 0 }}
@@ -362,6 +384,29 @@ export function GamesHome({
       />
 
       <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)] md:p-6">
+        {SHADO_LIVE_PROTOTYPE_ENABLED && <button
+          type="button"
+          aria-label="Open Shado Live prototype"
+          onClick={enterShadoLive}
+          className={pickerCardClass}
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_18%,rgba(232,189,88,0.32),transparent_29%),radial-gradient(circle_at_18%_78%,rgba(112,72,178,0.2),transparent_36%),linear-gradient(135deg,#181208,#030303_64%)]" />
+          <div className="absolute inset-y-0 right-[14%] w-px bg-gradient-to-b from-transparent via-[#e8bd58]/45 to-transparent" />
+          <div className="absolute right-[8%] top-1/2 h-20 w-20 -translate-y-1/2 rounded-full border border-[#e8bd58]/35 shadow-[0_0_0_12px_rgba(232,189,88,0.04),0_0_70px_rgba(232,189,88,0.18)]" />
+          <div className={pickerCardContentClass}>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[#e8bd58]">
+                <span className="h-2 w-2 rounded-full bg-[#e8bd58]" /> Interactive prototype
+              </div>
+              <p className="mt-2 text-3xl font-black tracking-[-0.04em] text-white md:text-4xl">Shado <span className="text-[#e8bd58]">Live</span></p>
+              <p className="mt-1 text-xs text-[#a9a295] md:text-sm">Preview the future room, stage, chat, and safety model.</p>
+            </div>
+            <span className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full border border-[#e8bd58]/45 bg-black/40 text-[#f0d381] backdrop-blur-md">
+              <Radio className="h-6 w-6" aria-hidden="true" />
+            </span>
+          </div>
+        </button>}
+
         <button
           type="button"
           aria-label="Open Will & Kirk"

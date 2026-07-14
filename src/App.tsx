@@ -24,7 +24,7 @@ import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
 import { useTheme } from './hooks/useTheme'
 import { WeatherProvider } from './hooks/useWeatherForecast'
 import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib/mobileViewport'
-import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED } from './config/featureFlags'
+import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED } from './config/featureFlags'
 import {
   getLocationStateFromUrl,
   resolveChatThreadRouteMutation,
@@ -53,6 +53,7 @@ import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
 import { useConnectionNotifications } from './features/connections/useConnectionNotifications'
 import type { ActivityTarget } from './features/activity/activityModel'
+import { buildCatchUpTargetUrl, type CatchUpItem } from './features/catch-up/catchUpModel'
 import { FirstRunActivationCoordinator } from './features/activation/FirstRunActivationCoordinator'
 
 const DirectMessagesView = lazy(() =>
@@ -107,6 +108,14 @@ const ActivityProvider = ACTIVITY_FEATURE_ENABLED
   ? lazy(() =>
       import('./features/activity/ActivityProvider').then(module => ({
         default: module.ActivityProvider,
+      }))
+    )
+  : null
+
+const CatchUpView = CATCH_UP_FEATURE_ENABLED
+  ? lazy(() =>
+      import('./features/catch-up/CatchUpView').then(module => ({
+        default: module.CatchUpView,
       }))
     )
   : null
@@ -355,6 +364,13 @@ function App() {
       : null)
   }
 
+  const handleCatchUpOpen = (item: CatchUpItem) => {
+    if (!CATCH_UP_FEATURE_ENABLED || typeof window === 'undefined') return
+    const url = buildCatchUpTargetUrl(item.target, window.location.href)
+    window.history.pushState({ ...(window.history.state ?? {}), shadowchatLayer: 'catch-up-result' }, '', url)
+    applyLocationState(getLocationStateFromUrl(url))
+  }
+
   const handlePinRoute = (
     action: PinRouteAction,
     imageId?: string,
@@ -363,7 +379,7 @@ function App() {
     if (typeof window === 'undefined') return
 
     const storedLayer = window.history.state?.shadowchatLayer
-    const currentLayer: PinHistoryLayer = storedLayer === 'pin-viewer' || storedLayer === 'pin-comments'
+    const currentLayer: PinHistoryLayer = storedLayer === 'pin-viewer' || storedLayer === 'pin-comments' || storedLayer === 'catch-up-result'
       ? storedLayer
       : null
     const mutation = resolvePinRouteMutation({
@@ -479,7 +495,8 @@ function App() {
       storedLayer === 'dm-panel' ||
       storedLayer === 'dm-panel-cold' ||
       storedLayer === 'dm-result' ||
-      storedLayer === 'dm-result-cold'
+      storedLayer === 'dm-result-cold' ||
+      storedLayer === 'catch-up-result'
       ? storedLayer
       : null
     const mutation = resolveDMRouteMutation({
@@ -546,6 +563,7 @@ function App() {
   const handleViewChange = (view: View) => {
     const availableView = (view === 'boards' && !BOARDS_FEATURE_ENABLED)
       || (view === 'activity' && !ACTIVITY_FEATURE_ENABLED)
+      || (view === 'catchup' && !CATCH_UP_FEATURE_ENABLED)
       ? 'chat'
       : view
 
@@ -730,6 +748,16 @@ function App() {
             currentView={currentView}
             onViewChange={handleViewChange}
             onOpenActivity={handleActivityOpen}
+          />
+        ) : (
+          <ChatView currentView="chat" onViewChange={handleViewChange} />
+        )
+      case 'catchup':
+        return CATCH_UP_FEATURE_ENABLED && CatchUpView ? (
+          <CatchUpView
+            currentView={currentView}
+            onViewChange={handleViewChange}
+            onOpenSource={handleCatchUpOpen}
           />
         ) : (
           <ChatView currentView="chat" onViewChange={handleViewChange} />

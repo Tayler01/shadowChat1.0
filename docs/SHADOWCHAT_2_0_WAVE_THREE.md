@@ -239,8 +239,15 @@ explicitly excluded from v1.
   passed. The smoke readiness selector now follows the visible mobile message
   viewport and composer instead of the intentionally hidden legacy Lounge
   header.
-- Shado Live specification/prototype work is active while its Activity and
-  reporting dependencies remain paused.
-- Catch-Up remains queued behind a deterministic, source-linked contract; no
-  private AI trial has started.
+- Shado Live is specified and implemented as a flagged, frontend-only local
+  interaction prototype. Its unit and Pixel Chromium/iPhone WebKit gates pass
+  without media permission, provider, Supabase, notification, or residue work;
+  the real live system remains gated by paused Activity and reporting.
+- Deterministic Catch-Up is implemented behind its isolated-trial flag. Additive
+  migration `20260714020000` is linked with clean local/remote migration,
+  database-lint, security-contract, transactional two-user, unchanged-
+  production compatibility, unit, routing, and Pixel Chromium/iPhone WebKit
+  proof. It remains source-linked and non-AI; no private AI trial has started.
+- The final flagged build and isolated Netlify deployment are the remaining
+  release step for these two tracks.
 - Production `main` and the production Netlify frontend remain unchanged.

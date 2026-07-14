@@ -45,6 +45,25 @@ const checks = [
       'Submit safety report',
     ],
   },
+  {
+    feature: 'Shado Live prototype',
+    enabled: isEnabled('VITE_FEATURE_SHADO_LIVE_PROTOTYPE'),
+    filenamePatterns: [/shadoliveprototype/iu],
+    contentPatterns: [
+      'Shado Live',
+      'Leave Shado Live preview',
+    ],
+  },
+  {
+    feature: 'Catch-Up',
+    enabled: isEnabled('VITE_FEATURE_CATCH_UP'),
+    filenamePatterns: [/catchupview/iu],
+    contentPatterns: [
+      'Your Catch-Up',
+      'get_my_catch_up_v1',
+      'Source-linked / No AI',
+    ],
+  },
 ]
 
 const filenames = await fs.readdir(assetsDir)

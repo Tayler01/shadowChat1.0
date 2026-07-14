@@ -10,6 +10,14 @@ remain preserved and compatible with both frontends against the same Supabase
 project. Re-enable only through `VITE_FEATURE_ACTIVITY=true` plus the release
 gate below.
 
+The separately flagged deterministic Catch-Up trial may read bounded,
+caller-visible `activity_events` only through the on-demand
+`get_my_catch_up_v1` RPC after the member opens or refreshes Catch-Up. It does
+not mount Activity navigation, its provider, badge query, fetch loop, or
+Realtime subscription. See
+[CATCH_UP.md](C:/repos/chat2.0/docs/CATCH_UP.md:1) for the narrow exception and
+acknowledgement contract.
+
 ## Product Contract
 
 Activity is a first-class destination for durable, recipient-owned updates:

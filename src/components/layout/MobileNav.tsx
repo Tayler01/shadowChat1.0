@@ -1,11 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, ChevronLeft, ChevronRight, Gamepad2, Images, MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
+import { Bell, ChevronLeft, ChevronRight, Gamepad2, Images, ListChecks, MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useOptionalClientReset } from '../../hooks/ClientResetContext'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useOptionalMessages } from '../../hooks/MessagesContext'
 import { useOptionalActivity } from '../../features/activity/ActivityContext'
-import { ACTIVITY_FEATURE_ENABLED } from '../../config/featureFlags'
+import { ACTIVITY_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED } from '../../config/featureFlags'
 import { openSettingsMain } from '../../lib/settingsNavigation'
 import { uploadChatImageAsset } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
@@ -54,6 +54,7 @@ export function MobileNav({
   const primaryItems = useMemo(() => [
     { id: 'chat' as const, icon: MessageSquare, label: 'Chat', badge: null },
     { id: 'dms' as const, icon: Users, label: 'DMs', badge: totalUnread || null },
+    ...(CATCH_UP_FEATURE_ENABLED ? [{ id: 'catchup' as const, icon: ListChecks, label: 'Catch-Up', badge: null }] : []),
     ...(ACTIVITY_FEATURE_ENABLED ? [{ id: 'activity' as const, icon: Bell, label: 'Activity', badge: activity?.unreadCount || null }] : []),
     ...(boardsEnabled ? [{ id: 'boards' as const, icon: Newspaper, label: 'Boards', badge: boardsBadgeCount || null }] : []),
     { id: 'pins' as const, icon: Images, label: 'Pins', badge: null },

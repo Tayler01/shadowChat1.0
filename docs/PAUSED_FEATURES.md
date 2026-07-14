@@ -26,6 +26,8 @@ VITE_FEATURE_BOARDS=false
 VITE_FEATURE_ESP_ADMIN=false
 VITE_FEATURE_ACTIVITY=false
 VITE_FEATURE_MEMBER_REPORTING=false
+VITE_FEATURE_SHADO_LIVE_PROTOTYPE=false
+VITE_FEATURE_CATCH_UP=false
 ```
 
 Leaving either variable unset also means `false`. Only the literal value
@@ -47,10 +49,23 @@ With the default production build:
 - News and ESP admin panel chunks are not emitted in `dist`.
 - Activity View, member report sheet, and My Reports chunks are not emitted in
   `dist`.
+- Shado Live and Catch-Up cards, routes, navigation, lazy chunks, and API
+  markers are not emitted in `dist` unless their isolated-trial flags are
+  explicitly enabled.
 
 `npm run build` runs `scripts/verify-paused-feature-build.mjs` after Vite and
 fails if paused feature chunks or known subscription/API markers leak into the
 default build.
+
+## Narrow Catch-Up Exception
+
+Activity HQ remains paused: its navigation, provider fetch, badge query,
+Realtime subscription, and view are still omitted from the default and 2.0
+trial builds. The separately flagged deterministic Catch-Up surface may consume
+the existing recipient-owned `activity_events` ledger only through the bounded
+on-demand `get_my_catch_up_v1` RPC when a member explicitly opens or refreshes
+Catch-Up. It must not import or mount the Activity runtime. This exception adds
+no Activity navigation, eager query, subscription, or background work.
 
 ## Remote Services
 

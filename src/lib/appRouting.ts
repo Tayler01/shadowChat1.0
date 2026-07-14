@@ -1,4 +1,4 @@
-import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED } from '../config/featureFlags'
+import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED, SHADO_LIVE_PROTOTYPE_ENABLED } from '../config/featureFlags'
 import type { AppView } from '../types/navigation'
 
 export type AppLocationState = {
@@ -89,6 +89,7 @@ export type PlayExperience =
   | 'shadow-checkers'
   | 'shado-tv'
   | 'shadow-mystery'
+  | 'shado-live'
   | 'will-kirk'
 
 export type PlayRouteAction = 'push-experience' | 'push-item' | 'close-item' | 'close-experience'
@@ -108,9 +109,10 @@ const PLAY_EXPERIENCES = new Set<PlayExperience>([
 
 const PLAY_EXPERIENCES_WITH_ITEMS = new Set<PlayExperience>(['shado-tv', 'shadow-mystery'])
 
-export const normalizePlayExperience = (value: string | null): PlayExperience | null => (
-  value && PLAY_EXPERIENCES.has(value as PlayExperience) ? value as PlayExperience : null
-)
+export const normalizePlayExperience = (value: string | null): PlayExperience | null => {
+  if (SHADO_LIVE_PROTOTYPE_ENABLED && value === 'shado-live') return value
+  return value && PLAY_EXPERIENCES.has(value as PlayExperience) ? value as PlayExperience : null
+}
 
 const normalizePlayItem = (value: string | null) => {
   const normalized = value?.trim()
@@ -147,7 +149,7 @@ export const resolvePlayRouteMutation = ({
     return { method: 'replace', url, layer: null }
   }
 
-  const nextExperience = experience ?? normalizePlayExperience(url.searchParams.get('experience'))
+  const nextExperience = normalizePlayExperience(experience ?? url.searchParams.get('experience'))
   if (!nextExperience) return null
   url.searchParams.set('experience', nextExperience)
 
@@ -185,6 +187,7 @@ export type DMHistoryLayer =
   | 'dm-panel-cold'
   | 'dm-result'
   | 'dm-result-cold'
+  | 'catch-up-result'
   | null
 
 export type DMRouteMutation =
@@ -206,7 +209,9 @@ export const resolveDMRouteMutation = ({
   messageId?: string
 }): DMRouteMutation | null => {
   if (action === 'close-panel' && currentLayer === 'dm-panel') return { method: 'back' }
+  if (action === 'close-panel' && currentLayer === 'catch-up-result') return { method: 'back' }
   if (action === 'close-thread' && currentLayer === 'dm-thread') return { method: 'back' }
+  if (action === 'close-thread' && currentLayer === 'catch-up-result') return { method: 'back' }
   if (action === 'close-thread' && currentLayer === 'dm-result') return { method: 'back-two' }
 
   const url = new URL(currentUrl)
@@ -294,7 +299,7 @@ export type PinRouteAction =
   | 'close-comments'
   | 'close-viewer'
 
-export type PinHistoryLayer = 'pin-viewer' | 'pin-comments' | null
+export type PinHistoryLayer = 'pin-viewer' | 'pin-comments' | 'catch-up-result' | null
 
 export type PinFeedMode = 'discover' | 'connections'
 
@@ -410,7 +415,9 @@ export const resolvePinRouteMutation = ({
   commentId?: string
 }): PinRouteMutation | null => {
   if (action === 'close-comments' && currentLayer === 'pin-comments') return { method: 'back' }
+  if (action === 'close-comments' && currentLayer === 'catch-up-result') return { method: 'back' }
   if (action === 'close-viewer' && currentLayer === 'pin-viewer') return { method: 'back' }
+  if (action === 'close-viewer' && currentLayer === 'catch-up-result') return { method: 'back' }
 
   const url = new URL(currentUrl)
   url.searchParams.set('view', 'pins')
@@ -454,6 +461,7 @@ export const resolvePinRouteMutation = ({
 const isEnabledView = (value: string | null): value is AppView => (
   value === 'chat' ||
   value === 'dms' ||
+  (CATCH_UP_FEATURE_ENABLED && value === 'catchup') ||
   (ACTIVITY_FEATURE_ENABLED && value === 'activity') ||
   value === 'games' ||
   value === 'pins' ||
@@ -471,6 +479,10 @@ export const normalizeViewParam = (value: string | null): AppView | null => {
   }
 
   if (value === 'activity' && !ACTIVITY_FEATURE_ENABLED) {
+    return 'chat'
+  }
+
+  if (value === 'catchup' && !CATCH_UP_FEATURE_ENABLED) {
     return 'chat'
   }
 

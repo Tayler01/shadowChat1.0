@@ -280,6 +280,7 @@ test('General Chat thread mutations reject missing and oversized identifiers', (
 
 test('Play URL state accepts typed experiences and bounded exact items', () => {
   expect(normalizePlayExperience('shado-tv')).toBe('shado-tv')
+  expect(normalizePlayExperience('shado-live')).toBeNull()
   expect(normalizePlayExperience('unknown')).toBeNull()
 
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=shado-tv&item=the-chicken-snatchers'))).toMatchObject({
@@ -293,6 +294,10 @@ test('Play URL state accepts typed experiences and bounded exact items', () => {
   })
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=shadow-runner&item=ignored'))).toMatchObject({
     playExperience: 'shadow-runner',
+    playItem: null,
+  })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=shado-live'))).toMatchObject({
+    playExperience: null,
     playItem: null,
   })
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=unknown&item=ignored'))).toMatchObject({
@@ -577,4 +582,34 @@ test('direct ShadowPin links close by replacement when no layer marker exists', 
   })
   expect(closeViewer).toMatchObject({ method: 'replace', layer: null })
   expect(closeViewer && closeViewer.method !== 'back' ? closeViewer.url.search : '').toBe('?view=pins')
+})
+
+test('Catch-Up source layers return through in-app DM and ShadowPin close controls', () => {
+  expect(resolveDMRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=dms&conversation=conversation-1&message=message-1'),
+    currentLayer: 'catch-up-result',
+    action: 'close-thread',
+    conversationId: 'conversation-1',
+  })).toEqual({ method: 'back' })
+
+  expect(resolveDMRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=dms&panel=connections'),
+    currentLayer: 'catch-up-result',
+    action: 'close-panel',
+  })).toEqual({ method: 'back' })
+
+  expect(resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-1'),
+    currentLayer: 'catch-up-result',
+    action: 'close-viewer',
+    imageId: 'pin-1',
+  })).toEqual({ method: 'back' })
+
+  expect(resolvePinRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&pin=pin-1&panel=comments&comment=comment-1'),
+    currentLayer: 'catch-up-result',
+    action: 'close-comments',
+    imageId: 'pin-1',
+    commentId: 'comment-1',
+  })).toEqual({ method: 'back' })
 })

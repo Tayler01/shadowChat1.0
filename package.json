@@ -50,6 +50,8 @@
     "qa:mobile-pwa": "node scripts/mobile-pwa-visual-qa.mjs",
     "qa:shadow-pin-feed-modes": "node scripts/verify-shadow-pin-feed-modes-browser.mjs",
     "qa:inner-circles": "node scripts/verify-inner-circles-browser.mjs",
+    "qa:shado-live": "node scripts/verify-shado-live-prototype-browser.mjs",
+    "qa:catch-up": "node scripts/verify-catch-up-browser.mjs",
     "qa:comfort": "node scripts/comfort-visual-qa.mjs",
     "qa:themes": "node scripts/theme-visual-qa.mjs",
     "automation:submit-daily-scan": "node scripts/submit-daily-scan-approval-packets.mjs",

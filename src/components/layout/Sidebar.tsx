@@ -1,7 +1,7 @@
-import { Bell, Gamepad2, Images, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
+import { Bell, Gamepad2, Images, ListChecks, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
 import { useOptionalActivity } from '../../features/activity/ActivityContext';
 import { formatActivityBadge } from '../../features/activity/activityModel';
-import { ACTIVITY_FEATURE_ENABLED } from '../../config/featureFlags';
+import { ACTIVITY_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED } from '../../config/featureFlags';
 import { Avatar } from '../ui/Avatar';
 import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { UserPresenceBadge } from '../ui/UserPresenceBadge';
@@ -55,6 +55,12 @@ export function Sidebar({
       icon: Users,
       badge: totalUnread > 0 ? totalUnread : null,
     },
+    ...(CATCH_UP_FEATURE_ENABLED ? [{
+      id: 'catchup' as const,
+      label: 'Catch-Up',
+      icon: ListChecks,
+      badge: null,
+    }] : []),
     ...(ACTIVITY_FEATURE_ENABLED ? [{
       id: 'activity' as const,
       label: 'Activity',
@@ -113,7 +119,7 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-2 px-4 py-5">
+      <nav className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-5">
         {navItems.map((item) => (
           <button
             key={item.id}

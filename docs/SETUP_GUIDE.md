@@ -86,6 +86,8 @@ VITE_FEATURE_BOARDS=false
 VITE_FEATURE_ESP_ADMIN=false
 VITE_FEATURE_ACTIVITY=false
 VITE_FEATURE_MEMBER_REPORTING=false
+VITE_FEATURE_SHADO_LIVE_PROTOTYPE=false
+VITE_FEATURE_CATCH_UP=false
 ```
 
 Boards/News/Art Board and ESP admin are intentionally compile-time off. See
