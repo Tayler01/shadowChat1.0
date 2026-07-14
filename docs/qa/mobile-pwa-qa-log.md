@@ -8,6 +8,28 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-13
 
+## July 13 Wave Three Inner Circles Automated Checkpoint
+
+- Immutable isolated deploy `6a55892252f0d306fae5b852` passed the complete
+  two-account Pixel Chromium/iPhone WebKit verifier. Stable isolated deploy
+  `6a558acc257a6d21fa379fa2` serves byte-identical HTML and all 12 boot assets;
+  a fresh stable iPhone WebKit session opened Connections and switched to
+  Circles on the canonical route.
+- The run covered People/Circles/detail/Back routing, create/rename/delete,
+  atomic accepted-only member rejection, picker add/remove/re-add, private
+  circle Pin filtering, empty state, universal Search, Theater, comments, and
+  route restoration.
+- Hub, editor, picker, feed, Theater, and comments remained inside Pixel
+  `412x839` and iPhone `390x664` viewports, including compressed keyboard
+  heights, with no horizontal overflow.
+- Pixel Chromium and iPhone WebKit reported zero console, page, request, or
+  HTTP errors. Exact cleanup restored Circle/member and feed-preference
+  snapshots and left zero Connection, block, Pin, category, comment,
+  notification, activity, or analytics residue. Evidence:
+  `output/playwright/wave3-inner-circles/summary.json`.
+- Production ShadowChat and `main` remain unchanged. Installed iPhone/Android
+  PWA touch, browser-chrome, and resume acceptance remains a real-device gate.
+
 ## July 13 Wave Three ShadowPin Feed Modes Automated Checkpoint
 
 - Immutable deploy `6a5575bcbc2a1131aab40695` and the stable isolated URL

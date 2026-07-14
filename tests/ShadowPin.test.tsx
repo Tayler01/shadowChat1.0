@@ -8,6 +8,8 @@ const mockUseShadowPinCategories = jest.fn()
 const mockUseShadowPinImages = jest.fn()
 const mockUseShadowPinFeedMode = jest.fn()
 const mockUseShadowPinConnectionFeed = jest.fn()
+const mockUseInnerCircles = jest.fn()
+const mockUseInnerCircleFeed = jest.fn()
 const mockToggleCategoryHeart = jest.fn()
 const mockToggleImageHeart = jest.fn()
 const mockShadowPinActivityTracker = {
@@ -77,6 +79,14 @@ jest.mock('../src/features/shadow-pin/hooks/useShadowPinFeedMode', () => ({
 
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinConnectionFeed', () => ({
   useShadowPinConnectionFeed: () => mockUseShadowPinConnectionFeed(),
+}))
+
+jest.mock('../src/features/inner-circles/useInnerCircles', () => ({
+  useInnerCircles: () => mockUseInnerCircles(),
+}))
+
+jest.mock('../src/features/inner-circles/useInnerCircleFeed', () => ({
+  useInnerCircleFeed: () => mockUseInnerCircleFeed(),
 }))
 
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinActivityTracker', () => ({
@@ -205,6 +215,22 @@ beforeEach(() => {
     error: null,
     hasMore: false,
     acceptedCount: 0,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    toggleHeart: jest.fn(),
+    setCommentCount: jest.fn(),
+  })
+  mockUseInnerCircles.mockReturnValue({
+    circles: [],
+    loading: false,
+    error: null,
+    refresh: jest.fn(),
+  })
+  mockUseInnerCircleFeed.mockReturnValue({
+    images: [],
+    loading: false,
+    error: null,
+    hasMore: false,
     refresh: jest.fn(),
     loadMore: jest.fn(),
     toggleHeart: jest.fn(),
@@ -387,6 +413,48 @@ test('Connections empty states distinguish no relationships from no eligible Pin
   })
   rerender(<ShadowPin initialFeedMode="connections" />)
   expect(screen.getByText('No new Pins from your Connections')).toBeInTheDocument()
+})
+
+test('Inner Circle filter stays scoped, explains its empty state, and can return to All Connections', () => {
+  const circleId = '019f4b8c-31a7-7f82-9fb7-5d653efef8ec'
+  const onCircleChange = jest.fn()
+  mockUseShadowPinFeedMode.mockReturnValue({
+    mode: 'connections',
+    loading: false,
+    saveError: null,
+    selectMode: jest.fn(),
+    retrySave: jest.fn(),
+  })
+  mockUseInnerCircles.mockReturnValue({
+    circles: [{ id: circleId, name: 'Closest Friends', memberCount: 2 }],
+    loading: false,
+    error: null,
+    refresh: jest.fn(),
+  })
+  mockUseInnerCircleFeed.mockReturnValue({
+    images: [],
+    loading: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    toggleHeart: jest.fn(),
+    setCommentCount: jest.fn(),
+  })
+
+  render(
+    <ShadowPin
+      initialFeedMode="connections"
+      initialCircleId={circleId}
+      onCircleChange={onCircleChange}
+    />
+  )
+
+  expect(screen.getByText('No Pins from Closest Friends yet')).toBeInTheDocument()
+  fireEvent.click(screen.getByTestId('shadow-pin-circle-filter-trigger'))
+  expect(screen.getByRole('dialog', { name: 'Filter Connections' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('radio', { name: /All Connections/i }))
+  expect(onCircleChange).toHaveBeenCalledWith(null)
 })
 
 test('shows an exploding heart burst when liking a ShadowPin category', async () => {

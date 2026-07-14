@@ -48,7 +48,7 @@ import type { BasicUser, ChatMessageType, DMMessage, User } from '../../lib/supa
 import { UnreadDivider } from '../chat/UnreadDivider'
 import type { EmojiClickData } from '../../types'
 import type { AppView } from '../../types/navigation'
-import type { DMRouteAction } from '../../lib/appRouting'
+import type { DMRouteAction, InnerCircleRouteAction } from '../../lib/appRouting'
 import { saveMessageToLibrary } from '../../lib/messageLibrary'
 import { EmojiPickerOverlay } from '../chat/EmojiPickerOverlay'
 import { ImageModal } from '../ui/ImageModal'
@@ -79,7 +79,10 @@ interface DirectMessagesViewProps {
   initialConversation?: string
   initialMessageId?: string
   initialPanel?: 'details' | 'search' | 'shared' | 'connections' | null
+  initialConnectionsSection?: 'circles' | null
+  initialCircleId?: string
   onRoute?: (action: DMRouteAction, conversationId?: string, messageId?: string) => void
+  onConnectionsRoute?: (action: InnerCircleRouteAction, circleId?: string) => void
 }
 
 const HISTORY_LOAD_SCROLL_THRESHOLD = 180
@@ -775,7 +778,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   initialConversation,
   initialMessageId,
   initialPanel,
+  initialConnectionsSection,
+  initialCircleId,
   onRoute,
+  onConnectionsRoute,
 }) => {
   const { profile } = useAuth()
   const isDesktop = useIsDesktop()
@@ -1811,6 +1817,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             currentUserId={profile?.id ?? ''}
             summary={connectionSummary}
             onMessage={connectionUser => { void handleUserSelect(connectionUser) }}
+            initialSection={initialConnectionsSection}
+            initialCircleId={initialCircleId}
+            onCircleRoute={onConnectionsRoute}
           />
         </React.Suspense>
       )}

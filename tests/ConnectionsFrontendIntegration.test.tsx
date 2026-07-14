@@ -15,10 +15,17 @@ const searchUsersStrictMock = jest.fn()
 const rpcMock = jest.fn()
 const toastSuccessMock = jest.fn()
 const toastErrorMock = jest.fn()
+const mockUseInnerCirclesHook = jest.fn()
+const mockUseInnerCircleMembersHook = jest.fn()
 
 jest.mock('../src/lib/supabase', () => ({
   getWorkingClient: (...args: unknown[]) => getWorkingClientMock(...args),
   searchUsersStrict: (...args: unknown[]) => searchUsersStrictMock(...args),
+}))
+
+jest.mock('../src/features/inner-circles/useInnerCircles', () => ({
+  useInnerCircles: () => mockUseInnerCirclesHook(),
+  useInnerCircleMembers: () => mockUseInnerCircleMembersHook(),
 }))
 
 jest.mock('../src/components/ui/Avatar', () => ({
@@ -79,6 +86,14 @@ beforeEach(() => {
   jest.clearAllMocks()
   getWorkingClientMock.mockResolvedValue({ rpc: rpcMock })
   searchUsersStrictMock.mockResolvedValue([])
+  mockUseInnerCirclesHook.mockReturnValue({
+    circles: [], loading: false, error: null, mutating: false,
+    refresh: jest.fn(), createCircle: jest.fn(), renameCircle: jest.fn(), deleteCircle: jest.fn(),
+  })
+  mockUseInnerCircleMembersHook.mockReturnValue({
+    members: [], loading: false, error: null, mutating: false,
+    refresh: jest.fn(), addMember: jest.fn(), removeMember: jest.fn(), setMembers: jest.fn(),
+  })
   jest.spyOn(window, 'confirm').mockReturnValue(true)
 })
 
@@ -281,6 +296,98 @@ describe('ConnectionsHubSheet integration basics', () => {
     expect(alert).toHaveTextContent('Connections are unavailable')
     expect(alert).toHaveTextContent('Connection service offline')
     expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument()
+  })
+
+  it('routes between People, private Circle list, and Circle detail', async () => {
+    const circle = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Closest Friends',
+      memberCount: 1,
+      revision: 2,
+      createdAt: '2026-07-13T20:00:00.000Z',
+      updatedAt: '2026-07-13T20:00:00.000Z',
+    }
+    const onCircleRoute = jest.fn()
+    mockUseInnerCirclesHook.mockReturnValue({
+      circles: [circle], loading: false, error: null, mutating: false,
+      refresh: jest.fn(), createCircle: jest.fn(), renameCircle: jest.fn(), deleteCircle: jest.fn(),
+    })
+    mockUseInnerCircleMembersHook.mockReturnValue({
+      members: [{ circleId: circle.id, memberId: profile.id, addedAt: circle.createdAt, profile }],
+      loading: false, error: null, mutating: false,
+      refresh: jest.fn(), addMember: jest.fn(), removeMember: jest.fn(), setMembers: jest.fn(),
+    })
+    rpcMock.mockResolvedValue({ data: [], error: null })
+    const browserUser = userEvent.setup()
+
+    render(
+      <ConnectionsHubSheet
+        open
+        onClose={jest.fn()}
+        currentUserId="user-1"
+        summary={{ acceptedCount: 1, incomingCount: 0, outgoingCount: 0 }}
+        onMessage={jest.fn()}
+        initialSection="circles"
+        onCircleRoute={onCircleRoute}
+      />
+    )
+
+    expect(screen.getByRole('tab', { name: /Circles/i })).toHaveAttribute('aria-selected', 'true')
+    await browserUser.click(screen.getByRole('button', { name: /Open Closest Friends/i }))
+    expect(onCircleRoute).toHaveBeenCalledWith('open-circle', circle.id)
+    expect(screen.getByRole('heading', { name: 'Closest Friends' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Message Jules' })).toBeInTheDocument()
+
+    await browserUser.click(screen.getByRole('button', { name: 'Back to Inner Circles' }))
+    expect(onCircleRoute).toHaveBeenCalledWith('close-circle')
+    await browserUser.click(screen.getByRole('tab', { name: /People/i }))
+    expect(onCircleRoute).toHaveBeenCalledWith('show-people')
+    expect(screen.getByRole('tablist', { name: 'Connection lists' })).toBeInTheDocument()
+  })
+
+  it('fails closed when the member picker cannot load the complete accepted list', async () => {
+    const circle = {
+      id: '11111111-1111-4111-8111-111111111111',
+      name: 'Closest Friends',
+      memberCount: 1,
+      revision: 2,
+      createdAt: '2026-07-13T20:00:00.000Z',
+      updatedAt: '2026-07-13T20:00:00.000Z',
+    }
+    const setMembers = jest.fn()
+    mockUseInnerCirclesHook.mockReturnValue({
+      circles: [circle], loading: false, error: null, mutating: false,
+      refresh: jest.fn(), createCircle: jest.fn(), renameCircle: jest.fn(), deleteCircle: jest.fn(),
+    })
+    mockUseInnerCircleMembersHook.mockReturnValue({
+      members: [{ circleId: circle.id, memberId: profile.id, addedAt: circle.createdAt, profile }],
+      loading: false, error: null, mutating: false,
+      refresh: jest.fn(), addMember: jest.fn(), removeMember: jest.fn(), setMembers,
+    })
+    rpcMock.mockImplementation((name: string) => {
+      if (name === 'list_my_connections') {
+        return Promise.resolve({ data: null, error: new Error('Accepted list unavailable') })
+      }
+      return Promise.resolve({ data: [], error: null })
+    })
+    const browserUser = userEvent.setup()
+
+    render(
+      <ConnectionsHubSheet
+        open
+        onClose={jest.fn()}
+        currentUserId="user-1"
+        summary={{ acceptedCount: 1, incomingCount: 0, outgoingCount: 0 }}
+        onMessage={jest.fn()}
+        initialSection="circles"
+        initialCircleId={circle.id}
+      />
+    )
+
+    await browserUser.click(screen.getByRole('button', { name: 'Add Connections' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Accepted list unavailable')
+    expect(screen.getByRole('button', { name: 'Save Members' })).toBeDisabled()
+    expect(setMembers).not.toHaveBeenCalled()
   })
 })
 

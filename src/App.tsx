@@ -32,6 +32,8 @@ import {
   resolvePlayRouteMutation,
   resolvePinRouteMutation,
   resolvePinFeedModeMutation,
+  resolvePinCircleFilterMutation,
+  resolveInnerCircleRouteMutation,
   shouldPersistDMPanelInUrl,
   type AppLocationState as LocationState,
   type DMHistoryLayer,
@@ -39,6 +41,8 @@ import {
   type PinHistoryLayer,
   type PinFeedMode,
   type PinRouteAction,
+  type InnerCircleHistoryLayer,
+  type InnerCircleRouteAction,
   type PlayExperience,
   type PlayHistoryLayer,
   type PlayRouteAction,
@@ -159,10 +163,13 @@ function App() {
   const [messageTarget, setMessageTarget] = useState<string | null>(() => getInitialLocationState().message)
   const [threadTarget, setThreadTarget] = useState<string | null>(() => getInitialLocationState().thread ?? null)
   const [dmPanel, setDmPanel] = useState<'details' | 'search' | 'shared' | 'connections' | null>(() => getInitialLocationState().dmPanel)
+  const [dmConnectionsSection, setDmConnectionsSection] = useState<'circles' | null>(() => getInitialLocationState().dmConnectionsSection ?? null)
+  const [dmCircle, setDmCircle] = useState<string | null>(() => getInitialLocationState().dmCircle ?? null)
   const [pinTarget, setPinTarget] = useState<string | null>(() => getInitialLocationState().pin)
   const [commentTarget, setCommentTarget] = useState<string | null>(() => getInitialLocationState().comment)
   const [pinPanel, setPinPanel] = useState<'viewer' | 'comments' | null>(() => getInitialLocationState().pinPanel)
   const [pinFeed, setPinFeed] = useState<'connections' | null>(() => getInitialLocationState().pinFeed)
+  const [pinCircle, setPinCircle] = useState<string | null>(() => getInitialLocationState().pinCircle ?? null)
   const [playExperience, setPlayExperience] = useState<PlayExperience | null>(() => getInitialLocationState().playExperience)
   const [playItem, setPlayItem] = useState<string | null>(() => getInitialLocationState().playItem)
   const isDarkMode = mode === 'dark'
@@ -281,10 +288,13 @@ function App() {
     setMessageTarget(locationState.message)
     setThreadTarget(locationState.thread ?? null)
     setDmPanel(locationState.dmPanel)
+    setDmConnectionsSection(locationState.dmConnectionsSection ?? null)
+    setDmCircle(locationState.dmCircle ?? null)
     setPinTarget(locationState.pin)
     setCommentTarget(locationState.comment)
     setPinPanel(locationState.pinPanel)
     setPinFeed(locationState.pinFeed)
+    setPinCircle(locationState.pinCircle ?? null)
     setPlayExperience(locationState.playExperience)
     setPlayItem(locationState.playItem)
   }, [])
@@ -388,6 +398,41 @@ function App() {
       mode,
     })
     window.history.replaceState(window.history.state ?? {}, '', mutation.url)
+    applyLocationState(getLocationStateFromUrl(mutation.url))
+  }, [applyLocationState])
+
+  const handlePinCircleChange = useCallback((circleId: string | null) => {
+    if (typeof window === 'undefined') return
+    const mutation = resolvePinCircleFilterMutation({
+      currentUrl: new URL(window.location.href),
+      circleId,
+    })
+    window.history.replaceState(window.history.state ?? {}, '', mutation.url)
+    applyLocationState(getLocationStateFromUrl(mutation.url))
+  }, [applyLocationState])
+
+  const handleInnerCircleRoute = useCallback((action: InnerCircleRouteAction, circleId?: string) => {
+    if (typeof window === 'undefined') return
+    const storedLayer = window.history.state?.shadowchatLayer
+    const currentLayer: InnerCircleHistoryLayer | DMHistoryLayer = storedLayer === 'dm-inner-circle' ||
+      storedLayer === 'dm-thread' || storedLayer === 'dm-panel' || storedLayer === 'dm-panel-cold' ||
+      storedLayer === 'dm-result' || storedLayer === 'dm-result-cold'
+      ? storedLayer
+      : null
+    const mutation = resolveInnerCircleRouteMutation({
+      currentUrl: new URL(window.location.href),
+      currentLayer,
+      action,
+      circleId,
+    })
+    if (!mutation) return
+    if (mutation.method === 'back') {
+      window.history.back()
+      return
+    }
+    const nextState = { ...(window.history.state ?? {}), shadowchatLayer: mutation.layer }
+    if (mutation.method === 'push') window.history.pushState(nextState, '', mutation.url)
+    else window.history.replaceState(nextState, '', mutation.url)
     applyLocationState(getLocationStateFromUrl(mutation.url))
   }, [applyLocationState])
 
@@ -516,11 +561,14 @@ function App() {
     if (availableView !== 'dms') {
       setDmTarget(null)
       setDmPanel(null)
+      setDmConnectionsSection(null)
+      setDmCircle(null)
     }
     if (availableView !== 'pins') {
       setPinTarget(null)
       setCommentTarget(null)
       setPinPanel(null)
+      setPinCircle(null)
     }
     if (availableView !== currentView) {
       setMessageTarget(null)
@@ -554,6 +602,8 @@ function App() {
       url.searchParams.delete('experience')
       url.searchParams.delete('item')
       url.searchParams.delete('feed')
+      url.searchParams.delete('section')
+      url.searchParams.delete('circle')
     } else {
       url.searchParams.set('view', currentView)
       url.searchParams.delete('thread')
@@ -572,6 +622,14 @@ function App() {
       } else if (currentView !== 'pins') {
         url.searchParams.delete('panel')
       }
+      if (currentView === 'dms' && dmPanel === 'connections' && dmConnectionsSection === 'circles') {
+        url.searchParams.set('section', 'circles')
+        if (dmCircle) url.searchParams.set('circle', dmCircle)
+        else url.searchParams.delete('circle')
+      } else {
+        url.searchParams.delete('section')
+        if (currentView !== 'pins') url.searchParams.delete('circle')
+      }
       if (currentView === 'pins' && pinTarget) {
         url.searchParams.set('pin', pinTarget)
       } else {
@@ -589,8 +647,11 @@ function App() {
       }
       if (currentView === 'pins' && pinFeed === 'connections') {
         url.searchParams.set('feed', 'connections')
+        if (pinCircle) url.searchParams.set('circle', pinCircle)
+        else url.searchParams.delete('circle')
       } else {
         url.searchParams.delete('feed')
+        if (currentView === 'pins') url.searchParams.delete('circle')
       }
       if (currentView === 'games' && playExperience) {
         url.searchParams.set('experience', playExperience)
@@ -603,7 +664,7 @@ function App() {
     }
 
     window.history.replaceState(window.history.state ?? {}, '', url)
-  }, [currentView, dmTarget, dmPanel, messageTarget, threadTarget, pinTarget, commentTarget, pinPanel, pinFeed, playExperience, playItem])
+  }, [currentView, dmTarget, dmPanel, dmConnectionsSection, dmCircle, messageTarget, threadTarget, pinTarget, commentTarget, pinPanel, pinFeed, pinCircle, playExperience, playItem])
 
   useEffect(() => {
     if (currentView !== 'boards') {
@@ -640,7 +701,10 @@ function App() {
             initialConversation={dmTarget || undefined}
             initialMessageId={messageTarget || undefined}
             initialPanel={dmPanel}
+            initialConnectionsSection={dmConnectionsSection}
+            initialCircleId={dmCircle || undefined}
             onRoute={handleDMRoute}
+            onConnectionsRoute={handleInnerCircleRoute}
           />
         )
       case 'boards':
@@ -690,8 +754,10 @@ function App() {
             initialCommentId={commentTarget || undefined}
             initialPanel={pinPanel || undefined}
             initialFeedMode={pinFeed || undefined}
+            initialCircleId={pinCircle || undefined}
             onPinRoute={handlePinRoute}
             onFeedModeChange={handlePinFeedModeChange}
+            onCircleChange={handlePinCircleChange}
           />
         )
       case 'settings':

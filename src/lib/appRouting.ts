@@ -7,10 +7,13 @@ export type AppLocationState = {
   message: string | null
   thread?: string | null
   dmPanel: 'details' | 'search' | 'shared' | 'connections' | null
+  dmConnectionsSection?: 'circles' | null
+  dmCircle?: string | null
   pin: string | null
   comment: string | null
   pinPanel: 'viewer' | 'comments' | null
   pinFeed: 'connections' | null
+  pinCircle?: string | null
   playExperience: PlayExperience | null
   playItem: string | null
 }
@@ -295,6 +298,67 @@ export type PinHistoryLayer = 'pin-viewer' | 'pin-comments' | null
 
 export type PinFeedMode = 'discover' | 'connections'
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu
+
+export const normalizeInnerCircleId = (value: string | null | undefined) => {
+  const normalized = value?.trim()
+  return normalized && UUID_PATTERN.test(normalized) ? normalized.toLowerCase() : null
+}
+
+const preserveRequestedInnerCircleId = (value: string | null | undefined) => {
+  const requested = value?.trim()
+  if (!requested) return null
+  return normalizeInnerCircleId(requested) ?? requested.slice(0, 100)
+}
+
+export type InnerCircleRouteAction = 'show-people' | 'show-circles' | 'open-circle' | 'close-circle'
+export type InnerCircleHistoryLayer = 'dm-inner-circle' | null
+export type InnerCircleRouteMutation =
+  | { method: 'back' }
+  | { method: 'push' | 'replace'; url: URL; layer: InnerCircleHistoryLayer | DMHistoryLayer }
+
+export const resolveInnerCircleRouteMutation = ({
+  currentUrl,
+  currentLayer,
+  action,
+  circleId,
+}: {
+  currentUrl: URL
+  currentLayer: InnerCircleHistoryLayer | DMHistoryLayer
+  action: InnerCircleRouteAction
+  circleId?: string
+}): InnerCircleRouteMutation | null => {
+  if (action === 'close-circle' && currentLayer === 'dm-inner-circle') return { method: 'back' }
+
+  const url = new URL(currentUrl)
+  url.searchParams.set('view', 'dms')
+  url.searchParams.set('panel', 'connections')
+  url.searchParams.delete('conversation')
+  url.searchParams.delete('message')
+  url.searchParams.delete('pin')
+  url.searchParams.delete('comment')
+  url.searchParams.delete('feed')
+  url.searchParams.delete('experience')
+  url.searchParams.delete('item')
+
+  if (action === 'show-people') {
+    url.searchParams.delete('section')
+    url.searchParams.delete('circle')
+    return { method: 'replace', url, layer: currentLayer === 'dm-inner-circle' ? 'dm-panel' : currentLayer }
+  }
+
+  url.searchParams.set('section', 'circles')
+  if (action === 'show-circles' || action === 'close-circle') {
+    url.searchParams.delete('circle')
+    return { method: 'replace', url, layer: currentLayer === 'dm-inner-circle' ? 'dm-panel' : currentLayer }
+  }
+
+  const normalizedCircleId = normalizeInnerCircleId(circleId)
+  if (!normalizedCircleId) return null
+  url.searchParams.set('circle', normalizedCircleId)
+  return { method: 'push', url, layer: 'dm-inner-circle' }
+}
+
 export const resolvePinFeedModeMutation = ({
   currentUrl,
   mode,
@@ -305,7 +369,26 @@ export const resolvePinFeedModeMutation = ({
   const url = new URL(currentUrl)
   url.searchParams.set('view', 'pins')
   if (mode === 'connections') url.searchParams.set('feed', 'connections')
-  else url.searchParams.delete('feed')
+  else {
+    url.searchParams.delete('feed')
+    url.searchParams.delete('circle')
+  }
+  return { method: 'replace' as const, url }
+}
+
+export const resolvePinCircleFilterMutation = ({
+  currentUrl,
+  circleId,
+}: {
+  currentUrl: URL
+  circleId: string | null
+}) => {
+  const url = new URL(currentUrl)
+  url.searchParams.set('view', 'pins')
+  url.searchParams.set('feed', 'connections')
+  const normalizedCircleId = normalizeInnerCircleId(circleId)
+  if (normalizedCircleId) url.searchParams.set('circle', normalizedCircleId)
+  else url.searchParams.delete('circle')
   return { method: 'replace' as const, url }
 }
 
@@ -406,6 +489,12 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
   const comment = view === 'pins' ? params.get('comment') : null
   const panel = view === 'pins' ? params.get('panel') : null
   const dmPanelParam = view === 'dms' ? params.get('panel') : null
+  const connectionsSection = view === 'dms' && dmPanelParam === 'connections' && params.get('section') === 'circles'
+    ? 'circles' as const
+    : null
+  const dmCircle = connectionsSection ? preserveRequestedInnerCircleId(params.get('circle')) : null
+  const pinFeed = view === 'pins' && params.get('feed') === 'connections' ? 'connections' as const : null
+  const pinCircle = pinFeed ? preserveRequestedInnerCircleId(params.get('circle')) : null
   const playExperience = view === 'games' ? normalizePlayExperience(params.get('experience')) : null
   const playItem = playExperience && PLAY_EXPERIENCES_WITH_ITEMS.has(playExperience)
     ? normalizePlayItem(params.get('item'))
@@ -419,10 +508,13 @@ export const getLocationStateFromUrl = (url: URL): AppLocationState => {
     dmPanel: dmPanelParam === 'details' || dmPanelParam === 'search' || dmPanelParam === 'shared' || dmPanelParam === 'connections'
       ? dmPanelParam
       : null,
+    ...(connectionsSection ? { dmConnectionsSection: connectionsSection } : {}),
+    ...(dmCircle ? { dmCircle } : {}),
     pin,
     comment,
     pinPanel: pin ? (comment || panel === 'comments' ? 'comments' : 'viewer') : null,
-    pinFeed: view === 'pins' && params.get('feed') === 'connections' ? 'connections' : null,
+    pinFeed,
+    ...(pinCircle ? { pinCircle } : {}),
     playExperience,
     playItem,
   }

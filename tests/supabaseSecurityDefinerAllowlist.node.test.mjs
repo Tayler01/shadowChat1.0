@@ -64,8 +64,8 @@ test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', 
   assert.equal(new Set(signatures).size, signatures.length)
   assert.ok(signatures.every(signature => /^[a-z0-9_]+\(.*\)$/.test(signature)))
   assert.equal(new Set([...signatures, ...contract.internal_signatures]).size, contract.expected_total_security_definers)
-  assert.equal(contract.required_active_table_privileges.length, 53)
-  assert.equal(new Set(contract.required_active_table_privileges).size, 53)
+  assert.equal(contract.required_active_table_privileges.length, 55)
+  assert.equal(new Set(contract.required_active_table_privileges).size, 55)
   assert.deepEqual(contract.authenticated_users_update_columns, [
     'avatar_thumbnail_path',
     'avatar_thumbnail_url',

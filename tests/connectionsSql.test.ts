@@ -56,7 +56,7 @@ describe('Connections database contract', () => {
     expect(sql).toMatch(/connections_private\.get_my_connection_state_impl[\s\S]*security definer/i)
     expect(sql).toMatch(/connections_private\.get_my_connection_summary_impl[\s\S]*security definer/i)
     expect(sql).toMatch(/connections_private\.list_my_connections_impl[\s\S]*security definer/i)
-    expect(verifier).toContain("'activation_private', 'connections_private'")
+    expect(verifier).toMatch(/n\.nspname in \([\s\S]*?'connections_private'[\s\S]*?\)/)
     expect(allowlist.unexposed_security_definers).toEqual(expect.arrayContaining([
       'connections_private.mutate_connection_impl(uuid,text)',
       'connections_private.remove_connection_on_block()',

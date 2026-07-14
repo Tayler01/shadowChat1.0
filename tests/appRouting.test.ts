@@ -6,6 +6,8 @@ import {
   resolveDMRouteMutation,
   resolvePinRouteMutation,
   resolvePinFeedModeMutation,
+  resolvePinCircleFilterMutation,
+  resolveInnerCircleRouteMutation,
   resolvePlayRouteMutation,
   shouldPersistDMPanelInUrl,
 } from '../src/lib/appRouting'
@@ -123,7 +125,56 @@ test('ShadowPin Connections feed routes are normalized and replaced without poll
   const discover = resolvePinFeedModeMutation({ currentUrl: connections.url, mode: 'discover' })
   expect(discover.method).toBe('replace')
   expect(discover.url.searchParams.has('feed')).toBe(false)
+  expect(discover.url.searchParams.has('circle')).toBe(false)
   expect(discover.url.searchParams.get('pin')).toBe('pin-1')
+})
+
+test('Inner Circle routes keep list filters replace-only and detail opens Back-safe', () => {
+  const circleId = '550e8400-e29b-41d4-a716-446655440000'
+  const list = resolveInnerCircleRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=dms&panel=connections'),
+    currentLayer: 'dm-panel',
+    action: 'show-circles',
+  })
+  expect(list).toMatchObject({ method: 'replace', layer: 'dm-panel' })
+  expect(list && list.method !== 'back' ? list.url.search : '').toBe('?view=dms&panel=connections&section=circles')
+
+  const detail = resolveInnerCircleRouteMutation({
+    currentUrl: list && list.method !== 'back' ? list.url : new URL('https://shadochat.online'),
+    currentLayer: 'dm-panel',
+    action: 'open-circle',
+    circleId,
+  })
+  expect(detail).toMatchObject({ method: 'push', layer: 'dm-inner-circle' })
+  expect(detail && detail.method !== 'back' ? detail.url.searchParams.get('circle') : null).toBe(circleId)
+  expect(resolveInnerCircleRouteMutation({
+    currentUrl: detail && detail.method !== 'back' ? detail.url : new URL('https://shadochat.online'),
+    currentLayer: 'dm-inner-circle',
+    action: 'close-circle',
+  })).toEqual({ method: 'back' })
+
+  expect(getLocationStateFromUrl(new URL(`https://shadochat.online/?view=dms&panel=connections&section=circles&circle=${circleId}`))).toMatchObject({
+    dmPanel: 'connections',
+    dmConnectionsSection: 'circles',
+    dmCircle: circleId,
+  })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=dms&panel=connections&section=circles&circle=not-a-uuid')).dmCircle).toBe('not-a-uuid')
+})
+
+test('ShadowPin Inner Circle filter is transient Connections route state', () => {
+  const circleId = '550e8400-e29b-41d4-a716-446655440000'
+  const selected = resolvePinCircleFilterMutation({
+    currentUrl: new URL('https://shadochat.online/?view=pins&feed=connections'),
+    circleId,
+  })
+  expect(selected.method).toBe('replace')
+  expect(selected.url.search).toBe(`?view=pins&feed=connections&circle=${circleId}`)
+  expect(getLocationStateFromUrl(selected.url)).toMatchObject({ pinFeed: 'connections', pinCircle: circleId })
+
+  const all = resolvePinCircleFilterMutation({ currentUrl: selected.url, circleId: null })
+  expect(all.url.searchParams.has('circle')).toBe(false)
+  expect(getLocationStateFromUrl(new URL(`https://shadochat.online/?view=pins&circle=${circleId}`)).pinCircle).toBeUndefined()
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=pins&feed=connections&circle=not-a-uuid')).pinCircle).toBe('not-a-uuid')
 })
 
 test('General Chat thread URLs preserve a root and exact reply target', () => {

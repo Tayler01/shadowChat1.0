@@ -71,7 +71,12 @@ const unexposedRows = query(`
   select p.oid::regprocedure::text as signature
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname in ('activation_private', 'connections_private', 'shadow_pin_private')
+  where n.nspname in (
+    'activation_private',
+    'connections_private',
+    'inner_circles_private',
+    'shadow_pin_private'
+  )
     and p.prosecdef
   order by 1
 `)
@@ -117,7 +122,12 @@ const [unexposedDefinerSummary] = query(`
     )::integer as missing_search_path
   from pg_proc p
   join pg_namespace n on n.oid = p.pronamespace
-  where n.nspname in ('activation_private', 'connections_private', 'shadow_pin_private')
+  where n.nspname in (
+    'activation_private',
+    'connections_private',
+    'inner_circles_private',
+    'shadow_pin_private'
+  )
     and p.prosecdef
 `)
 const pausedGrantRows = query(`

@@ -31,6 +31,7 @@ import {
   Share2,
   Trash2,
   Upload,
+  UsersRound,
   Volume2,
   VolumeX,
   X,
@@ -72,6 +73,10 @@ import { ShadowPinFeedModeTabs } from './components/ShadowPinFeedModeTabs'
 import { useShadowPinConnectionFeed } from './hooks/useShadowPinConnectionFeed'
 import { useShadowPinFeedMode } from './hooks/useShadowPinFeedMode'
 import { CONNECTIONS_CHANGED_EVENT } from '../connections/connectionModel'
+import { ShadowPinCircleFilterSheet } from '../inner-circles/components'
+import { getMyShadowPinCircleFeedWindow } from '../inner-circles/innerCirclesApi'
+import { useInnerCircleFeed } from '../inner-circles/useInnerCircleFeed'
+import { useInnerCircles } from '../inner-circles/useInnerCircles'
 import { hasCreatorStudioQuery } from './creator/creatorHistory'
 import {
   useShadowPinActivityTracker,
@@ -91,6 +96,7 @@ const LazyShadowPinCreatorStudio = lazy(() => import('./creator').then(module =>
 })))
 
 const NOOP_SHADOW_PIN_FEED_MODE_CHANGE = () => {}
+const NOOP_SHADOW_PIN_CIRCLE_CHANGE = () => {}
 
 type ShadowPinProps = {
   currentView?: AppView
@@ -100,8 +106,10 @@ type ShadowPinProps = {
   initialCommentId?: string
   initialPanel?: 'viewer' | 'comments'
   initialFeedMode?: Extract<ShadowPinFeedMode, 'connections'>
+  initialCircleId?: string
   onPinRoute?: (action: PinRouteAction, imageId?: string, commentId?: string) => void
   onFeedModeChange?: (mode: ShadowPinFeedMode) => void
+  onCircleChange?: (circleId: string | null) => void
 }
 
 type ModalMode =
@@ -2896,6 +2904,8 @@ function ShadowPinHome({
   onPinRoute,
   onViewerImageResolved,
   onFeedModeChange,
+  initialCircleId,
+  onCircleChange,
   tracker,
 }: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & {
   onOpenCategory: (category: ShadowPinCategory) => void
@@ -2912,6 +2922,8 @@ function ShadowPinHome({
   onPinRoute: (action: PinRouteAction, imageId?: string, commentId?: string) => void
   onViewerImageResolved: (image: ShadowPinImage) => void
   onFeedModeChange: (mode: ShadowPinFeedMode) => void
+  initialCircleId?: string
+  onCircleChange: (circleId: string | null) => void
   tracker: ShadowPinActivityTracker
 }) {
   const { user } = useAuth()
@@ -2919,7 +2931,17 @@ function ShadowPinHome({
   const messagesApi = useOptionalMessages()
   const categoriesState = useShadowPinCategories()
   const feedModeState = useShadowPinFeedMode(initialFeedMode ?? null, onFeedModeChange)
-  const connectionsState = useShadowPinConnectionFeed(feedModeState.mode === 'connections')
+  const connectionsState = useShadowPinConnectionFeed(feedModeState.mode === 'connections' && !initialCircleId)
+  const circlesState = useInnerCircles(feedModeState.mode === 'connections')
+  const selectedCircle = useMemo(
+    () => circlesState.circles.find(circle => circle.id === initialCircleId) ?? null,
+    [circlesState.circles, initialCircleId]
+  )
+  const circleFeedState = useInnerCircleFeed(
+    selectedCircle?.id ?? null,
+    feedModeState.mode === 'connections' && Boolean(selectedCircle)
+  )
+  const activeConnectionsState = initialCircleId ? circleFeedState : connectionsState
   const [modal, setModal] = useState<ModalMode>(null)
   const [creatorOpen, setCreatorOpen] = useState(initialCreatorOpen)
   const [creatorTargetImage, setCreatorTargetImage] = useState<ShadowPinImage | null>(null)
@@ -2933,6 +2955,7 @@ function ShadowPinHome({
   const [pinSearchLoading, setPinSearchLoading] = useState(false)
   const [pinSearchError, setPinSearchError] = useState<string | null>(null)
   const [categorySearchPullDistance, setCategorySearchPullDistance] = useState(0)
+  const [circleFilterOpen, setCircleFilterOpen] = useState(false)
   const categoryScrollRef = useRef<HTMLElement | null>(null)
   const categorySearchInputRef = useRef<HTMLInputElement | null>(null)
   const categoryPullRef = useRef<{
@@ -2977,14 +3000,14 @@ function ShadowPinHome({
   }
 
   const connectionsViewerImage = modal?.type === 'image-viewer'
-    ? connectionsState.images.find(image => image.id === modal.image.id) ?? modal.image
+    ? activeConnectionsState.images.find(image => image.id === modal.image.id) ?? modal.image
     : null
   const connectionsViewerImages = useMemo(
     () => buildViewerSequence(
-      [...connectionsState.images, ...(initialNeighbors ?? []), ...viewerSessionImages],
+      [...activeConnectionsState.images, ...(initialNeighbors ?? []), ...viewerSessionImages],
       connectionsViewerImage ?? initialImage
     ),
-    [connectionsState.images, connectionsViewerImage, initialImage, initialNeighbors, viewerSessionImages]
+    [activeConnectionsState.images, connectionsViewerImage, initialImage, initialNeighbors, viewerSessionImages]
   )
 
   const toggleConnectionImageHeart = (image: ShadowPinImage) => {
@@ -2999,7 +3022,7 @@ function ShadowPinHome({
       : current)
     setCommentsImage(current => current?.id === image.id ? optimisticImage : current)
     setViewerSessionImages(current => current.map(item => item.id === image.id ? optimisticImage : item))
-    void connectionsState.toggleHeart(image)
+    void activeConnectionsState.toggleHeart(image)
       .then(updatedImage => {
         setModal(current => current?.type === 'image-viewer' && current.image.id === image.id
           ? { type: 'image-viewer', image: updatedImage }
@@ -3053,13 +3076,25 @@ function ShadowPinHome({
     if (feedModeState.mode !== 'connections' || !connectionsViewerImage) return
     const generation = ++viewerEligibilityGenerationRef.current
     try {
-      const result = await fetchMyShadowPinConnectionFeedWindow(connectionsViewerImage.id)
+      const result = initialCircleId
+        ? await getMyShadowPinCircleFeedWindow(initialCircleId, connectionsViewerImage.id)
+        : await fetchMyShadowPinConnectionFeedWindow(connectionsViewerImage.id)
       if (viewerEligibilityGenerationRef.current !== generation) return
-      if (!result.target) leaveIneligibleConnectionViewer()
+      if (result.target) return
+      if (initialCircleId) {
+        const broaderResult = await fetchMyShadowPinConnectionFeedWindow(connectionsViewerImage.id)
+        if (viewerEligibilityGenerationRef.current !== generation) return
+        if (broaderResult.target) {
+          toast('This Pin is no longer in that circle. Showing All Connections.')
+          onCircleChange(null)
+          return
+        }
+      }
+      leaveIneligibleConnectionViewer()
     } catch {
       // A transient resume check must not close an otherwise valid Theater.
     }
-  }, [connectionsViewerImage, feedModeState.mode, leaveIneligibleConnectionViewer])
+  }, [connectionsViewerImage, feedModeState.mode, initialCircleId, leaveIneligibleConnectionViewer, onCircleChange])
 
   const shareConnectionImage = async (image: ShadowPinImage) => {
     tracker.recordShareTapped(image, null)
@@ -3119,14 +3154,14 @@ function ShadowPinHome({
     const targetKey = `${initialImage.id}:${initialPanel || (initialCommentId ? 'comments' : 'viewer')}:${initialCommentId || ''}`
     if (openedInitialTargetRef.current === targetKey) return
     openedInitialTargetRef.current = targetKey
-    const currentImage = connectionsState.images.find(image => image.id === initialImage.id) ?? initialImage
+    const currentImage = activeConnectionsState.images.find(image => image.id === initialImage.id) ?? initialImage
     setViewerSessionImages(current => current.some(image => image.id === currentImage.id)
       ? current.map(image => image.id === currentImage.id ? currentImage : image)
       : [...current, currentImage])
     setModal({ type: 'image-viewer', image: currentImage })
     setCommentsImage(initialPanel === 'comments' || initialCommentId ? currentImage : null)
   }, [
-    connectionsState.images,
+    activeConnectionsState.images,
     feedModeState.mode,
     initialCommentId,
     initialImage,
@@ -3406,7 +3441,7 @@ function ShadowPinHome({
   useEffect(() => {
     if (homeScrollMemory.current.restoreMode !== feedModeState.mode) return
     if (feedModeState.mode === 'discover' && categoriesState.loading) return
-    if (feedModeState.mode === 'connections' && connectionsState.loading && connectionsState.images.length === 0) return
+    if (feedModeState.mode === 'connections' && activeConnectionsState.loading && activeConnectionsState.images.length === 0) return
 
     const scrollNode = categoryScrollRef.current
     if (!scrollNode) return
@@ -3421,8 +3456,8 @@ function ShadowPinHome({
   }, [
     categoriesState.categories.length,
     categoriesState.loading,
-    connectionsState.images.length,
-    connectionsState.loading,
+    activeConnectionsState.images.length,
+    activeConnectionsState.loading,
     feedModeState.mode,
     homeScrollMemory,
   ])
@@ -3441,11 +3476,18 @@ function ShadowPinHome({
     feedModeState.selectMode(nextMode)
   }
 
-  const openConnectionsHub = () => {
+  const openConnectionsHub = (targetCircleId?: string) => {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
     url.searchParams.set('view', 'dms')
     url.searchParams.set('panel', 'connections')
+    if (targetCircleId) {
+      url.searchParams.set('section', 'circles')
+      url.searchParams.set('circle', targetCircleId)
+    } else {
+      url.searchParams.delete('section')
+      url.searchParams.delete('circle')
+    }
     url.searchParams.delete('feed')
     url.searchParams.delete('pin')
     url.searchParams.delete('comment')
@@ -3457,7 +3499,7 @@ function ShadowPinHome({
     <div
       className="theme-image-surface relative flex h-full min-h-0 flex-col overflow-hidden overscroll-contain"
       data-feed-mode={feedModeState.mode}
-      aria-busy={feedModeState.loading || (feedModeState.mode === 'connections' && connectionsState.loading)}
+      aria-busy={feedModeState.loading || (feedModeState.mode === 'connections' && activeConnectionsState.loading)}
     >
       <MobileAppHeader
         currentView={currentView}
@@ -3500,6 +3542,26 @@ function ShadowPinHome({
             disabled={feedModeState.loading}
           />
         </div>
+        {feedModeState.mode === 'connections' && (
+          <button
+            type="button"
+            onClick={() => setCircleFilterOpen(true)}
+            className="mb-3 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--theme-accent-border-soft)] bg-[rgba(5,6,8,0.72)] px-4 text-left shadow-[var(--shadow-panel)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+            aria-haspopup="dialog"
+            data-testid="shadow-pin-circle-filter-trigger"
+          >
+            <UsersRound className="h-4 w-4 shrink-0 text-[var(--theme-accent-readable)]" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">Connections filter</span>
+              <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">
+                {initialCircleId
+                  ? selectedCircle?.name || (circlesState.loading ? 'Loading Circle' : 'Circle unavailable')
+                  : 'All Connections'}
+              </span>
+            </span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+          </button>
+        )}
         {feedModeState.saveError && (
           <div className="mb-3 flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-amber-300/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100" role="status" data-testid="shadow-pin-feed-save-error">
             <span>{feedModeState.saveError}</span>
@@ -3678,11 +3740,30 @@ function ShadowPinHome({
             data-testid="shadow-pin-connections-panel"
           >
             <div className="sr-only" role="status" aria-live="polite">
-              {connectionsState.loading
+              {activeConnectionsState.loading
                 ? 'Loading Pins from your Connections'
-                : `${connectionsState.images.length} Pins from your Connections loaded`}
+                : `${activeConnectionsState.images.length} Pins from your Connections loaded`}
             </div>
-            {connectionsState.loading && connectionsState.images.length === 0 ? (
+            {initialCircleId && circlesState.loading && circlesState.circles.length === 0 ? (
+              <div className="grid grid-cols-2 gap-3" data-testid="shadow-pin-feed-skeleton" aria-hidden="true">
+                {[0, 1, 2, 3, 4, 5].map(index => (
+                  <div key={index} className="animate-pulse rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(255,255,255,0.055)]" style={{ aspectRatio: index % 3 === 1 ? '4 / 5' : '1 / 1' }} />
+                ))}
+              </div>
+            ) : initialCircleId && circlesState.error && !selectedCircle ? (
+              <div className="mx-auto max-w-md rounded-[var(--radius-lg)] border border-red-400/30 bg-red-500/10 p-5 text-center text-red-100" data-testid="shadow-pin-circle-error">
+                <h2 className="text-lg font-semibold">This circle could not load</h2>
+                <p className="mt-1 text-sm text-red-100/75">{circlesState.error}</p>
+                <Button className="mt-4" onClick={circlesState.refresh}>Retry</Button>
+              </div>
+            ) : initialCircleId && !selectedCircle ? (
+              <div className="mx-auto max-w-md rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.58)] p-5 text-center" data-testid="shadow-pin-circle-unavailable">
+                <UsersRound className="mx-auto mb-3 h-8 w-8 text-[var(--theme-accent-readable)]" aria-hidden="true" />
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">Circle unavailable</h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">It may have been deleted, or this private circle is not yours.</p>
+                <Button className="mt-4" variant="secondary" onClick={() => onCircleChange(null)}>View All Connections</Button>
+              </div>
+            ) : activeConnectionsState.loading && activeConnectionsState.images.length === 0 ? (
               <div className="grid grid-cols-2 gap-3" data-testid="shadow-pin-feed-skeleton" aria-hidden="true">
                 {[0, 1, 2, 3, 4, 5].map(index => (
                   <div
@@ -3692,44 +3773,52 @@ function ShadowPinHome({
                   />
                 ))}
               </div>
-            ) : connectionsState.error && connectionsState.images.length === 0 ? (
+            ) : activeConnectionsState.error && activeConnectionsState.images.length === 0 ? (
               <div className="mx-auto max-w-md rounded-[var(--radius-lg)] border border-red-400/30 bg-red-500/10 p-5 text-center text-red-100" data-testid="shadow-pin-feed-error">
-                <h2 className="text-lg font-semibold">Your Connections feed could not load</h2>
-                <p className="mt-1 text-sm text-red-100/75">{connectionsState.error}</p>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Button variant="secondary" onClick={() => selectFeedMode('discover')}>View Discover</Button>
-                  <Button onClick={connectionsState.refresh}>Retry</Button>
+                <h2 className="text-lg font-semibold">{selectedCircle ? `${selectedCircle.name} could not load` : 'Your Connections feed could not load'}</h2>
+                <p className="mt-1 text-sm text-red-100/75">{activeConnectionsState.error}</p>
+                <div className={`mt-4 grid gap-2 ${selectedCircle ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {!selectedCircle && <Button variant="secondary" onClick={() => selectFeedMode('discover')}>View Discover</Button>}
+                  <Button onClick={activeConnectionsState.refresh}>Retry</Button>
                 </div>
               </div>
-            ) : connectionsState.images.length === 0 ? (
+            ) : activeConnectionsState.images.length === 0 ? (
               <div className="mx-auto max-w-md rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[rgba(5,6,8,0.58)] p-5 text-center" data-testid="shadow-pin-feed-empty">
                 <Pin className="mx-auto mb-3 h-8 w-8 text-[var(--theme-accent-readable)]" />
                 <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                  {connectionsState.acceptedCount === 0
+                  {selectedCircle?.memberCount === 0
+                    ? 'This circle is empty'
+                    : selectedCircle
+                      ? `No Pins from ${selectedCircle.name} yet`
+                      : connectionsState.acceptedCount === 0
                     ? 'Your Connections feed is waiting'
                     : 'No new Pins from your Connections'}
                 </h2>
                 <p className="mt-1 text-sm text-[var(--text-secondary)]">
-                  {connectionsState.acceptedCount === 0
+                  {selectedCircle?.memberCount === 0
+                    ? 'Add accepted Connections to see their Pins here.'
+                    : selectedCircle
+                      ? 'New Pins from this circle will appear here without changing who can view them.'
+                      : connectionsState.acceptedCount === 0
                     ? 'Connect with people you trust to see their new Pins here.'
                     : 'When your Connections publish something new, it will appear here.'}
                 </p>
                 <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Button variant="secondary" onClick={() => selectFeedMode('discover')}>View Discover</Button>
-                  <Button onClick={openConnectionsHub}>{connectionsState.acceptedCount === 0 ? 'Find Connections' : 'Manage Connections'}</Button>
+                  <Button variant="secondary" onClick={() => selectedCircle ? onCircleChange(null) : selectFeedMode('discover')}>{selectedCircle ? 'All Connections' : 'View Discover'}</Button>
+                  <Button onClick={() => openConnectionsHub(selectedCircle?.id)}>{selectedCircle ? 'Manage Circle' : connectionsState.acceptedCount === 0 ? 'Find Connections' : 'Manage Connections'}</Button>
                 </div>
               </div>
             ) : (
               <>
-                {connectionsState.error && (
+                {activeConnectionsState.error && (
                   <div className="mb-3 flex items-center justify-between gap-3 rounded-[var(--radius-md)] border border-amber-300/25 bg-amber-500/10 px-3 py-2 text-sm text-amber-100" role="status" data-testid="shadow-pin-feed-refresh-error">
                     <span>Some Pins may be out of date.</span>
-                    <button type="button" className="min-h-9 shrink-0 font-semibold text-[var(--theme-accent-readable)]" onClick={connectionsState.refresh}>Retry</button>
+                    <button type="button" className="min-h-9 shrink-0 font-semibold text-[var(--theme-accent-readable)]" onClick={activeConnectionsState.refresh}>Retry</button>
                   </div>
                 )}
                 <ShadowPinMasonryGrid
-                  images={connectionsState.images}
-                  label="Pins from your Connections"
+                  images={activeConnectionsState.images}
+                  label={selectedCircle ? `Pins from ${selectedCircle.name}` : 'Pins from your Connections'}
                   testId="shadow-pin-feed"
                   onViewer={openConnectionImageViewer}
                   onEdit={image => { setCreatorTargetImage(image); setCreatorOpen(true) }}
@@ -3739,12 +3828,12 @@ function ShadowPinHome({
                   onShareToGroupChat={messagesApi ? shareConnectionImageToGroupChat : undefined}
                   onVisible={image => tracker.recordPinViewed(image, null)}
                 />
-                {connectionsState.hasMore && (
+                {activeConnectionsState.hasMore && (
                   <div className="mt-4 flex justify-center">
                     <Button
                       variant="secondary"
-                      onClick={connectionsState.loadMore}
-                      loading={connectionsState.loading}
+                      onClick={activeConnectionsState.loadMore}
+                      loading={activeConnectionsState.loading}
                       data-testid="shadow-pin-feed-load-more"
                     >
                       Load More
@@ -3764,7 +3853,7 @@ function ShadowPinHome({
             onClose={() => { setCreatorOpen(false); setCreatorTargetImage(null) }}
             onPublished={async image => {
               await categoriesState.refresh()
-              if (feedModeState.mode === 'connections') await connectionsState.refresh()
+              if (feedModeState.mode === 'connections') await activeConnectionsState.refresh()
               tracker.recordPinMutation(image, 'pin_created', null)
               if (feedModeState.mode === 'connections') {
                 toast.success('Published to Discover')
@@ -3803,13 +3892,23 @@ function ShadowPinHome({
           onHeart={() => toggleCategoryHeart(detailsCategory)}
         />
       )}
+      <ShadowPinCircleFilterSheet
+        open={circleFilterOpen}
+        circles={circlesState.circles}
+        selectedCircleId={initialCircleId ?? null}
+        onSelect={circleId => {
+          onCircleChange(circleId)
+          setCircleFilterOpen(false)
+        }}
+        onClose={() => setCircleFilterOpen(false)}
+      />
       {connectionsViewerImage && feedModeState.mode === 'connections' && (
         <ShadowPinImmersiveViewer
           images={connectionsViewerImages}
           activeImageId={connectionsViewerImage.id}
-          categoryTitle="Connections"
-          hasMore={connectionsState.hasMore}
-          loadingMore={connectionsState.loading}
+          categoryTitle={selectedCircle?.name || 'Connections'}
+          hasMore={activeConnectionsState.hasMore}
+          loadingMore={activeConnectionsState.loading}
           commentsOpen={Boolean(commentsImage)}
           canManageImage={image => canManage(image, user?.id, adminRole)}
           getPosterUrl={image => getPinImageUrl(image, 'medium')}
@@ -3837,7 +3936,7 @@ function ShadowPinHome({
             onViewerImageResolved(image)
             onPinRoute('replace-viewer', image.id)
           }}
-          onLoadMore={connectionsState.loadMore}
+          onLoadMore={activeConnectionsState.loadMore}
           onSettled={image => tracker.recordPinOpened(image, null)}
           onHeart={toggleConnectionImageHeart}
           onComments={image => openConnectionImageComments(image, true)}
@@ -3860,7 +3959,7 @@ function ShadowPinHome({
             onPinRoute('close-comments', connectionsViewerImage?.id || commentsImage.id)
           }}
           onCountChange={count => {
-            connectionsState.setCommentCount(commentsImage.id, count)
+            activeConnectionsState.setCommentCount(commentsImage.id, count)
             setCommentsImage(current => current?.id === commentsImage.id
               ? { ...current, comment_count: count }
               : current)
@@ -4258,8 +4357,10 @@ export function ShadowPin({
   initialCommentId,
   initialPanel,
   initialFeedMode,
+  initialCircleId,
   onPinRoute = () => {},
   onFeedModeChange = NOOP_SHADOW_PIN_FEED_MODE_CHANGE,
+  onCircleChange = NOOP_SHADOW_PIN_CIRCLE_CHANGE,
 }: ShadowPinProps) {
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [returnHomeAfterViewerClose, setReturnHomeAfterViewerClose] = useState(false)
@@ -4287,7 +4388,7 @@ export function ShadowPin({
     }
 
     const locallyResolved = routedViewerImagesRef.current.get(initialImageId)
-    if (locallyResolved?.category_id) {
+    if (locallyResolved?.category_id && !(initialFeedMode === 'connections' && initialCircleId)) {
       setInitialImage(locallyResolved)
       setInitialNeighbors([])
       setInitialImageStatus('idle')
@@ -4298,24 +4399,40 @@ export function ShadowPin({
     setInitialImageStatus('loading')
 
     if (initialFeedMode === 'connections') {
-      void fetchMyShadowPinConnectionFeedWindow(initialImageId)
-        .then(windowResult => {
+      const scopedWindow = initialCircleId
+        ? getMyShadowPinCircleFeedWindow(initialCircleId, initialImageId)
+        : fetchMyShadowPinConnectionFeedWindow(initialImageId)
+      void scopedWindow
+        .then(async windowResult => {
           if (cancelled) return
           if (!windowResult.target) {
-            return fetchShadowPinImage(initialImageId).then(image => {
+            if (initialCircleId) {
+              const broaderWindow = await fetchMyShadowPinConnectionFeedWindow(initialImageId)
               if (cancelled) return
-              if (!image?.category_id) {
-                setInitialImage(null)
-                setInitialImageStatus('unavailable')
+              if (broaderWindow.target) {
+                toast('This Pin is no longer in that circle. Showing All Connections.')
+                onCircleChange(null)
+                setInitialImage(broaderWindow.target)
+                setInitialNeighbors(broaderWindow.images.filter(image => image.id !== broaderWindow.target?.id))
+                setInitialImageStatus('idle')
+                setActiveCategoryId(null)
                 return
               }
-              toast('This Pin is no longer in your Connections feed')
-              onFeedModeChange('discover')
-              setInitialImage(image)
-              setInitialNeighbors([])
-              setInitialImageStatus('idle')
-              setActiveCategoryId(image.category_id)
-            })
+            }
+            const image = await fetchShadowPinImage(initialImageId)
+            if (cancelled) return
+            if (!image?.category_id) {
+              setInitialImage(null)
+              setInitialImageStatus('unavailable')
+              return
+            }
+            toast('This Pin is no longer in your Connections feed')
+            onFeedModeChange('discover')
+            setInitialImage(image)
+            setInitialNeighbors([])
+            setInitialImageStatus('idle')
+            setActiveCategoryId(image.category_id)
+            return
           }
           setInitialImage(windowResult.target)
           setInitialNeighbors(windowResult.images.filter(image => image.id !== windowResult.target?.id))
@@ -4323,7 +4440,15 @@ export function ShadowPin({
           setActiveCategoryId(null)
         })
         .catch(() => {
-          if (!cancelled) setInitialImageStatus('unavailable')
+          if (cancelled) return
+          if (initialCircleId) {
+            setInitialImage(null)
+            setInitialNeighbors([])
+            setInitialImageStatus('idle')
+            setActiveCategoryId(null)
+          } else {
+            setInitialImageStatus('unavailable')
+          }
         })
 
       return () => {
@@ -4358,7 +4483,7 @@ export function ShadowPin({
     return () => {
       cancelled = true
     }
-  }, [initialFeedMode, initialImageId, onFeedModeChange])
+  }, [initialCircleId, initialFeedMode, initialImageId, onCircleChange, onFeedModeChange])
 
   if (initialImageId && !activeCategoryId && initialImageStatus !== 'idle') {
     return (
@@ -4460,6 +4585,8 @@ export function ShadowPin({
         routedViewerImagesRef.current.set(image.id, image)
       }}
       onFeedModeChange={onFeedModeChange}
+      initialCircleId={initialCircleId}
+      onCircleChange={onCircleChange}
       tracker={tracker}
     />
   )

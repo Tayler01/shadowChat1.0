@@ -40,8 +40,8 @@ Canonical detail and release gates live in:
   and deterministic source-linked Catch-Up track without changing production
   `main`.
 - Started: 2026-07-13
-- Status: Candidate 1 Connections and Candidate 2 ShadowPin Feed Modes
-  accepted; Candidate 3 Inner Circles is active.
+- Status: Candidates 1-3 are independently accepted; the combined Wave Three
+  regression/mobile/cleanup gate is active.
 - Backend boundary: reciprocal caller-private relationships, no public graph or
   counts, personal-block teardown with no restore, and compatibility with the
   unchanged production frontend sharing Supabase.
@@ -63,6 +63,15 @@ Canonical detail and release gates live in:
   The browser gate covered persistence, universal Search, ordered feeds,
   Theater, hearts/comments, Back routes, relationship teardown/reconnect,
   geometry/diagnostics, exact preference restoration, and zero residue.
+- Candidate 3 contract: [INNER_CIRCLES.md](C:/repos/chat2.0/docs/INNER_CIRCLES.md:1)
+- Candidate 3 proof: linked migration `20260713235745`, clean linked dry run,
+  local/remote security parity, unchanged-production compatibility smoke, 201
+  Jest suites / 1,065 passing tests, 42 Node contracts, clean lint/typecheck/
+  build/budgets, transactional SQL, and complete Pixel Chromium/iPhone WebKit
+  lifecycle/feed/Theater/comments/geometry/diagnostics/cleanup proof against
+  immutable deploy `6a55892252f0d306fae5b852`. Stable isolated deploy
+  `6a558acc257a6d21fa379fa2` serves the byte-identical boot artifact and passed
+  a fresh iPhone WebKit Connections -> Circles route check.
 - Production `main` and the production Netlify frontend remain unchanged.
 
 ### ShadowChat 2.0 Wave Two

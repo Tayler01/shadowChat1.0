@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, MessageCircle, RefreshCw, Search, UserPlus, UsersRound, X } from 'lucide-react'
+import toast from 'react-hot-toast'
 import type { BasicUser, User } from '../../lib/supabase'
 import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
@@ -16,6 +17,18 @@ import {
   type ConnectionScope,
 } from './connectionModel'
 import type { ConnectionSummary } from './connectionModel'
+import type { InnerCircleRouteAction } from '../../lib/appRouting'
+import {
+  InnerCircleDeleteDialog,
+  InnerCircleDetail,
+  InnerCircleEditorSheet,
+  InnerCircleList,
+  InnerCircleMemberPickerSheet,
+  InnerCirclesHubTabs,
+  type InnerCirclesHubTab,
+} from '../inner-circles/components'
+import { useInnerCircleMembers, useInnerCircles } from '../inner-circles/useInnerCircles'
+import type { InnerCircle } from '../inner-circles/innerCirclesModel'
 
 type ConnectionsHubSheetProps = {
   open: boolean
@@ -23,6 +36,9 @@ type ConnectionsHubSheetProps = {
   currentUserId: string
   summary: ConnectionSummary
   onMessage: (user: { id: string; username: string; display_name: string }) => void
+  initialSection?: 'circles' | null
+  initialCircleId?: string
+  onCircleRoute?: (action: InnerCircleRouteAction, circleId?: string) => void
 }
 
 const PAGE_SIZE = 40
@@ -51,7 +67,18 @@ const scopeEmptyCopy: Record<ConnectionScope, { title: string; copy: string }> =
   outgoing: { title: 'No sent requests', copy: 'Requests you are waiting on will appear here.' },
 }
 
-export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onMessage }: ConnectionsHubSheetProps) {
+export function ConnectionsHubSheet({
+  open,
+  onClose,
+  currentUserId,
+  summary,
+  onMessage,
+  initialSection,
+  initialCircleId,
+  onCircleRoute,
+}: ConnectionsHubSheetProps) {
+  const [hubTab, setHubTab] = useState<InnerCirclesHubTab>(initialSection === 'circles' ? 'circles' : 'people')
+  const [circleId, setCircleId] = useState<string | null>(initialCircleId ?? null)
   const [scope, setScope] = useState<ConnectionScope>('accepted')
   const [items, setItems] = useState<ConnectionListItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -65,9 +92,57 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searchRevision, setSearchRevision] = useState(0)
   const [profileUser, setProfileUser] = useState<User | null>(null)
+  const [editor, setEditor] = useState<{ mode: 'create' | 'rename'; circle: InnerCircle | null } | null>(null)
+  const [editorName, setEditorName] = useState('')
+  const [editorPending, setEditorPending] = useState(false)
+  const [editorError, setEditorError] = useState<string | null>(null)
+  const [deleteCircle, setDeleteCircle] = useState<InnerCircle | null>(null)
+  const [deletePending, setDeletePending] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pickerQuery, setPickerQuery] = useState('')
+  const [pickerConnections, setPickerConnections] = useState<ConnectionProfile[]>([])
+  const [pickerSelectedIds, setPickerSelectedIds] = useState<Set<string>>(new Set())
+  const [pickerLoading, setPickerLoading] = useState(false)
+  const [pickerPending, setPickerPending] = useState(false)
+  const [pickerReady, setPickerReady] = useState(false)
+  const [pickerError, setPickerError] = useState<string | null>(null)
   const requestRef = useRef(0)
   const searchRequestRef = useRef(0)
+  const pickerRequestRef = useRef(0)
   const closeProfile = useCallback(() => setProfileUser(null), [])
+  const circlesState = useInnerCircles(open && hubTab === 'circles')
+  const selectedCircle = useMemo(
+    () => circlesState.circles.find(circle => circle.id === circleId) ?? null,
+    [circleId, circlesState.circles]
+  )
+  const membersState = useInnerCircleMembers(
+    selectedCircle?.id ?? null,
+    open && hubTab === 'circles' && Boolean(selectedCircle)
+  )
+
+  useEffect(() => {
+    const nextTab: InnerCirclesHubTab = initialSection === 'circles' || initialCircleId ? 'circles' : 'people'
+    setHubTab(nextTab)
+    setCircleId(initialCircleId ?? null)
+  }, [initialCircleId, initialSection])
+
+  const selectHubTab = useCallback((nextTab: InnerCirclesHubTab) => {
+    setHubTab(nextTab)
+    setCircleId(null)
+    onCircleRoute?.(nextTab === 'circles' ? 'show-circles' : 'show-people')
+  }, [onCircleRoute])
+
+  const openCircle = useCallback((circle: InnerCircle) => {
+    setHubTab('circles')
+    setCircleId(circle.id)
+    onCircleRoute?.('open-circle', circle.id)
+  }, [onCircleRoute])
+
+  const closeCircle = useCallback(() => {
+    setCircleId(null)
+    onCircleRoute?.('close-circle')
+  }, [onCircleRoute])
 
   const load = useCallback(async (append = false) => {
     const requestId = ++requestRef.current
@@ -99,16 +174,16 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
   }, [items, scope])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || hubTab !== 'people') return
     setItems([])
     setHasMore(false)
     void load(false)
   // `load` includes the current list for keyset append; opening/scope changes are the reset boundary.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, scope])
+  }, [hubTab, open, scope])
 
   useEffect(() => {
-    if (!open) return
+    if (!open || hubTab !== 'people') return
     const refresh = () => void load(false)
     const refreshAfterBlock = (event: Event) => {
       const detail = (event as CustomEvent<{ userId?: string; blocked?: boolean }>).detail
@@ -125,7 +200,7 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
       window.removeEventListener(CONNECTIONS_CHANGED_EVENT, refresh)
       window.removeEventListener(PERSONAL_BLOCKS_CHANGED_EVENT, refreshAfterBlock)
     }
-  }, [load, open])
+  }, [hubTab, load, open])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedQuery(query.trim().slice(0, 100)), 250)
@@ -134,7 +209,7 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
 
   useEffect(() => {
     const requestId = ++searchRequestRef.current
-    if (!open || debouncedQuery.length < 2) {
+    if (!open || hubTab !== 'people' || debouncedQuery.length < 2) {
       setSearchResults([])
       setSearchError(null)
       setSearching(false)
@@ -157,7 +232,7 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
         if (requestId === searchRequestRef.current) setSearching(false)
       })
     return () => controller.abort()
-  }, [currentUserId, debouncedQuery, open, searchRevision])
+  }, [currentUserId, debouncedQuery, hubTab, open, searchRevision])
 
   useEffect(() => {
     if (!open) {
@@ -165,8 +240,174 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
       setDebouncedQuery('')
       setSearchResults([])
       setProfileUser(null)
+      setEditor(null)
+      setDeleteCircle(null)
+      setPickerOpen(false)
+      setPickerQuery('')
+      setPickerError(null)
     }
   }, [open])
+
+  const startCreateCircle = useCallback(() => {
+    setEditor({ mode: 'create', circle: null })
+    setEditorName('')
+    setEditorError(null)
+  }, [])
+
+  const startRenameCircle = useCallback((circle: InnerCircle) => {
+    setEditor({ mode: 'rename', circle })
+    setEditorName(circle.name)
+    setEditorError(null)
+  }, [])
+
+  const submitEditor = useCallback(async () => {
+    if (!editor || editorPending) return
+    setEditorPending(true)
+    setEditorError(null)
+    try {
+      if (editor.mode === 'create') {
+        const created = await circlesState.createCircle(editorName)
+        setEditor(null)
+        setEditorName('')
+        toast.success('Inner Circle created')
+        if (created) openCircle(created)
+      } else if (editor.circle) {
+        await circlesState.renameCircle(editor.circle.id, editorName)
+        setEditor(null)
+        setEditorName('')
+        toast.success('Inner Circle renamed')
+      }
+    } catch (caught) {
+      setEditorError(caught instanceof Error ? caught.message : 'Unable to save this Inner Circle.')
+    } finally {
+      setEditorPending(false)
+    }
+  }, [circlesState, editor, editorName, editorPending, openCircle])
+
+  const confirmDeleteCircle = useCallback(async () => {
+    if (!deleteCircle || deletePending) return
+    const deletedId = deleteCircle.id
+    setDeletePending(true)
+    setDeleteError(null)
+    try {
+      await circlesState.deleteCircle(deletedId)
+      setDeleteCircle(null)
+      toast.success('Inner Circle deleted')
+      if (circleId === deletedId) closeCircle()
+    } catch (caught) {
+      setDeleteError(caught instanceof Error ? caught.message : 'Unable to delete this Inner Circle.')
+    } finally {
+      setDeletePending(false)
+    }
+  }, [circleId, circlesState, closeCircle, deleteCircle, deletePending])
+
+  const loadPickerConnections = useCallback(async () => {
+    const request = ++pickerRequestRef.current
+    setPickerLoading(true)
+    setPickerReady(false)
+    setPickerError(null)
+    try {
+      const accepted: ConnectionProfile[] = membersState.members.map(member => member.profile)
+      const acceptedIds = new Set(accepted.map(profile => profile.id))
+      const seenBoundaries = new Set<string>()
+      let beforeUpdatedAt: string | null = null
+      let beforeId: string | null = null
+      let complete = false
+      for (let pageIndex = 0; pageIndex < 200; pageIndex += 1) {
+        const page = await listMyConnections({
+          scope: 'accepted',
+          limit: 50,
+          beforeUpdatedAt,
+          beforeId,
+        })
+        page.forEach(item => {
+          if (!acceptedIds.has(item.profile.id)) {
+            acceptedIds.add(item.profile.id)
+            accepted.push(item.profile)
+          }
+        })
+        const boundary = page[page.length - 1]
+        if (page.length < 50) {
+          complete = true
+          break
+        }
+        if (!boundary) throw new Error('Accepted Connections returned an incomplete page. Please retry.')
+        const boundaryKey = `${boundary.updatedAt}:${boundary.connectionId}`
+        if (seenBoundaries.has(boundaryKey)) {
+          throw new Error('Accepted Connections could not be loaded completely. Please retry.')
+        }
+        seenBoundaries.add(boundaryKey)
+        beforeUpdatedAt = boundary.updatedAt
+        beforeId = boundary.connectionId
+      }
+      if (!complete) throw new Error('Accepted Connections exceeded the safe picker window. Please narrow the list and retry.')
+      if (pickerRequestRef.current !== request) return
+      setPickerConnections(accepted)
+      setPickerReady(true)
+    } catch (caught) {
+      if (pickerRequestRef.current !== request) return
+      setPickerError(caught instanceof Error ? caught.message : 'Accepted Connections could not be loaded.')
+    } finally {
+      if (pickerRequestRef.current === request) setPickerLoading(false)
+    }
+  }, [membersState.members])
+
+  const openMemberPicker = useCallback(() => {
+    if (membersState.loading || membersState.error) {
+      toast.error(membersState.error || 'Wait for the current members to finish loading.')
+      return
+    }
+    setPickerSelectedIds(new Set(membersState.members.map(member => member.memberId)))
+    setPickerQuery('')
+    setPickerError(null)
+    setPickerReady(false)
+    setPickerOpen(true)
+    void loadPickerConnections()
+  }, [loadPickerConnections, membersState.error, membersState.loading, membersState.members])
+
+  const closeMemberPicker = useCallback(() => {
+    if (pickerPending) return
+    pickerRequestRef.current += 1
+    setPickerOpen(false)
+    setPickerLoading(false)
+    setPickerReady(false)
+  }, [pickerPending])
+
+  const saveMemberPicker = useCallback(async () => {
+    if (
+      !selectedCircle
+      || pickerPending
+      || pickerLoading
+      || !pickerReady
+      || pickerError
+      || membersState.loading
+      || membersState.error
+    ) return
+    const profilesById = new Map<string, ConnectionProfile>()
+    membersState.members.forEach(member => profilesById.set(member.memberId, member.profile))
+    pickerConnections.forEach(profile => profilesById.set(profile.id, profile))
+    const selectedProfiles = Array.from(pickerSelectedIds).map(memberId => profilesById.get(memberId))
+    if (selectedProfiles.some(profile => !profile)) {
+      setPickerReady(false)
+      setPickerError('The complete selected-member set is no longer available. Reload and try again.')
+      return
+    }
+    setPickerPending(true)
+    setPickerError(null)
+    try {
+      await membersState.setMembers(selectedProfiles as ConnectionProfile[])
+      setPickerOpen(false)
+      setPickerReady(false)
+      toast.success('Inner Circle members updated')
+    } catch (caught) {
+      setPickerSelectedIds(new Set(membersState.members.map(member => member.memberId)))
+      setPickerError(caught instanceof Error ? caught.message : 'Unable to update the selected members.')
+    } finally {
+      setPickerPending(false)
+    }
+  }, [membersState, pickerConnections, pickerError, pickerLoading, pickerPending, pickerReady, pickerSelectedIds, selectedCircle])
+
+  const nestedSheetOpen = Boolean(profileUser || editor || deleteCircle || pickerOpen)
 
   const countByScope = useMemo<Record<ConnectionScope, number>>(() => ({
     accepted: summary.acceptedCount,
@@ -186,8 +427,17 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
         description="Build a trusted network without changing who can message you."
         testId="connections-hub"
         className="sm:max-w-2xl"
-        suspended={Boolean(profileUser)}
+        suspended={nestedSheetOpen}
       >
+        <InnerCirclesHubTabs
+          selected={hubTab}
+          onChange={selectHubTab}
+          peopleCount={summary.acceptedCount}
+          circleCount={circlesState.circles.length}
+        />
+
+        {hubTab === 'people' ? (
+          <div id="connections-hub-panel-people" role="tabpanel" aria-labelledby="connections-hub-tab-people">
         <div className="grid grid-cols-3 gap-1 rounded-2xl border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.2)] p-1" role="tablist" aria-label="Connection lists">
           {tabs.map(tab => {
             const selected = scope === tab.id
@@ -321,9 +571,95 @@ export function ConnectionsHubSheet({ open, onClose, currentUserId, summary, onM
             </>
           )}
         </div>
+          </div>
+        ) : (
+          <div id="connections-hub-panel-circles" role="tabpanel" aria-labelledby="connections-hub-tab-circles" className="mt-3">
+            {circleId ? (
+              selectedCircle ? (
+                <InnerCircleDetail
+                  circle={selectedCircle}
+                  members={membersState.members.map(member => member.profile)}
+                  loading={membersState.loading}
+                  error={membersState.error}
+                  onBack={closeCircle}
+                  onAddConnections={openMemberPicker}
+                  onRetry={membersState.refresh}
+                  onMessage={onMessage}
+                  onRemove={member => {
+                    void membersState.removeMember(member.id)
+                      .then(() => toast.success(`${member.display_name || member.username} removed`))
+                      .catch(caught => toast.error(caught instanceof Error ? caught.message : 'Unable to remove this member.'))
+                  }}
+                  onRename={() => startRenameCircle(selectedCircle)}
+                  onDelete={() => { setDeleteCircle(selectedCircle); setDeleteError(null) }}
+                />
+              ) : circlesState.loading ? (
+                <div className="flex min-h-40 items-center justify-center gap-2 text-sm text-[var(--text-muted)]" role="status"><Loader2 className="h-4 w-4 animate-spin" />Loading Inner Circle</div>
+              ) : (
+                <div className="rounded-[var(--radius-lg)] border border-dashed border-[var(--border-subtle)] px-5 py-8 text-center text-[var(--text-muted)]" data-testid="inner-circle-unavailable">
+                  <UsersRound className="mx-auto mb-3 h-8 w-8" aria-hidden="true" />
+                  <p className="font-semibold text-[var(--text-primary)]">Circle unavailable</p>
+                  <p className="mt-1 text-sm">It may have been deleted, or this private circle is not yours.</p>
+                  <Button type="button" variant="secondary" className="mt-4" onClick={closeCircle}>Back to Circles</Button>
+                </div>
+              )
+            ) : (
+              <InnerCircleList
+                circles={circlesState.circles}
+                loading={circlesState.loading}
+                error={circlesState.error}
+                onRetry={circlesState.refresh}
+                onCreate={startCreateCircle}
+                onOpen={circle => openCircle(circle as InnerCircle)}
+                onRename={circle => startRenameCircle(circle as InnerCircle)}
+                onDelete={circle => { setDeleteCircle(circle as InnerCircle); setDeleteError(null) }}
+              />
+            )}
+          </div>
+        )}
       </DMHubBottomSheet>
 
       {profileUser && <PublicProfileDialog user={profileUser} open onClose={closeProfile} />}
+      <InnerCircleEditorSheet
+        open={Boolean(editor)}
+        mode={editor?.mode ?? 'create'}
+        name={editorName}
+        onNameChange={setEditorName}
+        onSubmit={() => { void submitEditor() }}
+        onClose={() => { if (!editorPending) setEditor(null) }}
+        pending={editorPending}
+        error={editorError}
+      />
+      <InnerCircleDeleteDialog
+        open={Boolean(deleteCircle)}
+        circleName={deleteCircle?.name ?? 'this Inner Circle'}
+        onConfirm={() => { void confirmDeleteCircle() }}
+        onClose={() => { if (!deletePending) setDeleteCircle(null) }}
+        pending={deletePending}
+        error={deleteError}
+      />
+      <InnerCircleMemberPickerSheet
+        open={pickerOpen}
+        circleName={selectedCircle?.name ?? 'Inner Circle'}
+        connections={pickerConnections}
+        selectedMemberIds={pickerSelectedIds}
+        query={pickerQuery}
+        onQueryChange={setPickerQuery}
+        onToggleMember={member => {
+          setPickerSelectedIds(current => {
+            const next = new Set(current)
+            if (next.has(member.id)) next.delete(member.id)
+            else next.add(member.id)
+            return next
+          })
+        }}
+        onSave={() => { void saveMemberPicker() }}
+        onClose={closeMemberPicker}
+        pending={pickerPending}
+        loading={pickerLoading}
+        saveDisabled={!pickerReady || Boolean(pickerError) || Boolean(membersState.error)}
+        error={pickerError}
+      />
     </>
   )
 }

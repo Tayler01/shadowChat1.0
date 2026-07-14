@@ -23,17 +23,16 @@ On `codex/shadowchat-2.0`, all five Wave One candidate implementations remain
 preserved. Activity and member-facing report intake stay paused, while the
 operator Safety Case Center remains available. All four Wave Two candidates
 are implemented and passed their local, shared-backend, immutable-Netlify, and
-automated Pixel Chromium/iPhone WebKit gates. The exact trial deploy is
-`6a556190a9c126b4758b29f1`, published at the isolated stable test URL
+automated Pixel Chromium/iPhone WebKit gates. The cumulative 2.0 trial deploy is
+`6a558acc257a6d21fa379fa2`, published at the isolated stable test URL
 `https://shadowchat-2-0-wave-one.netlify.app`; production `main` remains
 unchanged while Tayler's installed-phone acceptance is pending. Wave Three
-Candidate 1 Connections and Candidate 2 ShadowPin Feed Modes are implemented,
-linked, and accepted through repeat two-account Pixel Chromium/iPhone WebKit
-lifecycle, realtime, routing, engagement, focus, geometry, and zero-residue
-proof. Feed Modes immutable deploy `6a5575bcbc2a1131aab40695` is also live at
-the isolated stable test URL. Inner Circles is the active Candidate 3
-checkpoint; the gated Shado Live prototype and deterministic source-linked
-Catch-Up follow in that order. Read
+Candidates 1-3 (Connections, ShadowPin Feed Modes, and Inner Circles) are
+implemented, linked, and independently accepted through two-account Pixel
+Chromium/iPhone WebKit lifecycle, realtime, routing, engagement, focus,
+geometry, and zero-residue proof. The combined Wave Three regression gate is
+active; the gated Shado Live prototype and deterministic source-linked Catch-Up
+follow in that order. Read
 [docs/SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
 before changing Wave Three, and read
 [docs/SHADOWCHAT_2_0_WAVE_TWO.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_TWO.md:1)

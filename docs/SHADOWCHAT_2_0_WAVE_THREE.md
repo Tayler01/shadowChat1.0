@@ -150,8 +150,8 @@ contract is locked in
 
 ## Candidate 3 Contract - Inner Circles
 
-Candidate 3 is active after Connections and Feed Modes passed their independent
-gates. Inner Circles are private, owner-curated lists of accepted Connections.
+Candidate 3 is accepted after Connections and Feed Modes passed their
+independent gates. Inner Circles are private, owner-curated lists of accepted Connections.
 V1 supports up to 10 circles per owner and 50 members per circle. Circle names,
 membership, and counts are visible only to the owner; adding or removing a
 member creates no notification and no new relationship, DM, group chat, badge,
@@ -222,7 +222,16 @@ explicitly excluded from v1.
   linked; immutable deploy `6a5575bcbc2a1131aab40695` and the stable isolated
   URL passed the complete two-account Pixel Chromium/iPhone WebKit feed,
   Theater, engagement, lifecycle, routing, geometry, diagnostics, and
-  zero-residue verifier. Candidate 3 Inner Circles is active.
+  zero-residue verifier.
+- Inner Circles is accepted. Additive migration `20260713235745` is linked with
+  clean local/remote security and no-pending proof; the unchanged production
+  frontend passed its compatibility smoke. All 201 Jest suites (1,065 tests),
+  42 Node contracts, lint, typecheck, build/budgets, transactional SQL, and the
+  complete Pixel Chromium/iPhone WebKit verifier passed against immutable
+  deploy `6a55892252f0d306fae5b852` with exact zero-residue cleanup. Stable
+  isolated deploy `6a558acc257a6d21fa379fa2` serves byte-identical HTML and
+  all 12 boot assets and passed a fresh iPhone WebKit Connections -> Circles
+  route check. The combined Wave Three regression gate is active.
 - Shado Live is limited to specification/prototype work while its Activity and
   reporting dependencies remain paused.
 - Catch-Up remains queued behind a deterministic, source-linked contract; no
