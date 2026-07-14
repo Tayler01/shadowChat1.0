@@ -40,8 +40,9 @@ Canonical detail and release gates live in:
   and deterministic source-linked Catch-Up track without changing production
   `main`.
 - Started: 2026-07-13
-- Status: Candidates 1-3 are independently accepted; the combined Wave Three
-  regression/mobile/cleanup gate is active.
+- Status: Candidates 1-3 and the combined Wave Three regression/mobile/cleanup
+  gate are accepted. Shado Live specification/prototype work is active; the
+  full live system remains gated by paused Activity and member reporting.
 - Backend boundary: reciprocal caller-private relationships, no public graph or
   counts, personal-block teardown with no restore, and compatibility with the
   unchanged production frontend sharing Supabase.
@@ -72,6 +73,11 @@ Canonical detail and release gates live in:
   immutable deploy `6a55892252f0d306fae5b852`. Stable isolated deploy
   `6a558acc257a6d21fa379fa2` serves the byte-identical boot artifact and passed
   a fresh iPhone WebKit Connections -> Circles route check.
+- Combined proof: each complete two-account Pixel Chromium/iPhone WebKit
+  candidate verifier passed on exact immutable deploy
+  `6a558acc257a6d21fa379fa2` with exact cleanup. The core auth, DM, and mobile
+  DM Back smoke also passed after its mobile readiness selector was aligned to
+  the visible message viewport and composer.
 - Production `main` and the production Netlify frontend remain unchanged.
 
 ### ShadowChat 2.0 Wave Two

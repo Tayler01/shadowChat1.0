@@ -231,8 +231,15 @@ explicitly excluded from v1.
   deploy `6a55892252f0d306fae5b852` with exact zero-residue cleanup. Stable
   isolated deploy `6a558acc257a6d21fa379fa2` serves byte-identical HTML and
   all 12 boot assets and passed a fresh iPhone WebKit Connections -> Circles
-  route check. The combined Wave Three regression gate is active.
-- Shado Live is limited to specification/prototype work while its Activity and
+  route check.
+- The cumulative Wave Three gate is accepted on exact immutable deploy
+  `6a558acc257a6d21fa379fa2`. Connections, ShadowPin Feed Modes, and Inner
+  Circles each passed their complete two-account Pixel Chromium/iPhone WebKit
+  verifier with exact cleanup; the core auth, DM, and mobile DM Back smoke also
+  passed. The smoke readiness selector now follows the visible mobile message
+  viewport and composer instead of the intentionally hidden legacy Lounge
+  header.
+- Shado Live specification/prototype work is active while its Activity and
   reporting dependencies remain paused.
 - Catch-Up remains queued behind a deterministic, source-linked contract; no
   private AI trial has started.

@@ -31,8 +31,8 @@ Candidates 1-3 (Connections, ShadowPin Feed Modes, and Inner Circles) are
 implemented, linked, and independently accepted through two-account Pixel
 Chromium/iPhone WebKit lifecycle, realtime, routing, engagement, focus,
 geometry, and zero-residue proof. The combined Wave Three regression gate is
-active; the gated Shado Live prototype and deterministic source-linked Catch-Up
-follow in that order. Read
+accepted on `6a558acc257a6d21fa379fa2`; the gated Shado Live specification and
+prototype are active, followed by deterministic source-linked Catch-Up. Read
 [docs/SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
 before changing Wave Three, and read
 [docs/SHADOWCHAT_2_0_WAVE_TWO.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_TWO.md:1)

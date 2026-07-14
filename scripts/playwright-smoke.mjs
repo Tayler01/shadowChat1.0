@@ -1013,7 +1013,7 @@ async function dismissAppReleaseDialog(page) {
 }
 
 async function waitForChatView(page) {
-  await page.getByText(/Lounge/i).first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByTestId('message-scroll').waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
   await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
