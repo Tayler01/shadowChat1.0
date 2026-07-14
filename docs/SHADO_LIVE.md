@@ -14,6 +14,9 @@ connection, creates no Supabase row, sends no notification, subscribes to no
 Activity feed, and exposes no pretend report action. Production `main` and the
 production Netlify frontend remain unchanged.
 
+Accepted isolated trial deploy: `6a55a76aa3ae37c5d2d35a6e` at
+`https://shadowchat-2-0-wave-one.netlify.app`.
+
 ## Product Promise
 
 Shado Live should make a small live gathering feel understandable and intimate

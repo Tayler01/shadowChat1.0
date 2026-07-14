@@ -43,10 +43,10 @@ Canonical detail and release gates live in:
 - Status: Candidates 1-3 and the combined Wave Three regression/mobile/cleanup
   gate are accepted. The flagged frontend-only Shado Live prototype and
   deterministic source-linked Catch-Up implementation are complete through
-  local, shared-backend, unit, routing, and Pixel Chromium/iPhone WebKit proof;
-  their final isolated Netlify deployment is pending. The full live system
-  remains gated by paused Activity and member reporting, and no private AI
-  Catch-Up trial has started.
+  local, shared-backend, unit, routing, and Pixel Chromium/iPhone WebKit proof,
+  then accepted on isolated deploy `6a55a76aa3ae37c5d2d35a6e`. The full live
+  system remains gated by paused Activity and member reporting, and no private
+  AI Catch-Up trial has started.
 - Backend boundary: reciprocal caller-private relationships, no public graph or
   counts, personal-block teardown with no restore, and compatibility with the
   unchanged production frontend sharing Supabase.
@@ -94,6 +94,11 @@ Canonical detail and release gates live in:
   frontend/unit/routing coverage, and authenticated Pixel Chromium/iPhone
   WebKit on-demand, source-route, Back/focus, geometry, diagnostics, and zero-
   acknowledgement/residue checks. V1 contains no AI.
+- Final-track deploy proof: implementation commit `0ff5127` produced the
+  flagged, budget-clean artifact. Immutable deploy
+  `6a55a76aa3ae37c5d2d35a6e` passed Shado Live, Catch-Up, auth, DM, and mobile
+  DM Back; the stable isolated URL serves byte-identical HTML and repeated both
+  Pixel Chromium/iPhone WebKit final-track verifiers with zero residue.
 - Production `main` and the production Netlify frontend remain unchanged.
 
 ### ShadowChat 2.0 Wave Two

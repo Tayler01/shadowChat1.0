@@ -11,6 +11,9 @@ Production `main` and the production Netlify frontend remain unchanged. The
 shared Supabase addition is additive and does not change an existing RPC,
 table policy, trigger, or old-client behavior.
 
+Accepted isolated trial deploy: `6a55a76aa3ae37c5d2d35a6e` at
+`https://shadowchat-2-0-wave-one.netlify.app`.
+
 ## Product Contract
 
 Catch-Up answers one question: "What should I look at since I was away?" It is

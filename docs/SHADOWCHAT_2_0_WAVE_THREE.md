@@ -248,6 +248,10 @@ explicitly excluded from v1.
   database-lint, security-contract, transactional two-user, unchanged-
   production compatibility, unit, routing, and Pixel Chromium/iPhone WebKit
   proof. It remains source-linked and non-AI; no private AI trial has started.
-- The final flagged build and isolated Netlify deployment are the remaining
-  release step for these two tracks.
+- The final flagged build is accepted on isolated deploy
+  `6a55a76aa3ae37c5d2d35a6e`. Its release health identifies implementation
+  commit `0ff5127f820ba905fec7b8597ef91f75855a5e57`; the immutable deploy passed
+  Shado Live, Catch-Up, core auth, DM, and mobile DM Back gates. The stable
+  isolated URL serves byte-identical HTML and repeated both Pixel Chromium and
+  iPhone WebKit final-track verifiers with zero test residue.
 - Production `main` and the production Netlify frontend remain unchanged.
