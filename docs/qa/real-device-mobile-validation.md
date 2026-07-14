@@ -1,6 +1,6 @@
 # Real-Device Mobile Validation
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 14, 2026
 
 The checklist now includes the deployed July 10 Release A PWA update,
 notification, blocking, ShadowPin, and private-identity risks. No new physical-
@@ -24,6 +24,12 @@ Wave Three Connections has passed automated Pixel Chromium and iPhone WebKit
 proof on isolated deploy `6a556190a9c126b4758b29f1`; RD-029 remains the
 required installed-device acceptance and must not be marked passed from that
 automation alone.
+
+The flagged Shado Live prototype has automated 320px/Pixel Chromium/iPhone
+WebKit/desktop proof, including simulated iOS keyboard compression and zero
+permission or backend residue. RD-030 remains the required installed-device
+acceptance; automation does not prove native keyboard animation, safe-area
+feel, assistive technology, lock/resume, or real-finger touch comfort.
 
 Do not create a production ShadowPin post merely for device smoke. New pins fan
 out in-app notifications and web push to eligible members; deleting the pin
@@ -99,6 +105,7 @@ Minimum real-device pass:
 | RD-027 | Both | Private identity Release A | Sign in with stable users, open profiles, General Chat, DMs, search, and full-admin access where authorized. | Public surfaces omit Auth email and legacy `full_name`; guarded full-admin email remains available; no profile/bootstrap regression appears. | not run | | Required before considering the later Release B column drop. |
 | RD-028 | Both | ShadowPin social UI | Use an existing or staged pin to open search, tags, comments, replies, moderation, and notification settings. | Controls fit the safe area/keyboard, thread state updates once, and no unintended production-wide notification fan-out occurs. | not run | | Production pin creation requires explicit approval. |
 | RD-029 | Both | Connections | From the DM Hub, open Connections; search a controlled account; request, accept, open the profile, enter the existing DM, return, remove, and test Back/Escape. | Sheet and nested profile fit the safe area, focus/touch behavior is comfortable, realtime request state appears once, Back/Escape restore the correct layer, and the existing DM is unchanged. | not run | | Use the isolated 2.0 URL and controlled accounts; restore Connection and discovery/notification preference state. |
+| RD-030 | Both | Shado Live prototype | On the isolated 2.0 URL, open Play, inspect the Shado Live banner, enter the preview, switch Chat/Room/Safety, type and submit a local message, toggle mic/camera/hand/reactions, exercise reconnect/ended dialogs, background/reopen, lock/unlock, and exit. Repeat with VoiceOver or TalkBack enabled. | Banner crop and hierarchy feel native to Entertainment; nothing clips or sits under safe areas; composer tracks the real keyboard without a blank gap; stage and panel never overlap; tabs/dialogs/controls announce meaningful state; no camera/mic prompt appears; no network-backed live action or residue is created; focus and route restore on exit. | not run | | Use the isolated test URL only. This is a frontend-only local prototype, not a live broadcast. |
 
 ## Known Emulator Gaps
 

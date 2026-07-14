@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
-import { Film, Gamepad2, Radio, Volume2, VolumeX } from 'lucide-react'
+import { Film, Gamepad2, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { createGameSoundtrackController, type GameSoundtrackController } from './gameSoundtrack'
 import { ShadowWarScreen } from './shadow-war/ShadowWarScreen'
@@ -18,6 +18,7 @@ import { ShadowMysteryScreen } from '../entertainment/shadow-mystery/ShadowMyste
 import { SHADOW_MYSTERY_ASSETS } from '../entertainment/shadow-mystery/assets/manifest'
 import { WillKirkScreen } from '../entertainment/will-kirk/WillKirkScreen'
 import { WILL_KIRK_ASSETS } from '../entertainment/will-kirk/assets/manifest'
+import { SHADO_LIVE_ASSETS } from '../entertainment/shado-live/assets/manifest'
 import { SHADO_LIVE_PROTOTYPE_ENABLED } from '../../config/featureFlags'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import type { AppView } from '../../types/navigation'
@@ -390,21 +391,20 @@ export function GamesHome({
           onClick={enterShadoLive}
           className={pickerCardClass}
         >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_18%,rgba(232,189,88,0.32),transparent_29%),radial-gradient(circle_at_18%_78%,rgba(112,72,178,0.2),transparent_36%),linear-gradient(135deg,#181208,#030303_64%)]" />
-          <div className="absolute inset-y-0 right-[14%] w-px bg-gradient-to-b from-transparent via-[#e8bd58]/45 to-transparent" />
-          <div className="absolute right-[8%] top-1/2 h-20 w-20 -translate-y-1/2 rounded-full border border-[#e8bd58]/35 shadow-[0_0_0_12px_rgba(232,189,88,0.04),0_0_70px_rgba(232,189,88,0.18)]" />
-          <div className={pickerCardContentClass}>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[#e8bd58]">
-                <span className="h-2 w-2 rounded-full bg-[#e8bd58]" /> Interactive prototype
-              </div>
-              <p className="mt-2 text-3xl font-black tracking-[-0.04em] text-white md:text-4xl">Shado <span className="text-[#e8bd58]">Live</span></p>
-              <p className="mt-1 text-xs text-[#a9a295] md:text-sm">Preview the future room, stage, chat, and safety model.</p>
-            </div>
-            <span className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full border border-[#e8bd58]/45 bg-black/40 text-[#f0d381] backdrop-blur-md">
-              <Radio className="h-6 w-6" aria-hidden="true" />
-            </span>
-          </div>
+          <img
+            src={SHADO_LIVE_ASSETS.pickerBanner}
+            alt="Shado Live"
+            className="absolute inset-0 h-full w-full object-cover object-center"
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            width={1920}
+            height={720}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10" />
+          <span className="absolute bottom-2.5 right-3 rounded-full border border-[#d7aa46]/35 bg-black/70 px-2.5 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[#f0d381] backdrop-blur-sm md:bottom-3 md:right-4">
+            Interactive preview
+          </span>
         </button>}
 
         <button

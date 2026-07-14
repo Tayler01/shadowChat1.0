@@ -17,6 +17,14 @@ production Netlify frontend remain unchanged.
 Accepted isolated trial deploy: `6a55a76aa3ae37c5d2d35a6e` at
 `https://shadowchat-2-0-wave-one.netlify.app`.
 
+The July 14 polish candidate adds a crop-safe `1920x720` retro picker banner,
+aligns the lobby and stage with the Entertainment picker and ShadowChat's
+obsidian/gold visual system, removes mobile stage/panel overlap, and keeps the
+chat composer directly above the iOS keyboard inset. The banner source,
+dimensions, accessibility description, and generation prompt are recorded in
+`src/features/entertainment/shado-live/assets/manifest.ts`; the optimized
+runtime asset is `public/entertainment/shado-live/picker-banner.webp`.
+
 ## Product Promise
 
 Shado Live should make a small live gathering feel understandable and intimate
@@ -170,6 +178,38 @@ room ends, or claim an operator action succeeded without authoritative proof.
 - the isolated test deploy creates no rows, uploads, notifications, or other
   residue; and
 - production `main` and production Netlify remain untouched.
+
+The automated Shado Live browser proof is
+`scripts/verify-shado-live-prototype-browser.mjs`. Its July 14 matrix covers a
+320x568 Chromium viewport at 130% text, Pixel Chromium, iPhone WebKit, and
+desktop Chromium. It checks the real picker asset, lobby CTA, route/focus
+restoration, stage/panel separation, local chat, tabs, dialog keyboard
+behavior, controls, iOS keyboard compression, diagnostics, permission calls,
+and zero backend or provider residue.
+
+## Remaining Work
+
+The prototype cleanup is ready for deeper testing, but these items remain
+deliberately open:
+
+1. Complete RD-030 on an installed iPhone PWA and installed Android PWA,
+   including native keyboard animation, safe areas, touch comfort,
+   VoiceOver/TalkBack, background/resume, and lock/unlock.
+2. Collect structured feedback from Tayler and additional phone testers on the
+   picker, lobby clarity, stage density, panel switching, reactions, and
+   failure-state comprehension; fix reproducible issues on the isolated branch.
+3. Keep the full live system gated until member reporting and Activity safety
+   routes resume, the operator controls are proven, and a current media-provider
+   capability/privacy/cost spike is approved.
+4. If the full system is approved, implement the server-authoritative room
+   lifecycle, role-scoped token service, provider adapter/webhooks, block and
+   ban enforcement, notifications, failure recovery, and physical-device
+   performance budgets described above.
+5. Keep the private AI Catch-Up experiment separate. Deterministic Catch-Up is
+   the accepted baseline; no AI trial starts until its accuracy, privacy,
+   attribution, cost, and failure gates are defined.
+6. Merge to production `main` and deploy the production Netlify frontend only
+   after separate installed-phone acceptance and explicit approval.
 
 The full Shado Live build can begin only after Tayler explicitly resumes the
 required Activity and member-reporting dependencies and the safety gate above

@@ -1501,6 +1501,38 @@ html, body, #root {
     transform: translateY(100%);
   }
 
+  .shado-live-stage-visual,
+  .shado-live-control-dock {
+    transition:
+      opacity var(--dur-fast) var(--ease-premium),
+      padding var(--dur-fast) var(--ease-premium),
+      transform var(--dur-med) var(--ease-premium);
+  }
+
+  html[data-shadowchat-keyboard='open'] .shado-live-stage-grid {
+    grid-template-rows: 0 minmax(0, 1fr);
+  }
+
+  html[data-shadowchat-keyboard='open'] .shado-live-stage-visual {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    padding: 0 !important;
+    pointer-events: none;
+    transform: translateY(-0.5rem);
+  }
+
+  html[data-shadowchat-keyboard='open'] .shado-live-control-dock {
+    max-height: 0;
+    overflow: hidden;
+    border-color: transparent;
+    opacity: 0;
+    padding-bottom: 0;
+    padding-top: 0;
+    pointer-events: none;
+    transform: translateY(100%);
+  }
+
   html[data-shadowchat-keyboard='open'][data-shadowchat-mobile-platform='android'] .shadow-checkers-keyboard-collapse {
     max-height: 0 !important;
     margin-bottom: 0 !important;

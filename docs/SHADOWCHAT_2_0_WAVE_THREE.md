@@ -255,3 +255,24 @@ explicitly excluded from v1.
   isolated URL serves byte-identical HTML and repeated both Pixel Chromium and
   iPhone WebKit final-track verifiers with zero test residue.
 - Production `main` and the production Netlify frontend remain unchanged.
+
+## Final-Track Polish - July 14, 2026
+
+- Shado Live now has a custom crop-safe retro picker banner and a cohesive
+  Entertainment/lobby/stage visual treatment using the existing obsidian,
+  antique-gold, and oxblood language.
+- The phone stage uses separate normal-flow visual, panel, composer, and
+  control regions. The compact 320px/130%-text state has a dedicated host
+  summary, and the iOS keyboard state collapses nonessential chrome so the
+  composer remains directly above the keyboard inset.
+- Tabs, local message focus, enter/leave focus restoration, failure dialogs,
+  mic/camera/hand state, and listener labeling have explicit accessibility
+  behavior. The prototype still requests no media permission and performs no
+  live/backend action.
+- The dedicated verifier covers compact Chromium, Pixel Chromium, iPhone
+  WebKit, and desktop Chromium with route, layout, keyboard, interaction,
+  diagnostics, and zero-residue assertions.
+- Remaining before any production decision: RD-030 installed iPhone/Android
+  acceptance, broader tester feedback, and explicit merge approval. The real
+  Shado Live system and private AI Catch-Up trial remain separately gated as
+  documented in `docs/SHADO_LIVE.md`.

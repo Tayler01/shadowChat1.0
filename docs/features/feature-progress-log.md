@@ -1,6 +1,6 @@
 # Feature Progress Log
 
-## Documentation Status - July 13, 2026
+## Documentation Status - July 14, 2026
 
 Refreshed for the July 10 Release A deployment. Historical feature entries
 remain below; current shipped-versus-candidate status and follow-ups are tracked
@@ -86,7 +86,11 @@ Canonical detail and release gates live in:
 - Shado Live proof: compile-time default-build exclusion plus flagged lazy
   route, unit coverage, and Pixel Chromium/iPhone WebKit routing, focus,
   keyboard, geometry, 130% text, diagnostics, no-permission, no-network, and
-  zero-residue checks. It is UI state only; the full live backend is not built.
+  zero-residue checks. The July 14 cleanup adds the final retro picker banner,
+  premium mobile lobby/stage treatment, normal-flow stage/panel layout,
+  keyboard-locked composer, accessible tabs/dialog/controls, and a four-profile
+  320px/Pixel/iPhone/desktop verifier. It is UI state only; the full live
+  backend is not built.
 - Catch-Up contract: [CATCH_UP.md](C:/repos/chat2.0/docs/CATCH_UP.md:1)
 - Catch-Up proof: linked additive migration `20260714020000`, clean migration
   parity/dry run, local and linked database lint/security, rollback-only
@@ -100,6 +104,11 @@ Canonical detail and release gates live in:
   DM Back; the stable isolated URL serves byte-identical HTML and repeated both
   Pixel Chromium/iPhone WebKit final-track verifiers with zero residue.
 - Production `main` and the production Netlify frontend remain unchanged.
+- Remaining final-track work: RD-030 installed iPhone/Android acceptance,
+  multi-tester feedback and targeted fixes, then explicit production-merge
+  approval. The real Shado Live backend remains gated by reporting, Activity,
+  operator safety, and provider selection; the private AI Catch-Up trial has
+  not started.
 
 ### ShadowChat 2.0 Wave Two
 
