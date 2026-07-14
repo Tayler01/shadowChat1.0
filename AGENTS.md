@@ -32,9 +32,10 @@ implemented, linked, and independently accepted through two-account Pixel
 Chromium/iPhone WebKit lifecycle, realtime, routing, engagement, focus,
 geometry, and zero-residue proof. The combined Wave Three regression gate is
 accepted on `6a558acc257a6d21fa379fa2`. The gated frontend-only Shado Live
-prototype and deterministic source-linked Catch-Up are also implemented and
-accepted on isolated deploy `6a55a76aa3ae37c5d2d35a6e`, published at the same
-stable test URL; the full Shado Live system and any private AI Catch-Up trial
+prototype and deterministic source-linked Catch-Up are also implemented. The
+July 14 Shado Live visual/mobile cleanup is accepted on isolated deploy
+`6a561d93dc105334eca9a5f9`, published at the same stable test URL; the full
+Shado Live system and any private AI Catch-Up trial
 remain separately gated. Read
 [docs/SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
 before changing Wave Three, and read

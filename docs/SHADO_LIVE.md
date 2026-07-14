@@ -14,10 +14,10 @@ connection, creates no Supabase row, sends no notification, subscribes to no
 Activity feed, and exposes no pretend report action. Production `main` and the
 production Netlify frontend remain unchanged.
 
-Accepted isolated trial deploy: `6a55a76aa3ae37c5d2d35a6e` at
+Accepted isolated trial deploy: `6a561d93dc105334eca9a5f9` at
 `https://shadowchat-2-0-wave-one.netlify.app`.
 
-The July 14 polish candidate adds a crop-safe `1920x720` retro picker banner,
+The July 14 accepted polish adds a crop-safe `1920x720` retro picker banner,
 aligns the lobby and stage with the Entertainment picker and ShadowChat's
 obsidian/gold visual system, removes mobile stage/panel overlap, and keeps the
 chat composer directly above the iOS keyboard inset. The banner source,

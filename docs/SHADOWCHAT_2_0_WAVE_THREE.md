@@ -248,12 +248,12 @@ explicitly excluded from v1.
   database-lint, security-contract, transactional two-user, unchanged-
   production compatibility, unit, routing, and Pixel Chromium/iPhone WebKit
   proof. It remains source-linked and non-AI; no private AI trial has started.
-- The final flagged build is accepted on isolated deploy
-  `6a55a76aa3ae37c5d2d35a6e`. Its release health identifies implementation
-  commit `0ff5127f820ba905fec7b8597ef91f75855a5e57`; the immutable deploy passed
-  Shado Live, Catch-Up, core auth, DM, and mobile DM Back gates. The stable
-  isolated URL serves byte-identical HTML and repeated both Pixel Chromium and
-  iPhone WebKit final-track verifiers with zero test residue.
+- The polished flagged build is accepted on isolated deploy
+  `6a561d93dc105334eca9a5f9`. Its release health identifies polish commit
+  `47df36f`; immutable deploy `6a561c97b13a2f301ce618f4` passed Shado Live,
+  Catch-Up, core auth, DM, and mobile DM Back gates. The stable isolated URL
+  serves the same artifact and repeated the final-track verifiers with zero
+  Shado Live media/backend residue.
 - Production `main` and the production Netlify frontend remain unchanged.
 
 ## Final-Track Polish - July 14, 2026
@@ -272,6 +272,10 @@ explicitly excluded from v1.
 - The dedicated verifier covers compact Chromium, Pixel Chromium, iPhone
   WebKit, and desktop Chromium with route, layout, keyboard, interaction,
   diagnostics, and zero-residue assertions.
+- Immutable deploy `6a561c97b13a2f301ce618f4` and stable deploy
+  `6a561d93dc105334eca9a5f9` passed the Shado Live, Catch-Up, auth, DM, and
+  mobile DM Back gates. The stable URL is
+  `https://shadowchat-2-0-wave-one.netlify.app`.
 - Remaining before any production decision: RD-030 installed iPhone/Android
   acceptance, broader tester feedback, and explicit merge approval. The real
   Shado Live system and private AI Catch-Up trial remain separately gated as

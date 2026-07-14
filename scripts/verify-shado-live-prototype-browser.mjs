@@ -146,6 +146,11 @@ for (const profile of profiles) {
     await pickerButton.waitFor({ timeout: 20_000 })
     const pickerImage = pickerButton.getByRole('img', { name: 'Shado Live' })
     await pickerImage.waitFor()
+    const pickerImageHandle = await pickerImage.elementHandle()
+    await page.waitForFunction(image => {
+      const banner = image instanceof HTMLImageElement ? image : null
+      return Boolean(banner?.complete && banner.naturalWidth === 1920 && banner.naturalHeight === 720)
+    }, pickerImageHandle, { timeout: 20_000 })
     const pickerGeometry = await pickerButton.evaluate((button, image) => {
       const buttonRect = button.getBoundingClientRect()
       const banner = image instanceof HTMLImageElement ? image : null
@@ -158,7 +163,7 @@ for (const profile of profiles) {
         naturalWidth: banner?.naturalWidth ?? 0,
         naturalHeight: banner?.naturalHeight ?? 0,
       }
-    }, await pickerImage.elementHandle())
+    }, pickerImageHandle)
     must(pickerGeometry.scrollWidth <= pickerGeometry.viewportWidth + 1, `${profile.name} picker has horizontal overflow.`)
     must(pickerGeometry.imageComplete && pickerGeometry.naturalWidth === 1920 && pickerGeometry.naturalHeight === 720, `${profile.name} did not load the Shado Live banner.`)
     await page.waitForFunction(() => {
