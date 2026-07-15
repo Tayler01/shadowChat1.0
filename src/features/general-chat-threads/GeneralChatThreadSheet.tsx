@@ -20,8 +20,9 @@ import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useOptionalMessages, type MessagesContextValue } from '../../hooks/MessagesContext'
 import { useReadCursor } from '../../hooks/useReadCursor'
+import { clearGroupNotifications, requestAppBadgeRefresh } from '../../lib/appBadge'
+import { markGeneralNotificationEventsReadThrough, type ChatMessageType, type Message } from '../../lib/supabase'
 import { cn, shouldGroupMessage } from '../../lib/utils'
-import type { ChatMessageType, Message } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
 import { useGeneralChatThread } from './useGeneralChatThread'
 
@@ -82,6 +83,9 @@ export function GeneralChatThreadSheet({
     readInFlightRef.current = true
     try {
       await markRead(latest.id, latest.created_at)
+      await markGeneralNotificationEventsReadThrough(latest.id, threadId)
+      await clearGroupNotifications(undefined, undefined, threadId)
+      requestAppBadgeRefresh()
       await messagesApi.refreshThreadSummaries?.([threadId])
     } catch {
       // A later scroll/realtime refresh can retry the cursor without blocking the thread.

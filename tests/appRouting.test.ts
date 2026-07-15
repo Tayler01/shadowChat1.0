@@ -46,6 +46,15 @@ test('paused board and legacy news routes fall back to chat', () => {
 })
 
 test('active routes and message targets keep their expected shape', () => {
+  expect(normalizeViewParam('active-users')).toBe('active-users')
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=active-users'))).toMatchObject({
+    view: 'active-users',
+  })
+  expect(normalizeViewParam('weather')).toBe('weather')
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=weather'))).toMatchObject({
+    view: 'weather',
+  })
+
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=dms&conversation=dm-1&message=message-2'))).toEqual({
     view: 'dms',
     conversation: 'dm-1',

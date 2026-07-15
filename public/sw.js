@@ -34,15 +34,10 @@ const normalizeBadgeCount = (value) => {
     return 0
   }
 
-  return Math.floor(numeric)
+  return Math.min(99, Math.floor(numeric))
 }
 
 const getPayloadBadgeCount = (payload) => {
-  const notificationType = payload.type ?? payload.data?.type
-  if (notificationType === 'group_message') {
-    return null
-  }
-
   const count = payload.badgeCount ?? payload.unreadCount ?? payload.data?.badgeCount ?? payload.data?.unreadCount
   if (count === undefined || count === null) {
     return null
@@ -55,9 +50,16 @@ const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 let badgeUpdateVersion = 0
 
-const applyAppBadge = async () => {
-  // Foreground pages own the Badging API. Invoking it from the worker crashes
-  // some Chromium mobile runtimes while the game shell is starting.
+const applyAppBadge = async (count) => {
+  try {
+    if (count > 0 && typeof self.navigator?.setAppBadge === 'function') {
+      await self.navigator.setAppBadge(count)
+    } else if (count === 0 && typeof self.navigator?.clearAppBadge === 'function') {
+      await self.navigator.clearAppBadge()
+    }
+  } catch {
+    // Badging is best-effort: install state and OS policy can still reject it.
+  }
 }
 
 const updateAppBadge = async (count) => {
@@ -112,6 +114,14 @@ const notificationMatchesClearRequest = (notification, request) => {
     return false
   }
 
+  if (Array.isArray(request.messageIds) && request.messageIds.length > 0 && !request.messageIds.includes(data.messageId)) {
+    return false
+  }
+
+  if (request.threadId && data.threadId !== request.threadId) {
+    return false
+  }
+
   return true
 }
 
@@ -159,22 +169,36 @@ self.addEventListener('push', (event) => {
     payload = { title: 'Shadow Chat', body: event.data ? event.data.text() : '' }
   }
 
-  const title = payload.title || 'Shadow Chat'
-  const options = {
-    body: payload.body || '',
-    icon: payload.icon || '/icons/app-icon-192.png',
-    badge: payload.badge || '/icons/badge.svg',
-    tag: payload.tag || undefined,
-    data: payload.data || payload,
-  }
+  event.waitUntil((async () => {
+    const data = payload.data || payload
+    if (data.type === 'presence_active') {
+      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const hasVisibleAppClient = clients.some((client) => {
+        try {
+          return client.visibilityState === 'visible' && new URL(client.url).origin === self.location.origin
+        } catch {
+          return false
+        }
+      })
+      if (hasVisibleAppClient) return
+    }
 
-  const tasks = [self.registration.showNotification(title, options)]
-  const badgeCount = getPayloadBadgeCount(payload)
-  if (badgeCount !== null) {
-    tasks.push(settleAppBadge(badgeCount))
-  }
+    const title = payload.title || 'Shadow Chat'
+    const options = {
+      body: payload.body || '',
+      icon: payload.icon || '/icons/app-icon-192.png',
+      badge: payload.badge || '/icons/badge.svg',
+      tag: payload.tag || undefined,
+      data,
+    }
 
-  event.waitUntil(Promise.allSettled(tasks))
+    const tasks = [self.registration.showNotification(title, options)]
+    const badgeCount = getPayloadBadgeCount(payload)
+    if (badgeCount !== null) {
+      tasks.push(settleAppBadge(badgeCount))
+    }
+    await Promise.allSettled(tasks)
+  })())
 })
 
 self.addEventListener('notificationclick', (event) => {
@@ -197,6 +221,8 @@ self.addEventListener('notificationclick', (event) => {
     targetUrl = data.messageId
       ? `/?view=chat&message=${encodeURIComponent(data.messageId)}`
       : '/?view=chat'
+  } else if (data.type === 'presence_active') {
+    targetUrl = '/?view=active-users'
   }
   const targetHref = new URL(targetUrl, self.location.origin).href
 

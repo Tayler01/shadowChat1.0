@@ -4,6 +4,7 @@ import { MessageSquare, Reply } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../../hooks/useAuth'
 import { createRealtimeChannelName } from '../../../lib/realtimeChannelName'
+import { requestAppBadgeRefresh } from '../../../lib/appBadge'
 import { getRealtimeClient, getWorkingClient } from '../../../lib/supabase'
 
 type ShadowPinNotificationEvent = {
@@ -31,6 +32,7 @@ export function useShadowPinCommentNotifications() {
   const handleEvent = useCallback(async (event: ShadowPinNotificationEvent) => {
     if (handledRef.current.has(event.id)) return
     handledRef.current.add(event.id)
+    requestAppBadgeRefresh()
 
     const actor = event.payload?.actor
     const actorLabel = actor?.display_name || (actor?.username ? `@${actor.username}` : 'Someone')
@@ -46,6 +48,15 @@ export function useShadowPinCommentNotifications() {
       <button
         type="button"
         onClick={() => {
+          void (async () => {
+            const client = await getWorkingClient()
+            const { error } = await client
+              .from('notification_events')
+              .update({ read_at: new Date().toISOString() })
+              .eq('id', event.id)
+              .eq('user_id', user?.id ?? '')
+            if (!error) requestAppBadgeRefresh()
+          })()
           openShadowPin()
           toast.dismiss(t.id)
         }}
@@ -71,12 +82,6 @@ export function useShadowPinCommentNotifications() {
     ), { duration: 5000, position: 'top-center' })
     window.setTimeout(() => toast.dismiss(toastId), 5000)
 
-    const client = await getWorkingClient()
-    await client
-      .from('notification_events')
-      .update({ read_at: new Date().toISOString() })
-      .eq('id', event.id)
-      .eq('user_id', user?.id ?? '')
   }, [user?.id])
 
   useEffect(() => {

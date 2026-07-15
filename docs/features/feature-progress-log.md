@@ -1,6 +1,6 @@
 # Feature Progress Log
 
-## Documentation Status - July 14, 2026
+## Documentation Status - July 15, 2026
 
 Refreshed for the July 10 Release A deployment. Historical feature entries
 remain below; current shipped-versus-candidate status and follow-ups are tracked
@@ -48,6 +48,16 @@ Canonical detail and release gates live in:
   `6a561d93dc105334eca9a5f9`. The full live
   system remains gated by paused Activity and member reporting, and no private
   AI Catch-Up trial has started.
+- Final acceptance batch: Active Users and Weather full pages, presence-return
+  notifications, unified launcher badges, exact notification/read clearing,
+  ShadowPin radial/draft corrections, and composer alignment are implemented on
+  the trial branch. Four additive migrations and `send-push` v41 are linked;
+  dry-run, database lint, security-definer, and 24-function manifest checks are
+  clean. Immutable trial deploy `6a580a60762e6e4b81058c71` passed authenticated
+  settings smoke and dedicated Android Chromium/iPhone WebKit route, geometry,
+  settings, and diagnostics proof with no test-data residue. Stable isolated
+  publication and physical iPhone/Android acceptance remain pending. Production
+  `main` remains unchanged.
 - Backend boundary: reciprocal caller-private relationships, no public graph or
   counts, personal-block teardown with no restore, and compatibility with the
   unchanged production frontend sharing Supabase.

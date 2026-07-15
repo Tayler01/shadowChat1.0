@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { useOptionalClientReset } from '../../hooks/ClientResetContext'
 import { useOptionalMessages } from '../../hooks/MessagesContext'
-import { uploadChatImageAsset } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
 import { ActiveUsersButton } from './ActiveUsersButton'
 import { PinnedMessagesButton } from './PinnedMessagesButton'
@@ -19,7 +17,6 @@ export function GeneralChatRoomTools({ onViewChange }: GeneralChatRoomToolsProps
   const messagesContext = useOptionalMessages()
   const { status: resetStatus } = useOptionalClientReset()
   const [expanded, setExpanded] = useState(false)
-  const [sharingWeather, setSharingWeather] = useState(false)
   const toggleRef = useRef<HTMLButtonElement>(null)
   const pinnedMessages = useMemo(
     () => (messagesContext?.messages || []).filter(message => message.pinned),
@@ -54,29 +51,6 @@ export function GeneralChatRoomTools({ onViewChange }: GeneralChatRoomToolsProps
     }
   }, [expanded])
 
-  const handleShareWeather = async (file: File) => {
-    setSharingWeather(true)
-    try {
-      if (!messagesContext) {
-        throw new Error('General Chat is still loading.')
-      }
-
-      const asset = await uploadChatImageAsset(file, 'weather')
-      const sent = await messagesContext.sendMessage(
-        'Weather share',
-        'image',
-        asset.publicUrl,
-        undefined,
-        asset.thumbnailUrl
-      )
-      if (sent) toast.success('Weather shared')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to share weather')
-    } finally {
-      setSharingWeather(false)
-    }
-  }
-
   return (
     <div className="relative isolate flex h-11 shrink-0 items-center">
       {expanded ? (
@@ -87,10 +61,12 @@ export function GeneralChatRoomTools({ onViewChange }: GeneralChatRoomToolsProps
           className="room-tools-inline-rail absolute right-[calc(100%+0.2rem)] top-1/2 z-20 flex h-11 w-max max-w-[calc(100vw-9.5rem)] -translate-y-1/2 items-center gap-1 overflow-hidden rounded-l-full bg-[var(--bg-panel-strong)] pl-2 pr-1 shadow-[-12px_0_18px_rgba(0,0,0,0.18)] backdrop-blur-xl"
         >
           <WeatherWidget
-            onOpenSettings={() => onViewChange('settings')}
-            onShareWeather={sharingWeather ? undefined : handleShareWeather}
+            onOpen={() => onViewChange('weather')}
           />
-          <ActiveUsersButton resetStatus={resetStatus} />
+          <ActiveUsersButton
+            resetStatus={resetStatus}
+            onOpen={() => onViewChange('active-users')}
+          />
           <PinnedMessagesButton
             messages={pinnedMessages}
             onUnpin={messagesContext?.togglePin ?? (async () => {})}

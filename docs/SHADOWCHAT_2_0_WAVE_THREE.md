@@ -280,3 +280,43 @@ explicitly excluded from v1.
   acceptance, broader tester feedback, and explicit merge approval. The real
   Shado Live system and private AI Catch-Up trial remain separately gated as
   documented in `docs/SHADO_LIVE.md`.
+
+## Final Acceptance Batch - July 15, 2026
+
+The following changes are implemented only on `codex/shadowchat-2.0` and remain
+outside production `main` until physical-phone and tester acceptance:
+
+- ShadowPin draft attention now appears only for meaningful unfinished work;
+  Connections-feed scrolling owns no radial pointer session, and one global
+  radial session dismisses on scroll, viewer, modal, feed, blur, and background
+  transitions.
+- Chat and DM composer controls share one 48px phone baseline.
+- Active Users is a full routed page with live count/status, profile access,
+  and Connection controls. The existing bottom tool keeps its green live
+  signal and routes to the page.
+- Weather is a full routed, mobile-first surface with explicit GPS permission,
+  private saved locations, current/24-hour/10-day data, units, refresh, share,
+  US NWS alerts, and lazy OpenStreetMap/RainViewer radar. Air quality, pollen,
+  lightning layers, and history remain outside v1.
+- Active-user notifications use a server-owned 15-minute offline threshold and
+  rolling one-hour recipient/actor cooldown. In-app and push delivery are
+  independent, default-on settings with Connections-only or Everyone scope.
+  A short per-device foreground lease suppresses presence push on the visible
+  device while keeping background-device delivery eligible.
+- The launcher badge is preference-gated across DMs, General Chat, mentions and
+  interactions, Connections, and ShadowPin; the visible count caps at 99.
+  DM/General/thread reads clear only through presented content, and Connection
+  or ShadowPin events no longer become read merely because a toast appeared.
+
+Backend rollout remained additive and backend-first. Linked migrations
+`20260715214707`, `20260715214708`, `20260715231400`, and `20260715232500` are
+applied, `send-push` v41 is active, linked dry-run reports no pending changes,
+linked database lint reports no warnings, the security-definer contract passes,
+and the 24-function health manifest matches the remote project. Immutable trial
+deploy `6a580a60762e6e4b81058c71` passed authenticated settings smoke plus the
+dedicated final-acceptance verifier on Android Chromium and iPhone WebKit with
+zero page errors or horizontal overflow. The verifier covered Active Users,
+Weather, presence settings, launcher-badge settings, and five-button bottom-nav
+geometry without creating database or Storage data. Production `main` remains
+unchanged. Physical iPhone/Android PWA push, notification-center clearing,
+launcher badge, GPS, and radar gestures remain the user acceptance gate.

@@ -8,6 +8,8 @@ import { DMHubBottomSheet } from '../../components/dms/hub/DMHubBottomSheet'
 import { PublicProfileDialog } from '../../components/profile/PublicProfileDialog'
 import { cn } from '../../lib/utils'
 import { PERSONAL_BLOCKS_CHANGED_EVENT } from '../../lib/personalBlocking'
+import { requestAppBadgeRefresh } from '../../lib/appBadge'
+import { getWorkingClient } from '../../lib/supabase'
 import { ConnectionControl } from './ConnectionControl'
 import { listMyConnections, searchConnectionPeople } from './connectionsApi'
 import {
@@ -116,6 +118,20 @@ export function ConnectionsHubSheet({
     () => circlesState.circles.find(circle => circle.id === circleId) ?? null,
     [circleId, circlesState.circles]
   )
+
+  useEffect(() => {
+    if (!open || !currentUserId) return
+    void (async () => {
+      const client = await getWorkingClient()
+      const { error } = await client
+        .from('notification_events')
+        .update({ read_at: new Date().toISOString() })
+        .eq('user_id', currentUserId)
+        .in('type', ['connection_request', 'connection_accepted'])
+        .is('read_at', null)
+      if (!error) requestAppBadgeRefresh()
+    })()
+  }, [currentUserId, open])
   const membersState = useInnerCircleMembers(
     selectedCircle?.id ?? null,
     open && hubTab === 'circles' && Boolean(selectedCircle)

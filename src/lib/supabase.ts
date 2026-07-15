@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { invokeEdgeFunctionWithRetry } from './edgeFunctionRetry'
 import {
   VITE_SUPABASE_ANON_KEY,
   VITE_SUPABASE_URL,
@@ -1723,7 +1724,21 @@ export const updateUserPresence = async () => {
       return
     }
     
-    await workingClient.rpc('update_user_last_active')
+    const { data, error } = await workingClient.rpc('update_user_last_active_v2')
+    if (error) {
+      await workingClient.rpc('update_user_last_active')
+      return
+    }
+
+    if (typeof data === 'string' && data) {
+      void invokeEdgeFunctionWithRetry(workingClient, 'send-push', {
+        type: 'presence_active',
+        activationId: data,
+      })
+        .catch(() => {
+          // Presence remains correct even when optional notification dispatch fails.
+        })
+    }
   } catch {
   }
 }
@@ -1899,6 +1914,34 @@ export const searchUsersStrict = async (
   return (data ?? []).map((user: any) =>
     pickPublicProfile(user as Record<string, unknown>) as unknown as BasicUser
   )
+}
+
+export const markDMMessagesReadThrough = async (
+  conversationId: string,
+  throughMessageId: string
+) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('mark_dm_messages_read_through', {
+    conversation_id: conversationId,
+    through_message_id: throughMessageId,
+  })
+
+  if (error) throw error
+  return Math.max(0, Number(data) || 0)
+}
+
+export const markGeneralNotificationEventsReadThrough = async (
+  throughMessageId: string,
+  threadId?: string
+) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('mark_general_notification_events_read_through', {
+    through_message_id: throughMessageId,
+    target_thread_id: threadId ?? null,
+  })
+
+  if (error) throw error
+  return Math.max(0, Number(data) || 0)
 }
 
 export const searchUsers = async (

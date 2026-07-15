@@ -42,11 +42,13 @@ type PushEventType =
   | 'reaction'
   | 'shadow_pin_post'
   | 'shadow_pin_comment'
+  | 'presence_active'
 
 type SendPushRequestBody = {
   type?: PushEventType
   messageId?: string
   eventId?: string
+  activationId?: string
   emoji?: string
   isDm?: boolean
   senderUserId?: string
@@ -66,6 +68,8 @@ type NotificationPrefs = {
   shadow_pin_new_post_enabled?: boolean
   shadow_pin_comment_enabled?: boolean
   shadow_pin_reply_enabled?: boolean
+  presence_push_enabled?: boolean
+  presence_in_app_enabled?: boolean
   general_chat_muted: boolean
   quiet_hours_start: string | null
   quiet_hours_end: string | null
@@ -78,6 +82,21 @@ type StoredSubscription = {
   endpoint: string
   p256dh: string
   auth: string
+  foreground_until: string | null
+}
+
+type PresenceActivationRecord = {
+  id: string
+  actor_id: string
+  expires_at: string
+  dispatched_at: string | null
+}
+
+type PresenceRecipientClaim = {
+  recipient_id: string
+  event_id: string
+  push_enabled: boolean
+  in_app_enabled: boolean
 }
 
 type NotificationEventRow = {
@@ -228,6 +247,8 @@ const NOTIFICATION_PREFERENCE_SELECT = [
   'shadow_pin_new_post_enabled',
   'shadow_pin_comment_enabled',
   'shadow_pin_reply_enabled',
+  'presence_push_enabled',
+  'presence_in_app_enabled',
   'general_chat_muted',
   'quiet_hours_start',
   'quiet_hours_end',
@@ -353,7 +374,7 @@ const getActiveSubscriptions = async (
 ) => {
   const { data, error } = await supabase
     .from('push_subscriptions')
-    .select('id, endpoint, p256dh, auth')
+    .select('id, endpoint, p256dh, auth, foreground_until')
     .eq('user_id', userId)
     .eq('enabled', true)
 
@@ -426,17 +447,20 @@ const getUnreadBadgeCount = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   userId: string
 ) => {
-  const { data, error } = await supabase.rpc('count_unread_dm_messages', {
+  const { data, error } = await supabase.rpc('get_app_badge_state', {
     target_user_id: userId,
   })
 
   if (error) {
     console.error('Failed to load unread badge count', error)
-    return undefined
+    return 0
   }
 
-  const count = Number(data ?? 0)
-  return Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0
+  const badgeState = data && typeof data === 'object' && !Array.isArray(data)
+    ? data as { total?: unknown }
+    : null
+  const count = Number(badgeState?.total ?? 0)
+  return Number.isFinite(count) ? Math.min(99, Math.max(0, Math.floor(count))) : 0
 }
 
 const upsertNotificationEvent = async (
@@ -486,7 +510,8 @@ const deliverPushToSubscriptions = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   vapid: VapidKeys,
   subscriptions: StoredSubscription[],
-  message: PushMessage
+  message: PushMessage,
+  options: { retryAttempts?: number } = {}
 ) => {
   const results = await Promise.all(
     subscriptions.map(async (subscriptionRow) => {
@@ -555,6 +580,32 @@ const deliverPushToSubscriptions = async (
 
   if (invalidSubscriptionIds.length) {
     await supabase.from('push_subscriptions').delete().in('id', invalidSubscriptionIds)
+  }
+
+  const retryableSubscriptionIds = new Set(
+    results
+      .filter((result) => result.retryable)
+      .map((result) => result.id)
+  )
+  const retryAttempts = Math.max(0, options.retryAttempts ?? 0)
+  if (retryableSubscriptionIds.size && retryAttempts > 0) {
+    const retrySubscriptions = subscriptions.filter(subscription =>
+      retryableSubscriptionIds.has(subscription.id)
+    )
+    const retryDelivery = await deliverPushToSubscriptions(
+      supabase,
+      vapid,
+      retrySubscriptions,
+      message,
+      { retryAttempts: retryAttempts - 1 }
+    )
+
+    return {
+      deliveredCount: results.filter((result) => result.ok).length + retryDelivery.deliveredCount,
+      removedSubscriptions: invalidSubscriptionIds.length + retryDelivery.removedSubscriptions,
+      attemptedCount: results.length + retryDelivery.attemptedCount,
+      retryableFailures: retryDelivery.retryableFailures,
+    }
   }
 
   return {
@@ -649,30 +700,28 @@ const sendDmPush = async (
         : suppressionReason || 'Recipient muted this conversation',
     }
   } else {
-    const subscriptions = await getActiveSubscriptions(supabase, recipientId)
-    if (!subscriptions.length) {
-      delivery = { skipped: true, reason: 'Recipient has no active push subscriptions' }
+    const dedupeKey = `dm:${dmMessage.id}:${recipientId}`
+    const eventRecord = await upsertNotificationEvent(supabase, {
+      user_id: recipientId,
+      type: 'dm_message',
+      entity_id: dmMessage.id,
+      conversation_id: dmMessage.conversation_id,
+      dm_message_id: dmMessage.id,
+      payload: {
+        title: senderLabel,
+        body: preview,
+        route,
+        sender_id: authUserId,
+      },
+    }, dedupeKey)
+
+    if (eventRecord.sent_at) {
+      delivery = { skipped: true, reason: 'Notification already sent' }
     } else {
-      const dedupeKey = `dm:${dmMessage.id}:${recipientId}`
       const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
-
-      const eventRecord = await upsertNotificationEvent(supabase, {
-        user_id: recipientId,
-        type: 'dm_message',
-        entity_id: dmMessage.id,
-        conversation_id: dmMessage.conversation_id,
-        dm_message_id: dmMessage.id,
-        payload: {
-          title: senderLabel,
-          body: preview,
-          route,
-          sender_id: authUserId,
-          badge_count: badgeCount,
-        },
-      }, dedupeKey)
-
-      if (eventRecord.sent_at) {
-        delivery = { skipped: true, reason: 'Notification already sent' }
+      const subscriptions = await getActiveSubscriptions(supabase, recipientId)
+      if (!subscriptions.length) {
+        delivery = { skipped: true, reason: 'Recipient has no active push subscriptions' }
       } else {
         const pushMessage: PushMessage = {
           data: JSON.stringify({
@@ -732,16 +781,7 @@ const sendDmPush = async (
     })
   }
 
-  const senderSubscriptions = await getActiveSubscriptions(supabase, authUserId)
-  if (!senderSubscriptions.length) {
-    return deliveryResponse({
-      ...delivery,
-      bridgeSender: { skipped: true, reason: 'Sender has no active push subscriptions' },
-    })
-  }
-
   const bridgeSenderDedupeKey = `dm:${dmMessage.id}:${authUserId}:bridge-sender`
-  const senderBadgeCount = await getUnreadBadgeCount(supabase, authUserId)
   const bridgeSenderEvent = await upsertNotificationEvent(supabase, {
     user_id: authUserId,
     type: 'dm_message',
@@ -753,7 +793,6 @@ const sendDmPush = async (
       body: `Sent DM: ${preview}`,
       route,
       sender_id: authUserId,
-      badge_count: senderBadgeCount,
       origin: 'bridge',
       bridge_device_id: bridgeDeviceId,
     },
@@ -763,6 +802,15 @@ const sendDmPush = async (
     return deliveryResponse({
       ...delivery,
       bridgeSender: { skipped: true, reason: 'Notification already sent' },
+    })
+  }
+
+  const senderBadgeCount = await getUnreadBadgeCount(supabase, authUserId)
+  const senderSubscriptions = await getActiveSubscriptions(supabase, authUserId)
+  if (!senderSubscriptions.length) {
+    return deliveryResponse({
+      ...delivery,
+      bridgeSender: { skipped: true, reason: 'Sender has no active push subscriptions' },
     })
   }
 
@@ -942,11 +990,6 @@ const sendReactionPush = async (
     })
   }
 
-  const subscriptions = await getActiveSubscriptions(supabase, recipientId)
-  if (!subscriptions.length) {
-    return json({ skipped: true, reason: 'Recipient has no active push subscriptions' })
-  }
-
   const { data: actor, error: actorError } = await supabase
     .from('users')
     .select('username, display_name')
@@ -984,11 +1027,19 @@ const sendReactionPush = async (
     return json({ skipped: true, reason: 'Notification already sent' })
   }
 
+  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
+  const subscriptions = await getActiveSubscriptions(supabase, recipientId)
+  if (!subscriptions.length) {
+    return json({ skipped: true, reason: 'Recipient has no active push subscriptions' })
+  }
+
   const pushMessage: PushMessage = {
     data: JSON.stringify({
       title,
       body,
       tag: `reaction:${isDm ? 'dm' : 'group'}:${targetMessageId}`,
+      badgeCount,
+      unreadCount: badgeCount,
       data: {
         url: route,
         route,
@@ -998,6 +1049,8 @@ const sendReactionPush = async (
         senderId: authUserId,
         emoji: reaction.emoji,
         isDm,
+        badgeCount,
+        unreadCount: badgeCount,
       },
     }),
     options: {
@@ -1113,19 +1166,6 @@ const sendGroupPush = async (
   const perRecipientResults = await Promise.all(
     eligibleRecipients.map(async ({ preferences: prefs, kind }) => {
       const isBridgeSenderRecipient = origin === 'bridge' && prefs.user_id === authUserId
-      const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
-      if (!subscriptions.length) {
-        return {
-          userId: prefs.user_id,
-          skipped: true,
-          reason: 'No active push subscriptions',
-          delivered: 0,
-          removedSubscriptions: 0,
-          attemptedCount: 0,
-          retryableFailures: 0,
-        }
-      }
-
       const dedupeKey = `group:${groupMessage.id}:${prefs.user_id}`
       const copy = getGroupNotificationCopy(kind, senderLabel, preview)
       const title = isBridgeSenderRecipient ? 'ShadowChat Bridge' : copy.title
@@ -1163,11 +1203,27 @@ const sendGroupPush = async (
         }
       }
 
+      const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
+      const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
+      if (!subscriptions.length) {
+        return {
+          userId: prefs.user_id,
+          skipped: true,
+          reason: 'No active push subscriptions',
+          delivered: 0,
+          removedSubscriptions: 0,
+          attemptedCount: 0,
+          retryableFailures: 0,
+        }
+      }
+
       const pushMessage: PushMessage = {
         data: JSON.stringify({
           title,
           body,
           tag: isBridgeSenderRecipient ? `bridge-group:${groupMessage.id}` : `group:${groupMessage.id}`,
+          badgeCount,
+          unreadCount: badgeCount,
           data: {
             url: route,
             route,
@@ -1178,6 +1234,8 @@ const sendGroupPush = async (
             threadId,
             origin: isBridgeSenderRecipient ? 'bridge' : undefined,
             bridgeDeviceId: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
+            badgeCount,
+            unreadCount: badgeCount,
           },
         }),
         options: {
@@ -1284,19 +1342,6 @@ const sendShadowPinPostPush = async (
   const thumbnailUrl = image.thumbnail_url || image.medium_url || image.image_url
 
   const results = await Promise.all(recipients.map(async preferences => {
-    const subscriptions = await getActiveSubscriptions(supabase, preferences.user_id)
-    if (!subscriptions.length) {
-      return {
-        userId: preferences.user_id,
-        skipped: true,
-        reason: 'No active push subscriptions',
-        deliveredCount: 0,
-        removedSubscriptions: 0,
-        attemptedCount: 0,
-        retryableFailures: 0,
-      }
-    }
-
     const eventRecord = await upsertNotificationEvent(
       supabase,
       {
@@ -1329,6 +1374,20 @@ const sendShadowPinPostPush = async (
       }
     }
 
+    const badgeCount = await getUnreadBadgeCount(supabase, preferences.user_id)
+    const subscriptions = await getActiveSubscriptions(supabase, preferences.user_id)
+    if (!subscriptions.length) {
+      return {
+        userId: preferences.user_id,
+        skipped: true,
+        reason: 'No active push subscriptions',
+        deliveredCount: 0,
+        removedSubscriptions: 0,
+        attemptedCount: 0,
+        retryableFailures: 0,
+      }
+    }
+
     const pushMessage: PushMessage = {
       data: JSON.stringify({
         title,
@@ -1336,6 +1395,8 @@ const sendShadowPinPostPush = async (
         icon: thumbnailUrl || undefined,
         image: thumbnailUrl || undefined,
         tag: `shadow-pin-post:${image.id}`,
+        badgeCount,
+        unreadCount: badgeCount,
         data: {
           url: route,
           route,
@@ -1343,6 +1404,8 @@ const sendShadowPinPostPush = async (
           imageId: image.id,
           categoryId: image.category_id,
           senderId: authUserId,
+          badgeCount,
+          unreadCount: badgeCount,
         },
       }),
       options: {
@@ -1446,11 +1509,6 @@ const sendShadowPinCommentPush = async (
     : `${actorLabel} commented on your ShadowPin`
   const body = truncate(comment.body.trim() || `Open ${image.title}`, 120)
   const route = '/?view=pins'
-  const subscriptions = await getActiveSubscriptions(supabase, recipientId)
-  if (!subscriptions.length) {
-    return json({ skipped: true, reason: 'No active push subscriptions' })
-  }
-
   const eventRecord = await upsertNotificationEvent(
     supabase,
     {
@@ -1475,11 +1533,19 @@ const sendShadowPinCommentPush = async (
     return json({ skipped: true, reason: 'Notification already sent' })
   }
 
+  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
+  const subscriptions = await getActiveSubscriptions(supabase, recipientId)
+  if (!subscriptions.length) {
+    return json({ skipped: true, reason: 'No active push subscriptions' })
+  }
+
   const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, {
     data: JSON.stringify({
       title,
       body,
       tag: `${notificationType}:${comment.id}`,
+      badgeCount,
+      unreadCount: badgeCount,
       data: {
         url: route,
         route,
@@ -1487,6 +1553,8 @@ const sendShadowPinCommentPush = async (
         imageId: comment.image_id,
         commentId: comment.id,
         senderId: authUserId,
+        badgeCount,
+        unreadCount: badgeCount,
       },
     }),
     options: { ttl: 900, urgency: 'normal' },
@@ -1574,19 +1642,6 @@ const sendHypePush = async (
 
   const perRecipientResults = await Promise.all(
     eligibleRecipients.map(async (prefs) => {
-      const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
-      if (!subscriptions.length) {
-        return {
-          userId: prefs.user_id,
-          skipped: true,
-          reason: 'No active push subscriptions',
-          delivered: 0,
-          removedSubscriptions: 0,
-          attemptedCount: 0,
-          retryableFailures: 0,
-        }
-      }
-
       const dedupeKey = `hype:${stackBucket}:${prefs.user_id}`
       const eventRecord = await upsertNotificationEvent(
         supabase,
@@ -1619,11 +1674,27 @@ const sendHypePush = async (
         }
       }
 
+      const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
+      const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
+      if (!subscriptions.length) {
+        return {
+          userId: prefs.user_id,
+          skipped: true,
+          reason: 'No active push subscriptions',
+          delivered: 0,
+          removedSubscriptions: 0,
+          attemptedCount: 0,
+          retryableFailures: 0,
+        }
+      }
+
       const pushMessage: PushMessage = {
         data: JSON.stringify({
           title,
           body,
           tag: `hype:${stackBucket}`,
+          badgeCount,
+          unreadCount: badgeCount,
           data: {
             url: route,
             route,
@@ -1633,6 +1704,8 @@ const sendHypePush = async (
             messageId: hypeEvent.message_id,
             senderId: authUserId,
             stackBucket,
+            badgeCount,
+            unreadCount: badgeCount,
           },
         }),
         options: {
@@ -1679,6 +1752,172 @@ const sendHypePush = async (
   }, retryableFailures > 0 ? 503 : 200)
 }
 
+const hasActiveForegroundLease = (
+  subscription: Pick<StoredSubscription, 'foreground_until'>,
+  now = Date.now()
+) => {
+  if (!subscription.foreground_until) return false
+  const foregroundUntil = new Date(subscription.foreground_until).getTime()
+  return Number.isFinite(foregroundUntil) && foregroundUntil > now
+}
+
+const sendPresenceActivePush = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  vapid: VapidKeys,
+  authUserId: string,
+  activationId: string
+) => {
+  const { data: activationData, error: activationError } = await supabase
+    .from('presence_activation_events')
+    .select('id, actor_id, expires_at, dispatched_at')
+    .eq('id', activationId)
+    .maybeSingle()
+
+  if (activationError) throw activationError
+  if (!activationData) return json({ error: 'Presence activation was not found' }, 404)
+
+  const activation = activationData as PresenceActivationRecord
+  if (activation.actor_id !== authUserId) {
+    return unauthorized('You can only send notifications for your own presence activation')
+  }
+  if (activation.dispatched_at) {
+    return json({ skipped: true, reason: 'Presence activation was already dispatched' })
+  }
+  if (new Date(activation.expires_at).getTime() <= Date.now()) {
+    return json({ skipped: true, reason: 'Presence activation expired' })
+  }
+
+  const { data: actor, error: actorError } = await supabase
+    .from('users')
+    .select('id, username, display_name, presence_visibility')
+    .eq('id', authUserId)
+    .maybeSingle()
+  if (actorError) throw actorError
+  if (!actor) return json({ error: 'Presence actor was not found' }, 404)
+
+  const { data: claimData, error: claimError } = await supabase.rpc(
+    'claim_presence_activation_recipients',
+    {
+      target_activation_id: activationId,
+      target_actor_id: authUserId,
+    }
+  )
+  if (claimError) throw claimError
+
+  const claims = (claimData ?? []) as PresenceRecipientClaim[]
+  const actorLabel = getActorLabel(actor)
+  const title = `${actorLabel} is active now`
+  const body = 'Open Active Users to connect and say hello.'
+  const route = '/?view=active-users'
+
+  let dispatchResponse: Response | undefined
+  let dispatchError: unknown
+  try {
+    const results = await Promise.all(claims.map(async claim => {
+      if (!claim.push_enabled) {
+        return {
+          userId: claim.recipient_id,
+          skipped: true,
+          reason: 'Recipient enabled in-app presence notifications only',
+          deliveredCount: 0,
+          removedSubscriptions: 0,
+          attemptedCount: 0,
+          retryableFailures: 0,
+        }
+      }
+
+      const preferences = await getNotificationPreferences(supabase, claim.recipient_id)
+      const suppressionReason = getDeliverySuppressionReason(preferences)
+      if (!preferences?.presence_push_enabled || suppressionReason) {
+        return {
+          userId: claim.recipient_id,
+          skipped: true,
+          reason: !preferences?.presence_push_enabled
+            ? 'Recipient disabled presence push notifications'
+            : suppressionReason,
+          deliveredCount: 0,
+          removedSubscriptions: 0,
+          attemptedCount: 0,
+          retryableFailures: 0,
+        }
+      }
+
+      const subscriptions = (await getActiveSubscriptions(supabase, claim.recipient_id))
+        .filter(subscription => !hasActiveForegroundLease(subscription))
+      if (!subscriptions.length) {
+        return {
+          userId: claim.recipient_id,
+          skipped: true,
+          reason: 'Recipient has no background push subscriptions',
+          deliveredCount: 0,
+          removedSubscriptions: 0,
+          attemptedCount: 0,
+          retryableFailures: 0,
+        }
+      }
+
+      const delivery = await deliverPushToSubscriptions(
+        supabase,
+        vapid,
+        subscriptions,
+        {
+          data: JSON.stringify({
+            title,
+            body,
+            tag: `presence-active:${authUserId}`,
+            data: {
+              url: route,
+              route,
+              type: 'presence_active',
+              activationId,
+              actorId: authUserId,
+            },
+          }),
+          options: { ttl: 300, urgency: 'normal' },
+        },
+        { retryAttempts: 1 }
+      )
+
+      if (delivery.deliveredCount > 0) {
+        await supabase
+          .from('notification_events')
+          .update({ sent_at: new Date().toISOString() })
+          .eq('id', claim.event_id)
+      }
+
+      return { userId: claim.recipient_id, skipped: false, ...delivery }
+    }))
+
+    dispatchResponse = json({
+      claimedRecipients: claims.length,
+      deliveredRecipients: results.filter(result => result.deliveredCount > 0).length,
+      deliveredSubscriptions: results.reduce(
+        (sum, result) => sum + Number(result.deliveredCount ?? 0),
+        0
+      ),
+      removedSubscriptions: results.reduce(
+        (sum, result) => sum + Number(result.removedSubscriptions ?? 0),
+        0
+      ),
+      retryableFailures: results.reduce(
+        (sum, result) => sum + Number(result.retryableFailures ?? 0),
+        0
+      ),
+    })
+  } catch (error) {
+    dispatchError = error
+  }
+
+  const { error: finishError } = await supabase.rpc('finish_presence_activation_dispatch', {
+    target_activation_id: activationId,
+    target_actor_id: authUserId,
+  })
+  if (finishError) throw finishError
+  if (dispatchError) throw dispatchError
+  if (!dispatchResponse) throw new Error('Presence dispatch did not produce a response')
+  return dispatchResponse
+}
+
 serve(async (req): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -1701,13 +1940,15 @@ serve(async (req): Promise<Response> => {
     const type = body?.type as PushEventType | undefined
     const messageId = typeof body?.messageId === 'string' ? body.messageId : ''
     const eventId = typeof body?.eventId === 'string' ? body.eventId : ''
+    const activationId = typeof body?.activationId === 'string' ? body.activationId : ''
     const emoji = typeof body?.emoji === 'string' ? body.emoji.trim() : ''
     const origin = getPushOrigin(body)
     const bridgeDeviceId = typeof body?.bridgeDeviceId === 'string' ? body.bridgeDeviceId : undefined
 
     if (
-      (type !== 'hype_event' && !messageId) ||
+      (type !== 'hype_event' && type !== 'presence_active' && !messageId) ||
       (type === 'hype_event' && !eventId) ||
+      (type === 'presence_active' && !activationId) ||
       (type === 'reaction' && (!emoji || emoji.length > 32 || typeof body?.isDm !== 'boolean')) ||
       (
         type !== 'dm_message' &&
@@ -1715,7 +1956,8 @@ serve(async (req): Promise<Response> => {
         type !== 'hype_event' &&
         type !== 'reaction' &&
         type !== 'shadow_pin_post' &&
-        type !== 'shadow_pin_comment'
+        type !== 'shadow_pin_comment' &&
+        type !== 'presence_active'
       )
     ) {
       return json({ error: 'Unsupported notification payload' }, 400)
@@ -1729,7 +1971,11 @@ serve(async (req): Promise<Response> => {
       return json({ skipped: true, reason: 'Reaction is no longer active' })
     }
 
-    const entityId = type === 'hype_event' ? eventId : reaction?.id || messageId
+    const entityId = type === 'hype_event'
+      ? eventId
+      : type === 'presence_active'
+      ? activationId
+      : reaction?.id || messageId
     const requestKey = `${type}:${entityId}`
     const claim = await claimEdgeRequest(supabase, {
       userId: auth.userId,
@@ -1794,6 +2040,8 @@ serve(async (req): Promise<Response> => {
       response = ensureResponse(await sendShadowPinPostPush(supabase, vapid, auth.userId, messageId))
     } else if (type === 'shadow_pin_comment') {
       response = ensureResponse(await sendShadowPinCommentPush(supabase, vapid, auth.userId, messageId))
+    } else if (type === 'presence_active') {
+      response = ensureResponse(await sendPresenceActivePush(supabase, vapid, auth.userId, activationId))
     } else {
       response = ensureResponse(await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
     }

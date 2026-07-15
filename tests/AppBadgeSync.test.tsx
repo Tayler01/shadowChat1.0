@@ -1,7 +1,7 @@
 import { render, waitFor } from '@testing-library/react'
 import { AppBadgeSync } from '../src/components/notifications/AppBadgeSync'
 import { useDirectMessages } from '../src/hooks/useDirectMessages'
-import { refreshAppBadge, updateAppBadge } from '../src/lib/appBadge'
+import { refreshAppBadge } from '../src/lib/appBadge'
 
 jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: jest.fn(),
@@ -9,7 +9,7 @@ jest.mock('../src/hooks/useDirectMessages', () => ({
 
 jest.mock('../src/lib/appBadge', () => ({
   refreshAppBadge: jest.fn().mockResolvedValue(0),
-  updateAppBadge: jest.fn().mockResolvedValue(undefined),
+  APP_BADGE_REFRESH_EVENT: 'shadowchat:app-badge-refresh',
 }))
 
 type MockConversation = {
@@ -18,7 +18,6 @@ type MockConversation = {
 
 const mockedUseDirectMessages = useDirectMessages as jest.Mock
 const mockedRefreshAppBadge = refreshAppBadge as jest.Mock
-const mockedUpdateAppBadge = updateAppBadge as jest.Mock
 
 let conversations: MockConversation[] = []
 
@@ -40,7 +39,7 @@ describe('AppBadgeSync', () => {
     })
   })
 
-  it('trusts a local clear briefly so Android does not repaint a stale launcher badge', async () => {
+  it('refreshes authoritative badge state after local unread messages clear', async () => {
     conversations = [{ unread_count: 2 }]
     const { rerender } = renderBadgeSync()
 
@@ -49,14 +48,12 @@ describe('AppBadgeSync', () => {
     conversations = []
     rerender(<AppBadgeSync />)
 
-    await waitFor(() => expect(mockedUpdateAppBadge).toHaveBeenCalledWith(0))
+    await waitFor(() => expect(mockedRefreshAppBadge).toHaveBeenCalledWith(0))
     mockedRefreshAppBadge.mockClear()
-    mockedUpdateAppBadge.mockClear()
 
     window.dispatchEvent(new Event('focus'))
 
-    await waitFor(() => expect(mockedUpdateAppBadge).toHaveBeenCalledWith(0))
-    expect(mockedRefreshAppBadge).not.toHaveBeenCalled()
+    await waitFor(() => expect(mockedRefreshAppBadge).toHaveBeenCalledWith(0))
   })
 
   it('still refreshes from the server while unread messages exist', async () => {

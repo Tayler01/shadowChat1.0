@@ -4,13 +4,8 @@ import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
-import { clearGroupNotifications } from '../../lib/appBadge'
 import { getBlockedActionMessage, getCurrentUserChannelBan, formatChannelBanBlockMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
-import {
-  SESSION_RECOVERY_EVENT,
-  type SessionRecoveryResult,
-} from '../../lib/sessionRecovery'
 import { resolveGeneralChatThreadId, type ChatMessageType } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
 import type { Message } from '../../lib/supabase'
@@ -86,22 +81,6 @@ export const ChatView: React.FC<ChatViewProps> = ({
       loungeScrollTopRef.current = null
     }
   }, [activeThreadId, restoreLoungeScroll])
-
-  useEffect(() => {
-    void clearGroupNotifications()
-  }, [])
-
-  useEffect(() => {
-    const handleSessionRecovery = (event: Event) => {
-      const result = (event as CustomEvent<SessionRecoveryResult>).detail
-      if (result?.ok) {
-        void clearGroupNotifications()
-      }
-    }
-
-    window.addEventListener(SESSION_RECOVERY_EVENT, handleSessionRecovery)
-    return () => window.removeEventListener(SESSION_RECOVERY_EVENT, handleSessionRecovery)
-  }, [])
 
   const openThread = useCallback((message: Message, targetMessageId = message.id) => {
     captureLoungeScroll()

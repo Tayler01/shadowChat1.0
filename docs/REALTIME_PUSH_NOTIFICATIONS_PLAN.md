@@ -1,14 +1,16 @@
 # Realtime Push Notifications Plan
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 15, 2026
 
 This file documents the notification architecture shipped in Release A rather
 than only the original plan. The deployed release includes targeted
 General Chat/DM delivery, ShadowPin events, master and type controls, daily
 quiet hours, temporary snooze, General Chat mute, private DM conversation
 mutes, personal-block suppression, service-worker routing, and recipient-owned
-in-app ShadowPin events. Normal-device delivery proof remains pending; use the
-latest workflow and health manifest for release identity.
+in-app ShadowPin events. The isolated 2.0 trial now also includes server-owned
+active-user notifications, per-device foreground suppression, exact read
+clearing, and a unified launcher badge. Normal-device delivery proof remains
+pending; use the latest workflow and health manifest for release identity.
 
 ## Goal
 
@@ -68,8 +70,9 @@ This covers the Windows requirement without introducing a native Windows app.
 
 The active product supports independently controlled delivery for direct
 messages, mentions, replies, reactions, every General Chat message, Hype, new
-ShadowPin posts, ShadowPin comments, and ShadowPin replies. Every-message group
-delivery remains off by default so targeted activity does not become noisy.
+ShadowPin posts, ShadowPin comments, ShadowPin replies, and eligible active-user
+returns. Group and reaction delivery are default-on for new or untouched
+preference rows; deliberate existing opt-outs are preserved.
 
 ## Current State In This Repo
 
@@ -81,7 +84,7 @@ Relevant existing pieces:
 - [public/sw.js](/C:/repos/chat2.0/public/sw.js:1) handles Web Push display, notification click routing, and app badge updates
 - [public/manifest.webmanifest](/C:/repos/chat2.0/public/manifest.webmanifest:1) defines the installed app identity
 - [supabase/functions/send-push/index.ts](/C:/repos/chat2.0/supabase/functions/send-push/index.ts:1) delivers Web Push with VAPID
-- [src/components/notifications/AppBadgeSync.tsx](/C:/repos/chat2.0/src/components/notifications/AppBadgeSync.tsx:1) mirrors unread DM count to the installed app icon when supported
+- [src/components/notifications/AppBadgeSync.tsx](/C:/repos/chat2.0/src/components/notifications/AppBadgeSync.tsx:1) mirrors the server-owned unified unread total to the installed app icon when supported
 
 Shipped in Release A:
 
@@ -94,11 +97,13 @@ Shipped in Release A:
 - two bounded client retries for network, `409`, and `5xx` Function failures;
   permanent `4xx` responses are not retried
 
-Still open:
+Still open after the isolated trial gate:
 
-- richer operator-only diagnostics that preserve subscription/recipient privacy
-- group unread tracking if group chat badge counts become product scope
-- production mobile QA on iOS Home Screen, Android install, and Windows PWA
+- physical iPhone Home Screen and Android installed-PWA proof for foreground
+  presence, background presence push, notification-center clearing, and the
+  launcher badge
+- richer operator-only notification diagnostics and delivery observability
+  that preserve subscription and recipient privacy
 
 ## Architecture
 
@@ -126,7 +131,7 @@ Flow:
 6. The `send-push` Edge Function sends Web Push using VAPID
 7. Service worker receives push and shows a notification
 8. Notification click opens the app and routes to the right screen
-9. The app and service worker update the app icon badge from unread DM count when the Badging API is available
+9. The app and service worker update the app icon badge from the preference-gated unified unread count when the Badging API is available
 
 ## PWA Requirements
 
@@ -162,6 +167,8 @@ Columns:
 - `device_label text null`
 - `user_agent text null`
 - `last_seen_at timestamptz not null default now()`
+- `foreground_until timestamptz null`; a visible installed/browser client
+  refreshes this short lease so only that device is excluded from presence push
 - `enabled boolean not null default true`
 - `created_at timestamptz not null default now()`
 - `updated_at timestamptz not null default now()`
@@ -190,12 +197,21 @@ Columns:
 - `dm_enabled boolean not null default true`
 - `mention_enabled boolean not null default true`
 - `reply_enabled boolean not null default true`
-- `reaction_enabled boolean not null default false`
-- `group_enabled boolean not null default false`
+- `reaction_enabled boolean not null default true`
+- `group_enabled boolean not null default true`
 - `hype_enabled boolean not null default true`
 - `shadow_pin_new_post_enabled boolean not null default true`
 - `shadow_pin_comment_enabled boolean not null default true`
 - `shadow_pin_reply_enabled boolean not null default true`
+- `presence_in_app_enabled boolean not null default true`
+- `presence_push_enabled boolean not null default true`
+- `presence_notification_scope text not null default 'connections'`;
+  `connections | all`
+- `badge_dm_enabled boolean not null default true`
+- `badge_group_enabled boolean not null default true`
+- `badge_interactions_enabled boolean not null default true`
+- `badge_connections_enabled boolean not null default true`
+- `badge_shadow_pin_enabled boolean not null default true`
 - `general_chat_muted boolean not null default false`
 - `quiet_hours_start time null`
 - `quiet_hours_end time null`
@@ -252,6 +268,28 @@ Constraints:
 `notification_events` is in the Supabase Realtime publication as of
 `20260710044500_publish_notification_events_realtime.sql`. RLS continues to
 limit SELECT and live INSERT delivery to the event recipient.
+
+### Active-user eligibility and cooldown
+
+`presence_notification_state`, `presence_activation_events`, and
+`presence_notification_cooldowns` are server-owned and expose no browser table
+grants. A tracked member is eligible after at least 15 minutes without a
+foreground heartbeat. Each recipient/actor pair can produce at most one event
+per rolling hour. Recipient scope, reciprocal personal blocks, invisible
+presence, global push suppression, and per-device foreground leases are
+enforced server-side. Presence awareness is intentionally excluded from the
+launcher badge.
+
+### Unified launcher badge and exact read clearing
+
+`get_app_badge_state(uuid)` returns the caller-owned total plus DM, General
+Chat, interaction, Connection, and ShadowPin category counts. The database
+keeps the uncapped total; clients display at most `99`. DM and General Chat
+read RPCs advance only through the last presented message. The service worker
+closes matching active notifications after successful read persistence instead
+of clearing everything when the app merely opens. Connection and ShadowPin
+events remain unread until their destination is opened; a toast appearing is
+not a read action.
 
 ## Event Types
 

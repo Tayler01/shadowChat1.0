@@ -8,7 +8,7 @@ import { MessageItem } from './MessageItem'
 import type { FailedMessage } from '../../hooks/useFailedMessages'
 import { FailedMessageItem } from './FailedMessageItem'
 import toast from 'react-hot-toast'
-import type { Message } from '../../lib/supabase'
+import { markGeneralNotificationEventsReadThrough, type Message } from '../../lib/supabase'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useAuth } from '../../hooks/useAuth'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
@@ -20,6 +20,7 @@ import { useUnreadScroll, type UnreadScrollFeedState } from '../../hooks/useUnre
 import { UnreadDivider } from './UnreadDivider'
 import { compareMessageKey, isMessageAfterCursor, type ReadSurface } from '../../lib/readCursors'
 import { useBlockedUsers } from '../../hooks/useBlockedUsers'
+import { clearGroupNotifications, requestAppBadgeRefresh } from '../../lib/appBadge'
 
 interface MessageListProps {
   messagesApi?: MessagesContextValue
@@ -218,8 +219,17 @@ export const MessageList: React.FC<MessageListProps> = ({
     async (message: Message) => {
       if (!isReadCursorMessage(message)) return
       await markRead(message.id, message.created_at)
+      await markGeneralNotificationEventsReadThrough(message.id)
+      const readMessageIds = readCursorMessages
+        .filter(candidate => compareMessagesByStableKey(candidate, message) <= 0)
+        .map(candidate => candidate.id)
+      await clearGroupNotifications(
+        readMessageIds.length === 1 ? readMessageIds[0] : undefined,
+        readMessageIds.length > 1 ? readMessageIds : undefined
+      )
+      requestAppBadgeRefresh()
     },
-    [markRead]
+    [markRead, readCursorMessages]
   )
   const getMessageId = useCallback((message: Message) => message.id, [])
   const getMessageCreatedAt = useCallback((message: Message) => message.created_at, [])

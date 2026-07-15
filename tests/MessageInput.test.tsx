@@ -153,6 +153,20 @@ test('uses a 16px mobile textarea to avoid iOS focus zoom', () => {
   expect(screen.getByRole('textbox')).toHaveClass('text-base', 'md:text-sm')
 })
 
+test('aligns the mobile composer controls on one 48px baseline', () => {
+  const { container } = render(<MessageInput onSendMessage={() => {}} />)
+  const textarea = screen.getByRole('textbox')
+  const attachmentButton = screen.getByRole('button', { name: 'Add attachment' })
+  const sendButton = screen.getByRole('button', { name: 'Send message' })
+  const surface = container.querySelector('[data-message-composer-surface="true"]')
+
+  expect(surface).toHaveClass('py-2.5', 'md:p-3')
+  expect(textarea).toHaveClass('block', 'min-h-12')
+  expect(textarea.parentElement).toHaveClass('min-w-0', 'flex-1')
+  expect(attachmentButton).toHaveClass('h-12', 'w-12')
+  expect(sendButton).toHaveClass('h-12', 'w-12')
+})
+
 test('clears immediately and blocks repeated send taps while pending', async () => {
   let resolveSend!: () => void
   const pendingSend = new Promise<void>(resolve => {

@@ -465,6 +465,8 @@ const isEnabledView = (value: string | null): value is AppView => (
   (ACTIVITY_FEATURE_ENABLED && value === 'activity') ||
   value === 'games' ||
   value === 'pins' ||
+  value === 'active-users' ||
+  value === 'weather' ||
   value === 'settings' ||
   (BOARDS_FEATURE_ENABLED && value === 'boards')
 )

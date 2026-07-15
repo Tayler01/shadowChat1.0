@@ -1087,7 +1087,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       if (!currentConversation) return
       await Promise.all([
         markRead(message.id, message.created_at),
-        markAsRead(currentConversation),
+        markAsRead(currentConversation, message.id),
       ])
     },
     [currentConversation, markAsRead, markRead]
@@ -1117,6 +1117,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     getMessageCreatedAt: getDMMessageCreatedAt,
     getElementId: getDMMessageElementId,
     getUnreadMessages: getUnreadDMMessages,
+    markInitialVisibleRead: true,
+    markVisibleOnScroll: true,
     onMarkReadToLatest: markDMReadToLatest,
   })
 

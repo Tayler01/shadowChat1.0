@@ -10,7 +10,27 @@ const normalizeBadgeCount = (count: number) => {
     return 0
   }
 
-  return Math.floor(count)
+  return Math.min(99, Math.floor(count))
+}
+
+export const APP_BADGE_REFRESH_EVENT = 'shadowchat:app-badge-refresh'
+
+export interface AppBadgeState {
+  total: number
+  dm: number
+  group: number
+  interactions: number
+  connections: number
+  shadow_pin: number
+}
+
+const EMPTY_BADGE_STATE: AppBadgeState = {
+  total: 0,
+  dm: 0,
+  group: 0,
+  interactions: 0,
+  connections: 0,
+  shadow_pin: 0,
 }
 
 const postMessageToServiceWorker = async (message: Record<string, unknown>) => {
@@ -69,20 +89,31 @@ export const updateAppBadge = async (count: number) => {
   await postBadgeCountToServiceWorker(normalizedCount)
 }
 
-export const clearDMNotifications = async (conversationId: string, messageId?: string) => {
+export const clearDMNotifications = async (
+  conversationId: string,
+  messageId?: string,
+  messageIds?: string[]
+) => {
   await postServiceWorkerMessage({
     type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
     notificationType: 'dm_message',
     conversationId,
     ...(messageId ? { messageId } : {}),
+    ...(messageIds?.length ? { messageIds } : {}),
   })
 }
 
-export const clearGroupNotifications = async (messageId?: string) => {
+export const clearGroupNotifications = async (
+  messageId?: string,
+  messageIds?: string[],
+  threadId?: string
+) => {
   await postServiceWorkerMessage({
     type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
     notificationType: 'group_message',
     ...(messageId ? { messageId } : {}),
+    ...(messageIds?.length ? { messageIds } : {}),
+    ...(threadId ? { threadId } : {}),
   })
 }
 
@@ -97,7 +128,7 @@ export const fetchUnreadAppBadgeCount = async () => {
     return 0
   }
 
-  const { data, error } = await workingClient.rpc('count_unread_dm_messages', {
+  const { data, error } = await workingClient.rpc('get_app_badge_state', {
     target_user_id: user.id,
   })
 
@@ -105,7 +136,10 @@ export const fetchUnreadAppBadgeCount = async () => {
     throw error
   }
 
-  return normalizeBadgeCount(Number(data ?? 0))
+  const state = data && typeof data === 'object'
+    ? data as Partial<AppBadgeState>
+    : EMPTY_BADGE_STATE
+  return normalizeBadgeCount(Number(state.total ?? 0))
 }
 
 export const refreshAppBadge = async (fallbackCount = 0) => {
@@ -117,4 +151,9 @@ export const refreshAppBadge = async (fallbackCount = 0) => {
     await updateAppBadge(fallbackCount)
     return normalizeBadgeCount(fallbackCount)
   }
+}
+
+export const requestAppBadgeRefresh = () => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new Event(APP_BADGE_REFRESH_EVENT))
 }

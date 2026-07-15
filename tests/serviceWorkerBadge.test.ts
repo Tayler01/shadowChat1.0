@@ -55,8 +55,10 @@ const loadServiceWorker = (options: { caches?: unknown } = {}) => {
 
   return {
     clearAppBadge,
+    clients: selfMock.clients,
     listeners,
     notifications,
+    showNotification: selfMock.registration.showNotification,
     setAppBadge,
   }
 }
@@ -70,7 +72,7 @@ describe('service worker app badge handling', () => {
     jest.useRealTimers()
   })
 
-  it('leaves launcher badge painting to the foreground page', async () => {
+  it('applies push badge counts in the worker and clears them on page sync', async () => {
     const { clearAppBadge, listeners, setAppBadge } = loadServiceWorker()
     const pending: Promise<unknown>[] = []
 
@@ -87,7 +89,7 @@ describe('service worker app badge handling', () => {
     })
 
     await flushPromises()
-    expect(setAppBadge).not.toHaveBeenCalled()
+    expect(setAppBadge).toHaveBeenCalledWith(1)
 
     listeners.message({
       data: {
@@ -98,16 +100,16 @@ describe('service worker app badge handling', () => {
     })
 
     await flushPromises()
-    expect(clearAppBadge).not.toHaveBeenCalled()
+    expect(clearAppBadge).toHaveBeenCalledTimes(1)
 
     await jest.advanceTimersByTimeAsync(3000)
     await Promise.allSettled(pending)
 
-    expect(setAppBadge).not.toHaveBeenCalled()
-    expect(clearAppBadge).not.toHaveBeenCalled()
+    expect(setAppBadge).toHaveBeenCalled()
+    expect(clearAppBadge).toHaveBeenCalledTimes(1)
   })
 
-  it('does not invoke worker badge APIs during repeated pushes', async () => {
+  it('uses the latest capped badge count during repeated pushes', async () => {
     const { listeners, setAppBadge } = loadServiceWorker()
     const pending: Promise<unknown>[] = []
 
@@ -127,13 +129,36 @@ describe('service worker app badge handling', () => {
 
     pushBadge(1)
     await flushPromises()
-    pushBadge(2)
+    pushBadge(120)
     await flushPromises()
 
     await jest.advanceTimersByTimeAsync(3000)
     await Promise.allSettled(pending)
 
-    expect(setAppBadge).not.toHaveBeenCalled()
+    expect(setAppBadge).toHaveBeenCalledWith(1)
+    expect(setAppBadge).toHaveBeenCalledWith(99)
+  })
+
+  it('suppresses presence push when a same-origin app window is visible', async () => {
+    const { clients, listeners, showNotification } = loadServiceWorker()
+    clients.matchAll.mockResolvedValueOnce([{
+      url: 'https://shadowchat.test/?view=chat',
+      visibilityState: 'visible',
+    }])
+    const pending: Promise<unknown>[] = []
+
+    listeners.push({
+      data: {
+        json: () => ({
+          title: 'JJ is active now',
+          data: { type: 'presence_active', url: '/?view=active-users' },
+        }),
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+    expect(showNotification).not.toHaveBeenCalled()
   })
 
   it('closes only DM notifications for the conversation that was read', async () => {
@@ -243,6 +268,30 @@ describe('service worker app badge handling', () => {
     expect(closeBridgeGroup).toHaveBeenCalledTimes(1)
     expect(closeDM).not.toHaveBeenCalled()
     expect(closeUnknown).not.toHaveBeenCalled()
+  })
+
+  it('closes only the presented message ids when advancing a partial read cursor', async () => {
+    const { listeners, notifications } = loadServiceWorker()
+    const closePresented = jest.fn()
+    const closeStillUnread = jest.fn()
+    const pending: Promise<unknown>[] = []
+
+    notifications.push(
+      { close: closePresented, data: { messageId: 'm-seen', type: 'group_message' }, tag: 'group:m-seen' },
+      { close: closeStillUnread, data: { messageId: 'm-new', type: 'group_message' }, tag: 'group:m-new' }
+    )
+    listeners.message({
+      data: {
+        messageIds: ['m-seen'],
+        notificationType: 'group_message',
+        type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+    expect(closePresented).toHaveBeenCalledTimes(1)
+    expect(closeStillUnread).not.toHaveBeenCalled()
   })
 
   it('classifies targeted and reaction notifications by their active chat surface', async () => {

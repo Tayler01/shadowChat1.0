@@ -12,11 +12,15 @@ jest.mock('../src/components/search/GlobalSearchButton', () => ({
 }))
 
 jest.mock('../src/components/chat/WeatherWidget', () => ({
-  WeatherWidget: () => <button type="button">Weather</button>,
+  WeatherWidget: ({ onOpen, active }: { onOpen: () => void; active?: boolean }) => (
+    <button type="button" onClick={onOpen} aria-label="Open weather" aria-current={active ? 'page' : undefined}>Weather</button>
+  ),
 }))
 
 jest.mock('../src/components/chat/ActiveUsersButton', () => ({
-  ActiveUsersButton: () => <button type="button">Active</button>,
+  ActiveUsersButton: ({ onOpen, active }: { onOpen: () => void; active?: boolean }) => (
+    <button type="button" onClick={onOpen} aria-label="Open active users" aria-current={active ? 'page' : undefined}>Active</button>
+  ),
 }))
 
 jest.mock('../src/hooks/useAuth', () => ({
@@ -53,7 +57,8 @@ test('mobile navigation exposes only the active destination as the current page'
 })
 
 test('mobile navigation slides to utility controls and back', async () => {
-  render(<MobileNav currentView="chat" onViewChange={jest.fn()} />)
+  const onViewChange = jest.fn()
+  render(<MobileNav currentView="chat" onViewChange={onViewChange} />)
 
   fireEvent.click(screen.getByRole('button', { name: 'Show app tools' }))
   expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
@@ -62,8 +67,30 @@ test('mobile navigation slides to utility controls and back', async () => {
   expect(await screen.findByText('Search')).toBeInTheDocument()
   expect(screen.getByText('Settings')).toBeInTheDocument()
 
+  fireEvent.click(screen.getByRole('button', { name: 'Open active users' }))
+  expect(onViewChange).toHaveBeenCalledWith('active-users')
+  expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
+
   fireEvent.click(screen.getByRole('button', { name: 'Return to main navigation' }))
   expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('translate-x-0')
+})
+
+test('active users route keeps its existing utility icon visible and current', async () => {
+  render(<MobileNav currentView="active-users" onViewChange={jest.fn()} />)
+
+  expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
+  expect(await screen.findByRole('button', { name: 'Open active users' })).toHaveAttribute('aria-current', 'page')
+})
+
+test('weather route keeps its existing utility icon visible and current', async () => {
+  const onViewChange = jest.fn()
+  render(<MobileNav currentView="weather" onViewChange={onViewChange} />)
+
+  expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
+  const weather = await screen.findByRole('button', { name: 'Open weather' })
+  expect(weather).toHaveAttribute('aria-current', 'page')
+  fireEvent.click(weather)
+  expect(onViewChange).toHaveBeenCalledWith('weather')
 })
 
 test('sidebar navigation omits paused boards by default', () => {

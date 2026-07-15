@@ -52,6 +52,7 @@ import {
 import type { AppView as View } from './types/navigation'
 import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
 import { useConnectionNotifications } from './features/connections/useConnectionNotifications'
+import { usePresenceNotifications } from './hooks/usePresenceNotifications'
 import type { ActivityTarget } from './features/activity/activityModel'
 import { buildCatchUpTargetUrl, type CatchUpItem } from './features/catch-up/catchUpModel'
 import { FirstRunActivationCoordinator } from './features/activation/FirstRunActivationCoordinator'
@@ -93,6 +94,18 @@ const GamesHome = lazy(() =>
 const ShadowPin = lazy(() =>
   import('./features/shadow-pin/ShadowPin').then(module => ({
     default: module.ShadowPin,
+  }))
+)
+
+const ActiveUsersView = lazy(() =>
+  import('./components/chat/ActiveUsersView').then(module => ({
+    default: module.ActiveUsersView,
+  }))
+)
+
+const WeatherView = lazy(() =>
+  import('./features/weather/WeatherView').then(module => ({
+    default: module.WeatherView,
   }))
 )
 
@@ -158,6 +171,7 @@ function App() {
   useAdminRoleNotifications()
   useShadowPinCommentNotifications()
   useConnectionNotifications()
+  usePresenceNotifications()
   useChannelBanExpirySweep()
   const { scheme, setScheme, mode } = useTheme()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
@@ -786,6 +800,20 @@ function App() {
             onPinRoute={handlePinRoute}
             onFeedModeChange={handlePinFeedModeChange}
             onCircleChange={handlePinCircleChange}
+          />
+        )
+      case 'active-users':
+        return (
+          <ActiveUsersView
+            currentView={currentView}
+            onViewChange={handleViewChange}
+          />
+        )
+      case 'weather':
+        return (
+          <WeatherView
+            currentView={currentView}
+            onViewChange={handleViewChange}
           />
         )
       case 'settings':

@@ -4,6 +4,7 @@ import { UserRoundCheck, UserRoundPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
 import { openConnectionsHub } from '../../lib/connectionsNavigation'
+import { requestAppBadgeRefresh } from '../../lib/appBadge'
 import { createRealtimeChannelName } from '../../lib/realtimeChannelName'
 import { getRealtimeClient, getWorkingClient } from '../../lib/supabase'
 import {
@@ -37,6 +38,7 @@ export function useConnectionNotifications() {
         .update({ read_at: new Date().toISOString() })
         .eq('id', eventId)
         .eq('user_id', user.id)
+      if (!error) requestAppBadgeRefresh()
       return !error
     } catch {
       return false
@@ -51,6 +53,7 @@ export function useConnectionNotifications() {
       targetUserId: getConnectionNotificationTargetUserId(event.payload),
       source: 'notification',
     })
+    requestAppBadgeRefresh()
 
     const firstPresentation = !presentedRef.current.has(event.id)
     presentedRef.current.add(event.id)
@@ -61,6 +64,9 @@ export function useConnectionNotifications() {
         <button
           type="button"
           onClick={() => {
+            void markRead(event.id).then(marked => {
+              if (marked) completedRef.current.add(event.id)
+            })
             openConnectionsHub()
             toast.dismiss(currentToast.id)
           }}
@@ -82,8 +88,6 @@ export function useConnectionNotifications() {
       window.setTimeout(() => toast.dismiss(toastId), 5000)
     }
 
-    const markedRead = await markRead(event.id)
-    if (markedRead) completedRef.current.add(event.id)
     inFlightRef.current.delete(event.id)
   }, [markRead])
 

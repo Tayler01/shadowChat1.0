@@ -16,7 +16,8 @@ test('Netlify ships safe immediate browser headers while CSP remains report-only
   assert.ok(block, 'expected a global Netlify headers block')
   assert.match(block, /X-Content-Type-Options\s*=\s*"nosniff"/)
   assert.match(block, /X-Frame-Options\s*=\s*"DENY"/)
-  assert.match(block, /Referrer-Policy\s*=\s*"no-referrer"/)
+  assert.match(block, /Referrer-Policy\s*=\s*"strict-origin-when-cross-origin"/)
+  assert.match(block, /Permissions-Policy\s*=\s*"[^"]*geolocation=\(self\)[^"]*"/)
   assert.match(block, /Permissions-Policy\s*=\s*"[^"]*microphone=\(self\)[^"]*"/)
   assert.doesNotMatch(block, /^\s*Content-Security-Policy\s*=/m)
 
@@ -38,6 +39,10 @@ test('Netlify ships safe immediate browser headers while CSP remains report-only
     'wss://*.supabase.co',
     'https://api.open-meteo.com',
     'https://geocoding-api.open-meteo.com',
+    'https://api.weather.gov',
+    'https://api.rainviewer.com',
+    'https://tile.openstreetmap.org',
+    'https://tilecache.rainviewer.com',
     'https://*.ingest.sentry.io',
     'https://www.youtube.com',
     'https://player.vimeo.com',

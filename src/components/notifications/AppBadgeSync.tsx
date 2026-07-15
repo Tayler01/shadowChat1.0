@@ -1,28 +1,16 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
-import { refreshAppBadge, updateAppBadge } from '../../lib/appBadge'
+import { APP_BADGE_REFRESH_EVENT, refreshAppBadge } from '../../lib/appBadge'
 
 export function AppBadgeSync() {
   const { conversations } = useDirectMessages()
-  const previousUnreadRef = useRef(0)
-  const trustLocalClearUntilRef = useRef(0)
   const totalUnread = useMemo(
     () => conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0),
     [conversations]
   )
 
   useEffect(() => {
-    const previousUnread = previousUnreadRef.current
-    previousUnreadRef.current = totalUnread
-
-    if (totalUnread === 0 && previousUnread > 0) {
-      trustLocalClearUntilRef.current = Date.now() + 10000
-    }
-
-    void updateAppBadge(totalUnread)
-    if (totalUnread > 0) {
-      void refreshAppBadge(totalUnread)
-    }
+    void refreshAppBadge(totalUnread)
   }, [totalUnread])
 
   useEffect(() => {
@@ -31,21 +19,18 @@ export function AppBadgeSync() {
         return
       }
 
-      if (totalUnread === 0 && Date.now() < trustLocalClearUntilRef.current) {
-        void updateAppBadge(0)
-        return
-      }
-
       void refreshAppBadge(totalUnread)
     }
 
     window.addEventListener('focus', syncBadge)
     window.addEventListener('pageshow', syncBadge)
+    window.addEventListener(APP_BADGE_REFRESH_EVENT, syncBadge)
     document.addEventListener('visibilitychange', syncBadge)
 
     return () => {
       window.removeEventListener('focus', syncBadge)
       window.removeEventListener('pageshow', syncBadge)
+      window.removeEventListener(APP_BADGE_REFRESH_EVENT, syncBadge)
       document.removeEventListener('visibilitychange', syncBadge)
     }
   }, [totalUnread])
@@ -53,11 +38,6 @@ export function AppBadgeSync() {
   useEffect(() => {
     const interval = window.setInterval(() => {
       if (document.visibilityState === 'visible') {
-        if (totalUnread === 0 && Date.now() < trustLocalClearUntilRef.current) {
-          void updateAppBadge(0)
-          return
-        }
-
         void refreshAppBadge(totalUnread)
       }
     }, 30000)

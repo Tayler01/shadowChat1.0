@@ -4,11 +4,13 @@ import {
   getNotificationPermission,
   getPushSupportStatus,
   syncCurrentDeviceSubscription,
+  updateCurrentDeviceForegroundLease,
 } from '../../lib/push'
 
 const PUSH_SUBSCRIPTION_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000
 const PUSH_SUBSCRIPTION_SYNC_RETRY_MS = 60 * 1000
 const PUSH_SUBSCRIPTION_SYNC_STORAGE_PREFIX = 'shadowchat:push-subscription-sync:'
+const FOREGROUND_LEASE_REFRESH_MS = 30 * 1000
 
 const getSyncStorageKey = (userId: string) =>
   `${PUSH_SUBSCRIPTION_SYNC_STORAGE_PREFIX}${userId}`
@@ -101,6 +103,36 @@ export function PushSubscriptionSync() {
       document.removeEventListener('visibilitychange', syncWhenVisible)
     }
   }, [syncIfDue, user])
+
+  useEffect(() => {
+    if (!user) return
+
+    const updateLease = () => {
+      const foreground = document.visibilityState === 'visible'
+      void updateCurrentDeviceForegroundLease(user.id, foreground).catch(() => {
+        // A short server lease expires safely if a transient update fails.
+      })
+    }
+    const clearLease = () => {
+      void updateCurrentDeviceForegroundLease(user.id, false).catch(() => undefined)
+    }
+
+    updateLease()
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') updateLease()
+    }, FOREGROUND_LEASE_REFRESH_MS)
+    document.addEventListener('visibilitychange', updateLease)
+    window.addEventListener('focus', updateLease)
+    window.addEventListener('pagehide', clearLease)
+
+    return () => {
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', updateLease)
+      window.removeEventListener('focus', updateLease)
+      window.removeEventListener('pagehide', clearLease)
+      void updateCurrentDeviceForegroundLease(user.id, false).catch(() => undefined)
+    }
+  }, [user])
 
   return null
 }

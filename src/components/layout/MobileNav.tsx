@@ -1,13 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, ChevronLeft, ChevronRight, Gamepad2, Images, ListChecks, MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
-import toast from 'react-hot-toast'
 import { useOptionalClientReset } from '../../hooks/ClientResetContext'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
-import { useOptionalMessages } from '../../hooks/MessagesContext'
 import { useOptionalActivity } from '../../features/activity/ActivityContext'
 import { ACTIVITY_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED } from '../../config/featureFlags'
 import { openSettingsMain } from '../../lib/settingsNavigation'
-import { uploadChatImageAsset } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
 
 const LazyActiveUsersButton = lazy(() => import('../chat/ActiveUsersButton').then(module => ({
@@ -41,12 +38,10 @@ export function MobileNav({
   boardsBadgeCount = 0,
 }: MobileNavProps) {
   const { conversations } = useDirectMessages()
-  const messagesContext = useOptionalMessages()
   const activity = useOptionalActivity()
   const { status: resetStatus } = useOptionalClientReset()
-  const [page, setPage] = useState<0 | 1>(0)
-  const [toolsMounted, setToolsMounted] = useState(false)
-  const [sharingWeather, setSharingWeather] = useState(false)
+  const [page, setPage] = useState<0 | 1>(() => currentView === 'active-users' || currentView === 'weather' ? 1 : 0)
+  const [toolsMounted, setToolsMounted] = useState(() => currentView === 'active-users' || currentView === 'weather')
   const primaryPageRef = useRef<HTMLUListElement>(null)
   const toolsPageRef = useRef<HTMLUListElement>(null)
   const totalUnread = conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)
@@ -75,6 +70,12 @@ export function MobileNav({
   }, [])
 
   useEffect(() => {
+    if (currentView !== 'active-users' && currentView !== 'weather') return
+    setToolsMounted(true)
+    setPage(1)
+  }, [currentView])
+
+  useEffect(() => {
     if (primaryPageRef.current) primaryPageRef.current.inert = page === 1
     if (toolsPageRef.current) toolsPageRef.current.inert = page === 0
   }, [page])
@@ -99,24 +100,16 @@ export function MobileNav({
     })
   }
 
-  const shareWeather = async (file: File) => {
-    setSharingWeather(true)
-    try {
-      if (!messagesContext) throw new Error('General Chat is still loading.')
-      const asset = await uploadChatImageAsset(file, 'weather')
-      const sent = await messagesContext.sendMessage(
-        'Weather share',
-        'image',
-        asset.publicUrl,
-        undefined,
-        asset.thumbnailUrl
-      )
-      if (sent) toast.success('Weather shared')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to share weather')
-    } finally {
-      setSharingWeather(false)
-    }
+  const openActiveUsers = () => {
+    setToolsMounted(true)
+    setPage(1)
+    onViewChange('active-users')
+  }
+
+  const openWeather = () => {
+    setToolsMounted(true)
+    setPage(1)
+    onViewChange('weather')
   }
 
   const navSurface = embedded
@@ -181,8 +174,8 @@ export function MobileNav({
               <Suspense fallback={<span className="block h-full w-full" aria-hidden="true" />}>
                 <LazyWeatherWidget
                   variant="nav"
-                  onOpenSettings={() => openSettingsMain(changeView)}
-                  onShareWeather={sharingWeather ? undefined : shareWeather}
+                  onOpen={openWeather}
+                  active={currentView === 'weather'}
                 />
               </Suspense>
             ) : null}
@@ -190,7 +183,12 @@ export function MobileNav({
           <li className="min-w-0">
             {toolsMounted ? (
               <Suspense fallback={<span className="block h-full w-full" aria-hidden="true" />}>
-                <LazyActiveUsersButton resetStatus={resetStatus} variant="nav" />
+                <LazyActiveUsersButton
+                  resetStatus={resetStatus}
+                  variant="nav"
+                  onOpen={openActiveUsers}
+                  active={currentView === 'active-users'}
+                />
               </Suspense>
             ) : null}
           </li>

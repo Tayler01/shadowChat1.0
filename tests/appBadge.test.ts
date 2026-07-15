@@ -79,3 +79,18 @@ test('badge updates do not wait forever for a pending service worker ready promi
     count: 3,
   })
 })
+
+test('caps the visible launcher badge at 99', async () => {
+  const setAppBadge = jest.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, 'setAppBadge', {
+    configurable: true,
+    value: setAppBadge,
+  })
+  Object.defineProperty(navigator, 'serviceWorker', {
+    configurable: true,
+    value: {},
+  })
+
+  await updateAppBadge(140)
+  expect(setAppBadge).toHaveBeenCalledWith(99)
+})

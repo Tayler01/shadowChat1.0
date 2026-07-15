@@ -52,6 +52,7 @@ import { BOARDS_FEATURE_ENABLED, ESP_ADMIN_FEATURE_ENABLED, MEMBER_REPORTING_FEA
 import type { AppView } from '../../types/navigation'
 import { getBrowserTimeZone } from '../../lib/push'
 import { COMFORT_RESET_EVENT } from '../../lib/comfortPreferences'
+import { requestAppBadgeRefresh } from '../../lib/appBadge'
 
 const ShadowPinActivityAdmin = React.lazy(() =>
   import('./ShadowPinActivityAdmin').then(module => ({ default: module.ShadowPinActivityAdmin }))
@@ -408,6 +409,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     updatePreferences,
   } = usePushNotifications({ enabled: shouldLoadPushSettings })
 
+  const updateBadgePreference = async (
+    key: 'badge_dm_enabled' | 'badge_group_enabled' | 'badge_interactions_enabled' | 'badge_connections_enabled' | 'badge_shadow_pin_enabled',
+    enabled: boolean
+  ) => {
+    await updatePreference(key, enabled)
+    requestAppBadgeRefresh()
+  }
+
   const devicePushEnabled = subscribed
   const quietHoursEnabled = Boolean(preferences?.quiet_hours_start && preferences?.quiet_hours_end)
   const snoozedUntil = preferences?.mute_until && new Date(preferences.mute_until).getTime() > Date.now()
@@ -498,9 +507,21 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             },
             {
               label: 'Connections (in-app)',
-              description: 'Show an in-app banner when someone sends or accepts a connection request. OS push is not enabled yet.',
+              description: 'Show an in-app banner when someone sends or accepts a connection request.',
               enabled: preferences.connection_notifications_enabled,
               onChange: (enabled: boolean) => updatePreference('connection_notifications_enabled', enabled),
+            },
+            {
+              label: 'Active Users (in-app)',
+              description: 'Show an in-app banner when an eligible member becomes active.',
+              enabled: preferences.presence_in_app_enabled,
+              onChange: (enabled: boolean) => updatePreference('presence_in_app_enabled', enabled),
+            },
+            {
+              label: 'Active Users (push)',
+              description: 'Send a phone notification when an eligible member becomes active while this app is in the background.',
+              enabled: preferences.presence_push_enabled,
+              onChange: (enabled: boolean) => updatePreference('presence_push_enabled', enabled),
             },
           ]
         : []
@@ -788,7 +809,89 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             />
           ))}
         </div>
+
+        {preferences && (
+          <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Who can trigger Active User notifications?</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+              A member must have been offline for at least 15 minutes. You can receive at most one alert from the same member per rolling hour.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Active user notification audience">
+              {([
+                ['connections', 'Connections only'],
+                ['all', 'Everyone'],
+              ] as const).map(([value, label]) => {
+                const selected = preferences.presence_notification_scope === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={pushSaving}
+                    onClick={() => void updatePreference('presence_notification_scope', value)}
+                    className={`min-h-11 rounded-[var(--radius-sm)] border px-3 py-2 text-sm font-semibold transition-[background-color,border-color,color] ${
+                      selected
+                        ? 'border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]'
+                        : 'border-[var(--border-subtle)] bg-[rgba(0,0,0,0.18)] text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
+
+      {preferences && (
+        <div className="glass-panel min-w-0 rounded-[var(--radius-lg)] p-4 sm:p-5">
+          <div className="mb-4">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Home Screen Badge</h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              Choose which unread activity counts toward the app icon. The visible count is capped at 99 and clears only after content is read.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ToggleRow
+              label="Direct Messages"
+              description="Count unread messages in your DM conversations."
+              enabled={preferences.badge_dm_enabled}
+              disabled={pushSaving}
+              onChange={enabled => updateBadgePreference('badge_dm_enabled', enabled)}
+            />
+            <ToggleRow
+              label="General Chat"
+              description="Count unread General Chat messages when Group Chat notifications are enabled."
+              enabled={preferences.badge_group_enabled}
+              disabled={pushSaving}
+              onChange={enabled => updateBadgePreference('badge_group_enabled', enabled)}
+            />
+            <ToggleRow
+              label="Mentions & Interactions"
+              description="Count unread mentions, replies, reactions, and Hype activity."
+              enabled={preferences.badge_interactions_enabled}
+              disabled={pushSaving}
+              onChange={enabled => updateBadgePreference('badge_interactions_enabled', enabled)}
+            />
+            <ToggleRow
+              label="Connections"
+              description="Count unread connection requests and accepted connections."
+              enabled={preferences.badge_connections_enabled}
+              disabled={pushSaving}
+              onChange={enabled => updateBadgePreference('badge_connections_enabled', enabled)}
+            />
+            <ToggleRow
+              label="ShadowPin"
+              description="Count unread ShadowPin posts, comments, and replies."
+              enabled={preferences.badge_shadow_pin_enabled}
+              disabled={pushSaving}
+              onChange={enabled => updateBadgePreference('badge_shadow_pin_enabled', enabled)}
+            />
+          </div>
+        </div>
+      )}
 
       {preferences && (
         <div className="glass-panel min-w-0 rounded-[var(--radius-lg)] p-4 sm:p-5">

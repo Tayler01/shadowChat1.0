@@ -938,7 +938,12 @@ async function goToSettings(page) {
   if (await desktopSettings.isVisible().catch(() => false)) {
     await desktopSettings.click()
   } else {
-    await page.getByRole('button', { name: 'Open app preferences' }).click()
+    const mobileSettings = page.getByRole('button', { name: 'Open app preferences' })
+    if (!(await mobileSettings.isVisible().catch(() => false))) {
+      await page.getByRole('button', { name: 'Show app tools' }).click()
+      await mobileSettings.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+    }
+    await mobileSettings.click()
   }
   await waitForSettingsView(page)
 }
@@ -1022,7 +1027,6 @@ async function waitForDmView(page) {
 }
 
 async function waitForSettingsView(page) {
-  await page.getByRole('heading', { name: 'Settings' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.getByRole('button', { name: 'Notifications & Audio' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 

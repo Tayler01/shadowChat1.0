@@ -1,4 +1,4 @@
-import { ensureSession, getWorkingClient, supabase } from './supabase'
+import { ensureSession, getWorkingClient, supabase, updateUserPresence } from './supabase'
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js'
 import type { AuthenticatedUser, User as PublicUser } from './supabase'
 import {
@@ -222,7 +222,7 @@ export const signIn = async ({ email, password }: SignInData) => {
 
   if (data.user) {
     try {
-      await supabase.rpc('update_user_last_active')
+      await updateUserPresence()
     } catch {
       // The foreground heartbeat will retry; sign-in should not fail on presence.
     }

@@ -5,6 +5,7 @@ import {
   getNotificationPermission,
   getPushSupportStatus,
   syncCurrentDeviceSubscription,
+  updateCurrentDeviceForegroundLease,
 } from '../src/lib/push'
 
 jest.mock('../src/hooks/useAuth', () => ({
@@ -15,12 +16,14 @@ jest.mock('../src/lib/push', () => ({
   getNotificationPermission: jest.fn(),
   getPushSupportStatus: jest.fn(),
   syncCurrentDeviceSubscription: jest.fn(),
+  updateCurrentDeviceForegroundLease: jest.fn(),
 }))
 
 const mockedUseAuth = useAuth as jest.Mock
 const mockedGetNotificationPermission = getNotificationPermission as jest.Mock
 const mockedGetPushSupportStatus = getPushSupportStatus as jest.Mock
 const mockedSyncCurrentDeviceSubscription = syncCurrentDeviceSubscription as jest.Mock
+const mockedUpdateCurrentDeviceForegroundLease = updateCurrentDeviceForegroundLease as jest.Mock
 
 const syncStorageKey = 'shadowchat:push-subscription-sync:user-1'
 
@@ -44,6 +47,7 @@ describe('PushSubscriptionSync', () => {
       reason: null,
     })
     mockedSyncCurrentDeviceSubscription.mockResolvedValue(true)
+    mockedUpdateCurrentDeviceForegroundLease.mockResolvedValue(undefined)
   })
 
   it('repairs an already-granted push subscription after sign in', async () => {
@@ -53,6 +57,7 @@ describe('PushSubscriptionSync', () => {
       expect(mockedSyncCurrentDeviceSubscription).toHaveBeenCalledWith('user-1')
     })
     expect(Number(window.localStorage.getItem(syncStorageKey))).toBeGreaterThan(0)
+    expect(mockedUpdateCurrentDeviceForegroundLease).toHaveBeenCalledWith('user-1', true)
   })
 
   it('does not prompt or sync before permission is granted', async () => {

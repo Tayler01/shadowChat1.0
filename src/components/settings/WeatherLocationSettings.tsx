@@ -107,7 +107,7 @@ export function WeatherLocationSettings() {
         <div>
           <h2 className="text-lg font-semibold text-[var(--text-primary)]">Weather Location</h2>
           <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
-            Choose the city used by the General Chat weather widget.
+            Choose the default city used by the full Weather page and its compact navigation control.
           </p>
         </div>
       </div>

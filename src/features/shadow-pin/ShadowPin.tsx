@@ -78,6 +78,7 @@ import { getMyShadowPinCircleFeedWindow } from '../inner-circles/innerCirclesApi
 import { useInnerCircleFeed } from '../inner-circles/useInnerCircleFeed'
 import { useInnerCircles } from '../inner-circles/useInnerCircles'
 import { hasCreatorStudioQuery } from './creator/creatorHistory'
+import { hasCreatorDraftsNeedingAttention } from './creator/creatorAttention'
 import {
   useShadowPinActivityTracker,
   useShadowPinCategoryDwell,
@@ -1587,6 +1588,21 @@ const EMPTY_PIN_RADIAL_STATE: PinRadialState = {
   actions: PIN_ACTIONS.right,
 }
 
+const SHADOW_PIN_RADIAL_SESSION_EVENT = 'shadowchat:shadow-pin-radial-session'
+
+type ShadowPinRadialSessionDetail = {
+  ownerId: string | null
+}
+
+const setShadowPinRadialOwner = (ownerId: string | null) => {
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent<ShadowPinRadialSessionDetail>(SHADOW_PIN_RADIAL_SESSION_EVENT, {
+    detail: { ownerId },
+  }))
+}
+
+const dismissShadowPinRadials = () => setShadowPinRadialOwner(null)
+
 function PinActionRadialMenu({
   state,
   hearted,
@@ -1745,6 +1761,7 @@ function ImageCard({
     active: boolean
   } | null>(null)
   const unlockGestureScrollRef = useRef<(() => void) | null>(null)
+  const pressListenerCleanupRef = useRef<(() => void) | null>(null)
   const pressConsumedRef = useRef(false)
   const feedbackKeyRef = useRef(0)
   const feedbackTimerRef = useRef<number | null>(null)
@@ -1877,6 +1894,8 @@ function ImageCard({
     if (clickTimer.current) window.clearTimeout(clickTimer.current)
     if (pressRef.current?.timerId) window.clearTimeout(pressRef.current.timerId)
     if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current)
+    pressListenerCleanupRef.current?.()
+    pressListenerCleanupRef.current = null
     unlockGestureScrollRef.current?.()
     unlockGestureScrollRef.current = null
   }, [])
@@ -2020,10 +2039,46 @@ function ImageCard({
     }
   }
 
+  const cleanupPressListeners = () => {
+    pressListenerCleanupRef.current?.()
+    pressListenerCleanupRef.current = null
+  }
+
   const clearPress = () => {
     clearPressTimer()
+    cleanupPressListeners()
     pressRef.current = null
   }
+
+  useEffect(() => {
+    const dismissCurrentGesture = () => {
+      const press = pressRef.current
+      if (press?.timerId) window.clearTimeout(press.timerId)
+      pressListenerCleanupRef.current?.()
+      pressListenerCleanupRef.current = null
+      pressRef.current = null
+      setRadialState(EMPTY_PIN_RADIAL_STATE)
+      unlockGestureScrollRef.current?.()
+      unlockGestureScrollRef.current = null
+    }
+    const handleRadialSession = (event: Event) => {
+      const detail = (event as CustomEvent<ShadowPinRadialSessionDetail>).detail
+      if (detail?.ownerId !== image.id) dismissCurrentGesture()
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') dismissShadowPinRadials()
+    }
+    const handleBlur = () => dismissShadowPinRadials()
+
+    window.addEventListener(SHADOW_PIN_RADIAL_SESSION_EVENT, handleRadialSession)
+    window.addEventListener('blur', handleBlur)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      window.removeEventListener(SHADOW_PIN_RADIAL_SESSION_EVENT, handleRadialSession)
+      window.removeEventListener('blur', handleBlur)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [image.id])
 
   const releasePointerCapture = (event: ReactPointerEvent<HTMLElement>) => {
     const target = event.currentTarget
@@ -2164,6 +2219,8 @@ function ImageCard({
       timerId: window.setTimeout(() => {
         if (!pressRef.current || pressRef.current.pointerId !== pointerId) return
 
+        cleanupPressListeners()
+        setShadowPinRadialOwner(image.id)
         if (clickTimer.current) {
           window.clearTimeout(clickTimer.current)
           clickTimer.current = null
@@ -2196,6 +2253,55 @@ function ImageCard({
       menuOriginY: originY,
       actions,
       active: false,
+    }
+
+    const listenerOptions: AddEventListenerOptions = { capture: true, passive: true }
+    const removeOptions: EventListenerOptions = { capture: true }
+    const cancelIfMovedBeforeHold = (clientX: number, clientY: number) => {
+      const press = pressRef.current
+      if (!press || press.pointerId !== pointerId || press.active) return
+      if (Math.hypot(
+        finitePointerCoordinate(clientX) - press.startClientX,
+        finitePointerCoordinate(clientY) - press.startClientY
+      ) > PIN_ACTION_MOVE_CANCEL_PX) {
+        clearPress()
+      }
+    }
+    const handleDocumentPointerMove = (nativeEvent: PointerEvent) => {
+      if (nativeEvent.pointerId !== pointerId) return
+      cancelIfMovedBeforeHold(nativeEvent.clientX, nativeEvent.clientY)
+    }
+    const handleDocumentPointerEnd = (nativeEvent: PointerEvent) => {
+      if (nativeEvent.pointerId !== pointerId || pressRef.current?.active) return
+      clearPress()
+    }
+    const handleDocumentTouchMove = (nativeEvent: TouchEvent) => {
+      const touch = nativeEvent.touches[0] ?? nativeEvent.changedTouches[0]
+      if (touch) cancelIfMovedBeforeHold(touch.clientX, touch.clientY)
+    }
+    const handleDocumentTouchEnd = () => {
+      if (!pressRef.current?.active) clearPress()
+    }
+    const handleScroll = () => {
+      if (pressRef.current?.active) dismissShadowPinRadials()
+      else clearPress()
+    }
+
+    document.addEventListener('pointermove', handleDocumentPointerMove, listenerOptions)
+    document.addEventListener('pointerup', handleDocumentPointerEnd, listenerOptions)
+    document.addEventListener('pointercancel', handleDocumentPointerEnd, listenerOptions)
+    document.addEventListener('touchmove', handleDocumentTouchMove, listenerOptions)
+    document.addEventListener('touchend', handleDocumentTouchEnd, listenerOptions)
+    document.addEventListener('touchcancel', handleDocumentTouchEnd, listenerOptions)
+    window.addEventListener('scroll', handleScroll, true)
+    pressListenerCleanupRef.current = () => {
+      document.removeEventListener('pointermove', handleDocumentPointerMove, removeOptions)
+      document.removeEventListener('pointerup', handleDocumentPointerEnd, removeOptions)
+      document.removeEventListener('pointercancel', handleDocumentPointerEnd, removeOptions)
+      document.removeEventListener('touchmove', handleDocumentTouchMove, removeOptions)
+      document.removeEventListener('touchend', handleDocumentTouchEnd, removeOptions)
+      document.removeEventListener('touchcancel', handleDocumentTouchEnd, removeOptions)
+      window.removeEventListener('scroll', handleScroll, true)
     }
   }
 
@@ -2242,7 +2348,7 @@ function ImageCard({
 
     event.preventDefault()
     event.stopPropagation()
-    setRadialState(EMPTY_PIN_RADIAL_STATE)
+    dismissShadowPinRadials()
     unlockGestureScroll()
 
     if (selected) {
@@ -2254,7 +2360,7 @@ function ImageCard({
     const wasActive = Boolean(pressRef.current?.active)
     clearPress()
     releasePointerCapture(event)
-    setRadialState(EMPTY_PIN_RADIAL_STATE)
+    dismissShadowPinRadials()
     unlockGestureScroll()
     if (wasActive) resetPressConsumed()
   }
@@ -2265,6 +2371,7 @@ function ImageCard({
       return
     }
 
+    dismissShadowPinRadials()
     onViewer()
   }
 
@@ -2945,6 +3052,8 @@ function ShadowPinHome({
   const [modal, setModal] = useState<ModalMode>(null)
   const [creatorOpen, setCreatorOpen] = useState(initialCreatorOpen)
   const [creatorTargetImage, setCreatorTargetImage] = useState<ShadowPinImage | null>(null)
+  const [creatorAttentionVisible, setCreatorAttentionVisible] = useState(false)
+  const creatorAttentionRequestRef = useRef(0)
   const [commentsImage, setCommentsImage] = useState<ShadowPinImage | null>(null)
   const [viewerSessionImages, setViewerSessionImages] = useState<ShadowPinImage[]>([])
   const openedInitialTargetRef = useRef<string | null>(null)
@@ -2971,6 +3080,46 @@ function ShadowPinHome({
   const detailsCategory = modal?.type === 'category-details'
     ? categoriesState.categories.find(category => category.id === modal.category.id) ?? modal.category
     : null
+
+  const refreshCreatorAttention = useCallback(async () => {
+    const requestId = ++creatorAttentionRequestRef.current
+    if (!user?.id) {
+      setCreatorAttentionVisible(false)
+      return
+    }
+
+    try {
+      const hasAttention = await hasCreatorDraftsNeedingAttention(user.id)
+      if (requestId === creatorAttentionRequestRef.current) setCreatorAttentionVisible(hasAttention)
+    } catch {
+      if (requestId === creatorAttentionRequestRef.current) setCreatorAttentionVisible(false)
+    }
+  }, [user?.id])
+
+  useEffect(() => {
+    void refreshCreatorAttention()
+    const handleFocus = () => { void refreshCreatorAttention() }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void refreshCreatorAttention()
+    }
+
+    window.addEventListener('focus', handleFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      creatorAttentionRequestRef.current += 1
+      window.removeEventListener('focus', handleFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [refreshCreatorAttention])
+
+  useEffect(() => {
+    if (modal || creatorOpen || circleFilterOpen) dismissShadowPinRadials()
+  }, [circleFilterOpen, creatorOpen, modal])
+
+  useEffect(() => {
+    dismissShadowPinRadials()
+  }, [feedModeState.mode, initialCircleId])
+
   const submitCreate = async (values: ShadowPinCategoryFormValues) => {
     const category = await categoriesState.createCategory(values)
     tracker.recordCategoryMutation(category, 'category_created')
@@ -3274,6 +3423,7 @@ function ShadowPinHome({
   }
 
   const handleCategoryScroll = (event: UIEvent<HTMLElement>) => {
+    dismissShadowPinRadials()
     rememberHomeScroll(event.currentTarget.scrollTop)
     if (event.currentTarget.scrollTop > CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX) {
       categoryPullRef.current = null
@@ -3284,6 +3434,11 @@ function ShadowPinHome({
   const handleCategoryPointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if (event.isPrimary === false) return
     if (typeof event.button === 'number' && event.button !== 0) return
+    const target = event.target
+    if (target instanceof Element && target.closest('.shadow-pin-action-card')) {
+      categoryPullRef.current = null
+      return
+    }
     try {
       event.currentTarget.setPointerCapture?.(event.pointerId)
     } catch {
@@ -3470,6 +3625,7 @@ function ShadowPinHome({
 
   const selectFeedMode = (nextMode: ShadowPinFeedMode) => {
     if (nextMode === feedModeState.mode) return
+    dismissShadowPinRadials()
     rememberHomeScroll()
     homeScrollMemory.current.restoreMode = nextMode
     hideCategorySearch()
@@ -3568,16 +3724,18 @@ function ShadowPinHome({
             <button type="button" className="min-h-9 shrink-0 font-semibold text-[var(--theme-accent-readable)]" onClick={feedModeState.retrySave}>Retry</button>
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => setCreatorOpen(true)}
-          className="mb-3 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] px-4 text-left shadow-[var(--shadow-panel)]"
-          aria-label="Open ShadowPin drafts and items needing attention"
-        >
-          <Save className="h-4 w-4 shrink-0 text-[var(--theme-accent-readable)]" />
-          <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--text-primary)]">Drafts &amp; needs attention</span><span className="block truncate text-xs text-[var(--text-muted)]">Resume uploads, processing, or unfinished Pins</span></span>
-          <ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-        </button>
+        {creatorAttentionVisible && (
+          <button
+            type="button"
+            onClick={() => setCreatorOpen(true)}
+            className="mb-3 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] px-4 text-left shadow-[var(--shadow-panel)]"
+            aria-label="Open ShadowPin drafts and items needing attention"
+          >
+            <Save className="h-4 w-4 shrink-0 text-[var(--theme-accent-readable)]" />
+            <span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[var(--text-primary)]">Drafts &amp; needs attention</span><span className="block truncate text-xs text-[var(--text-muted)]">Resume uploads, processing, or unfinished Pins</span></span>
+            <ArrowRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+          </button>
+        )}
         {shouldRenderCategorySearch && (
           <div
             className="mb-3 w-full overflow-hidden transition-[max-height,opacity,transform,margin] duration-200 ease-out will-change-[max-height,opacity,transform]"
@@ -3850,7 +4008,11 @@ function ShadowPinHome({
           <LazyShadowPinCreatorStudio
             open
             targetImage={creatorTargetImage}
-            onClose={() => { setCreatorOpen(false); setCreatorTargetImage(null) }}
+            onClose={() => {
+              setCreatorOpen(false)
+              setCreatorTargetImage(null)
+              void refreshCreatorAttention()
+            }}
             onPublished={async image => {
               await categoriesState.refresh()
               if (feedModeState.mode === 'connections') await activeConnectionsState.refresh()
@@ -4014,6 +4176,10 @@ function ShadowPinCategoryScreen({
   const openedInitialTargetRef = useRef<string | null>(null)
   const title = imagesState.category?.title || 'ShadowPin'
   useShadowPinCategoryDwell(imagesState.category, tracker)
+
+  useEffect(() => {
+    if (modal || creatorOpen || commentsImage) dismissShadowPinRadials()
+  }, [commentsImage, creatorOpen, modal])
 
   const submitEdit = async (image: ShadowPinImage, values: ShadowPinImageFormValues) => {
     const updatedImage = await imagesState.updateImage(image.id, values)

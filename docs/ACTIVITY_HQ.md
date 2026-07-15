@@ -32,8 +32,11 @@ Activity is a first-class destination for durable, recipient-owned updates:
 It deliberately excludes every General Chat message, broadcast Hype bell
 events, paused domains, admin-role notices, and historical backfill.
 
-The installed-app badge remains DM-only during the parallel 2.0 trial so DM
-events are not counted twice. Activity has its own navigation badge.
+The July 15 trial replaces the earlier DM-only launcher badge with the
+preference-gated unified DM, General Chat, interaction, Connection, and
+ShadowPin count. Presence awareness and paused Activity rows are excluded, so
+Activity events are not counted twice. Activity retains its own navigation
+badge when that paused surface is explicitly re-enabled.
 
 ## Data Model
 

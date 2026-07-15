@@ -36,6 +36,8 @@ interface UseUnreadScrollOptions<TMessage> {
   getElementId: (messageId: string) => string
   getUnreadMessages?: (messages: TMessage[]) => TMessage[]
   onBeforeInitialJump?: (message: TMessage) => void
+  markInitialVisibleRead?: boolean
+  markVisibleOnScroll?: boolean
   onMarkReadToLatest: (message: TMessage) => Promise<void> | void
 }
 
@@ -67,6 +69,8 @@ export function useUnreadScroll<TMessage>({
   getElementId,
   getUnreadMessages,
   onBeforeInitialJump,
+  markInitialVisibleRead = false,
+  markVisibleOnScroll = false,
   onMarkReadToLatest,
 }: UseUnreadScrollOptions<TMessage>) {
   const [autoScroll, setAutoScrollState] = useState(true)
@@ -417,6 +421,9 @@ export function useUnreadScroll<TMessage>({
       scheduleMarkObservedRead(true)
     } else {
       setFeedState('userScrolledUp')
+      if (markVisibleOnScroll) {
+        scheduleMarkObservedRead(false)
+      }
     }
 
     return atBottom
@@ -427,6 +434,7 @@ export function useUnreadScroll<TMessage>({
     setAutoScroll,
     setFeedState,
     updateLastObservedMessage,
+    markVisibleOnScroll,
   ])
 
   const completeTargetAfterSettle = useCallback((
@@ -670,7 +678,7 @@ export function useUnreadScroll<TMessage>({
 
       firstUnreadEl.scrollIntoView({ block: 'start', behavior: 'auto' })
       setAutoScroll(false)
-      completeTargetAfterSettle('anchoredCatchup', false)
+      completeTargetAfterSettle('anchoredCatchup', markInitialVisibleRead)
     }
 
     frameId = requestAnimationFrame(attemptInitialUnreadScroll)
@@ -691,6 +699,7 @@ export function useUnreadScroll<TMessage>({
     initialMessageId,
     loading,
     messages,
+    markInitialVisibleRead,
     onBeforeInitialJump,
     scrollContainerToBottom,
     renderSignal,

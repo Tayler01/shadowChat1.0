@@ -10,6 +10,7 @@ const mockUseShadowPinFeedMode = jest.fn()
 const mockUseShadowPinConnectionFeed = jest.fn()
 const mockUseInnerCircles = jest.fn()
 const mockUseInnerCircleFeed = jest.fn()
+const mockHasCreatorDraftsNeedingAttention = jest.fn()
 const mockToggleCategoryHeart = jest.fn()
 const mockToggleImageHeart = jest.fn()
 const mockShadowPinActivityTracker = {
@@ -87,6 +88,10 @@ jest.mock('../src/features/inner-circles/useInnerCircles', () => ({
 
 jest.mock('../src/features/inner-circles/useInnerCircleFeed', () => ({
   useInnerCircleFeed: () => mockUseInnerCircleFeed(),
+}))
+
+jest.mock('../src/features/shadow-pin/creator/creatorAttention', () => ({
+  hasCreatorDraftsNeedingAttention: (...args: unknown[]) => mockHasCreatorDraftsNeedingAttention(...args),
 }))
 
 jest.mock('../src/features/shadow-pin/hooks/useShadowPinActivityTracker', () => ({
@@ -193,6 +198,8 @@ beforeEach(() => {
   mockAdminRole = null
   mockToggleCategoryHeart.mockReset()
   mockToggleImageHeart.mockReset()
+  mockHasCreatorDraftsNeedingAttention.mockReset()
+  mockHasCreatorDraftsNeedingAttention.mockResolvedValue(false)
   Object.values(mockShadowPinActivityTracker).forEach(mockFn => mockFn.mockReset())
   mockUseShadowPinCategoryDwell.mockReset()
   mockToggleCategoryHeart.mockResolvedValue(undefined)
@@ -269,6 +276,21 @@ beforeEach(() => {
   })
 })
 
+test('hides the drafts attention pill when the creator has no unfinished work', async () => {
+  render(<ShadowPin />)
+
+  await waitFor(() => expect(mockHasCreatorDraftsNeedingAttention).toHaveBeenCalledWith('user-1'))
+  expect(screen.queryByText('Drafts & needs attention')).not.toBeInTheDocument()
+})
+
+test('shows the drafts attention pill only when unfinished creator work exists', async () => {
+  mockHasCreatorDraftsNeedingAttention.mockResolvedValue(true)
+
+  render(<ShadowPin />)
+
+  expect(await screen.findByText('Drafts & needs attention')).toBeInTheDocument()
+})
+
 test('Connections mode renders only the Connections feed and preserves its Theater route', () => {
   const connectionPins = [
     { ...image('connection-newer', 1200, 900), created_at: '2026-07-13T22:00:00Z' },
@@ -309,6 +331,72 @@ test('Connections mode renders only the Connections feed and preserves its Theat
   fireEvent.click(within(screen.getByTestId('shadow-pin-theater')).getByRole('button', { name: /0 comments\. open comments/i }))
   expect(screen.getByLabelText('Add a ShadowPin comment')).toBeInTheDocument()
   expect(onPinRoute).toHaveBeenCalledWith('push-comments', 'connection-newer')
+})
+
+test('Connections scrolling cancels pending radial controls before they can stack', () => {
+  jest.useFakeTimers()
+  const connectionPins = [
+    image('connection-one', 1200, 900),
+    image('connection-two', 900, 1200),
+  ]
+  mockUseShadowPinFeedMode.mockReturnValue({
+    mode: 'connections',
+    loading: false,
+    saveError: null,
+    selectMode: jest.fn(),
+    retrySave: jest.fn(),
+  })
+  mockUseShadowPinConnectionFeed.mockReturnValue({
+    images: connectionPins,
+    loading: false,
+    error: null,
+    hasMore: false,
+    acceptedCount: 2,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    toggleHeart: jest.fn(),
+    setCommentCount: jest.fn(),
+  })
+
+  try {
+    render(<ShadowPin initialFeedMode="connections" />)
+    const firstCard = screen.getByAltText('Pin connection-one').closest('article')
+    const secondCard = screen.getByAltText('Pin connection-two').closest('article')
+    const scroller = screen.getByTestId('shadow-pin-category-list')
+    expect(firstCard).not.toBeNull()
+    expect(secondCard).not.toBeNull()
+
+    fireShadowPinPointer(firstCard!, 'pointerdown', {
+      pointerId: 61,
+      clientX: 120,
+      clientY: 320,
+    })
+    fireShadowPinPointer(scroller, 'pointermove', {
+      pointerId: 61,
+      clientX: 120,
+      clientY: 360,
+    })
+    fireEvent.scroll(scroller, { target: { scrollTop: 40 } })
+
+    fireShadowPinPointer(secondCard!, 'pointerdown', {
+      pointerId: 62,
+      clientX: 270,
+      clientY: 420,
+    })
+    fireShadowPinPointer(document, 'pointercancel', {
+      pointerId: 62,
+      clientX: 270,
+      clientY: 420,
+    })
+
+    act(() => {
+      jest.advanceTimersByTime(600)
+    })
+
+    expect(screen.queryAllByTestId('shadow-pin-radial-menu')).toHaveLength(0)
+  } finally {
+    jest.useRealTimers()
+  }
 })
 
 test('Connections mode keeps universal ShadowPin search usable', async () => {
@@ -2512,6 +2600,41 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
     expect(screen.queryByTestId('shadow-pin-radial-menu')).not.toBeInTheDocument()
     expect(screen.getByTestId('shadow-pin-action-feedback')).toHaveAttribute('data-action', 'heart')
     expect(screen.getByTestId('shadow-pin-action-heart-burst')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin keeps exactly one radial session when another card is long-pressed', () => {
+  jest.useFakeTimers()
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+    fireEvent.click(screen.getByText('Fam & Friends'))
+    const firstCard = screen.getByAltText('Pin one').closest('article')
+    const secondCard = screen.getByAltText('Pin two').closest('article')
+    expect(firstCard).not.toBeNull()
+    expect(secondCard).not.toBeNull()
+
+    fireShadowPinPointer(firstCard!, 'pointerdown', {
+      pointerId: 71,
+      clientX: 120,
+      clientY: 320,
+    })
+    act(() => { jest.advanceTimersByTime(440) })
+    expect(screen.queryAllByTestId('shadow-pin-radial-menu')).toHaveLength(1)
+    expect(firstCard).toHaveClass('shadow-pin-action-card--active')
+
+    fireShadowPinPointer(secondCard!, 'pointerdown', {
+      pointerId: 72,
+      clientX: 280,
+      clientY: 420,
+    })
+    act(() => { jest.advanceTimersByTime(440) })
+
+    expect(screen.queryAllByTestId('shadow-pin-radial-menu')).toHaveLength(1)
+    expect(firstCard).not.toHaveClass('shadow-pin-action-card--active')
+    expect(secondCard).toHaveClass('shadow-pin-action-card--active')
   } finally {
     jest.useRealTimers()
   }

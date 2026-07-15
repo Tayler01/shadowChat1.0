@@ -1,110 +1,119 @@
-# Weather Widget
+# Weather
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 15, 2026
 
-Reviewed during the June 1, 2026 documentation refresh. This doc remains current and is the model for keeping private user preferences out of public profile rows.
-
-The General Chat header keeps room-specific controls behind a small left-facing
-chevron. Expanding it slides an inline rail left of the fixed Search and
-Settings controls with the weather widget, active-user count, and pinned
-messages control. The rail is part of the header and is not a selector popup.
+Weather is a full, mobile-first app page. The compact controls in General Chat
+and the bottom tool rail are navigation buttons; they no longer open a popup.
+Weather location data remains private to the owning user.
 
 ## Product Behavior
 
-- The compact weather pill shows only a weather icon and the current temperature
-  after the General Chat tool rail is expanded.
-- Clicking the right-facing chevron collapses the rail; opening the mobile
-  keyboard also collapses it automatically.
-- Clicking it opens a popup with current conditions and a short forecast.
-- The popup has no manual refresh button; forecasts refresh after preference
-  changes and every ten minutes while the widget has a saved location.
-- The popup can route users directly to Account & Profile settings when no
-  location is selected.
-- In General Chat, the popup can be shared as a themed image message. The
-  capture reflects the forecast card with the active theme while excluding
-  close/share controls from the image.
-- Location is personal to the signed-in user. It is not stored on public profile
-  rows and is not visible to other users.
+The Weather page provides:
 
-## Settings Flow
+- current conditions and detailed metrics;
+- the next 24 hours and a 10-day forecast;
+- explicit current-device GPS lookup;
+- city and postal-code search;
+- private saved locations;
+- Fahrenheit and Celsius unit modes;
+- US severe-weather alerts;
+- an on-demand interactive radar with observed and forecast frames;
+- manual refresh; and
+- a themed image share to General Chat.
 
-Users choose their weather location from:
+Air quality, pollen, lightning maps, and historical weather are intentionally
+outside the v1 scope. Weather and radar are best-effort information surfaces,
+not replacements for official emergency guidance.
 
-```text
-Settings > Account & Profile > Weather Location
-```
+The GPS prompt only runs after the member taps **Use current location**. The
+browser permission policy allows geolocation for this app origin, but the app
+does not request location in the background or continuously track a device.
 
-The settings card supports city or postal-code search, saving a selected
-location, and clearing the location.
+## Navigation
 
-## Data Model
+- The compact General Chat weather pill opens `?view=weather`.
+- The Weather icon on the bottom tool page opens the same route and remains
+  selected while the page is active.
+- The mobile bottom navigation remains visible on the Weather page.
+- The radar chunk and Leaflet runtime are loaded only after the member chooses
+  **Show radar**, protecting initial app and Weather-page startup.
 
-Private weather preferences live in `public.user_weather_preferences`, created
+## Private Data Model
+
+The current weather location remains in
+`public.user_weather_preferences`, created by
+[`20260502042003_user_weather_preferences.sql`](../supabase/migrations/20260502042003_user_weather_preferences.sql).
+
+Saved locations live in owner-private `public.user_weather_locations`, created
 by
-[`20260502042003_user_weather_preferences.sql`](C:/repos/chat2.0/supabase/migrations/20260502042003_user_weather_preferences.sql:1).
+[`20260715214708_weather_saved_locations.sql`](../supabase/migrations/20260715214708_weather_saved_locations.sql).
 
-Stored fields:
+Both tables use authenticated owner-only RLS. Location rows are not public
+profile data and are not added to the Realtime publication. The current-device
+GPS result is stored only when the member explicitly chooses it as their
+weather location.
 
-- `user_id`
-- `location_name`
-- `latitude`
-- `longitude`
-- `timezone`
-- `country_code`
-- `admin1`
-- `temperature_unit`
+## Providers And Attribution
 
-RLS allows each authenticated user to select, insert, update, and delete only
-their own weather preference row. The table is intentionally not in the
-Supabase Realtime publication because weather settings are private. The owning
-client reloads its preference and forecast through normal authenticated reads.
+- Forecast and geocoding: Open-Meteo
+  (`api.open-meteo.com` and `geocoding-api.open-meteo.com`).
+- US severe alerts: National Weather Service (`api.weather.gov`). Locations
+  outside NWS coverage return no NWS alerts without blocking the forecast.
+- Radar frames: RainViewer (`api.rainviewer.com` and
+  `tilecache.rainviewer.com`).
+- Interactive base map: OpenStreetMap standard tiles
+  (`tile.openstreetmap.org`).
 
-## Weather Provider
-
-The browser calls Open-Meteo directly:
-
-- Forecast API: `https://api.open-meteo.com/v1/forecast`
-- Geocoding API: `https://geocoding-api.open-meteo.com/v1/search`
-
-No API key is required for the current non-commercial style integration, and no
-weather provider token should be added to a browser-visible `VITE_*` variable.
+All provider calls are browser-side and use public, no-key endpoints. Do not
+add provider tokens to `VITE_*` variables. The radar surface visibly credits
+OpenStreetMap and RainViewer. Netlify uses
+`strict-origin-when-cross-origin` so the standard OpenStreetMap tile service can
+receive an origin referer, and its report-only CSP includes the forecast,
+alert, radar, and map hosts.
 
 ## Weather Sharing
 
-The General Chat weather share action captures a fixed-width off-screen copy of
-the forecast card with `html-to-image`, creates a PNG `File`, uploads it through
-the chat image media path, stores a display thumbnail URL, and sends it as an
-image message. The browser still performs the capture, but users do not need to
-resize, compress, or prepare anything manually.
+The Weather page renders a fixed-width off-screen obsidian-and-gold card,
+captures it with `html-to-image`, uploads it through the existing chat image
+path, and sends it to General Chat. Sharing is explicit and does not expose the
+member's saved-location list.
 
 ## Frontend Map
 
-- [`src/components/chat/WeatherWidget.tsx`](C:/repos/chat2.0/src/components/chat/WeatherWidget.tsx:1): compact header control and forecast popup.
-- [`src/components/chat/ChatView.tsx`](C:/repos/chat2.0/src/components/chat/ChatView.tsx:1): General Chat weather-share upload and send path.
-- [`src/components/settings/WeatherLocationSettings.tsx`](C:/repos/chat2.0/src/components/settings/WeatherLocationSettings.tsx:1): Account & Profile location picker.
-- [`src/hooks/useWeatherPreference.ts`](C:/repos/chat2.0/src/hooks/useWeatherPreference.ts:1): private preference load/save/clear hook.
-- [`src/hooks/useWeatherForecast.ts`](C:/repos/chat2.0/src/hooks/useWeatherForecast.ts:1): forecast load and periodic refresh hook.
-- [`src/lib/weather.ts`](C:/repos/chat2.0/src/lib/weather.ts:1): Open-Meteo mapping and Supabase preference helpers.
+- [`src/features/weather/WeatherView.tsx`](../src/features/weather/WeatherView.tsx):
+  full page, search, GPS, saved locations, alerts, units, forecast, and share.
+- [`src/features/weather/RadarMap.tsx`](../src/features/weather/RadarMap.tsx):
+  lazy Leaflet/OpenStreetMap/RainViewer surface.
+- [`src/features/weather/WeatherIcon.tsx`](../src/features/weather/WeatherIcon.tsx):
+  shared weather icon mapping.
+- [`src/components/chat/WeatherWidget.tsx`](../src/components/chat/WeatherWidget.tsx):
+  compact and bottom-nav route controls.
+- [`src/hooks/useWeatherPreference.ts`](../src/hooks/useWeatherPreference.ts):
+  current private preference load/save/clear.
+- [`src/hooks/useWeatherForecast.ts`](../src/hooks/useWeatherForecast.ts):
+  shared forecast cache and refresh lifecycle.
+- [`src/lib/weather.ts`](../src/lib/weather.ts): provider mappings and private
+  preference/saved-location helpers.
 
 ## Validation
 
-Targeted tests:
+Focused checks:
 
 ```powershell
-npx jest --runInBand tests/WeatherWidget.test.tsx tests/WeatherLocationSettings.test.tsx tests/weather.test.ts
+npx jest --runInBand tests/weather.test.ts tests/WeatherWidget.test.tsx tests/WeatherView.test.tsx tests/Navigation.test.tsx tests/appRouting.test.ts
+node --test tests/netlifySecurityHeaders.node.test.mjs tests/weatherSavedLocationsSql.node.test.mjs
 ```
 
-For UI changes, run a preview build and verify:
+Phone QA should verify on iPhone WebKit and Android Chromium:
 
-1. Desktop General Chat header shows the compact weather pill.
-2. Weather popup opens and fits inside the viewport.
-3. Weather popup shows no refresh icon/button.
-4. Mobile General Chat header expands the weather, active-user, and pinned
-   controls leftward without opening a selector popup or moving Search/Settings.
-5. The rail collapses from its right-facing chevron and when the keyboard opens.
-6. Account & Profile shows the Weather Location card.
-7. Clearing a location returns the header popup to the settings prompt.
-8. Sharing weather sends a themed PNG image message and does not include the
-   popup controls inside the captured card.
-9. The shared chat thumbnail shows the full card at lower resolution, and
-   tapping it opens the full weather image without side cropping.
+1. Weather opens from both existing icons and keeps the bottom navigation.
+2. GPS is requested only after tapping the current-location button.
+3. Search, saved-location switching/removal, refresh, and unit changes work.
+4. Hourly and 10-day rows scroll without page-level horizontal overflow.
+5. Radar loads on demand, pans and zooms, shows attribution, and respects the
+   Comfort motion policy.
+6. Sharing creates one readable General Chat image.
+7. Denied GPS, unavailable alerts, and unavailable radar fail gracefully.
+
+Physical-device validation remains required for installed-PWA GPS permission
+behavior and real iOS/Android map gestures.

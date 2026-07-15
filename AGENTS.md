@@ -2,7 +2,7 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
-## Documentation Status - July 13, 2026
+## Documentation Status - July 15, 2026
 
 This handbook is current through the July 10 production-alignment and Release A
 deployment: the paused-domain contract, Supabase
@@ -43,6 +43,19 @@ before changing Wave Three, and read
 before changing that branch track; use
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
 for the preserved Wave One contract.
+
+The July 15 final-acceptance batch on `codex/shadowchat-2.0` adds the full
+Active Users and Weather routes, server-owned presence-return notifications,
+unified launcher badges, exact DM/General/thread read clearing, ShadowPin
+radial/draft fixes, and composer alignment. It is not production-approved.
+Read the July 15 section of
+[docs/SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
+and [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1)
+before changing this batch. Its additive migrations and `send-push` v41 are
+linked and verified; the immutable isolated trial passed Android Chromium and
+iPhone WebKit route, settings, geometry, and diagnostics checks. Physical PWA
+acceptance is still pending. Do not merge it to production `main` without
+Tayler's explicit approval.
 
 ## Mission
 

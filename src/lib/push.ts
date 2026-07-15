@@ -1,5 +1,6 @@
 import { VITE_WEB_PUSH_PUBLIC_KEY } from './env'
 import { getWorkingClient } from './supabase'
+import { invokeEdgeFunctionWithRetry } from './edgeFunctionRetry'
 
 export interface NotificationPreferences {
   user_id: string
@@ -14,6 +15,14 @@ export interface NotificationPreferences {
   shadow_pin_comment_enabled: boolean
   shadow_pin_reply_enabled: boolean
   connection_notifications_enabled: boolean
+  presence_in_app_enabled: boolean
+  presence_push_enabled: boolean
+  presence_notification_scope: 'connections' | 'all'
+  badge_dm_enabled: boolean
+  badge_group_enabled: boolean
+  badge_interactions_enabled: boolean
+  badge_connections_enabled: boolean
+  badge_shadow_pin_enabled: boolean
   general_chat_muted: boolean
   quiet_hours_start: string | null
   quiet_hours_end: string | null
@@ -47,13 +56,21 @@ const DEFAULT_PREFERENCES = {
   dm_enabled: true,
   mention_enabled: true,
   reply_enabled: true,
-  reaction_enabled: false,
-  group_enabled: false,
+  reaction_enabled: true,
+  group_enabled: true,
   hype_enabled: true,
   shadow_pin_new_post_enabled: true,
   shadow_pin_comment_enabled: true,
   shadow_pin_reply_enabled: true,
   connection_notifications_enabled: true,
+  presence_in_app_enabled: true,
+  presence_push_enabled: true,
+  presence_notification_scope: 'connections' as const,
+  badge_dm_enabled: true,
+  badge_group_enabled: true,
+  badge_interactions_enabled: true,
+  badge_connections_enabled: true,
+  badge_shadow_pin_enabled: true,
   general_chat_muted: false,
   quiet_hours_start: null,
   quiet_hours_end: null,
@@ -74,6 +91,14 @@ const NOTIFICATION_PREFERENCE_SELECT = [
   'shadow_pin_comment_enabled',
   'shadow_pin_reply_enabled',
   'connection_notifications_enabled',
+  'presence_in_app_enabled',
+  'presence_push_enabled',
+  'presence_notification_scope',
+  'badge_dm_enabled',
+  'badge_group_enabled',
+  'badge_interactions_enabled',
+  'badge_connections_enabled',
+  'badge_shadow_pin_enabled',
   'general_chat_muted',
   'quiet_hours_start',
   'quiet_hours_end',
@@ -598,35 +623,34 @@ export const syncCurrentDeviceSubscription = async (userId: string) => {
   return true
 }
 
-const PUSH_DELIVERY_RETRY_DELAYS_MS = [250, 1000]
+export const updateCurrentDeviceForegroundLease = async (
+  userId: string,
+  foreground: boolean
+) => {
+  const subscription = await getCurrentPushSubscription()
+  if (!subscription) return false
 
-const getPushInvokeStatus = (error: unknown) => {
-  if (!error || typeof error !== 'object') return null
-  const candidate = error as { status?: unknown; context?: { status?: unknown } }
-  const value = candidate.context?.status ?? candidate.status
-  const status = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(status) ? status : null
-}
+  const workingClient = await getWorkingClient()
+  const foregroundUntil = foreground
+    ? new Date(Date.now() + 90_000).toISOString()
+    : null
+  const { error } = await workingClient
+    .from('push_subscriptions')
+    .update({
+      foreground_until: foregroundUntil,
+      last_seen_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('user_id', userId)
+    .eq('endpoint', subscription.endpoint)
 
-const shouldRetryPushInvoke = (error: unknown) => {
-  const status = getPushInvokeStatus(error)
-  return status === null || status === 409 || status >= 500
+  if (error) throw error
+  return true
 }
 
 const invokePushWithRetry = async (body: Record<string, unknown>) => {
   const workingClient = await getWorkingClient()
-
-  for (let attempt = 0; attempt <= PUSH_DELIVERY_RETRY_DELAYS_MS.length; attempt += 1) {
-    const { data, error } = await workingClient.functions.invoke('send-push', { body })
-    if (!error) return data
-    if (!shouldRetryPushInvoke(error) || attempt === PUSH_DELIVERY_RETRY_DELAYS_MS.length) {
-      throw error
-    }
-
-    await new Promise(resolve => setTimeout(resolve, PUSH_DELIVERY_RETRY_DELAYS_MS[attempt]))
-  }
-
-  return null
+  return invokeEdgeFunctionWithRetry(workingClient, 'send-push', body)
 }
 
 export const triggerDMPushNotification = async (messageId: string) => {

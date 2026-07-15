@@ -16,6 +16,7 @@ import {
   type ChatMessageType,
   getOrCreateDMConversation,
   markDMMessagesRead,
+  markDMMessagesReadThrough,
   fetchDMConversations,
   ensureSession,
   refreshSessionLocked,
@@ -37,7 +38,7 @@ import { MESSAGE_FETCH_LIMIT } from '../config';
 import { useAuth } from './useAuth';
 import { useRealtimeRecovery } from './useRealtimeRecovery';
 import { useSoundEffects } from './useSoundEffects';
-import { clearDMNotifications } from '../lib/appBadge';
+import { clearDMNotifications, requestAppBadgeRefresh } from '../lib/appBadge';
 import { compareMessageKey } from '../lib/readCursors';
 import {
   createRealtimeSubscriptionManager,
@@ -82,7 +83,7 @@ interface DirectMessagesContextValue {
   editMessage: (messageId: string, content: string) => Promise<void>;
   deleteMessage: (messageId: string) => Promise<void>;
   toggleReaction: (messageId: string, emoji: string) => Promise<void>;
-  markAsRead: (conversationId: string) => Promise<void>;
+  markAsRead: (conversationId: string, throughMessageId?: string) => Promise<void>;
   loadOlderMessages: () => Promise<void>;
   loadLatestMessages: () => Promise<void>;
   loadMessageWindow: (messageId: string) => Promise<boolean>;
@@ -500,17 +501,40 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     return null;
   }, [user]);
 
-  const markAsRead = useCallback(async (conversationId: string) => {
-    if (hasNewer) return;
-    await markDMMessagesRead(conversationId);
-    void clearDMNotifications(conversationId);
+  const markAsRead = useCallback(async (conversationId: string, throughMessageId?: string) => {
+    if (!throughMessageId && hasNewer) return;
+    let remaining = 0;
+    if (throughMessageId) {
+      remaining = await markDMMessagesReadThrough(conversationId, throughMessageId);
+    } else {
+      await markDMMessagesRead(conversationId);
+    }
+    const readMessageIds = throughMessageId
+      ? (() => {
+          const target = messages.find(message => message.id === throughMessageId);
+          if (!target) return [throughMessageId];
+          return messages
+            .filter(message => (
+              message.conversation_id === conversationId &&
+              message.sender_id !== user?.id &&
+              compareMessageKey(message, target) <= 0
+            ))
+            .map(message => message.id);
+        })()
+      : undefined;
+    void clearDMNotifications(
+      conversationId,
+      readMessageIds?.length === 1 ? readMessageIds[0] : undefined,
+      readMessageIds && readMessageIds.length > 1 ? readMessageIds : undefined
+    );
+    requestAppBadgeRefresh();
     setConversations(prev =>
       prev.map(c =>
-        c.id === conversationId ? { ...c, unread_count: 0 } : c
+        c.id === conversationId ? { ...c, unread_count: remaining } : c
       )
     );
     refreshConversationsDebounced();
-  }, [hasNewer, refreshConversationsDebounced]);
+  }, [hasNewer, messages, refreshConversationsDebounced, user?.id]);
 
   return {
     conversations,

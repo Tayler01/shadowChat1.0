@@ -660,7 +660,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div
       data-message-composer-surface="true"
-      className={`theme-composer-surface relative border-t border-[var(--border-panel)] px-3 pb-3 pt-2.5 md:p-3 ${className}`}
+      className={`theme-composer-surface relative border-t border-[var(--border-panel)] px-3 py-2.5 md:p-3 ${className}`}
     >
       {replyingTo && (
         <div
@@ -878,7 +878,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           />
         </div>
 
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <textarea
             ref={textareaRef}
             value={message}
@@ -891,7 +891,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             autoCapitalize="sentences"
             name={`message-composer-${cacheKey}`}
             rows={1}
-            className="obsidian-input no-scrollbar max-h-32 min-h-12 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base leading-6 text-[var(--text-primary)] md:px-3 md:py-2 md:text-sm"
+            className="obsidian-input no-scrollbar block max-h-32 min-h-12 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base leading-6 text-[var(--text-primary)] md:px-3 md:py-2 md:text-sm"
           />
         </div>
 

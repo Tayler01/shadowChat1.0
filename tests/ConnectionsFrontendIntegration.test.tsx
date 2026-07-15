@@ -84,7 +84,18 @@ const deferredRpcResult = () => {
 
 beforeEach(() => {
   jest.clearAllMocks()
-  getWorkingClientMock.mockResolvedValue({ rpc: rpcMock })
+  getWorkingClientMock.mockResolvedValue({
+    rpc: rpcMock,
+    from: jest.fn(() => ({
+      update: jest.fn(() => ({
+        eq: jest.fn(() => ({
+          in: jest.fn(() => ({
+            is: jest.fn().mockResolvedValue({ error: null }),
+          })),
+        })),
+      })),
+    })),
+  })
   searchUsersStrictMock.mockResolvedValue([])
   mockUseInnerCirclesHook.mockReturnValue({
     circles: [], loading: false, error: null, mutating: false,

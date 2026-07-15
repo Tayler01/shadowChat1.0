@@ -11,6 +11,7 @@ import {
   getWorkingClient,
   ensureSession,
   markDMMessagesRead,
+  markDMMessagesReadThrough,
   refreshSessionLocked,
   supabase,
 } from '../src/lib/supabase';
@@ -74,6 +75,7 @@ jest.mock('../src/lib/supabase', () => {
     fetchDMConversations: jest.fn().mockResolvedValue([]),
     getOrCreateDMConversation: jest.fn(),
     markDMMessagesRead: jest.fn(),
+    markDMMessagesReadThrough: jest.fn(),
     ensureSession: jest.fn().mockResolvedValue(true),
     refreshSessionLocked: jest.fn(),
     withTimeout: jest.fn((promise: Promise<unknown>) => promise),
@@ -150,6 +152,7 @@ beforeEach(() => {
   (getRealtimeClient as jest.Mock).mockReturnValue(workingClient);
   (fetchDMConversations as jest.Mock).mockResolvedValue([]);
   (markDMMessagesRead as jest.Mock).mockResolvedValue(undefined);
+  (markDMMessagesReadThrough as jest.Mock).mockResolvedValue(0);
   (ensureSession as jest.Mock).mockResolvedValue(true);
   (refreshSessionLocked as jest.Mock).mockResolvedValue({ data: { session: {} }, error: null });
   (runRealtimeRecovery as jest.Mock).mockResolvedValue({ ok: true, skipped: false, reason: 'channel-error' });

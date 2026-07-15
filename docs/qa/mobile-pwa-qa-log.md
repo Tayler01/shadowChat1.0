@@ -6,7 +6,30 @@ Older artifact paths remain historical evidence. The July 10 web Release A is
 deployed, but its mobile/PWA-sensitive behavior still needs a fresh harness
 artifact and physical-device pass.
 
-Last updated: 2026-07-13
+Last updated: 2026-07-15
+
+## July 15 Final Acceptance Automated Checkpoint
+
+- Immutable isolated deploy `6a580a60762e6e4b81058c71` passed authenticated
+  settings smoke plus `qa:final-acceptance-mobile` on Android Chromium and
+  iPhone WebKit.
+- The dedicated gate opened Active Users, Weather, presence-notification
+  settings, and launcher-badge settings; it asserted zero horizontal overflow,
+  exactly five visible in-bounds bottom-nav controls, and zero page errors.
+- Active Users and Weather retained the obsidian-and-gold phone layout across
+  `412x839` and `390x844` viewports. Presence settings expose independent
+  in-app/push toggles and Everyone/Connections scope. Badge settings expose the
+  five approved categories, a 99 display cap, and read-driven clearing copy.
+- Linked Supabase proof reports no pending migrations or database-lint warnings;
+  the security-definer contract and 24-function health manifest pass, and
+  `send-push` v41 is active.
+- These checks created no messages, notification events, database rows, or
+  Storage objects. Evidence:
+  `output/playwright/final-acceptance-6a580a60-r5/summary.json`.
+- Production `main` remains unchanged. Installed iPhone/Android PWA permission,
+  foreground/background push split, notification-center clearing, launcher
+  badge, GPS, radar gestures, and real notification arrival remain physical-
+  device acceptance items.
 
 ## July 13 Wave Three Inner Circles Automated Checkpoint
 
