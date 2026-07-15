@@ -10,7 +10,7 @@ Last updated: 2026-07-15
 
 ## July 15 Final Acceptance Automated Checkpoint
 
-- Immutable isolated deploy `6a580a60762e6e4b81058c71` passed authenticated
+- Stable isolated deploy `6a5811bc762e6e6704058ca3` passed authenticated
   settings smoke plus `qa:final-acceptance-mobile` on Android Chromium and
   iPhone WebKit.
 - The dedicated gate opened Active Users, Weather, presence-notification
@@ -25,7 +25,7 @@ Last updated: 2026-07-15
   `send-push` v41 is active.
 - These checks created no messages, notification events, database rows, or
   Storage objects. Evidence:
-  `output/playwright/final-acceptance-6a580a60-r5/summary.json`.
+  `output/playwright/final-acceptance-6a5811bc-mobile/summary.json`.
 - Production `main` remains unchanged. Installed iPhone/Android PWA permission,
   foreground/background push split, notification-center clearing, launcher
   badge, GPS, radar gestures, and real notification arrival remain physical-

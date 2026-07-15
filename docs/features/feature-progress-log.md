@@ -53,11 +53,11 @@ Canonical detail and release gates live in:
   ShadowPin radial/draft corrections, and composer alignment are implemented on
   the trial branch. Four additive migrations and `send-push` v41 are linked;
   dry-run, database lint, security-definer, and 24-function manifest checks are
-  clean. Immutable trial deploy `6a580a60762e6e4b81058c71` passed authenticated
+  clean. Stable isolated deploy `6a5811bc762e6e6704058ca3` passed authenticated
   settings smoke and dedicated Android Chromium/iPhone WebKit route, geometry,
-  settings, and diagnostics proof with no test-data residue. Stable isolated
-  publication and physical iPhone/Android acceptance remain pending. Production
-  `main` remains unchanged.
+  settings, and diagnostics proof with no test-data residue. It is published at
+  `https://shadowchat-2-0-wave-one.netlify.app`. Physical iPhone/Android
+  acceptance remains pending. Production `main` remains unchanged.
 - Backend boundary: reciprocal caller-private relationships, no public graph or
   counts, personal-block teardown with no restore, and compatibility with the
   unchanged production frontend sharing Supabase.

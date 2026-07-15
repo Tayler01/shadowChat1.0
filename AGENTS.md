@@ -24,7 +24,7 @@ preserved. Activity and member-facing report intake stay paused, while the
 operator Safety Case Center remains available. All four Wave Two candidates
 are implemented and passed their local, shared-backend, immutable-Netlify, and
 automated Pixel Chromium/iPhone WebKit gates. The cumulative 2.0 trial deploy is
-`6a558acc257a6d21fa379fa2`, published at the isolated stable test URL
+`6a5811bc762e6e6704058ca3`, published at the isolated stable test URL
 `https://shadowchat-2-0-wave-one.netlify.app`; production `main` remains
 unchanged while Tayler's installed-phone acceptance is pending. Wave Three
 Candidates 1-3 (Connections, ShadowPin Feed Modes, and Inner Circles) are
@@ -52,10 +52,11 @@ Read the July 15 section of
 [docs/SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
 and [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1)
 before changing this batch. Its additive migrations and `send-push` v41 are
-linked and verified; the immutable isolated trial passed Android Chromium and
-iPhone WebKit route, settings, geometry, and diagnostics checks. Physical PWA
-acceptance is still pending. Do not merge it to production `main` without
-Tayler's explicit approval.
+linked and verified; stable isolated deploy `6a5811bc762e6e6704058ca3`
+passed authenticated smoke plus Android Chromium and iPhone WebKit route,
+settings, geometry, and diagnostics checks. Physical PWA acceptance is still
+pending. Do not merge it to production `main` without Tayler's explicit
+approval.
 
 ## Mission
 

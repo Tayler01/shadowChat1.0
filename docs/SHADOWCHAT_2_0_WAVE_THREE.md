@@ -312,11 +312,12 @@ Backend rollout remained additive and backend-first. Linked migrations
 `20260715214707`, `20260715214708`, `20260715231400`, and `20260715232500` are
 applied, `send-push` v41 is active, linked dry-run reports no pending changes,
 linked database lint reports no warnings, the security-definer contract passes,
-and the 24-function health manifest matches the remote project. Immutable trial
-deploy `6a580a60762e6e4b81058c71` passed authenticated settings smoke plus the
+and the 24-function health manifest matches the remote project. Stable isolated
+deploy `6a5811bc762e6e6704058ca3` passed authenticated settings smoke plus the
 dedicated final-acceptance verifier on Android Chromium and iPhone WebKit with
 zero page errors or horizontal overflow. The verifier covered Active Users,
 Weather, presence settings, launcher-badge settings, and five-button bottom-nav
-geometry without creating database or Storage data. Production `main` remains
+geometry without creating database or Storage data. It is published at
+`https://shadowchat-2-0-wave-one.netlify.app`; production `main` remains
 unchanged. Physical iPhone/Android PWA push, notification-center clearing,
 launcher badge, GPS, and radar gestures remain the user acceptance gate.
