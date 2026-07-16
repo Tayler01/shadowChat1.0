@@ -20,12 +20,19 @@ export const DEFAULT_BUILD_BUDGETS = Object.freeze({
   phaserRawBytes: 1_550_000,
   phaserGzipBytes: 365_000,
 
+  // LiveKit is also isolated behind the real Shado Live feature flag. It may
+  // be absent from default builds, but when present it must remain one lazy
+  // provider chunk and stay outside the initial route.
+  liveKitRawBytes: 600_000,
+  liveKitGzipBytes: 160_000,
+
   // Runtime-only public assets keep the deploy near 75 MiB. Preserve source
   // material outside public/ and keep enough headroom for intentional releases.
   deployRawBytes: 100_000_000,
 })
 
 const PHASER_CHUNK_PATTERN = /^vendor-phaser-[A-Za-z0-9_-]+\.js$/
+const LIVEKIT_CHUNK_PATTERN = /^vendor-livekit-[A-Za-z0-9_-]+\.js$/
 
 export function extractInitialAssetPaths(indexHtml) {
   const assetPaths = new Set(['index.html'])
@@ -80,7 +87,11 @@ export function verifyBuildBudgets({
     .filter((filePath) => path.extname(filePath).toLowerCase() === '.js')
     .map((filePath) => measureFile(resolvedDistDir, filePath))
   const phaserAssets = allJavaScript.filter((asset) => PHASER_CHUNK_PATTERN.test(path.basename(asset.relativePath)))
-  const regularJavaScript = allJavaScript.filter((asset) => !PHASER_CHUNK_PATTERN.test(path.basename(asset.relativePath)))
+  const liveKitAssets = allJavaScript.filter((asset) => LIVEKIT_CHUNK_PATTERN.test(path.basename(asset.relativePath)))
+  const regularJavaScript = allJavaScript.filter((asset) => (
+    !PHASER_CHUNK_PATTERN.test(path.basename(asset.relativePath))
+    && !LIVEKIT_CHUNK_PATTERN.test(path.basename(asset.relativePath))
+  ))
   const deployRawBytes = allFiles.reduce((total, filePath) => total + statSync(filePath).size, 0)
   const initialRawBytes = sumBy(initialAssets, 'rawBytes')
   const initialGzipBytes = sumBy(initialAssets, 'gzipBytes')
@@ -114,6 +125,17 @@ export function verifyBuildBudgets({
     checkLimit(failures, `${phaserAsset.relativePath} (gzip)`, phaserAsset.gzipBytes, budgets.phaserGzipBytes)
   }
 
+  if (liveKitAssets.length > 1) {
+    failures.push(`Expected at most one lazy LiveKit chunk, found ${liveKitAssets.length}`)
+  } else if (liveKitAssets.length === 1) {
+    const liveKitAsset = liveKitAssets[0]
+    if (initialPaths.includes(liveKitAsset.relativePath)) {
+      failures.push(`Lazy LiveKit exception became eager: ${liveKitAsset.relativePath}`)
+    }
+    checkLimit(failures, `${liveKitAsset.relativePath} (raw)`, liveKitAsset.rawBytes, budgets.liveKitRawBytes)
+    checkLimit(failures, `${liveKitAsset.relativePath} (gzip)`, liveKitAsset.gzipBytes, budgets.liveKitGzipBytes)
+  }
+
   checkLimit(failures, 'Total deploy payload (raw)', deployRawBytes, budgets.deployRawBytes)
 
   if (failures.length > 0) {
@@ -122,6 +144,7 @@ export function verifyBuildBudgets({
 
   const largestEagerJavaScript = largestByRawBytes(initialJavaScript)
   const phaserAsset = phaserAssets[0]
+  const liveKitAsset = liveKitAssets[0]
   log('Build budgets passed:')
   log(`  Initial HTML/preloads: ${initialAssets.length} files, ${formatBytes(initialRawBytes)} raw / ${formatBytes(initialGzipBytes)} gzip`)
   if (largestEagerJavaScript) {
@@ -129,6 +152,9 @@ export function verifyBuildBudgets({
   }
   if (phaserAsset) {
     log(`  Lazy Phaser exception: ${phaserAsset.relativePath}, ${formatBytes(phaserAsset.rawBytes)} raw / ${formatBytes(phaserAsset.gzipBytes)} gzip`)
+  }
+  if (liveKitAsset) {
+    log(`  Lazy LiveKit exception: ${liveKitAsset.relativePath}, ${formatBytes(liveKitAsset.rawBytes)} raw / ${formatBytes(liveKitAsset.gzipBytes)} gzip`)
   }
   log(`  Total deploy payload: ${allFiles.length} files, ${formatBytes(deployRawBytes)} raw`)
 
@@ -138,6 +164,7 @@ export function verifyBuildBudgets({
     initialGzipBytes,
     initialRawBytes,
     largestEagerJavaScript,
+    liveKitAsset,
     phaserAsset,
   }
 }

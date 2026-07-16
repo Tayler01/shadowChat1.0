@@ -103,6 +103,22 @@ verify_jwt = false
 [functions.send-push]
 verify_jwt = false
 
+# Shado Live session and command endpoints authenticate the caller JWT in the
+# shared Edge guard before consulting database authority or LiveKit. The
+# provider webhook has no Supabase JWT and instead verifies LiveKit's signed
+# raw-body token before any database work.
+[functions.shado-live-session]
+verify_jwt = false
+
+[functions.shado-live-command]
+verify_jwt = false
+
+[functions.shado-live-provider-webhook]
+verify_jwt = false
+
+[functions.shado-live-reconcile]
+verify_jwt = false
+
 # Account deletion validates the caller's Supabase user token in code, then
 # uses the service role to remove owned storage objects before deleting auth.
 # It is deliberately exempt from the shared Edge request ledger: deletion is

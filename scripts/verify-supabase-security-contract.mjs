@@ -75,6 +75,7 @@ const unexposedRows = query(`
     'activation_private',
     'connections_private',
     'inner_circles_private',
+    'shado_live_private',
     'shadow_pin_private'
   )
     and p.prosecdef
@@ -126,6 +127,7 @@ const [unexposedDefinerSummary] = query(`
     'activation_private',
     'connections_private',
     'inner_circles_private',
+    'shado_live_private',
     'shadow_pin_private'
   )
     and p.prosecdef

@@ -1,6 +1,9 @@
 import {
+  applyShadoLiveCaseAction,
   formatModerationCaseReference,
   getModerationCase,
+  getShadoLiveModerationCase,
+  listShadoLiveModerationCases,
   listMyModerationReports,
   submitModerationReport,
   validateModerationEvidenceFiles,
@@ -75,6 +78,56 @@ test('uploads staged evidence and submits only target identity and operator cont
   expect(receipt).toEqual({ reportId: 'report-id', caseId: 'case-id', caseNumber: 9, status: 'new' })
 })
 
+test.each(['live_room', 'live_participant', 'live_message'] as const)(
+  'submits %s through the server-authoritative Live intake without uploading client evidence',
+  async liveTargetType => {
+    rpc.mockResolvedValue({
+      data: [{ report_id: 'live-report', case_id: 'live-case', case_number: 19, case_status: 'new' }],
+      error: null,
+    })
+    const liveTarget: ModerationReportTarget = {
+      ...target,
+      type: liveTargetType,
+      id: `20000000-0000-4000-8000-00000000000${liveTargetType === 'live_room' ? '1' : liveTargetType === 'live_participant' ? '2' : '3'}`,
+    }
+
+    await expect(submitModerationReport({
+      target: liveTarget,
+      category: 'immediate_safety',
+      details: '  Operator context only.  ',
+      clientReportId: '20000000-0000-4000-8000-000000000004',
+    })).resolves.toEqual({
+      reportId: 'live-report',
+      caseId: 'live-case',
+      caseNumber: 19,
+      status: 'new',
+    })
+
+    expect(upload).not.toHaveBeenCalled()
+    expect(rpc).toHaveBeenCalledWith('submit_shado_live_report', {
+      p_target_type: liveTargetType,
+      p_target_id: liveTarget.id,
+      p_category: 'immediate_safety',
+      p_client_report_id: '20000000-0000-4000-8000-000000000004',
+      p_details: 'Operator context only.',
+    })
+    expect(rpc.mock.calls[0][1]).not.toEqual(expect.objectContaining({
+      p_attachments: expect.anything(),
+    }))
+  },
+)
+
+test('rejects screenshots for Live reports before upload or intake', async () => {
+  await expect(submitModerationReport({
+    target: { ...target, type: 'live_message' },
+    category: 'harassment',
+    details: '',
+    attachments: [new File(['proof'], 'proof.png', { type: 'image/png' })],
+  })).rejects.toThrow(/authoritative room evidence/i)
+  expect(upload).not.toHaveBeenCalled()
+  expect(rpc).not.toHaveBeenCalled()
+})
+
 test('cleans staged evidence when intake fails', async () => {
   rpc.mockResolvedValue({ data: null, error: new Error('intake unavailable') })
   await expect(submitModerationReport({
@@ -123,4 +176,66 @@ test('signs case attachments only when operator detail is opened', async () => {
   const detail = await getModerationCase('case-id')
   expect(createSignedUrls).toHaveBeenCalledWith(['owner/report/proof.png'], 1800)
   expect(detail.reports[0].attachments?.[0].signedUrl).toBe('https://signed.example/proof')
+})
+
+test('uses only the dedicated Live operator list, detail, and action RPCs', async () => {
+  rpc
+    .mockResolvedValueOnce({ data: [{
+      case_id: 'live-case', case_number: 22, status: 'new', severity: 'high',
+      target_type: 'live_participant', primary_category: 'harassment',
+      subject_user_id: 'subject-id', subject_username: 'jj', subject_display_name: 'JJ',
+      subject_avatar_url: null, assigned_to: 'operator-id', assignee_username: 'op',
+      assignee_display_name: 'Operator', report_count: 2,
+      ack_due_at: '2026-07-16T02:00:00Z', resolve_due_at: '2026-07-17T00:00:00Z',
+      created_at: '2026-07-16T00:00:00Z', updated_at: '2026-07-16T01:00:00Z', version: 3,
+    }], error: null })
+    .mockResolvedValueOnce({ data: {
+      case: {
+        id: 'live-case', case_number: 22, subject_user_id: 'subject-id',
+        target_type: 'live_participant', target_id: 'participant-id',
+        primary_category: 'harassment', status: 'new', severity: 'high',
+        assigned_to: 'operator-id', full_admin_only: false, version: 3,
+        ack_due_at: '2026-07-16T02:00:00Z', resolve_due_at: '2026-07-17T00:00:00Z',
+        created_at: '2026-07-16T00:00:00Z', updated_at: '2026-07-16T01:00:00Z',
+      }, reports: [], evidence: [], events: [], actions: [], activeBans: [],
+    }, error: null })
+    .mockResolvedValueOnce({ data: {
+      ok: true, actionId: 'action-id', case: {
+        id: 'live-case', case_number: 22, subject_user_id: 'subject-id',
+        target_type: 'live_participant', target_id: 'participant-id',
+        primary_category: 'harassment', status: 'actioned', severity: 'high',
+        assigned_to: 'operator-id', full_admin_only: false, version: 4,
+        ack_due_at: '2026-07-16T02:00:00Z', resolve_due_at: '2026-07-17T00:00:00Z',
+        created_at: '2026-07-16T00:00:00Z', updated_at: '2026-07-16T01:10:00Z',
+      },
+    }, error: null })
+
+  await expect(listShadoLiveModerationCases({
+    queue: 'all', targetType: 'live_participant', search: '  jj  ', limit: 99,
+  })).resolves.toEqual([expect.objectContaining({
+    id: 'live-case', targetType: 'live_participant', reportCount: 2, version: 3,
+  })])
+  await expect(getShadoLiveModerationCase('live-case')).resolves.toEqual(expect.objectContaining({
+    case: expect.objectContaining({ id: 'live-case', targetType: 'live_participant' }),
+  }))
+  await expect(applyShadoLiveCaseAction({
+    caseId: 'live-case', expectedVersion: 3, actionType: 'set_live_restriction',
+    requestedScopes: ['join', 'chat'], durationMinutes: 60,
+    publicReason: '  Safety review  ', internalNote: '  Evidence checked  ',
+  })).resolves.toEqual(expect.objectContaining({ ok: true, actionId: 'action-id' }))
+
+  expect(rpc).toHaveBeenNthCalledWith(1, 'list_shado_live_moderation_cases', {
+    p_queue: 'all', p_status: null, p_severity: null,
+    p_target_type: 'live_participant', p_category: null, p_search: 'jj',
+    p_limit: 50, p_before_updated_at: null, p_before_id: null,
+  })
+  expect(rpc).toHaveBeenNthCalledWith(2, 'get_shado_live_moderation_case', {
+    p_case_id: 'live-case',
+  })
+  expect(rpc).toHaveBeenNthCalledWith(3, 'apply_shado_live_case_action', {
+    p_case_id: 'live-case', p_expected_version: 3,
+    p_action_type: 'set_live_restriction', p_requested_scopes: ['join', 'chat'],
+    p_duration_minutes: 60, p_public_reason: 'Safety review',
+    p_internal_note: 'Evidence checked',
+  })
 })

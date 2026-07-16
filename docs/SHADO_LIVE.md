@@ -1,68 +1,46 @@
 # Shado Live
 
-## Status - Flagship Prototype
+## Status - Real Allowlisted Beta
 
-Shado Live is a specification and frontend-only interaction prototype on
-`codex/shadowchat-2.0`. It is not a live-media product. The prototype is
-compiled behind `VITE_FEATURE_SHADO_LIVE_PROTOTYPE=true`, lazy-loaded from
-Entertainment, and routed at `?view=games&experience=shado-live` only in the
-isolated 2.0 test build.
+Shado Live is now implemented as a real, audio-first LiveKit experience on
+`codex/shadowchat-2.0`. It remains excluded from the default build and from
+production `main`. The real client is compiled only when
+`VITE_FEATURE_SHADO_LIVE_REAL=true`; the preserved frontend-only prototype uses
+the separate `VITE_FEATURE_SHADO_LIVE_PROTOTYPE` flag and must remain false in
+the real beta build.
 
-The default build keeps the flag false. It contains no Shado Live card or
-route, starts no camera or microphone permission request, opens no provider
-connection, creates no Supabase row, sends no notification, subscribes to no
-Activity feed, and exposes no pretend report action. Production `main` and the
-production Netlify frontend remain unchanged.
+The isolated beta uses the shared Supabase project through additive schema and
+Edge Functions, while access is server-gated to selected testers. A hidden
+production route or a forged feature flag does not grant access. The isolated
+frontend also restores deterministic Catch-Up with
+`VITE_FEATURE_CATCH_UP=true`.
 
-Accepted isolated trial deploy: `6a561d93dc105334eca9a5f9` at
-`https://shadowchat-2-0-wave-one.netlify.app`.
+The accepted July 14 retro picker banner remains the real beta picker asset:
+`public/entertainment/shado-live/picker-banner.webp`. Its source dimensions,
+accessibility description, and generation prompt are recorded in
+`src/features/entertainment/shado-live/assets/manifest.ts`.
 
-The July 14 accepted polish adds a crop-safe `1920x720` retro picker banner,
-aligns the lobby and stage with the Entertainment picker and ShadowChat's
-obsidian/gold visual system, removes mobile stage/panel overlap, and keeps the
-chat composer directly above the iOS keyboard inset. The banner source,
-dimensions, accessibility description, and generation prompt are recorded in
-`src/features/entertainment/shado-live/assets/manifest.ts`; the optimized
-runtime asset is `public/entertainment/shado-live/picker-banner.webp`.
+Production `main` and the production Netlify frontend remain unchanged until
+installed-phone acceptance and explicit merge approval.
 
-## Product Promise
+## V1 Product Contract
 
-Shado Live should make a small live gathering feel understandable and intimate
-on a phone. The first real milestone is an audio-first Connections room with:
+The beta is an intimate, phone-first audio room:
 
 - one host and up to three approved speakers;
-- listen-only entry, hand raising, and explicit host promotion;
-- stage, room, chat, and safety surfaces that never cover each other;
-- recording off by default;
-- exact room-ended, reconnecting, and host-disconnect behavior; and
-- server-authoritative roles, audience eligibility, blocks, and operator
-  actions.
+- listen-only entry by default, with hand raising and host promotion;
+- server-authoritative room, role, audience, block, restriction, and operator
+  decisions;
+- recording disabled;
+- room chat with canonical server persistence;
+- exact reconnecting, removed, ineligible, and room-ended states; and
+- live-room, participant, and message reporting with server-captured evidence.
 
 Video, recording, large public broadcasts, Inner Circle publishing, ticketing,
-replays, co-host revenue, and creator analytics are separate later milestones.
-Inner Circles do not become a publishing audience through this prototype.
+replays, revenue, and creator analytics are outside this beta. Inner Circles do
+not become a Shado Live audience.
 
-## Prototype Contract
-
-The current prototype exercises only local UI state:
-
-1. premium lobby and room discovery;
-2. listener entry without media permission;
-3. stage, speaker stack, audience count, room details, and safety tabs;
-4. local microphone/camera-state previews that never call `getUserMedia`;
-5. hand raise, reactions, and unsent local chat;
-6. keyboard-operable roving tabs and deliberate enter/leave focus restoration;
-7. reconnecting and room-ended failure treatments; and
-8. visible release-lock copy for Activity, member reporting, and operator
-   readiness.
-
-All visible latency, audience, recording, and format values are product targets
-or design examples, not live telemetry. The prototype must always say that
-nothing is broadcast, saved, reported, or sent.
-
-## Future Room Lifecycle
-
-The authoritative server state machine is:
+## Authoritative Lifecycle
 
 ```text
 scheduled -> green_room -> live -> ending -> ended
@@ -70,147 +48,190 @@ scheduled -> green_room -> live -> ending -> ended
     +-----------> cancelled
 ```
 
-- `scheduled`: discoverable only to the intended audience; no provider token.
-- `green_room`: host and invited speakers can prepare; listeners cannot join
-  media.
-- `live`: eligible listeners may receive short-lived, room-scoped tokens.
-- `ending`: new joins fail closed while media and audit state are finalized.
-- `ended` or `cancelled`: terminal; no token can restore the room.
+- `green_room` is visible only to its host. It is not advertised as a live
+  room to other members.
+- `live` is discoverable only to eligible allowlisted members. Listeners receive
+  short-lived, room-scoped media tokens.
+- `ending` rejects new joins while provider and audit state are finalized.
+- `ended` and `cancelled` are terminal. A stale token or reconnect cannot
+  restore access.
 
-Provider presence and Supabase Realtime may improve responsiveness, but neither
-authorizes a host, speaker, listener, moderator, or room transition.
+Supabase remains the authority. LiveKit presence and webhooks reconcile media
+state but never grant a role, access, or room transition.
 
-## Future Backend Boundary
+## Backend And Provider Boundary
 
-The real system is a new domain. It must not reuse Shado TV, General Chat, DM,
-News, Boards, or ShadowPin tables as its authority.
+The canonical domain is isolated from General Chat, DMs, ShadowPin, Shado TV,
+News, Boards, and Activity. The primary data is held in dedicated Shado Live
+tables for system state, access membership, rooms, participants, stage
+requests, messages, events, signals, provider operations, webhook receipts,
+restrictions, safety evidence, and notifications.
 
-Proposed canonical data:
+Direct browser mutation is revoked. Reviewed private `SECURITY DEFINER`
+functions in `shado_live_private` are reached through narrow public invoker
+RPCs. `live_room_signals` and recipient-owned notification rows are the only
+RLS-filtered browser Realtime surfaces required for invalidation.
 
-- `live_rooms`
-- `live_room_participants`
-- `live_room_stage_requests`
-- `live_room_invites`
-- append-only `live_room_events`
+LiveKit is the audio transport. Server-only credentials are named:
 
-Direct browser writes remain revoked. Narrow public invoker RPCs should call
-reviewed private implementation functions, following the Connections and Inner
-Circles architecture. A provider-neutral media adapter issues short-lived,
-room- and role-scoped participant tokens from server-only boundaries:
+- `LIVEKIT_URL`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
 
-- `shado-live-session`: authorize create/join and issue a provider token;
-- `shado-live-command`: start, end, promote, mute, remove, or close; and
-- `shado-live-provider-webhook`: verify signed provider lifecycle callbacks.
+Never expose those values through `VITE_*` variables. The real client receives
+only a short-lived participant token and the WebSocket URL returned by the
+authorized session function.
 
-Bunny Stream is an upload/on-demand playback system in this repo and must not
-be treated as the live RTC transport. Provider selection needs a separate
-current capability, region, privacy, reliability, and cost spike before adding
-an SDK, dependency, domain, or secret.
+The deployed Edge Function contract is:
 
-## Safety And Privacy Gates
+- `shado-live-session`: create, join, resume, leave, and issue role-scoped media
+  credentials;
+- `shado-live-command`: start/end, hand state, messages, promote/demote, mute,
+  and remove;
+- `shado-live-provider-webhook`: validate the raw signed LiveKit callback before
+  parsing and ingest it idempotently; and
+- `shado-live-reconcile`: claim bounded provider work and repair delayed or
+  missing provider state.
 
-A real build remains blocked until all of the following are accepted:
+The client runs reconciliation immediately and every 20 seconds only while the
+document is visible and online, with no overlapping request.
 
-- Activity supports exact live invite, start, change, end, and safety routes.
-- Member reporting supports live-room and participant evidence without
-  exposing reporter identity or unrelated media.
-- Operators can end a room, remove a participant, restrict hosting, and audit
-  every action.
-- Live-specific bans and emergency shutdown behavior exist.
-- Reciprocal personal blocking removes invitations, discovery, audience,
-  stage, chat, presence, and media subscription visibility without disclosing
-  block direction.
-- Recording has explicit room and participant consent, retention, access,
-  deletion, and evidence policies.
-- Provider secrets, signing material, and service-role access remain server
-  only.
-- Join-token expiry, rate limits, concurrent-room caps, host-disconnect grace,
-  webhook replay defense, and provider-outage behavior fail closed.
-- Camera/microphone Permissions Policy and provider CSP changes are reviewed
-  only for the real implementation. The prototype needs neither.
+## Access And Compatibility
 
-## Notification And Failure Contract
+`shado_live_system_state.access_mode` supports `disabled`, `allowlist`, and
+future global `enabled`. The isolated beta is `allowlist`; tester membership is
+private and operator-managed. Production clients do not expose the real route,
+and older clients remain compatible with the additive schema.
 
-Live events cannot be added opportunistically to `notification_events`,
-`activity_events`, or `send-push`. Each new type needs a dedupe key, preference,
-quiet-hours behavior, exact typed route, block suppression, retry policy, and
-old-client compatibility proof.
+Selected beta accounts are seeded by
+`20260716030000_shado_live_beta_access.sql`. The migration inserts only IDs that
+already exist in `public.users`, so local resets and incomplete environments do
+not create placeholder identities.
 
-Required failure states include:
+Personal blocking suppresses discovery, notifications, chat, stage, audience,
+and media eligibility in both directions. Block teardown does not reveal who
+blocked whom and does not restore prior live access after unblock.
 
-- permission denied or device unavailable;
-- token expired before join;
-- room full or no longer eligible;
-- host disconnect grace and authoritative end;
-- transient media reconnect with frozen controls;
-- metadata Realtime reconnect without role escalation;
-- provider outage and webhook delay;
-- app background/resume and duplicate join; and
-- recording or safety subsystem failure.
+## Safety And Operator Contract
 
-No state may silently fall back to a broader audience, keep publishing after a
-room ends, or claim an operator action succeeded without authoritative proof.
+Member-facing reporting is enabled only inside the real Shado Live runtime;
+the broader paused report entry points stay hidden. A live report may target a
+room, participant, or message. The server captures the authoritative snapshot;
+the reporting client cannot upload or replace evidence.
 
-## Accessibility And Performance
+The operator Shado Live queue supports:
 
-- Phone layout and safe areas are primary; desktop remains functional.
-- Controls retain at least the shared phone touch baseline.
-- Stage state, speaker state, mute state, and failure state are not conveyed by
-  color alone.
-- Tabs support Arrow keys, Home, End, and roving focus.
-- Enter/leave and nested state changes restore focus deliberately.
-- The Comfort provider remains authoritative for motion, autoplay, sound, and
-  haptics.
-- No media autoplays before explicit entry and authorization.
-- A production room needs measured thermal, battery, memory, network, and
-  background/resume budgets on physical iPhone and Android devices.
+- claim and review of live-only cases;
+- end room;
+- remove or mute participant;
+- set scoped `host`, `join`, and/or `chat` restrictions with duration and
+  public reason;
+- revoke a restriction; and
+- no-action closeout.
 
-## Prototype Acceptance Gate
+Every operator action is expected-version guarded and permanently audited.
+The existing operator Safety Case Center remains available for prior cases.
 
-- default build has no available route/card and does not execute prototype
-  code;
-- flagged test build exposes the lazy Entertainment route;
-- unit tests cover local stage, chat, tabs, focus, failure state, and prove no
-  media API call;
-- Pixel Chromium and iPhone WebKit cover routing, safe areas, phone geometry,
-  keyboard compression, 130% text, and zero permission prompts;
-- diagnostics show no unexpected network, Supabase, console, or page errors;
-- the isolated test deploy creates no rows, uploads, notifications, or other
-  residue; and
-- production `main` and production Netlify remain untouched.
+## Notification Contract
 
-The automated Shado Live browser proof is
-`scripts/verify-shado-live-prototype-browser.mjs`. Its July 14 matrix covers a
-320x568 Chromium viewport at 130% text, Pixel Chromium, iPhone WebKit, and
-desktop Chromium. It checks the real picker asset, lobby CTA, route/focus
-restoration, stage/panel separation, local chat, tabs, dialog keyboard
-behavior, controls, iOS keyboard compression, diagnostics, permission calls,
-and zero backend or provider residue.
+The beta uses a dedicated recipient-owned `shado_live_notifications` surface.
+Room starts/ends and participant role or safety changes are deduped, block
+filtered, preference controlled, and routed to:
 
-## Remaining Work
+`?view=games&experience=shado-live&item=<room-id>`
 
-The prototype cleanup is ready for deeper testing, but these items remain
-deliberately open:
+Foreground notifications use a five-second in-app treatment, canonical unread
+fetch, recipient-filtered Realtime invalidation, duplicate suppression, and an
+explicit mark-read RPC. The setting is on by default and may be disabled in
+Settings.
 
-1. Complete RD-030 on an installed iPhone PWA and installed Android PWA,
-   including native keyboard animation, safe areas, touch comfort,
-   VoiceOver/TalkBack, background/resume, and lock/unlock.
-2. Collect structured feedback from Tayler and additional phone testers on the
-   picker, lobby clarity, stage density, panel switching, reactions, and
-   failure-state comprehension; fix reproducible issues on the isolated branch.
-3. Keep the full live system gated until member reporting and Activity safety
-   routes resume, the operator controls are proven, and a current media-provider
-   capability/privacy/cost spike is approved.
-4. If the full system is approved, implement the server-authoritative room
-   lifecycle, role-scoped token service, provider adapter/webhooks, block and
-   ban enforcement, notifications, failure recovery, and physical-device
-   performance budgets described above.
-5. Keep the private AI Catch-Up experiment separate. Deterministic Catch-Up is
-   the accepted baseline; no AI trial starts until its accuracy, privacy,
-   attribution, cost, and failure gates are defined.
-6. Merge to production `main` and deploy the production Netlify frontend only
-   after separate installed-phone acceptance and explicit approval.
+Shado Live OS push is intentionally not part of this beta. It must not be
+described as delivered until a separate quiet-hours, background/foreground,
+badge, dedupe, block, and old-client compatibility pass extends `send-push`.
 
-The full Shado Live build can begin only after Tayler explicitly resumes the
-required Activity and member-reporting dependencies and the safety gate above
-is demonstrably complete.
+## Failure, Privacy, And Media Rules
+
+- Camera and display capture remain denied by Permissions Policy. Only
+  microphone is permitted for host/speaker media.
+- Listeners do not request microphone permission.
+- Recording is off and no egress is configured.
+- Tokens are short-lived, room scoped, identity scoped, and role scoped.
+- Session and command paths use authenticated user verification, rate limits,
+  idempotency claims, expected revisions, and fail-closed provider handling.
+- Webhook signatures cover the exact raw body and are verified before JSON
+  normalization.
+- Provider operations and webhook events are replay safe.
+- A provider outage never widens access or claims a state change succeeded.
+- Terminal room or eligibility state tears down media locally.
+
+## Mobile And Accessibility Contract
+
+- Phone layout, safe areas, installed-PWA behavior, and keyboard compression
+  are primary; desktop remains functional.
+- Listener, host, stage, mute, reconnect, and terminal state are not conveyed
+  by color alone.
+- Tabs and dialogs retain keyboard navigation and deliberate focus restore.
+- The existing Comfort provider remains authoritative for motion, sound,
+  haptics, and autoplay comfort.
+- Media starts only after explicit room entry and authorization.
+- The real client lazy-loads `livekit-client`; the default build contains no
+  LiveKit runtime chunk.
+- Camera APIs, display capture, recording, and egress are absent from the real
+  beta browser contract.
+
+## Verification
+
+Local backend gates cover a clean Supabase reset, transactional two-user
+verification with rollback, database lint, security-definer allowlisting,
+access-mode isolation, roles, messages, stage requests, blocks, restrictions,
+notifications, provider outbox, and webhook receipts.
+
+Frontend and Edge tests cover API normalization, LiveKit media state, host and
+listener controls, reconciliation cadence, reporting, operator actions,
+notification routing/dedupe, and signed provider boundaries. The production
+build verifier runs deterministic Pixel Chromium and iPhone WebKit host and
+listener flows with mocked provider/network state, exact phone geometry,
+keyboard and safe-area checks, no camera/recording requests, and zero residue.
+
+Commands:
+
+```powershell
+npm run qa:shado-live:real
+npm run supabase:functions:verify
+supabase db push --dry-run --linked
+```
+
+## Deployment Checklist
+
+1. Run lint, app TypeScript, build, targeted/full Jest, Deno checks, local
+   Supabase reset/verifier/lint, linked dry run, and phone browser QA.
+2. Apply the three additive Shado Live migrations in timestamp order.
+3. Set the three `LIVEKIT_*` secrets only in Supabase Edge Function secrets.
+4. Deploy the four active Shado Live Edge Functions with their checked-in JWT
+   verification contract.
+5. In LiveKit Cloud, open **Settings -> Webhooks**, create the Supabase provider
+   webhook URL, choose the same signing API key, and send a test event.
+6. Verify provider room create/join/start/chat/end/cleanup with controlled beta
+   accounts and confirm no provider room or test data remains.
+7. Build the isolated frontend with real Live enabled, prototype disabled, and
+   Catch-Up enabled; deploy only to `shadowchat-2-0-wave-one`.
+8. Repeat authenticated Pixel Chromium/iPhone WebKit smoke against the exact
+   deploy and then perform installed iPhone/Android beta acceptance.
+
+## Remaining Before Production
+
+1. Complete installed iPhone and Android PWA testing for microphone permission,
+   audio routing, speaker/listener handoff, Bluetooth/headphones, keyboard,
+   safe areas, background/resume, lock/unlock, weak network, and accessibility.
+2. Collect multi-tester feedback and repair reproducible beta issues.
+3. Add OS push only through its separate notification reliability gate.
+4. Measure physical-device battery, thermal, memory, and network behavior.
+5. Merge and deploy to production only after explicit approval. Catch-Up stays
+   deterministic and source linked; the private AI trial remains separate.
+
+## Preserved Prototype
+
+The July 14 frontend-only prototype and its verifier remain in the repo for
+design history and offline interaction QA. It must continue to make no media,
+database, notification, or reporting claim. Do not enable the prototype and
+real flags together in a release build.

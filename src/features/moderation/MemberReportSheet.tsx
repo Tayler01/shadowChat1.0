@@ -19,6 +19,9 @@ const targetKindLabel: Record<ModerationReportTarget['type'], string> = {
   dm_message: 'direct message',
   shadow_pin_image: 'ShadowPin post',
   shadow_pin_comment: 'ShadowPin comment',
+  live_room: 'Shado Live room',
+  live_participant: 'Shado Live participant',
+  live_message: 'Shado Live message',
 }
 
 export function MemberReportSheet({ target, onClose }: {
@@ -48,6 +51,9 @@ export function MemberReportSheet({ target, onClose }: {
   }, [target])
 
   if (!target) return null
+  const isShadoLiveTarget = target.type === 'live_room'
+    || target.type === 'live_participant'
+    || target.type === 'live_message'
 
   const submit = async () => {
     if (!category) {
@@ -132,7 +138,7 @@ export function MemberReportSheet({ target, onClose }: {
               <span className="mt-1 block text-right text-xs text-[var(--text-muted)]">{details.length}/2000</span>
             </label>
 
-            <div>
+            {!isShadoLiveTarget && <div>
               <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-[var(--border-panel)] bg-[var(--bg-panel)] px-4 py-2 text-sm text-[var(--text-secondary)] hover:border-[var(--border-glow)] hover:text-[var(--text-primary)] focus-within:ring-2 focus-within:ring-[var(--theme-focus-ring)]">
                 <ImagePlus className="h-4 w-4" /> Add screenshots
                 <input className="sr-only" type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple onChange={event => {
@@ -145,7 +151,13 @@ export function MemberReportSheet({ target, onClose }: {
                 }} />
               </label>
               {files.length > 0 && <p className="mt-2 text-xs text-[var(--text-muted)]">{files.length} private screenshot{files.length === 1 ? '' : 's'} attached</p>}
-            </div>
+            </div>}
+
+            {isShadoLiveTarget && (
+              <p className="rounded-2xl border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-soft)] p-3 text-xs leading-5 text-[var(--text-secondary)]">
+                ShadowChat captures the authoritative room, participant, or message state on the server when you submit. The reporting client cannot replace that evidence.
+              </p>
+            )}
 
             <div className="flex gap-3 rounded-2xl border border-amber-400/20 bg-amber-400/5 p-3 text-xs leading-5 text-[var(--text-secondary)]">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />

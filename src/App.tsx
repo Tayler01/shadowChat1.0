@@ -24,7 +24,12 @@ import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
 import { useTheme } from './hooks/useTheme'
 import { WeatherProvider } from './hooks/useWeatherForecast'
 import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib/mobileViewport'
-import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED } from './config/featureFlags'
+import {
+  ACTIVITY_FEATURE_ENABLED,
+  BOARDS_FEATURE_ENABLED,
+  CATCH_UP_FEATURE_ENABLED,
+  SHADO_LIVE_REAL_ENABLED,
+} from './config/featureFlags'
 import {
   getLocationStateFromUrl,
   resolveChatThreadRouteMutation,
@@ -131,6 +136,10 @@ const CatchUpView = CATCH_UP_FEATURE_ENABLED
         default: module.CatchUpView,
       }))
     )
+  : null
+
+const ShadoLiveNotificationBridge = SHADO_LIVE_REAL_ENABLED
+  ? lazy(() => import('./features/entertainment/shado-live/real/ShadoLiveNotificationBridge'))
   : null
 
 const getInitialLocationState = (): LocationState => {
@@ -919,6 +928,11 @@ function App() {
           </SoundEffectsProvider>
         </ClientResetProvider>
       </AuthGuard>
+    {SHADO_LIVE_REAL_ENABLED && ShadoLiveNotificationBridge && (
+      <Suspense fallback={null}>
+        <ShadoLiveNotificationBridge />
+      </Suspense>
+    )}
     <Toaster
       position={isDesktop ? 'top-right' : 'top-center'}
       containerStyle={

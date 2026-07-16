@@ -11,6 +11,9 @@ export type ModerationTargetType =
   | 'dm_message'
   | 'shadow_pin_image'
   | 'shadow_pin_comment'
+  | 'live_room'
+  | 'live_participant'
+  | 'live_message'
 
 export type ModerationReportCategory =
   | 'harassment'
@@ -43,7 +46,15 @@ export type ModerationCaseOutcome =
   | 'insufficient_evidence'
   | 'other'
 
-export type ModerationCaseActionType = 'no_action' | 'remove_content' | 'channel_ban'
+export type ModerationCaseActionType =
+  | 'no_action'
+  | 'remove_content'
+  | 'channel_ban'
+  | 'end_live_room'
+  | 'remove_live_participant'
+  | 'mute_live_participant'
+  | 'set_live_restriction'
+  | 'revoke_live_restriction'
 
 export type ModerationReportTarget = {
   type: ModerationTargetType
@@ -230,7 +241,11 @@ export const MODERATION_REPORT_REASONS: Array<{
 const getRandomId = () => (
   typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/gu, token => {
+        const value = Math.floor(Math.random() * 16)
+        const nibble = token === 'x' ? value : (value & 0x3) | 0x8
+        return nibble.toString(16)
+      })
 )
 
 const sanitizeFileName = (name: string) => {
@@ -274,6 +289,31 @@ export const submitModerationReport = async ({
   const { data: { user }, error: userError } = await client.auth.getUser()
   if (userError) throw userError
   if (!user) throw new Error('Sign in before sending a report')
+
+  const isShadoLiveTarget = target.type === 'live_room'
+    || target.type === 'live_participant'
+    || target.type === 'live_message'
+  if (isShadoLiveTarget) {
+    if (attachments.length > 0) {
+      throw new Error('Shado Live reports capture authoritative room evidence instead of screenshots')
+    }
+    const { data, error } = await client.rpc('submit_shado_live_report', {
+      p_target_type: target.type,
+      p_target_id: target.id,
+      p_category: category,
+      p_client_report_id: clientReportId,
+      p_details: details.trim(),
+    })
+    if (error) throw error
+    const row = Array.isArray(data) ? data[0] : data
+    if (!row?.report_id || !row?.case_id) throw new Error('Report receipt was not returned')
+    return {
+      reportId: String(row.report_id),
+      caseId: String(row.case_id),
+      caseNumber: Number(row.case_number),
+      status: row.case_status as ModerationCaseStatus,
+    }
+  }
 
   const uploaded: ModerationAttachmentUpload[] = []
   try {
@@ -395,6 +435,59 @@ export const listModerationCases = async ({
   }))
 }
 
+export const listShadoLiveModerationCases = async ({
+  queue = 'new',
+  status,
+  severity,
+  targetType,
+  category,
+  search,
+  limit = 30,
+}: {
+  queue?: ModerationCaseQueue
+  status?: ModerationCaseStatus | null
+  severity?: ModerationCaseSeverity | null
+  targetType?: Extract<ModerationTargetType, `live_${string}`> | null
+  category?: ModerationReportCategory | null
+  search?: string
+  limit?: number
+} = {}): Promise<ModerationCaseSummary[]> => {
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('list_shado_live_moderation_cases', {
+    p_queue: queue,
+    p_status: status ?? null,
+    p_severity: severity ?? null,
+    p_target_type: targetType ?? null,
+    p_category: category ?? null,
+    p_search: search?.trim() || null,
+    p_limit: Math.max(1, Math.min(limit, 50)),
+    p_before_updated_at: null,
+    p_before_id: null,
+  })
+  if (error) throw error
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    id: String(row.case_id),
+    caseNumber: Number(row.case_number),
+    status: row.status as ModerationCaseStatus,
+    severity: row.severity as ModerationCaseSeverity,
+    targetType: row.target_type as ModerationTargetType,
+    primaryCategory: row.primary_category as ModerationReportCategory,
+    subjectUserId: row.subject_user_id ? String(row.subject_user_id) : null,
+    subjectUsername: row.subject_username ? String(row.subject_username) : null,
+    subjectDisplayName: row.subject_display_name ? String(row.subject_display_name) : null,
+    subjectAvatarUrl: row.subject_avatar_url ? String(row.subject_avatar_url) : null,
+    assignedTo: row.assigned_to ? String(row.assigned_to) : null,
+    assigneeUsername: row.assignee_username ? String(row.assignee_username) : null,
+    assigneeDisplayName: row.assignee_display_name ? String(row.assignee_display_name) : null,
+    reportCount: Number(row.report_count ?? 0),
+    ackDueAt: String(row.ack_due_at),
+    resolveDueAt: String(row.resolve_due_at),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+    version: Number(row.version),
+  }))
+}
+
 const mapCaseRecord = (row: Record<string, unknown>): ModerationCaseRecord => ({
   id: String(row.id),
   caseNumber: Number(row.case_number),
@@ -419,9 +512,12 @@ const mapCaseRecord = (row: Record<string, unknown>): ModerationCaseRecord => ({
   assignee: (row.assignee as ModerationPerson | null | undefined) ?? null,
 })
 
-export const getModerationCase = async (caseId: string): Promise<ModerationCaseDetail> => {
+const getModerationCaseFromRpc = async (
+  rpcName: 'get_moderation_case' | 'get_shado_live_moderation_case',
+  caseId: string,
+): Promise<ModerationCaseDetail> => {
   const client = await getWorkingClient()
-  const { data, error } = await client.rpc('get_moderation_case', { p_case_id: caseId })
+  const { data, error } = await client.rpc(rpcName, { p_case_id: caseId })
   if (error) throw error
   const payload = data as Record<string, unknown>
   const reports = ((payload.reports as ModerationCaseReport[] | undefined) ?? [])
@@ -460,6 +556,14 @@ export const getModerationCase = async (caseId: string): Promise<ModerationCaseD
     activeBans: (payload.activeBans as ModerationCaseDetail['activeBans'] | undefined) ?? [],
   }
 }
+
+export const getModerationCase = async (caseId: string) => (
+  getModerationCaseFromRpc('get_moderation_case', caseId)
+)
+
+export const getShadoLiveModerationCase = async (caseId: string) => (
+  getModerationCaseFromRpc('get_shado_live_moderation_case', caseId)
+)
 
 export const assignModerationCase = async (caseId: string, expectedVersion: number, assigneeId: string | null) => {
   const client = await getWorkingClient()
@@ -522,6 +626,49 @@ export const applyModerationCaseAction = async ({
 }) => {
   const client = await getWorkingClient()
   const { data, error } = await client.rpc('apply_moderation_case_action', {
+    p_case_id: caseId,
+    p_expected_version: expectedVersion,
+    p_action_type: actionType,
+    p_requested_scopes: requestedScopes,
+    p_duration_minutes: durationMinutes ?? null,
+    p_public_reason: publicReason?.trim() || null,
+    p_internal_note: internalNote?.trim() || null,
+  })
+  if (error) throw error
+  const result = data as { ok?: boolean; error?: string; case?: Record<string, unknown>; actionId?: string }
+  return {
+    ok: Boolean(result.ok),
+    error: result.error ?? null,
+    case: result.case ? mapCaseRecord(result.case) : null,
+    actionId: result.actionId ?? null,
+  }
+}
+
+export const applyShadoLiveCaseAction = async ({
+  caseId,
+  expectedVersion,
+  actionType,
+  requestedScopes = [],
+  durationMinutes,
+  publicReason,
+  internalNote,
+}: {
+  caseId: string
+  expectedVersion: number
+  actionType: Extract<ModerationCaseActionType,
+    | 'no_action'
+    | 'end_live_room'
+    | 'remove_live_participant'
+    | 'mute_live_participant'
+    | 'set_live_restriction'
+    | 'revoke_live_restriction'>
+  requestedScopes?: Array<'host' | 'join' | 'chat'>
+  durationMinutes?: number | null
+  publicReason?: string | null
+  internalNote?: string | null
+}) => {
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('apply_shado_live_case_action', {
     p_case_id: caseId,
     p_expected_version: expectedVersion,
     p_action_type: actionType,

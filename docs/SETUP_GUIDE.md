@@ -2,7 +2,7 @@
 
 This guide covers the recommended local and hosted setup flow for ShadowChat 1.0.
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 15, 2026
 
 This setup guide matches the Node 24 GitHub/Netlify runtime, the backend-first
 release, the July Supabase credential and security cleanup, and the intentional
@@ -17,6 +17,7 @@ before changing auth or hosted security setup.
 - A Supabase account and project
 - Supabase CLI
 - Netlify CLI only if you plan to deploy from the terminal
+- LiveKit CLI only when deploying or diagnosing the real Shado Live beta
 - Render account only if a reviewed News reactivation or isolated worker proof
   requires it
 
@@ -54,6 +55,20 @@ C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Microsoft\Visual
 After updating PATH, restart the terminal or Codex process so new shells inherit
 it, then rerun the checks above.
 
+### LiveKit CLI on this Windows workstation
+
+LiveKit CLI 2.17.0 is installed through WinGet. The exact executable is:
+
+```powershell
+& 'C:\Users\tayle\AppData\Local\Microsoft\WinGet\Packages\LiveKit.LiveKitCLI_Microsoft.Winget.Source_8wekyb3d8bbwe\lk.exe' --version
+```
+
+Do not use the collapsed path from copied terminal text such as
+`C:Userstayle...`; the backslashes are required. `lk cloud auth` opens the
+browser link flow and `lk project list` verifies the imported project. The CLI
+can manage rooms and tokens, but LiveKit Cloud project webhooks are configured
+under **Settings -> Webhooks** in the Cloud dashboard.
+
 ## 1. Install Dependencies
 
 ```powershell
@@ -87,12 +102,18 @@ VITE_FEATURE_ESP_ADMIN=false
 VITE_FEATURE_ACTIVITY=false
 VITE_FEATURE_MEMBER_REPORTING=false
 VITE_FEATURE_SHADO_LIVE_PROTOTYPE=false
+VITE_FEATURE_SHADO_LIVE_REAL=false
 VITE_FEATURE_CATCH_UP=false
 ```
 
 Boards/News/Art Board and ESP admin are intentionally compile-time off. See
 [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) before changing
 either flag; re-enabling the UI alone does not restore or secure remote services.
+
+For the isolated real Shado Live beta, enable `VITE_FEATURE_SHADO_LIVE_REAL`
+and `VITE_FEATURE_CATCH_UP`, keep the prototype flag false, and set
+`LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` only as Supabase Edge
+Function secrets. Never create a `VITE_` LiveKit credential.
 
 ## 3. Create Or Link A Supabase Project
 

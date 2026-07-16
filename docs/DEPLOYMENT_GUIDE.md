@@ -450,15 +450,33 @@ Netlify needs the frontend equivalents of:
 - `VITE_FEATURE_ESP_ADMIN=false` while ESP Bridge remains on hold
 - `VITE_FEATURE_ACTIVITY=false` while Activity HQ remains paused
 - `VITE_FEATURE_MEMBER_REPORTING=false` while member intake remains paused
+- `VITE_FEATURE_SHADO_LIVE_REAL=false` except for the isolated, server-gated
+  Shado Live trial frontend
+- `VITE_FEATURE_CATCH_UP=true` on the accepted isolated 2.0 trial frontend;
+  keep it false on production `main` until final merge approval
+- `VITE_APP_DEPLOY_CONTEXT=trial` on the isolated 2.0 frontend so production
+  app-release prompts stay disabled
 
 Check [`.env.example`](C:/repos/chat2.0/.env.example:1) for the expected names.
 
 Do not place Supabase service-role keys, provider API tokens, Render scraper credentials, Bunny keys, or Meta/OpenRouter secrets in `VITE_*` variables.
 
-The two feature variables are browser-safe compile-time booleans. Only literal
+These feature variables are browser-safe compile-time booleans. Only literal
 `true` enables them. Follow
 [PAUSED_FEATURES.md](C:/repos/chat2.0/docs/PAUSED_FEATURES.md:1) for remote-state
 and reactivation requirements.
+
+The isolated real Shado Live build additionally requires server-only
+`LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` in Supabase secrets,
+the four Shado Live Edge Functions, and the signed provider webhook configured
+in LiveKit Cloud. Those values must never be copied into Netlify `VITE_*`
+variables.
+
+The isolated site's stable hostname and immutable Netlify deploy hostnames also
+disable the production app-release gate in client code. This is a deliberate
+PWA safety boundary: a cached or accidentally production-stamped trial bundle
+must not repeatedly prompt `Restart Now` for a release that only exists on
+production `main`.
 
 ## Two-Stage Private Identity Rollout
 

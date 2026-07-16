@@ -17,7 +17,7 @@ test('bridge Auth hold query requests machine-readable Supabase output', () => {
 
 test('every local Edge Function has one explicit production disposition', () => {
   const manifest = validateFunctionManifest(loadFunctionManifest())
-  assert.equal(manifest.active.length, 8)
+  assert.equal(manifest.active.length, 12)
   assert.equal(manifest.pausedDeny.length, 15)
   assert.deepEqual(manifest.pausedRemove.map(entry => entry.name), ['art-board-import-image'])
 })

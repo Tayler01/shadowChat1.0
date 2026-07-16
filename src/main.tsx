@@ -10,9 +10,11 @@ import { registerPushServiceWorker } from './lib/push';
 import { initializeTelemetry } from './lib/telemetry';
 import { BlockedUsersProvider } from './hooks/useBlockedUsers';
 import { ComfortPreferencesProvider } from './hooks/useComfortPreferences';
-import { MEMBER_REPORTING_FEATURE_ENABLED } from './config/featureFlags';
+import { MEMBER_REPORTING_FEATURE_ENABLED, SHADO_LIVE_REAL_ENABLED } from './config/featureFlags';
 
-const ModerationReportProvider = MEMBER_REPORTING_FEATURE_ENABLED
+const REPORTING_RUNTIME_ENABLED = MEMBER_REPORTING_FEATURE_ENABLED || SHADO_LIVE_REAL_ENABLED;
+
+const ModerationReportProvider = REPORTING_RUNTIME_ENABLED
   ? lazy(() => import('./features/moderation/ModerationReportProvider').then(module => ({
       default: module.ModerationReportProvider,
     })))
@@ -27,7 +29,7 @@ createRoot(document.getElementById('root')!).render(
         <PresenceRoot>
           <ComfortPreferencesProvider>
             <ThemeProvider>
-              {MEMBER_REPORTING_FEATURE_ENABLED && ModerationReportProvider ? (
+              {REPORTING_RUNTIME_ENABLED && ModerationReportProvider ? (
                 <Suspense fallback={null}>
                   <ModerationReportProvider>
                     <ErrorBoundary>

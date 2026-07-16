@@ -177,15 +177,16 @@ explicitly excluded from v1.
 
 ### Shado Live
 
-- Specify and prototype Shado Live now so its product, safety, moderation,
-  presence, media, notification, failure, and operator requirements can be
-  tested early.
-- Do not build or release the full live system until Activity and member
-  reporting are dependable enough to support the required safety and operator
-  workflows.
-- Activity HQ and member-facing report intake remain paused under the current
-  product contract. The full Shado Live build is therefore gated unless Tayler
-  explicitly changes those dependencies.
+- The accepted prototype has advanced to a real, audio-first LiveKit beta on
+  the isolated 2.0 frontend after Tayler explicitly resumed the work.
+- Supabase owns lifecycle, access, roles, blocks, restrictions, messages,
+  safety evidence, notifications, and provider reconciliation. LiveKit is only
+  the media transport.
+- Broader Activity HQ and generic member report intake stay paused. The real
+  Shado Live runtime exposes only its dedicated reporting, operator, and
+  foreground-notification paths.
+- Production `main` remains unchanged until installed-phone and multi-tester
+  acceptance plus explicit merge approval.
 
 ### Catch-Up
 
@@ -239,10 +240,12 @@ explicitly excluded from v1.
   passed. The smoke readiness selector now follows the visible mobile message
   viewport and composer instead of the intentionally hidden legacy Lounge
   header.
-- Shado Live is specified and implemented as a flagged, frontend-only local
-  interaction prototype. Its unit and Pixel Chromium/iPhone WebKit gates pass
-  without media permission, provider, Supabase, notification, or residue work;
-  the real live system remains gated by paused Activity and reporting.
+- Shado Live's accepted frontend-only prototype is preserved. The real
+  allowlisted LiveKit beta is now implemented behind the separate real flag,
+  with additive server authority, role-scoped audio credentials, provider
+  webhook/reconciliation, live-only reporting/operator controls, and
+  foreground notification routing. Final remote rollout and physical-phone
+  acceptance are recorded in `docs/SHADO_LIVE.md`.
 - Deterministic Catch-Up is implemented behind its isolated-trial flag. Additive
   migration `20260714020000` is linked with clean local/remote migration,
   database-lint, security-contract, transactional two-user, unchanged-
@@ -255,6 +258,31 @@ explicitly excluded from v1.
   serves the same artifact and repeated the final-track verifiers with zero
   Shado Live media/backend residue.
 - Production `main` and the production Netlify frontend remain unchanged.
+
+## Real Shado Live Beta - July 15, 2026
+
+- Added the isolated `shado_live_private` authority domain with disabled,
+  allowlist, and future-enabled access modes. The trial uses private selected-
+  tester allowlisting and keeps host green rooms hidden from everyone else.
+- Added audio-only LiveKit sessions for one host and up to three speakers,
+  canonical room chat/stage requests, expected-version host commands,
+  idempotent provider operations, signed webhook ingestion, bounded
+  reconciliation, host grace, terminal teardown, and personal-block handling.
+- Added live-room, participant, and message reports with server-captured
+  evidence; a live-only operator queue; scoped restrictions; audited end,
+  remove, mute, set, revoke, and no-action controls.
+- Added dedicated recipient-owned in-app notifications with canonical room
+  routes, preference control, Realtime invalidation, five-second presentation,
+  unread marking, block suppression, and old-client filtering. OS push is not
+  claimed in this beta.
+- The real client stays lazy and the default build contains no LiveKit chunk.
+  Deterministic Catch-Up remains intact and is restored on the isolated build
+  with `VITE_FEATURE_CATCH_UP=true`.
+- Local database reset, rollback verifier, database lint, security contract,
+  focused SQL/Edge/frontend tests, Deno checks, and deterministic Pixel
+  Chromium/iPhone WebKit host/listener QA pass. Linked rollout and exact deploy
+  evidence are completed only after the shared-backend and isolated-Netlify
+  release steps succeed.
 
 ## Final-Track Polish - July 14, 2026
 

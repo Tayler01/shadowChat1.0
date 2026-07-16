@@ -19,6 +19,7 @@ test('Netlify ships safe immediate browser headers while CSP remains report-only
   assert.match(block, /Referrer-Policy\s*=\s*"strict-origin-when-cross-origin"/)
   assert.match(block, /Permissions-Policy\s*=\s*"[^"]*geolocation=\(self\)[^"]*"/)
   assert.match(block, /Permissions-Policy\s*=\s*"[^"]*microphone=\(self\)[^"]*"/)
+  assert.match(block, /Permissions-Policy\s*=\s*"[^"]*camera=\(\)[^"]*"/)
   assert.doesNotMatch(block, /^\s*Content-Security-Policy\s*=/m)
 
   const policy = block.match(/Content-Security-Policy-Report-Only\s*=\s*"([^"]+)"/)?.[1] || ''
@@ -37,6 +38,8 @@ test('Netlify ships safe immediate browser headers while CSP remains report-only
   for (const requiredSource of [
     'https://*.supabase.co',
     'wss://*.supabase.co',
+    'https://*.livekit.cloud',
+    'wss://*.livekit.cloud',
     'https://api.open-meteo.com',
     'https://geocoding-api.open-meteo.com',
     'https://api.weather.gov',

@@ -37,12 +37,19 @@ const checks = [
     ],
   },
   {
-    feature: 'Member report intake',
+    feature: 'Member report sheet',
+    enabled: isEnabled('VITE_FEATURE_MEMBER_REPORTING') || isEnabled('VITE_FEATURE_SHADO_LIVE_REAL'),
+    filenamePatterns: [/memberreportsheet/iu],
+    contentPatterns: [
+      'Submit safety report',
+    ],
+  },
+  {
+    feature: 'My safety reports',
     enabled: isEnabled('VITE_FEATURE_MEMBER_REPORTING'),
-    filenamePatterns: [/memberreportsheet/iu, /myreportspanel/iu],
+    filenamePatterns: [/myreportspanel/iu],
     contentPatterns: [
       'My Safety Reports',
-      'Submit safety report',
     ],
   },
   {
@@ -50,8 +57,18 @@ const checks = [
     enabled: isEnabled('VITE_FEATURE_SHADO_LIVE_PROTOTYPE'),
     filenamePatterns: [/shadoliveprototype/iu],
     contentPatterns: [
-      'Shado Live',
       'Leave Shado Live preview',
+      'Nothing is broadcast, saved, or sent',
+    ],
+  },
+  {
+    feature: 'Shado Live real rooms',
+    enabled: isEnabled('VITE_FEATURE_SHADO_LIVE_REAL'),
+    filenamePatterns: [/shadoliveexperience/iu, /vendor-livekit/iu],
+    contentPatterns: [
+      'shado-live-session',
+      'shado-live-command',
+      'AudioPlaybackStatusChanged',
     ],
   },
   {

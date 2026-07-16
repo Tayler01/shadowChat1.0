@@ -1,0 +1,90 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { ShadoLiveStage } from '../src/features/entertainment/shado-live/real/ShadoLiveStage'
+import type { ShadoLiveRoomController } from '../src/features/entertainment/shado-live/real/useShadoLiveRoom'
+import type { ShadoLiveRoom } from '../src/features/entertainment/shado-live/real/shadoLiveModel'
+
+const room = (role: ShadoLiveRoom['myRole']): ShadoLiveRoom => ({
+  id: 'room-1', version: 4, title: 'The Midnight Room', status: 'live',
+  hostId: 'host-1', hostDisplayName: 'Tayler', listenerCount: 2, speakerLimit: 3,
+  recordingEnabled: false, canJoin: true, canHost: role === 'host', myRole: role,
+  myStageRequestStatus: 'none', hostGraceExpiresAt: null,
+  startedAt: '2026-07-15T20:00:00Z', scheduledAt: null, endedAt: null, updatedAt: '2026-07-15T20:01:00Z',
+  participants: [
+    { userId: 'host-1', participantId: 'participant-host', providerIdentity: 'host-1', displayName: 'Tayler', username: 'tayler', avatarUrl: null, role: 'host', hostMuted: false, handRaised: false, joinedAt: null },
+    { userId: 'listener-1', participantId: 'participant-listener', providerIdentity: 'listener-1', displayName: 'Jordan', username: 'jordan', avatarUrl: null, role: 'listener', hostMuted: false, handRaised: true, joinedAt: null },
+  ],
+  messages: [],
+})
+
+const controller = (role: ShadoLiveRoom['myRole']): ShadoLiveRoomController => ({
+  rooms: [], room: room(role), backendState: 'ready', syncState: 'synced', terminal: null,
+  error: null, notice: null, commandBusy: null, controlsEnabled: true, startEnabled: false,
+  media: {
+    state: 'connected', participants: [
+      { identity: 'host-1', name: 'Tayler', speaking: true, audioLevel: 0.7, microphoneEnabled: true, connectionQuality: 'excellent' },
+    ],
+    microphoneEnabled: false, microphoneAllowed: role === 'host' || role === 'speaker',
+    audioPlaybackEnabled: true, audioPlaybackBlocked: false, error: null,
+  },
+  refreshRooms: jest.fn().mockResolvedValue(undefined), refreshRoom: jest.fn().mockResolvedValue(null),
+  createRoom: jest.fn().mockResolvedValue(undefined), joinRoom: jest.fn().mockResolvedValue(undefined),
+  leaveRoom: jest.fn().mockResolvedValue(undefined), returnToLobby: jest.fn().mockResolvedValue(undefined),
+  startAudio: jest.fn().mockResolvedValue(undefined), toggleMicrophone: jest.fn().mockResolvedValue(undefined),
+  toggleHand: jest.fn().mockResolvedValue(undefined), sendMessage: jest.fn().mockResolvedValue(undefined),
+  startRoom: jest.fn().mockResolvedValue(undefined),
+  promote: jest.fn().mockResolvedValue(undefined), demote: jest.fn().mockResolvedValue(undefined),
+  mute: jest.fn().mockResolvedValue(undefined), remove: jest.fn().mockResolvedValue(undefined),
+  endRoom: jest.fn().mockResolvedValue(undefined), bindAudioContainer: jest.fn(), clearError: jest.fn(),
+})
+
+test('listener stage joins without any microphone control and raises a server-confirmed hand', () => {
+  const value = controller('listener')
+  render(<ShadoLiveStage controller={value} currentUserId="listener-1" />)
+
+  expect(screen.queryByRole('button', { name: /microphone/i })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Raise hand' }))
+  expect(value.toggleHand).toHaveBeenCalledTimes(1)
+})
+
+test('host microphone, participant moderation, and end-room controls call authority methods', async () => {
+  const value = controller('host')
+  render(<ShadoLiveStage controller={value} currentUserId="host-1" />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Unmute microphone' }))
+  expect(value.toggleMicrophone).toHaveBeenCalledTimes(1)
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Room' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Promote' }))
+  expect(value.promote).toHaveBeenCalledWith('listener-1')
+
+  fireEvent.click(screen.getByRole('tab', { name: 'Safety' }))
+  fireEvent.click(screen.getByRole('button', { name: 'End room for everyone' }))
+  expect(value.endRoom).toHaveBeenCalledTimes(1)
+})
+
+test('host starts a green room only through the synchronized version-checked command', () => {
+  const value = controller('host')
+  value.room = { ...value.room!, status: 'green_room' }
+  value.controlsEnabled = false
+  value.startEnabled = true
+  render(<ShadoLiveStage controller={value} currentUserId="host-1" />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Start live' }))
+  expect(value.startRoom).toHaveBeenCalledTimes(1)
+})
+
+test('chat clears only after the persistent server command resolves', async () => {
+  let confirmMessage: () => void = () => undefined
+  const value = controller('listener')
+  value.sendMessage = jest.fn(() => new Promise<void>(resolve => { confirmMessage = resolve }))
+  render(<ShadoLiveStage controller={value} currentUserId="listener-1" />)
+
+  const composer = screen.getByRole('textbox', { name: 'Message the live room' })
+  fireEvent.change(composer, { target: { value: 'Persist this' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Send live room message' }))
+  expect(value.sendMessage).toHaveBeenCalledWith('Persist this')
+  expect(composer).toHaveValue('Persist this')
+
+  confirmMessage()
+  await waitFor(() => expect(composer).toHaveValue(''))
+})

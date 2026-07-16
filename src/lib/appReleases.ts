@@ -10,7 +10,19 @@ export const CURRENT_APP_BUILD_ID = (VITE_APP_BUILD_ID || '').trim()
 export const CURRENT_APP_COMMIT_SHA = (VITE_APP_COMMIT_SHA || '').trim()
 export const CURRENT_APP_DEPLOY_CONTEXT = (VITE_APP_DEPLOY_CONTEXT || '').trim()
 
+const ISOLATED_TRIAL_NETLIFY_HOST = 'shadowchat-2-0-wave-one.netlify.app'
+
+export const isIsolatedTrialAppHost = (
+  hostname = typeof window === 'undefined' ? '' : window.location.hostname
+) => {
+  const normalizedHostname = hostname.trim().toLowerCase()
+
+  return normalizedHostname === ISOLATED_TRIAL_NETLIFY_HOST ||
+    normalizedHostname.endsWith(`--${ISOLATED_TRIAL_NETLIFY_HOST}`)
+}
+
 export const APP_RELEASE_CHECKS_ENABLED =
+  !isIsolatedTrialAppHost() &&
   Boolean(VITE_APP_IS_PROD) &&
   CURRENT_APP_DEPLOY_CONTEXT === 'production' &&
   CURRENT_APP_BUILD_ID.length > 0

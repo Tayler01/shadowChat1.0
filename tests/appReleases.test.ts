@@ -2,6 +2,7 @@ import {
   canAutoRestartRelease,
   chooseVisibleAppRelease,
   getAppReleasePresentation,
+  isIsolatedTrialAppHost,
 } from '../src/lib/appReleases'
 import {
   normalizeAppReleaseSections,
@@ -151,6 +152,22 @@ describe('app release presentation', () => {
     expect(canAutoRestartRelease('release-1', 1000)).toBe(true)
     expect(canAutoRestartRelease('release-1', 3000)).toBe(false)
     expect(canAutoRestartRelease('release-1', 123000)).toBe(true)
+  })
+
+  it('disables production release prompts on the isolated trial site and immutable deploys', () => {
+    expect(isIsolatedTrialAppHost('shadowchat-2-0-wave-one.netlify.app')).toBe(true)
+    expect(
+      isIsolatedTrialAppHost(
+        '6a58b30a53467e0ed09e3138--shadowchat-2-0-wave-one.netlify.app'
+      )
+    ).toBe(true)
+    expect(isIsolatedTrialAppHost('SHADOWCHAT-2-0-WAVE-ONE.NETLIFY.APP')).toBe(true)
+  })
+
+  it('keeps production release prompts eligible on unrelated hosts', () => {
+    expect(isIsolatedTrialAppHost('shadochat.online')).toBe(false)
+    expect(isIsolatedTrialAppHost('shadowchat-2-0-wave-one.example.com')).toBe(false)
+    expect(isIsolatedTrialAppHost('notshadowchat-2-0-wave-one.netlify.app')).toBe(false)
   })
 })
 

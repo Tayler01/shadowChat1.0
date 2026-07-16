@@ -80,6 +80,28 @@ const profiles = [
 ]
 const results = []
 
+const dismissTransientUi = async page => {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    let dismissed = false
+    for (const label of [
+      /^Skip for Now$/iu,
+      /^(Done|Got It|Later|Not now)$/iu,
+      /^(Restart Now|Update Now)$/iu,
+      /^(Close phone setup|I Finished Setup)$/iu,
+    ]) {
+      const button = page.getByRole('button', { name: label }).first()
+      if (await button.isVisible().catch(() => false)) {
+        const actionText = await button.textContent().catch(() => '')
+        await button.click({ force: true })
+        await page.waitForTimeout(/Now/iu.test(actionText ?? '') ? 1_200 : 120)
+        dismissed = true
+        break
+      }
+    }
+    if (!dismissed) return
+  }
+}
+
 for (const profile of profiles) {
   const browser = await profile.engine.launch({ headless: true })
   const context = await browser.newContext({ ...profile.device, serviceWorkers: 'block' })
@@ -109,15 +131,12 @@ for (const profile of profiles) {
 
   try {
     await page.goto(`${baseUrl}/?view=settings`, { waitUntil: 'domcontentloaded' })
-    for (let attempt = 0; attempt < 12; attempt += 1) {
-      const dismiss = page.getByRole('button', { name: /^(Skip for Now|Done|Got It|Later|Not now)$/iu }).first()
-      if (await dismiss.isVisible().catch(() => false)) await dismiss.click({ force: true })
-      await page.waitForTimeout(200)
-    }
+    await dismissTransientUi(page)
     await page.waitForTimeout(500)
     must(snapshotCalls === 0, `${profile.name} fetched Catch-Up before the surface was opened.`)
 
     await page.goto(`${baseUrl}/?view=catchup`, { waitUntil: 'domcontentloaded' })
+    await dismissTransientUi(page)
     await page.getByRole('heading', { name: 'Your Catch-Up', level: 1 }).waitFor({ timeout: 20_000 })
     await page.getByText('Source-linked / No AI').waitFor()
     await page.getByRole('button', { name: 'Refresh Catch-Up' }).waitFor()

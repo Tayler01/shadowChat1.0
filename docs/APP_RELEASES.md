@@ -88,6 +88,14 @@ refresh, and the one-minute poll remain as fallback paths.
 The app then shows the release popup to signed-in users and records per-user
 state in `public.app_release_receipts`.
 
+The isolated ShadowChat 2.0 trial must use
+`VITE_APP_DEPLOY_CONTEXT=trial`. As a fail-safe for installed PWA caches and
+mis-stamped preview metadata, the release gate is also disabled directly on
+`shadowchat-2-0-wave-one.netlify.app` and its immutable Netlify deploy
+hostnames. Production release rows target the production frontend only; a
+trial build must never loop on `Restart Now` while comparing itself with the
+production `main` build id.
+
 ## Required Secrets
 
 The production workflow needs these GitHub repository secrets:

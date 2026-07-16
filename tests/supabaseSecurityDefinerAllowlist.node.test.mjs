@@ -43,7 +43,7 @@ test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', 
   assert.match(contract.reviewed_on, /^\d{4}-\d{2}-\d{2}$/)
   assert.equal(contract.expected_total_security_definers, 125)
   assert.deepEqual(contract.anon_signatures, ['is_username_available(text)'])
-  assert.equal(contract.private_security_definers.length, 40)
+  assert.equal(contract.private_security_definers.length, 43)
   assert.equal(
     new Set(contract.private_security_definers).size,
     contract.private_security_definers.length,

@@ -27,6 +27,7 @@ beforeEach(() => {
       shadow_pin_comment_enabled: true,
       shadow_pin_reply_enabled: true,
       connection_notifications_enabled: true,
+      shado_live_in_app_enabled: true,
       presence_in_app_enabled: true,
       presence_push_enabled: true,
       presence_notification_scope: 'connections',

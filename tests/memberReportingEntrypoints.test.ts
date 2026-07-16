@@ -35,4 +35,33 @@ describe('member reporting entry points', () => {
     expect(provider).toContain("React.lazy(() =>")
     expect(provider).toContain("import('./MemberReportSheet')")
   })
+
+  test('Shado Live exposes room, participant, and message reports with self-report guards', () => {
+    const stage = source('src/features/entertainment/shado-live/real/ShadoLiveStage.tsx')
+    expect(stage).toContain("type: 'live_room'")
+    expect(stage).toContain("type: 'live_participant'")
+    expect(stage).toContain("type: 'live_message'")
+    expect(stage).toContain('Report this room')
+    expect(stage).toContain('Report message from')
+    expect(stage).toContain('participant.userId === currentUserId')
+    expect(stage).toContain('message.senderId !== currentUserId')
+    expect(stage).toContain('!isHost')
+  })
+
+  test('the Live notification bridge and operator center stay behind the real-stage flag', () => {
+    const app = source('src/App.tsx')
+    const settings = source('src/components/settings/SettingsView.tsx')
+    expect(app).toContain("lazy(() => import('./features/entertainment/shado-live/real/ShadoLiveNotificationBridge'))")
+    expect(app).toMatch(/SHADO_LIVE_REAL_ENABLED && ShadoLiveNotificationBridge/)
+    expect(settings).toContain("React.lazy(() => import('../../features/moderation/ShadoLiveCaseCenter'))")
+    expect(settings).toMatch(/SHADO_LIVE_REAL_ENABLED && ShadoLiveCaseCenter/)
+  })
+
+  test('the paused-build guard permits only the live report sheet for real Shado Live', () => {
+    const content = source('scripts/verify-paused-feature-build.mjs')
+    expect(content).toContain("feature: 'Member report sheet'")
+    expect(content).toContain("isEnabled('VITE_FEATURE_MEMBER_REPORTING') || isEnabled('VITE_FEATURE_SHADO_LIVE_REAL')")
+    expect(content).toContain("feature: 'My safety reports'")
+    expect(content).toContain('filenamePatterns: [/myreportspanel/iu]')
+  })
 })

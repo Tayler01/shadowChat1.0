@@ -48,7 +48,12 @@ import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { UserRoleBadge } from '../ui/UserRoleBadge'
 import { UserPresenceBadge } from '../ui/UserPresenceBadge'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
-import { BOARDS_FEATURE_ENABLED, ESP_ADMIN_FEATURE_ENABLED, MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
+import {
+  BOARDS_FEATURE_ENABLED,
+  ESP_ADMIN_FEATURE_ENABLED,
+  MEMBER_REPORTING_FEATURE_ENABLED,
+  SHADO_LIVE_REAL_ENABLED,
+} from '../../config/featureFlags'
 import type { AppView } from '../../types/navigation'
 import { getBrowserTimeZone } from '../../lib/push'
 import { COMFORT_RESET_EVENT } from '../../lib/comfortPreferences'
@@ -75,6 +80,10 @@ const MyReportsPanel = MEMBER_REPORTING_FEATURE_ENABLED
 const ModerationCaseCenter = React.lazy(() =>
   import('../../features/moderation/ModerationCaseCenter').then(module => ({ default: module.ModerationCaseCenter }))
 )
+
+const ShadoLiveCaseCenter = SHADO_LIVE_REAL_ENABLED
+  ? React.lazy(() => import('../../features/moderation/ShadoLiveCaseCenter'))
+  : null
 
 const AccessibilityComfortPanel = React.lazy(() =>
   import('./AccessibilityComfortPanel').then(module => ({ default: module.AccessibilityComfortPanel }))
@@ -511,6 +520,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               enabled: preferences.connection_notifications_enabled,
               onChange: (enabled: boolean) => updatePreference('connection_notifications_enabled', enabled),
             },
+            ...(SHADO_LIVE_REAL_ENABLED ? [{
+              label: 'Shado Live (in-app)',
+              description: 'Show an in-app banner for eligible Shado Live room starts, stage changes, and room endings.',
+              enabled: preferences.shado_live_in_app_enabled,
+              onChange: (enabled: boolean) => updatePreference('shado_live_in_app_enabled', enabled),
+            }] : []),
             {
               label: 'Active Users (in-app)',
               description: 'Show an in-app banner when an eligible member becomes active.',
@@ -1293,9 +1308,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   )
 
   const renderModerationCaseCenter = () => (
-    <React.Suspense fallback={<SettingsPanelLoading label="Loading safety cases..." />}>
-      <ModerationCaseCenter />
-    </React.Suspense>
+    <>
+      <React.Suspense fallback={<SettingsPanelLoading label="Loading safety cases..." />}>
+        <ModerationCaseCenter />
+      </React.Suspense>
+      {SHADO_LIVE_REAL_ENABLED && ShadoLiveCaseCenter && (
+        <React.Suspense fallback={<SettingsPanelLoading label="Loading Shado Live safety cases..." />}>
+          <ShadoLiveCaseCenter />
+        </React.Suspense>
+      )}
+    </>
   )
 
   const renderMyReports = () => (

@@ -35,19 +35,16 @@ Canonical detail and release gates live in:
 
 ### ShadowChat 2.0 Wave Three
 
-- Goal: deliver Connections, ShadowPin Feed Modes, and Inner Circles in that
-  order on `codex/shadowchat-2.0`, then prepare the gated Shado Live prototype
-  and deterministic source-linked Catch-Up track without changing production
-  `main`.
+- Goal: deliver Connections, ShadowPin Feed Modes, Inner Circles, deterministic
+  source-linked Catch-Up, and the isolated real Shado Live beta on
+  `codex/shadowchat-2.0` without changing production `main`.
 - Started: 2026-07-13
-- Status: Candidates 1-3 and the combined Wave Three regression/mobile/cleanup
-  gate are accepted. The flagged frontend-only Shado Live prototype and
-  deterministic source-linked Catch-Up implementation are complete through
-  local, shared-backend, unit, routing, and Pixel Chromium/iPhone WebKit proof,
-  then polished and reaccepted on isolated deploy
-  `6a561d93dc105334eca9a5f9`. The full live
-  system remains gated by paused Activity and member reporting, and no private
-  AI Catch-Up trial has started.
+- Status: Candidates 1-3 and the combined Wave Three gate are accepted. The
+  polished frontend-only Shado Live prototype remains preserved; its real,
+  audio-first LiveKit successor is implemented behind a separate server-gated
+  flag with dedicated safety and in-app notification paths. Deterministic
+  source-linked Catch-Up remains intact and no private AI trial has started.
+  Production `main` remains unchanged.
 - Final acceptance batch: Active Users and Weather full pages, presence-return
   notifications, unified launcher badges, exact notification/read clearing,
   ShadowPin radial/draft corrections, and composer alignment are implemented on
@@ -94,14 +91,14 @@ Canonical detail and release gates live in:
   DM Back smoke also passed after its mobile readiness selector was aligned to
   the visible message viewport and composer.
 - Shado Live contract: [SHADO_LIVE.md](C:/repos/chat2.0/docs/SHADO_LIVE.md:1)
-- Shado Live proof: compile-time default-build exclusion plus flagged lazy
-  route, unit coverage, and Pixel Chromium/iPhone WebKit routing, focus,
-  keyboard, geometry, 130% text, diagnostics, no-permission, no-network, and
-  zero-residue checks. The July 14 cleanup adds the final retro picker banner,
-  premium mobile lobby/stage treatment, normal-flow stage/panel layout,
-  keyboard-locked composer, accessible tabs/dialog/controls, and a four-profile
-  320px/Pixel/iPhone/desktop verifier. It is UI state only; the full live
-  backend is not built.
+- Shado Live proof: compile-time default-build exclusion; lazy LiveKit chunk;
+  three additive server-authority/safety/access migrations; four authenticated
+  Edge Functions; private allowlist; role-scoped audio tokens; signed webhook
+  and reconcile paths; live reporting/operator controls; foreground
+  notifications; targeted SQL/Edge/frontend tests; and Pixel Chromium/iPhone
+  WebKit host/listener routing, focus, keyboard, geometry, diagnostics, and
+  zero-residue QA. The retro picker and premium mobile layout remain from the
+  accepted July 14 prototype polish.
 - Catch-Up contract: [CATCH_UP.md](C:/repos/chat2.0/docs/CATCH_UP.md:1)
 - Catch-Up proof: linked additive migration `20260714020000`, clean migration
   parity/dry run, local and linked database lint/security, rollback-only
@@ -116,11 +113,11 @@ Canonical detail and release gates live in:
   `6a561d93dc105334eca9a5f9` serves the same artifact and repeated those gates
   with zero Shado Live media/backend residue.
 - Production `main` and the production Netlify frontend remain unchanged.
-- Remaining final-track work: RD-030 installed iPhone/Android acceptance,
-  multi-tester feedback and targeted fixes, then explicit production-merge
-  approval. The real Shado Live backend remains gated by reporting, Activity,
-  operator safety, and provider selection; the private AI Catch-Up trial has
-  not started.
+- Remaining final-track work: linked provider/backend rollout, isolated
+  Netlify proof, RD-030 installed iPhone/Android real-audio acceptance,
+  multi-tester feedback and targeted fixes, notification push follow-up, then
+  explicit production-merge approval. The private AI Catch-Up trial has not
+  started.
 
 ### ShadowChat 2.0 Wave Two
 

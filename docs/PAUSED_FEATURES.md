@@ -27,6 +27,7 @@ VITE_FEATURE_ESP_ADMIN=false
 VITE_FEATURE_ACTIVITY=false
 VITE_FEATURE_MEMBER_REPORTING=false
 VITE_FEATURE_SHADO_LIVE_PROTOTYPE=false
+VITE_FEATURE_SHADO_LIVE_REAL=false
 VITE_FEATURE_CATCH_UP=false
 ```
 
@@ -44,6 +45,9 @@ With the default production build:
   Chat, and the Activity provider performs no fetch or Realtime subscription;
 - General Chat, DM, member profile, ShadowPin post, and ShadowPin comment Report
   actions are absent, and Settings omits My Safety Reports;
+- when the isolated real Shado Live flag is enabled, only live-room,
+  participant, and live-message report entry points mount; the broader paused
+  report surfaces remain absent;
 - the operator Safety Case Center remains available so existing cases can still
   be triaged and audited;
 - News and ESP admin panel chunks are not emitted in `dist`.

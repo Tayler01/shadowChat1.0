@@ -15,6 +15,7 @@ export interface NotificationPreferences {
   shadow_pin_comment_enabled: boolean
   shadow_pin_reply_enabled: boolean
   connection_notifications_enabled: boolean
+  shado_live_in_app_enabled: boolean
   presence_in_app_enabled: boolean
   presence_push_enabled: boolean
   presence_notification_scope: 'connections' | 'all'
@@ -63,6 +64,7 @@ const DEFAULT_PREFERENCES = {
   shadow_pin_comment_enabled: true,
   shadow_pin_reply_enabled: true,
   connection_notifications_enabled: true,
+  shado_live_in_app_enabled: true,
   presence_in_app_enabled: true,
   presence_push_enabled: true,
   presence_notification_scope: 'connections' as const,
@@ -91,6 +93,7 @@ const NOTIFICATION_PREFERENCE_SELECT = [
   'shadow_pin_comment_enabled',
   'shadow_pin_reply_enabled',
   'connection_notifications_enabled',
+  'shado_live_in_app_enabled',
   'presence_in_app_enabled',
   'presence_push_enabled',
   'presence_notification_scope',

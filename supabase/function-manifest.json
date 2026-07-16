@@ -7,6 +7,10 @@
     { "name": "openai-chat", "verifyJwt": false },
     { "name": "send-push", "verifyJwt": false },
     { "name": "shado-tv-bunny-upload", "verifyJwt": true },
+    { "name": "shado-live-command", "verifyJwt": false },
+    { "name": "shado-live-provider-webhook", "verifyJwt": false },
+    { "name": "shado-live-reconcile", "verifyJwt": false },
+    { "name": "shado-live-session", "verifyJwt": false },
     { "name": "shadow-pin-import-image", "verifyJwt": true },
     { "name": "shadow-pin-video", "verifyJwt": false }
   ],

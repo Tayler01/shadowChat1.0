@@ -19,7 +19,7 @@ import { SHADOW_MYSTERY_ASSETS } from '../entertainment/shadow-mystery/assets/ma
 import { WillKirkScreen } from '../entertainment/will-kirk/WillKirkScreen'
 import { WILL_KIRK_ASSETS } from '../entertainment/will-kirk/assets/manifest'
 import { SHADO_LIVE_ASSETS } from '../entertainment/shado-live/assets/manifest'
-import { SHADO_LIVE_PROTOTYPE_ENABLED } from '../../config/featureFlags'
+import { SHADO_LIVE_PROTOTYPE_ENABLED, SHADO_LIVE_REAL_ENABLED } from '../../config/featureFlags'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import type { AppView } from '../../types/navigation'
 import type { PlayExperience, PlayRouteAction } from '../../lib/appRouting'
@@ -38,6 +38,12 @@ type SelectedEntertainment = PlayExperience | null
 const LazyShadoLivePrototype = SHADO_LIVE_PROTOTYPE_ENABLED
   ? lazy(() => import('../entertainment/shado-live/ShadoLivePrototype').then(module => ({ default: module.ShadoLivePrototype })))
   : null
+
+const LazyShadoLiveExperience = SHADO_LIVE_REAL_ENABLED
+  ? lazy(() => import('../entertainment/shado-live/real').then(module => ({ default: module.ShadoLiveExperience })))
+  : null
+
+const SHADO_LIVE_ENABLED = SHADO_LIVE_REAL_ENABLED || SHADO_LIVE_PROTOTYPE_ENABLED
 
 type ShadowRunnerOrientationLock =
   | 'any'
@@ -68,7 +74,7 @@ function readLocalPreviewEntertainment(): SelectedEntertainment {
   if (!isLocalHost) return null
 
   const localPreview = new URLSearchParams(window.location.search).get('localPreview')
-  if (localPreview === 'shadow-runner' || localPreview === 'shado-tv' || localPreview === 'shadow-mystery' || (SHADO_LIVE_PROTOTYPE_ENABLED && localPreview === 'shado-live')) {
+  if (localPreview === 'shadow-runner' || localPreview === 'shado-tv' || localPreview === 'shadow-mystery' || (SHADO_LIVE_ENABLED && localPreview === 'shado-live')) {
     return localPreview
   }
 
@@ -364,6 +370,20 @@ export function GamesHome({
         <div className="h-full min-h-0 overflow-hidden bg-black">
           <WillKirkScreen onExit={exitWillKirk} />
         </div>
+      ) : selectedEntertainment === 'shado-live' && SHADO_LIVE_REAL_ENABLED && LazyShadoLiveExperience ? (
+        <div className="h-full min-h-0 overflow-hidden bg-black">
+          <Suspense fallback={<div className="grid h-full place-items-center bg-black text-sm text-[var(--text-muted)]">Opening Shado Live...</div>}>
+            <LazyShadoLiveExperience
+              onExit={exitShadoLive}
+              initialRoomId={initialItem}
+              onRoomRoute={(action, roomId) => onPlayRoute?.(
+                action === 'open' ? 'push-item' : 'close-item',
+                'shado-live',
+                roomId,
+              )}
+            />
+          </Suspense>
+        </div>
       ) : selectedEntertainment === 'shado-live' && SHADO_LIVE_PROTOTYPE_ENABLED && LazyShadoLivePrototype ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
           <Suspense fallback={<div className="grid h-full place-items-center bg-black text-sm text-[var(--text-muted)]">Opening Shado Live preview...</div>}>
@@ -385,9 +405,9 @@ export function GamesHome({
       />
 
       <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)] md:p-6">
-        {SHADO_LIVE_PROTOTYPE_ENABLED && <button
+        {SHADO_LIVE_ENABLED && <button
           type="button"
-          aria-label="Open Shado Live prototype"
+          aria-label={SHADO_LIVE_REAL_ENABLED ? 'Open Shado Live' : 'Open Shado Live prototype'}
           onClick={enterShadoLive}
           className={pickerCardClass}
         >
@@ -403,7 +423,7 @@ export function GamesHome({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10" />
           <span className="absolute bottom-2.5 right-3 rounded-full border border-[#d7aa46]/35 bg-black/70 px-2.5 py-1 text-[0.58rem] font-semibold uppercase tracking-[0.14em] text-[#f0d381] backdrop-blur-sm md:bottom-3 md:right-4">
-            Interactive preview
+            {SHADO_LIVE_REAL_ENABLED ? 'Live audio beta' : 'Interactive preview'}
           </span>
         </button>}
 

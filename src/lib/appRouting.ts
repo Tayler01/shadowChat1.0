@@ -1,4 +1,10 @@
-import { ACTIVITY_FEATURE_ENABLED, BOARDS_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED, SHADO_LIVE_PROTOTYPE_ENABLED } from '../config/featureFlags'
+import {
+  ACTIVITY_FEATURE_ENABLED,
+  BOARDS_FEATURE_ENABLED,
+  CATCH_UP_FEATURE_ENABLED,
+  SHADO_LIVE_PROTOTYPE_ENABLED,
+  SHADO_LIVE_REAL_ENABLED,
+} from '../config/featureFlags'
 import type { AppView } from '../types/navigation'
 
 export type AppLocationState = {
@@ -107,10 +113,15 @@ const PLAY_EXPERIENCES = new Set<PlayExperience>([
   'will-kirk',
 ])
 
-const PLAY_EXPERIENCES_WITH_ITEMS = new Set<PlayExperience>(['shado-tv', 'shadow-mystery'])
+const SHADO_LIVE_ENABLED = SHADO_LIVE_REAL_ENABLED || SHADO_LIVE_PROTOTYPE_ENABLED
+const PLAY_EXPERIENCES_WITH_ITEMS = new Set<PlayExperience>([
+  'shado-tv',
+  'shadow-mystery',
+  ...(SHADO_LIVE_REAL_ENABLED ? ['shado-live' as const] : []),
+])
 
 export const normalizePlayExperience = (value: string | null): PlayExperience | null => {
-  if (SHADO_LIVE_PROTOTYPE_ENABLED && value === 'shado-live') return value
+  if (SHADO_LIVE_ENABLED && value === 'shado-live') return value
   return value && PLAY_EXPERIENCES.has(value as PlayExperience) ? value as PlayExperience : null
 }
 

@@ -5,6 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const isEnabled = (name: string) => (process.env[name] ?? env[name] ?? '').trim().toLowerCase() === 'true'
+  const shadoLiveRealEnabled = isEnabled('VITE_FEATURE_SHADO_LIVE_REAL')
 
   return {
     define: {
@@ -13,6 +14,7 @@ export default defineConfig(({ mode }) => {
       __SHADOWCHAT_ACTIVITY_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_ACTIVITY')),
       __SHADOWCHAT_MEMBER_REPORTING_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_MEMBER_REPORTING')),
       __SHADOWCHAT_SHADO_LIVE_PROTOTYPE_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_SHADO_LIVE_PROTOTYPE')),
+      __SHADOWCHAT_SHADO_LIVE_REAL_ENABLED__: JSON.stringify(shadoLiveRealEnabled),
       __SHADOWCHAT_CATCH_UP_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_CATCH_UP')),
     },
     plugins: [react()],
@@ -52,6 +54,10 @@ export default defineConfig(({ mode }) => {
 
             if (packageName === 'phaser') {
               return 'vendor-phaser'
+            }
+
+            if (shadoLiveRealEnabled && (packageName === 'livekit-client' || packageName.startsWith('@livekit/'))) {
+              return 'vendor-livekit'
             }
 
             return undefined
