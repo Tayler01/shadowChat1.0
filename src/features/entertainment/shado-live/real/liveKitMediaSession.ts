@@ -317,8 +317,8 @@ class LiveKitShadoLiveMediaSession implements ShadoLiveMediaSessionController {
     if (!room) throw new Error('Join the room before starting audio.')
     this.audioPlaybackRequested = true
     try {
-      await room.startAudio()
       for (const track of this.tracks.values()) this.attachTrack(track)
+      await room.startAudio()
       const enabled = room.canPlaybackAudio === true
       this.updateSnapshot({ audioPlaybackEnabled: enabled, audioPlaybackBlocked: !enabled, error: null })
       if (!enabled) throw new Error('Your browser still blocked room audio. Tap Start listening again.')

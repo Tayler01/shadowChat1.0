@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '../../../../hooks/useAuth'
-import { useComfortPreferences } from '../../../../hooks/useComfortPreferences'
 import { getWorkingClient } from '../../../../lib/supabase'
 import { createRealtimeChannelName } from '../../../../lib/realtimeChannelName'
 import {
@@ -83,7 +82,6 @@ export function useShadoLiveRoom({
   onRoomRoute,
 }: UseShadoLiveRoomOptions = {}): ShadoLiveRoomController {
   const { user } = useAuth()
-  const { shouldAutoplayMedia } = useComfortPreferences()
   const [rooms, setRooms] = useState<ShadoLiveRoom[]>([])
   const [room, setRoom] = useState<ShadoLiveRoom | null>(null)
   const [backendState, setBackendState] = useState<ShadoLiveBackendState>('idle')
@@ -96,6 +94,7 @@ export function useShadoLiveRoom({
   const mountedRef = useRef(true)
   const generationRef = useRef(0)
   const mediaSessionRef = useRef<ShadoLiveMediaSessionController | null>(null)
+  const audioContainerRef = useRef<HTMLDivElement | null>(null)
   const roomRef = useRef<ShadoLiveRoom | null>(null)
   const mediaRef = useRef<ShadoLiveMediaSnapshot>(initialMediaSnapshot())
   const refreshInFlightRef = useRef<Promise<ShadoLiveRoom | null> | null>(null)
@@ -204,8 +203,9 @@ export function useShadoLiveRoom({
       },
     })
     mediaSessionRef.current = mediaSession
-    await mediaSession.connect(mediaCredentials, { allowAudioPlayback: shouldAutoplayMedia })
-  }, [disconnectMedia, onRoomRoute, shouldAutoplayMedia])
+    mediaSession.setAudioContainer(audioContainerRef.current)
+    await mediaSession.connect(mediaCredentials, { allowAudioPlayback: false })
+  }, [disconnectMedia, onRoomRoute])
 
   const openSession = useCallback(async (
     action: 'create' | 'join',
@@ -342,6 +342,7 @@ export function useShadoLiveRoom({
   const endRoom = useCallback(() => runCommand('end'), [runCommand])
 
   const bindAudioContainer = useCallback((container: HTMLDivElement | null) => {
+    audioContainerRef.current = container
     mediaSessionRef.current?.setAudioContainer(container)
   }, [])
 

@@ -36,6 +36,8 @@ export interface ShadoLiveMessage {
   roomId: string
   senderId: string
   senderDisplayName: string
+  senderUsername: string | null
+  senderAvatarUrl: string | null
   body: string
   createdAt: string
   clientNonce: string | null
@@ -48,6 +50,8 @@ export interface ShadoLiveRoom {
   status: ShadoLiveRoomStatus
   hostId: string
   hostDisplayName: string
+  hostUsername: string | null
+  hostAvatarUrl: string | null
   listenerCount: number
   speakerLimit: number
   recordingEnabled: boolean
@@ -200,6 +204,10 @@ export const normalizeShadoLiveMessage = (value: unknown, fallbackRoomId?: strin
     roomId,
     senderId,
     senderDisplayName,
+    senderUsername: readNullableString(record, 'sender_username', 'senderUsername')
+      ?? readNullableString(sender, 'username'),
+    senderAvatarUrl: readNullableString(record, 'sender_avatar_url', 'senderAvatarUrl')
+      ?? readNullableString(sender, 'avatar_thumbnail_url', 'avatarThumbnailUrl', 'avatar_url', 'avatarUrl'),
     body: body.slice(0, 500),
     createdAt,
     clientNonce: readNullableString(record, 'client_nonce', 'clientNonce'),
@@ -263,6 +271,10 @@ export const normalizeShadoLiveRoom = (value: unknown): ShadoLiveRoom | null => 
     status: statusValue as ShadoLiveRoomStatus,
     hostId,
     hostDisplayName,
+    hostUsername: host ? readNullableString(host, 'username') : null,
+    hostAvatarUrl: host
+      ? readNullableString(host, 'avatar_thumbnail_url', 'avatarThumbnailUrl', 'avatar_url', 'avatarUrl')
+      : null,
     listenerCount: readCount(record, 0, 'listener_count', 'listenerCount'),
     speakerLimit: Math.max(1, readCount(record, 3, 'speaker_limit', 'speakerLimit')),
     recordingEnabled: readBoolean(record, false, 'recording_enabled', 'recordingEnabled'),

@@ -43,6 +43,8 @@ test('normalizes canonical room, participant, chat, role, and version state with
     id: 'd7fa28d4-0d4d-4a9e-bb8f-a422b57c50bf',
     version: 7,
     status: 'live',
+    hostUsername: 'tayler',
+    hostAvatarUrl: null,
     myRole: 'listener',
     myStageRequestStatus: 'none',
     listenerCount: 4,
@@ -51,8 +53,41 @@ test('normalizes canonical room, participant, chat, role, and version state with
       expect.objectContaining({ userId: 'host-1', role: 'host', participantId: 'participant-host' }),
       expect.objectContaining({ userId: 'listener-1', role: 'listener', handRaised: true }),
     ],
-    messages: [expect.objectContaining({ id: 'message-1', body: 'Welcome in.' })],
+    messages: [expect.objectContaining({
+      id: 'message-1',
+      body: 'Welcome in.',
+      senderUsername: null,
+      senderAvatarUrl: null,
+    })],
   }))
+})
+
+test('retains safe public profile media for hosts, participants, and chat identities', () => {
+  const normalized = normalizeShadoLiveRoom({
+    ...roomRow,
+    host: {
+      ...roomRow.host,
+      avatar_thumbnail_url: 'https://example.test/host-thumb.webp',
+    },
+    messages: [{
+      ...roomRow.messages[0],
+      sender: {
+        id: 'host-1',
+        display_name: 'Tayler',
+        username: 'tayler',
+        avatar_thumbnail_url: 'https://example.test/host-thumb.webp',
+      },
+    }],
+  })
+
+  expect(normalized).toMatchObject({
+    hostUsername: 'tayler',
+    hostAvatarUrl: 'https://example.test/host-thumb.webp',
+    messages: [{
+      senderUsername: 'tayler',
+      senderAvatarUrl: 'https://example.test/host-thumb.webp',
+    }],
+  })
 })
 
 test('rejects malformed room authority and live sessions without media credentials', () => {

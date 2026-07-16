@@ -382,15 +382,15 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 md:pt-6">
         <div className="mx-auto w-full max-w-4xl space-y-5">
-          <header className="relative overflow-hidden rounded-[1.75rem] border border-[rgba(215,170,70,0.3)] bg-[radial-gradient(circle_at_90%_8%,rgba(61,119,171,0.22),transparent_36%),linear-gradient(145deg,rgba(22,18,11,0.97),rgba(8,9,11,0.99))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.3)] sm:p-7">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-[0.68rem] font-semibold uppercase tracking-[0.2em] text-[var(--theme-accent-readable)]">Your weather</p>
-                <h1 className="mt-2 text-3xl font-black tracking-[-0.035em] text-[var(--text-primary)] sm:text-4xl">
+          <header className="border-b border-[var(--border-subtle)] px-1 pb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-[var(--theme-accent-readable)]">Weather</p>
+                <h1 className="mt-0.5 truncate text-xl font-bold text-[var(--text-primary)] sm:text-2xl">
                   {preference?.location_name || 'Choose a location'}
                 </h1>
                 {preference && (
-                  <p className="mt-2 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                     <MapPin className="h-3.5 w-3.5" />
                     {formatCoordinate(preference.latitude)}, {formatCoordinate(preference.longitude)}
                   </p>
@@ -398,7 +398,7 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                <div className="flex rounded-full border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.22)] p-1" aria-label="Temperature units">
+                <div className="flex rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] p-0.5" aria-label="Temperature units">
                   {(['fahrenheit', 'celsius'] as const).map(unit => (
                     <button
                       key={unit}
@@ -406,19 +406,22 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
                       onClick={() => void changeUnit(unit)}
                       disabled={!preference || saving}
                       aria-pressed={preference?.temperature_unit === unit}
-                      className={`min-h-10 min-w-10 rounded-full px-3 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] ${preference?.temperature_unit === unit ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]' : 'text-[var(--text-muted)]'}`}
+                      className={`min-h-10 min-w-10 rounded-full px-2.5 text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] ${preference?.temperature_unit === unit ? 'bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]' : 'text-[var(--text-muted)]'}`}
                     >
                       &deg;{getTemperatureUnitLabel(unit)}
                     </button>
                   ))}
                 </div>
-                <button type="button" onClick={() => void refreshAll()} disabled={!preference || loading} aria-label="Refresh weather" className="grid h-11 w-11 place-items-center rounded-full border border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-50">
+                <button type="button" onClick={() => void refreshAll()} disabled={!preference || loading} aria-label="Refresh weather" className="grid h-11 w-11 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-50">
                   <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                 </button>
               </div>
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          </header>
+
+          <section className="glass-panel rounded-[var(--radius-lg)] border border-[var(--border-panel)] p-3" aria-label="Choose weather location">
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
               <label className="relative block">
                 <span className="sr-only">Search city or postal code</span>
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
@@ -426,7 +429,7 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
                   value={query}
                   onChange={event => setQuery(event.target.value)}
                   placeholder="Search city or postal code"
-                  className="obsidian-input min-h-12 w-full rounded-full py-3 pl-10 pr-11 text-sm"
+                  className="obsidian-input min-h-12 w-full rounded-full py-3 pl-10 pr-11 text-base md:text-sm"
                 />
                 {searching && <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[var(--theme-accent-readable)]" />}
               </label>
@@ -450,7 +453,7 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
                 ))}
               </div>
             )}
-          </header>
+          </section>
 
           {savedLocations.length > 0 && (
             <section aria-labelledby="saved-weather-locations-title">

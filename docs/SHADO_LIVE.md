@@ -19,6 +19,9 @@ The accepted July 14 retro picker banner remains the real beta picker asset:
 `public/entertainment/shado-live/picker-banner.webp`. Its source dimensions,
 accessibility description, and generation prompt are recorded in
 `src/features/entertainment/shado-live/assets/manifest.ts`.
+The banner is intentionally limited to the Entertainment picker. The Live
+lobby uses the same compact, tokenized page chrome as the rest of ShadowChat
+instead of repeating a large decorative hero inside the feature.
 
 Production `main` and the production Netlify frontend remain unchanged until
 installed-phone acceptance and explicit merge approval.
@@ -35,6 +38,11 @@ The beta is an intimate, phone-first audio room:
 - room chat with canonical server persistence;
 - exact reconnecting, removed, ineligible, and room-ended states; and
 - live-room, participant, and message reporting with server-captured evidence.
+
+Room hosts, speakers, listeners, and message authors use their normal
+ShadowChat avatars. Those identity controls open the same canonical public
+profile card used elsewhere in the app; Shado Live does not create a parallel
+profile presentation.
 
 Video, recording, large public broadcasts, Inner Circle publishing, ticketing,
 replays, revenue, and creator analytics are outside this beta. Inner Circles do
@@ -174,6 +182,10 @@ badge, dedupe, block, and old-client compatibility pass extends `send-push`.
 - The existing Comfort provider remains authoritative for motion, sound,
   haptics, and autoplay comfort.
 - Media starts only after explicit room entry and authorization.
+- Audible room playback always requires the visible `Start listening` tap.
+  Remote audio elements are mounted before LiveKit consumes that user gesture,
+  and the renderer container is rebound across session creation and reconnect
+  timing so iPhone and Android do not depend on detached autoplay.
 - The real client lazy-loads `livekit-client`; the default build contains no
   LiveKit runtime chunk.
 - Camera APIs, display capture, recording, and egress are absent from the real
@@ -186,12 +198,14 @@ verification with rollback, database lint, security-definer allowlisting,
 access-mode isolation, roles, messages, stage requests, blocks, restrictions,
 notifications, provider outbox, and webhook receipts.
 
-Frontend and Edge tests cover API normalization, LiveKit media state, host and
-listener controls, reconciliation cadence, reporting, operator actions,
-notification routing/dedupe, and signed provider boundaries. The production
-build verifier runs deterministic Pixel Chromium and iPhone WebKit host and
-listener flows with mocked provider/network state, exact phone geometry,
-keyboard and safe-area checks, no camera/recording requests, and zero residue.
+Frontend and Edge tests cover API normalization, safe public avatar/profile
+projection, LiveKit media state, remote-track attachment before audio unlock,
+host and listener controls, reconciliation cadence, reporting, operator
+actions, notification routing/dedupe, and signed provider boundaries. The
+production build verifier runs deterministic Pixel Chromium and iPhone WebKit
+host and listener flows with mounted remote audio, clickable profiles, exact
+phone geometry, 16px mobile composers, keyboard and safe-area checks, no
+camera/recording requests, and zero residue.
 
 Commands:
 

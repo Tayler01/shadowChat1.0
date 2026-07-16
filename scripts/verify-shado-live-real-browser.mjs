@@ -142,8 +142,8 @@ const profile = (id, displayName, username) => ({
   id,
   username,
   display_name: displayName,
-  avatar_url: null,
-  avatar_thumbnail_url: null,
+  avatar_url: '/icons/app-icon-192.png',
+  avatar_thumbnail_url: '/icons/app-icon-192.png',
   avatar_thumbnail_path: null,
   banner_url: null,
   banner_thumbnail_url: null,
@@ -172,6 +172,13 @@ const existingHost = profile(EXISTING_HOST_ID, 'Midnight Host', 'midnight_host')
 const speakerProfile = profile(SPEAKER_ID, 'Casey Speaker', 'casey_speaker')
 const raisedProfile = profile(RAISED_LISTENER_ID, 'Jordan Raised', 'jordan_raised')
 const removableProfile = profile(REMOVABLE_LISTENER_ID, 'Riley Listener', 'riley_listener')
+const profilesById = new Map([
+  currentProfile,
+  existingHost,
+  speakerProfile,
+  raisedProfile,
+  removableProfile,
+].map(item => [item.id, item]))
 
 const makeState = () => ({
   mode: 'lobby',
@@ -361,9 +368,29 @@ export class Room {
       ['midnight-host', mediaParticipant('b1587fe8-bc9e-4fa6-b123-41be7678e303', 'Midnight Host', true)],
       ['casey-speaker', mediaParticipant('6874bb29-2cc0-4cb6-8eb2-df970131e404', 'Casey Speaker', true)]
     ]);
+    this.remoteParticipants.forEach(participant => {
+      const audioElement = document.createElement('audio');
+      audioElement.dataset.shadoLiveQaAudio = participant.identity;
+      const track = {
+        kind: 'audio',
+        attach: () => {
+          window.__shadoLiveQa.audioAttachCount += 1;
+          return audioElement;
+        },
+        detach: () => [audioElement],
+      };
+      const publication = { trackSid: 'audio-' + participant.identity, source: 'microphone', track };
+      participant.audioTrackPublications = new Map([[publication.trackSid, publication]]);
+      this.emit(RoomEvent.TrackSubscribed, track, publication, participant);
+    });
     window.__shadoLiveQa.mediaConnections.push({ url, tokenKind: isHost ? 'host' : 'listener' });
   }
-  async startAudio() { this.canPlaybackAudio = true; this.emit(RoomEvent.AudioPlaybackStatusChanged); }
+  async startAudio() {
+    window.__shadoLiveQa.audioUnlockSawMountedTrack = Boolean(document.querySelector('[data-shado-live-qa-audio]'));
+    if (!window.__shadoLiveQa.audioUnlockSawMountedTrack) throw new Error('Remote audio was not mounted before unlock.');
+    this.canPlaybackAudio = true;
+    this.emit(RoomEvent.AudioPlaybackStatusChanged);
+  }
   async disconnect() { window.__shadoLiveQa.mediaActions.push({ type: 'disconnect' }); }
 }
 window.__shadoLiveLiveKit.trigger = event => window.__shadoLiveLiveKit.rooms.at(-1)?.emit(event);
@@ -402,7 +429,8 @@ const installInitMocks = async (context, session) => {
     }))
     window.__shadoLiveQa = {
       userId, mediaCalls: [], mediaActions: [], mediaConnections: [], recordingCalls: 0,
-      displayCaptureCalls: 0, socketMessages: [],
+      displayCaptureCalls: 0, socketMessages: [], audioAttachCount: 0,
+      audioUnlockSawMountedTrack: false,
     }
     window.__shadoLiveLiveKit = { rooms: [], trigger: () => undefined }
 
@@ -558,7 +586,9 @@ const installNetworkMocks = async (context, state, session) => {
     }
     if (url.pathname === '/rest/v1/users') {
       const wantsObject = String(request.headers().accept || '').includes('application/vnd.pgrst.object')
-      await fulfillJson(route, wantsObject ? currentProfile : [currentProfile], 200, { 'content-range': '0-0/1' })
+      const requestedId = url.searchParams.get('id')?.replace(/^eq\./u, '')
+      const requestedProfile = profilesById.get(requestedId) ?? currentProfile
+      await fulfillJson(route, wantsObject ? requestedProfile : [requestedProfile], 200, { 'content-range': '0-0/1' })
       return
     }
     if (url.pathname.startsWith('/rest/v1/rpc/')) {
@@ -715,6 +745,7 @@ const assertKeyboardGeometry = async (page, profile) => {
     const input = document.querySelector('textarea')?.getBoundingClientRect()
     return {
       composerBottom: input?.bottom ?? Infinity,
+      composerFontSize: input ? Number.parseFloat(getComputedStyle(input).fontSize) : 0,
       keyboardTop: innerHeight - value,
       visualOpacity: getComputedStyle(document.querySelector('.shado-live-stage-visual')).opacity,
       dockOpacity: getComputedStyle(document.querySelector('.shado-live-control-dock')).opacity,
@@ -723,6 +754,7 @@ const assertKeyboardGeometry = async (page, profile) => {
     }
   }, inset)
   must(geometry.keyboardState === 'open', `${profile.name} keyboard state was reset during the simulation: ${JSON.stringify(geometry)}`)
+  must(geometry.composerFontSize >= 16, `${profile.name} live composer can trigger mobile page zoom: ${JSON.stringify(geometry)}`)
   must(geometry.visualOpacity === '0' && geometry.dockOpacity === '0', `${profile.name} did not collapse stage chrome for the simulated keyboard: ${JSON.stringify(geometry)}`)
   must(geometry.composerBottom <= geometry.keyboardTop + 1, `${profile.name} composer is behind the simulated keyboard: ${JSON.stringify(geometry)}`)
   await page.screenshot({ path: path.join(artifactDir, `${profile.name}-keyboard.png`), fullPage: true })
@@ -758,6 +790,10 @@ const runProfile = async profile => {
     await page.getByRole('heading', { name: 'Shado Live', level: 1 }).waitFor({ timeout: DEFAULT_TIMEOUT })
     must(new URL(page.url()).searchParams.get('experience') === 'shado-live', `${profile.name} did not preserve the real Shado Live route.`)
     await page.getByRole('heading', { name: 'Midnight Signals' }).waitFor()
+    await page.getByRole('img', { name: 'Midnight Host' }).waitFor()
+    await page.getByRole('button', { name: "Open Midnight Host's profile" }).click()
+    await page.getByRole('dialog').waitFor()
+    await page.getByRole('button', { name: /close profile/i }).click()
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}-lobby.png`), fullPage: true })
 
     await page.getByRole('button', { name: 'Join as listener' }).click()
@@ -768,6 +804,8 @@ const runProfile = async profile => {
     await page.getByRole('textbox', { name: 'Message the live room' }).fill(`Listener ${profile.name} message`)
     await page.getByRole('button', { name: 'Send live room message' }).click()
     await page.getByText(`Listener ${profile.name} message`).waitFor()
+    await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === null
+      && document.activeElement?.tagName === 'TEXTAREA')
     await page.getByRole('button', { name: 'Raise hand' }).click()
     await page.getByRole('button', { name: 'Lower hand' }).waitFor()
     const listenerGeometry = await assertStageGeometry(page, `${profile.name} listener`)
@@ -810,6 +848,8 @@ const runProfile = async profile => {
     const mediaAudit = await page.evaluate(() => window.__shadoLiveQa)
     must(mediaAudit.displayCaptureCalls === 0, `${profile.name} requested display/camera capture.`)
     must(mediaAudit.recordingCalls === 0, `${profile.name} constructed MediaRecorder.`)
+    must(mediaAudit.audioAttachCount > 0, `${profile.name} never attached a remote audio track.`)
+    must(mediaAudit.audioUnlockSawMountedTrack === true, `${profile.name} unlocked audio before mounting remote tracks.`)
     must(mediaAudit.mediaCalls.every(call => !call?.video && !call?.display), `${profile.name} requested video or display media.`)
     must(state.reconcileRequests.length >= 2, `${profile.name} did not reconcile both active room sessions.`)
     must(state.reconcileRequests.every(item => /^[0-9a-f-]{36}$/iu.test(item.request_id)), `${profile.name} reconciliation omitted UUID request ids.`)

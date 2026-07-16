@@ -1,5 +1,6 @@
 import { FormEvent, RefObject, useState } from 'react'
 import { Headphones, Loader2, Plus, Radio, RefreshCw, ShieldCheck, Users } from 'lucide-react'
+import { Avatar } from '../../../../components/ui/Avatar'
 import type { ShadoLiveBackendState, ShadoLiveRoom } from './shadoLiveModel'
 
 export interface ShadoLiveLobbyProps {
@@ -10,6 +11,7 @@ export interface ShadoLiveLobbyProps {
   onCreate: (title: string) => Promise<void>
   onJoin: (roomId: string) => Promise<void>
   onRefresh: () => Promise<void>
+  onOpenProfile: (userId: string) => void
 }
 
 const statusLabel = (room: ShadoLiveRoom) => {
@@ -28,6 +30,7 @@ export function ShadoLiveLobby({
   onCreate,
   onJoin,
   onRefresh,
+  onOpenProfile,
 }: ShadoLiveLobbyProps) {
   const [title, setTitle] = useState('')
   const [creating, setCreating] = useState(false)
@@ -56,19 +59,19 @@ export function ShadoLiveLobby({
   }
 
   return (
-    <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-3 sm:px-6 sm:pt-5">
-      <section className="rounded-[1.75rem] border border-[rgba(215,170,70,0.32)] bg-[linear-gradient(145deg,rgba(215,170,70,0.12),rgba(8,7,6,0.96)_48%)] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.45)] sm:p-6" aria-labelledby="shado-live-real-title">
-        <div className="flex items-start gap-4">
-          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-[#d7aa46]/45 bg-black/45 text-[#f0d381]">
-            <Radio className="h-6 w-6" aria-hidden="true" />
+    <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-y-auto overscroll-contain px-4 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-3 sm:px-6 sm:pt-5">
+      <header className="border-b border-[var(--border-subtle)] px-1 pb-4" aria-labelledby="shado-live-real-title">
+        <div className="flex items-start gap-3">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--theme-accent-readable)]">
+            <Radio className="h-5 w-5" aria-hidden="true" />
           </span>
           <div className="min-w-0">
-            <p className="text-[0.66rem] font-semibold uppercase tracking-[0.18em] text-[#d7aa46]">Audio-first Connections rooms</p>
-            <h1 id="shado-live-real-title" className="mt-1 text-2xl font-bold text-white">Shado Live</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">Listen without microphone access. Hosts explicitly invite speakers, and every role change is confirmed by the room server.</p>
+            <p className="text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-[var(--theme-accent-readable)]">Audio-first rooms</p>
+            <h1 id="shado-live-real-title" className="mt-0.5 text-xl font-bold text-[var(--text-primary)]">Shado Live</h1>
+            <p className="mt-1 max-w-2xl text-sm leading-5 text-[var(--text-muted)]">Listen freely. Hosts invite speakers, and room changes stay server confirmed.</p>
           </div>
         </div>
-      </section>
+      </header>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
         <section aria-labelledby="available-live-rooms" className="min-w-0">
@@ -107,10 +110,24 @@ export function ShadoLiveLobby({
               return (
                 <article key={room.id} className={`rounded-[1.5rem] border bg-[var(--bg-panel)] p-4 shadow-[var(--shadow-panel)] ${highlighted ? 'border-[#d7aa46]/60' : 'border-[var(--border-panel)]'}`}>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <p className="text-[0.64rem] font-semibold uppercase tracking-[0.15em] text-[#d7aa46]">{statusLabel(room)}</p>
                       <h3 className="mt-1 truncate text-lg font-bold text-white">{room.title}</h3>
-                      <p className="mt-1 text-xs text-[var(--text-muted)]">Hosted by {room.hostDisplayName}</p>
+                      <button
+                        type="button"
+                        onClick={() => onOpenProfile(room.hostId)}
+                        className="mt-2 inline-flex min-h-9 max-w-full items-center gap-2 rounded-full pr-2 text-left text-xs text-[var(--text-muted)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]"
+                        aria-label={`Open ${room.hostDisplayName}'s profile`}
+                      >
+                        <Avatar
+                          src={room.hostAvatarUrl || undefined}
+                          alt={room.hostDisplayName}
+                          fallback={room.hostDisplayName}
+                          userId={room.hostId}
+                          size="sm"
+                        />
+                        <span className="truncate">Hosted by {room.hostDisplayName}</span>
+                      </button>
                     </div>
                     <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-xs text-[#c9c3b7]">
                       <Users className="h-3.5 w-3.5" aria-hidden="true" /> {room.listenerCount}
@@ -151,7 +168,7 @@ export function ShadoLiveLobby({
                 onChange={event => setTitle(event.target.value)}
                 maxLength={100}
                 placeholder="The Midnight Room"
-                className="mt-2 min-h-12 w-full rounded-2xl border border-white/10 bg-black/30 px-4 text-sm text-white outline-none placeholder:text-[#777168] focus:border-[#d7aa46]/60 focus:ring-2 focus:ring-[#d7aa46]/20"
+                className="mt-2 min-h-12 w-full rounded-2xl border border-white/10 bg-black/30 px-4 text-base text-white outline-none placeholder:text-[#777168] focus:border-[#d7aa46]/60 focus:ring-2 focus:ring-[#d7aa46]/20 md:text-sm"
               />
             </label>
             <button

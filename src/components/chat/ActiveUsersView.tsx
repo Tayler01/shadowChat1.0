@@ -81,18 +81,18 @@ export function ActiveUsersView({ currentView, onViewChange }: ActiveUsersViewPr
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 md:pt-6">
         <div className="mx-auto w-full max-w-3xl">
-          <header className="relative overflow-hidden rounded-[1.75rem] border border-[rgba(215,170,70,0.3)] bg-[radial-gradient(circle_at_88%_12%,rgba(34,197,94,0.12),transparent_30%),linear-gradient(145deg,rgba(22,18,11,0.96),rgba(8,8,8,0.98))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.3)] sm:p-7">
-            <div className="flex items-start justify-between gap-4">
+          <header className="border-b border-[var(--border-subtle)] px-1 pb-4">
+            <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <span className="inline-flex min-h-7 items-center gap-2 rounded-full border border-[rgba(34,197,94,0.28)] bg-[rgba(34,197,94,0.08)] px-3 text-[0.64rem] font-semibold uppercase tracking-[0.15em] text-[#9aefb5]">
+                <span className="inline-flex items-center gap-2 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-[#9aefb5]">
                   <span className="h-2 w-2 rounded-full bg-[#22c55e] shadow-[0_0_10px_rgba(34,197,94,0.8)]" aria-hidden="true" />
                   Live presence
                 </span>
-                <h1 className="mt-4 text-3xl font-black tracking-[-0.035em] text-[var(--text-primary)] sm:text-4xl">
+                <h1 className="mt-0.5 text-xl font-bold text-[var(--text-primary)] sm:text-2xl">
                   Active now
                 </h1>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
-                  See who is around, open a profile, or make a connection without leaving the live list.
+                <p className="mt-1 max-w-xl text-sm leading-5 text-[var(--text-muted)]">
+                  <span className="font-semibold text-[var(--text-secondary)]">{activeUsers.length}</span> {activeUsers.length === 1 ? 'person is' : 'people are'} active. Open a profile or connect from the list.
                 </p>
               </div>
 
@@ -102,17 +102,10 @@ export function ActiveUsersView({ currentView, onViewChange }: ActiveUsersViewPr
                 disabled={refreshing}
                 aria-label="Refresh active users"
                 aria-busy={refreshing}
-                className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)] transition-colors hover:bg-[rgba(215,170,70,0.14)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-55"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--theme-accent-readable)] transition-colors hover:border-[var(--border-glow)] hover:bg-[var(--theme-accent-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-55"
               >
-                <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
               </button>
-            </div>
-
-            <div className="mt-5 flex items-end gap-3">
-              <span className="text-5xl font-black leading-none text-[var(--text-primary)]">{activeUsers.length}</span>
-              <span className="pb-1 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-                {activeUsers.length === 1 ? 'person active' : 'people active'}
-              </span>
             </div>
           </header>
 
@@ -124,7 +117,7 @@ export function ActiveUsersView({ currentView, onViewChange }: ActiveUsersViewPr
             </div>
           )}
 
-          <section className="mt-5" aria-labelledby="active-users-list-title">
+          <section className="mt-4" aria-labelledby="active-users-list-title">
             <div className="mb-3 flex items-center justify-between gap-3 px-1">
               <h2 id="active-users-list-title" className="text-lg font-bold text-[var(--text-primary)]">People online</h2>
               <span className="text-xs text-[var(--text-muted)]">Updates live</span>

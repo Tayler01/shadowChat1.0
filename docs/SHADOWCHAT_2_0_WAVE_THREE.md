@@ -284,6 +284,28 @@ explicitly excluded from v1.
   evidence are completed only after the shared-backend and isolated-Netlify
   release steps succeed.
 
+## New-Surface And Shado Live Refinement - July 16, 2026
+
+- Weather, Active Users, and the real Shado Live lobby no longer repeat the
+  oversized rounded gradient hero treatment. Their page identity and actions
+  now use compact, tokenized chrome consistent with the rest of the phone app;
+  the custom retro Shado Live artwork remains reserved for the Entertainment
+  picker.
+- Shado Live retains the safe public avatar and username already returned by
+  the canonical room snapshot. Hosts, stage members, room participants, and
+  message authors now render normal ShadowChat avatars and open the canonical
+  public profile card.
+- Live room inputs stay at a 16px phone font size, the composer retains focus
+  while sending, and chat scrolling is confined to its panel instead of using
+  page-level `scrollIntoView`.
+- Remote LiveKit tracks are attached to the mounted audio renderer before the
+  explicit `Start listening` unlock call. The renderer node is retained across
+  session timing, and audible Live playback no longer relies on generic media
+  autoplay.
+- Physical two-device iPhone/Android microphone, speaker routing,
+  Bluetooth/headphone, lock/resume, and weak-network validation remains
+  required before production approval.
+
 ## Final-Track Polish - July 14, 2026
 
 - Shado Live now has a custom crop-safe retro picker banner and a cohesive
