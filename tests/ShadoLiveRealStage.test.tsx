@@ -96,8 +96,9 @@ test('chat clears only after the persistent server command resolves', async () =
   expect(value.sendMessage).toHaveBeenCalledWith('Persist this')
   expect(composer).toHaveValue('Persist this')
 
+  fireEvent.change(composer, { target: { value: 'Next message' } })
   confirmMessage()
-  await waitFor(() => expect(composer).toHaveValue(''))
+  await waitFor(() => expect(composer).toHaveValue('Next message'))
 })
 
 test('renders real profile images and opens profiles from stage, chat, and room identities', () => {

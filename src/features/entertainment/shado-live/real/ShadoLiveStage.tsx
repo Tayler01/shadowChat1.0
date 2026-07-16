@@ -139,7 +139,7 @@ export function ShadoLiveStage({
     composerRef.current?.focus({ preventScroll: true })
     try {
       await controller.sendMessage(body)
-      setDraft('')
+      setDraft(current => current.trim() === body ? '' : current)
     } catch {
       // The hook exposes the authoritative failure; retain the draft for retry.
     }
@@ -150,6 +150,7 @@ export function ShadoLiveStage({
   const canUseMicrophone = canPublishShadoLiveMicrophone(room.myRole)
   const microphoneReady = (controller.controlsEnabled || controller.startEnabled) && media.microphoneAllowed
   const handRaised = room.myStageRequestStatus === 'raised'
+  const composerEnabled = controller.controlsEnabled || controller.commandBusy === 'send_message'
 
   return (
     <div className="flex h-[var(--shadowchat-app-height,var(--shadowchat-visual-viewport-height,100dvh))] min-h-0 w-full flex-1 touch-manipulation flex-col overflow-hidden bg-[var(--bg-app)] pb-[var(--shadowchat-mobile-scroll-keyboard-inset,0px)]" data-testid="shado-live-real-stage">
@@ -444,7 +445,7 @@ export function ShadoLiveStage({
 
           {panel === 'chat' && (
             <form onSubmit={submitMessage} className="flex shrink-0 items-end gap-2 border-t border-[var(--border-panel)] bg-[var(--bg-panel-strong)] p-2.5 sm:p-3" data-testid="shado-live-real-composer">
-              <label className="min-w-0 flex-1"><span className="sr-only">Message the live room</span><textarea ref={composerRef} value={draft} onChange={event => setDraft(event.target.value)} disabled={!controller.controlsEnabled} maxLength={500} rows={1} placeholder={controller.controlsEnabled ? 'Message the room' : 'Chat locked while room state syncs'} className="max-h-24 min-h-12 w-full resize-none rounded-2xl border border-[var(--border-subtle)] bg-white/[0.04] px-4 py-3 text-base text-white outline-none placeholder:text-[#777168] focus:border-[#d7aa46]/60 focus:ring-2 focus:ring-[#d7aa46]/20 disabled:opacity-55 md:text-sm" /></label>
+              <label className="min-w-0 flex-1"><span className="sr-only">Message the live room</span><textarea ref={composerRef} value={draft} onChange={event => setDraft(event.target.value)} disabled={!composerEnabled} maxLength={500} rows={1} placeholder={composerEnabled ? 'Message the room' : 'Chat locked while room state syncs'} className="max-h-24 min-h-12 w-full resize-none rounded-2xl border border-[var(--border-subtle)] bg-white/[0.04] px-4 py-3 text-base text-white outline-none placeholder:text-[#777168] focus:border-[#d7aa46]/60 focus:ring-2 focus:ring-[#d7aa46]/20 disabled:opacity-55 md:text-sm" /></label>
               <button
                 type="submit"
                 disabled={!controller.controlsEnabled || !draft.trim() || controller.commandBusy === 'send_message'}
