@@ -3,7 +3,7 @@ import { PinOff, Plus } from 'lucide-react'
 import { Button } from '../ui/Button'
 import type { Message } from '../../lib/supabase'
 import type { EmojiClickData } from '../../types'
-import { MessageReactions } from './MessageItem'
+import { MessageReactions } from './MessageReactions'
 import { MessageHypeBadge } from './MessageHypeBadge'
 import { VideoAttachment } from './VideoAttachment'
 import { FileAttachment } from './FileAttachment'
@@ -17,6 +17,7 @@ import { MessageRichText } from './MessageRichText'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { getImageMessageDisplaySrc } from './messageDisplay'
 import { getHypeTier } from '../../lib/hypePresentation'
+import { useAuth } from '../../hooks/useAuth'
 
 const QUICK_REACTIONS = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']
 
@@ -31,6 +32,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   onUnpin,
   onToggleReaction,
 }) => {
+  const { profile, user } = useAuth()
   const [showPicker, setShowPicker] = useState(false)
   const hypeCount = message.hype_count ?? 0
   const hypeTier = getHypeTier(hypeCount)
@@ -64,6 +66,7 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
         <MessageHypeBadge count={hypeCount} users={message.hype_users ?? []} className="float-right ml-2" />
         <MessageReactions
           message={message}
+          currentUserId={profile?.id ?? user?.id}
           onReact={handleReaction}
           className="text-[0.65rem]"
         />

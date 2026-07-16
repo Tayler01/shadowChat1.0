@@ -5,6 +5,7 @@ import {
   listMyShadoLiveRooms,
   openShadoLiveSession,
   sendShadoLiveCommand,
+  toggleMyShadoLiveMessageReaction,
 } from '../src/features/entertainment/shado-live/real/shadoLiveApi'
 import { createLiveKitMediaSession } from '../src/features/entertainment/shado-live/real/liveKitMediaSession'
 import type { ShadoLiveRoom } from '../src/features/entertainment/shado-live/real/shadoLiveModel'
@@ -41,6 +42,7 @@ jest.mock('../src/features/entertainment/shado-live/real/shadoLiveApi', () => ({
   openShadoLiveSession: jest.fn(),
   reconcileShadoLive: jest.fn(async () => ({ ok: true })),
   sendShadoLiveCommand: jest.fn(),
+  toggleMyShadoLiveMessageReaction: jest.fn(),
 }))
 
 jest.mock('../src/features/entertainment/shado-live/real/liveKitMediaSession', () => ({
@@ -76,6 +78,7 @@ const mockListRooms = listMyShadoLiveRooms as jest.MockedFunction<typeof listMyS
 const mockOpenSession = openShadoLiveSession as jest.MockedFunction<typeof openShadoLiveSession>
 const mockGetRoom = getMyShadoLiveRoom as jest.MockedFunction<typeof getMyShadoLiveRoom>
 const mockSendCommand = sendShadoLiveCommand as jest.MockedFunction<typeof sendShadoLiveCommand>
+const mockToggleReaction = toggleMyShadoLiveMessageReaction as jest.MockedFunction<typeof toggleMyShadoLiveMessageReaction>
 const mockCreateMedia = createLiveKitMediaSession as jest.MockedFunction<typeof createLiveKitMediaSession>
 
 beforeEach(() => {
@@ -92,6 +95,7 @@ beforeEach(() => {
     },
   })
   mockSendCommand.mockResolvedValue({ ...room, version: 4 })
+  mockToggleReaction.mockResolvedValue(true)
   mockCreateMedia.mockImplementation(callbacks => {
     const snapshot = {
       state: 'connected' as const,
@@ -133,4 +137,16 @@ test('keeps authoritative controls available when Realtime times out but the can
     action: 'send_message',
     roomId: '10000000-0000-4000-8000-000000000001',
   }))
+
+  await act(async () => {
+    await result.current.toggleMessageReaction(
+      '20000000-0000-4000-8000-000000000001',
+      '👍'
+    )
+  })
+  expect(mockToggleReaction).toHaveBeenCalledWith(
+    '20000000-0000-4000-8000-000000000001',
+    '👍'
+  )
+  expect(mockGetRoom).toHaveBeenCalled()
 })

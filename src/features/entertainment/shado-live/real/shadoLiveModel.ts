@@ -41,6 +41,12 @@ export interface ShadoLiveMessage {
   body: string
   createdAt: string
   clientNonce: string | null
+  reactions: Record<string, ShadoLiveMessageReactionSummary>
+}
+
+export interface ShadoLiveMessageReactionSummary {
+  count: number
+  reactedByCurrentUser: boolean
 }
 
 export interface ShadoLiveRoom {
@@ -211,6 +217,7 @@ export const normalizeShadoLiveMessage = (value: unknown, fallbackRoomId?: strin
     body: body.slice(0, 500),
     createdAt,
     clientNonce: readNullableString(record, 'client_nonce', 'clientNonce'),
+    reactions: {},
   }
 }
 

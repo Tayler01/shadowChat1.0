@@ -12,6 +12,7 @@ import {
   fetchGeneralChatThreadedWindow,
   fetchGeneralChatThreadSummaries,
   isGeneralChatThreadRpcUnavailable,
+  resolveGeneralChatThreadId,
   ensureSession,
   refreshSessionLocked,
   getRealtimeClient,
@@ -1170,6 +1171,18 @@ function useProvideMessages(): MessagesContextValue {
 
     let disposed = false;
     const subscriptionManager = subscriptionRef.current;
+    const refreshSummaryForReply = async (message: Message) => {
+      if (!message.reply_to || disposed) return
+
+      const directRootId = latestMessagesRef.current.some(candidate => (
+        !candidate.reply_to && candidate.id === message.reply_to
+      ))
+        ? message.reply_to
+        : null
+      const canonicalThreadId = await resolveGeneralChatThreadId(message.id).catch(() => directRootId)
+      if (!canonicalThreadId || disposed) return
+      await refreshThreadSummaries([canonicalThreadId])
+    }
 
     const subscribeToChannel = async () => {
       let currentClient = await getWorkingClient().catch(() => getRealtimeClient());
@@ -1206,7 +1219,9 @@ function useProvideMessages(): MessagesContextValue {
             if (disposed) return;
 
             if (newMessage) {
-              addNewMessage(newMessage as unknown as Message)
+              const normalizedMessage = newMessage as unknown as Message
+              addNewMessage(normalizedMessage)
+              void refreshSummaryForReply(normalizedMessage).catch(() => undefined)
             }
           } catch {
             // ignore realtime fetch errors and wait for the next refresh
@@ -1216,6 +1231,7 @@ function useProvideMessages(): MessagesContextValue {
           const newMessage = payload.payload as Message;
 
           addNewMessage(newMessage as Message)
+          void refreshSummaryForReply(newMessage).catch(() => undefined)
         })
         .on(
           'postgres_changes',

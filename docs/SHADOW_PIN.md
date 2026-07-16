@@ -42,6 +42,7 @@ Short video planning and rollout details live in
 Migration: `supabase/migrations/20260512203054_shadow_pin_domain.sql`
 Score migration: `supabase/migrations/20260519020527_shadow_pin_hidden_score_gold_pin.sql`
 Social/search migration: `supabase/migrations/20260710044050_shadow_pin_social_search.sql`
+Comment reactions migration: `supabase/migrations/20260716213000_shadow_pin_comment_reactions.sql`
 Notification Realtime publication: `supabase/migrations/20260710044500_publish_notification_events_realtime.sql`
 Engagement hardening: `supabase/migrations/20260710044600_personal_blocking_engagement_hardening.sql`
 
@@ -66,6 +67,9 @@ Engagement hardening: `supabase/migrations/20260710044600_personal_blocking_enga
 - `shadow_pin_comments`: comment and parent-reply rows with 1-1000 character
   bodies, author edit rights, author/operator delete rights, and same-pin parent
   validation.
+- `shadow_pin_comment_reactions`: member-owned emoji reactions with one row per
+  comment/member/emoji. Reads inherit the visible-comment and reciprocal-block
+  contract; the security-invoker toggle RPC keeps add/remove behavior atomic.
 - `shadow_pin_images.comment_count`: trigger-maintained comment count.
 - `notification_preferences.shadow_pin_new_post_enabled`,
   `shadow_pin_comment_enabled`, and `shadow_pin_reply_enabled`: independent
@@ -148,6 +152,12 @@ Database checks keep replies on the same pin, reject replies to replies and
 blocked reply targets, and maintain the pin's comment count after
 insert/delete. Deleting a root leaves its replies on the pin as roots through
 `ON DELETE SET NULL`; the dialog mirrors that promotion immediately.
+
+The comment UI follows the same compact text-message language as General Chat:
+author identity and time sit above a content-sized bubble, quick reactions open
+from a deliberate tap without firing during scroll, and Copy, Reply, Add
+Reaction, Edit, Delete, and the feature-gated Report action live in the shared
+three-dot context menu rather than an always-visible action row.
 
 Tags must finish a transaction attached to a pin. Deleting the last pin/tag
 link removes the orphan tag, preventing direct tag-table spam.

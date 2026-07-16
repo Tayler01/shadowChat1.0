@@ -545,6 +545,34 @@ test('Inner Circle filter stays scoped, explains its empty state, and can return
   expect(onCircleChange).toHaveBeenCalledWith(null)
 })
 
+test('Connections filter refreshes its private circles and routes empty setup to the Inner Circles hub', () => {
+  const refreshCircles = jest.fn()
+  mockUseShadowPinFeedMode.mockReturnValue({
+    mode: 'connections',
+    loading: false,
+    saveError: null,
+    selectMode: jest.fn(),
+    retrySave: jest.fn(),
+  })
+  mockUseInnerCircles.mockReturnValue({
+    circles: [],
+    loading: false,
+    error: null,
+    refresh: refreshCircles,
+  })
+
+  render(<ShadowPin initialFeedMode="connections" />)
+
+  fireEvent.click(screen.getByTestId('shadow-pin-circle-filter-trigger'))
+  expect(refreshCircles).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: 'Create an Inner Circle' }))
+
+  expect(window.location.search).toContain('view=dms')
+  expect(window.location.search).toContain('panel=connections')
+  expect(window.location.search).toContain('section=circles')
+  expect(window.location.search).not.toContain('feed=connections')
+})
+
 test('shows an exploding heart burst when liking a ShadowPin category', async () => {
   await act(async () => {
     render(<ShadowPin onBack={() => {}} />)

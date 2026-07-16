@@ -111,7 +111,13 @@ export interface ShadowPinComment {
   created_at: string
   updated_at: string
   author?: User | null
+  reactions?: ShadowPinCommentReactionSummary
 }
+
+export type ShadowPinCommentReactionSummary = Record<string, {
+  count: number
+  users: string[]
+}>
 
 export interface ShadowPinNotificationPreferences {
   shadow_pin_new_post_enabled: boolean

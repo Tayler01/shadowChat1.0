@@ -24,6 +24,7 @@ const room = (role: ShadoLiveRoom['myRole']): ShadoLiveRoom => ({
     body: 'Welcome in.',
     createdAt: '2026-07-15T20:00:30Z',
     clientNonce: null,
+    reactions: {},
   }],
 })
 
@@ -43,6 +44,7 @@ const controller = (role: ShadoLiveRoom['myRole']): ShadoLiveRoomController => (
   leaveRoom: jest.fn().mockResolvedValue(undefined), returnToLobby: jest.fn().mockResolvedValue(undefined),
   startAudio: jest.fn().mockResolvedValue(undefined), toggleMicrophone: jest.fn().mockResolvedValue(undefined),
   toggleHand: jest.fn().mockResolvedValue(undefined), sendMessage: jest.fn().mockResolvedValue(undefined),
+  toggleMessageReaction: jest.fn().mockResolvedValue(undefined),
   startRoom: jest.fn().mockResolvedValue(undefined),
   promote: jest.fn().mockResolvedValue(undefined), demote: jest.fn().mockResolvedValue(undefined),
   mute: jest.fn().mockResolvedValue(undefined), remove: jest.fn().mockResolvedValue(undefined),
@@ -116,6 +118,34 @@ test('renders real profile images and opens profiles from stage, chat, and room 
   fireEvent.click(screen.getByRole('tab', { name: 'Room' }))
   fireEvent.click(screen.getByRole('button', { name: "Open Jordan's profile" }))
   expect(openProfile).toHaveBeenCalledWith('listener-1')
+})
+
+test('live chat uses the shared message menu and persistent quick reactions', async () => {
+  const value = controller('listener')
+  render(<ShadoLiveStage controller={value} currentUserId="listener-1" onOpenProfile={jest.fn()} />)
+
+  const messageText = screen.getByText('Welcome in.')
+  fireEvent.pointerDown(messageText, { pointerId: 1, button: 0, clientX: 20, clientY: 20 })
+  fireEvent.pointerUp(messageText, { pointerId: 1, button: 0, clientX: 20, clientY: 20 })
+  fireEvent.click(await screen.findByRole('button', { name: 'React with 👍' }))
+  await waitFor(() => expect(value.toggleMessageReaction).toHaveBeenCalledWith('message-1', '👍'))
+
+  fireEvent.click(screen.getByRole('button', { name: 'Message actions for Tayler' }))
+  expect(await screen.findByRole('menuitem', { name: 'Copy' })).toBeInTheDocument()
+  expect(screen.getByRole('menuitem', { name: 'Add Reaction' })).toBeInTheDocument()
+  expect(screen.getByRole('menuitem', { name: 'Report message' })).toBeInTheDocument()
+})
+
+test('scroll movement does not open the live quick-reaction rail', () => {
+  const value = controller('listener')
+  render(<ShadoLiveStage controller={value} currentUserId="listener-1" onOpenProfile={jest.fn()} />)
+
+  const messageText = screen.getByText('Welcome in.')
+  fireEvent.pointerDown(messageText, { pointerId: 2, button: 0, clientX: 20, clientY: 20 })
+  fireEvent.pointerMove(messageText, { pointerId: 2, clientX: 20, clientY: 42 })
+  fireEvent.pointerUp(messageText, { pointerId: 2, button: 0, clientX: 20, clientY: 42 })
+
+  expect(screen.queryByRole('toolbar', { name: 'Quick reactions' })).not.toBeInTheDocument()
 })
 
 test('does not repeat the active host in the secondary stage avatar list', () => {

@@ -7,6 +7,14 @@ const keyFor = (userId: string) => `${PREFIX}:${userId}`
 export const saveCreatorLocalDraft = (userId: string, state: ShadowPinCreatorState) => {
   if (!userId || typeof window === 'undefined') return
   try {
+    if (
+      state.operation === 'published' ||
+      state.draft?.state === 'published' ||
+      state.draft?.state === 'abandoned'
+    ) {
+      window.localStorage.removeItem(keyFor(userId))
+      return
+    }
     window.localStorage.setItem(keyFor(userId), JSON.stringify(serializeCreatorLocalDraft(state)))
   } catch {
     // The owner-private server draft remains authoritative when device storage

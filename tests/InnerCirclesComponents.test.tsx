@@ -215,4 +215,57 @@ describe('Inner Circles controlled UI primitives', () => {
     expect(all).toHaveFocus()
     expect(all).toHaveAttribute('aria-checked', 'true')
   })
+
+  test('ShadowPin filter distinguishes refresh, failure, and the no-circle setup path', () => {
+    const onRetry = jest.fn()
+    const onManage = jest.fn()
+    const { rerender } = render(
+      <ShadowPinCircleFilterSheet
+        open
+        circles={[]}
+        loading
+        selectedCircleId={null}
+        onSelect={jest.fn()}
+        onRetry={onRetry}
+        onManage={onManage}
+        onClose={jest.fn()}
+      />
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent('Refreshing Inner Circles')
+    expect(screen.queryByRole('button', { name: 'Create an Inner Circle' })).not.toBeInTheDocument()
+
+    rerender(
+      <ShadowPinCircleFilterSheet
+        open
+        circles={[]}
+        error="Inner Circles are unavailable right now."
+        selectedCircleId={null}
+        onSelect={jest.fn()}
+        onRetry={onRetry}
+        onManage={onManage}
+        onClose={jest.fn()}
+      />
+    )
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Inner Circles are unavailable right now.')
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+
+    rerender(
+      <ShadowPinCircleFilterSheet
+        open
+        circles={[]}
+        selectedCircleId={null}
+        onSelect={jest.fn()}
+        onRetry={onRetry}
+        onManage={onManage}
+        onClose={jest.fn()}
+      />
+    )
+
+    expect(screen.getByText('Create an Inner Circle from Connections to add another filter.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Create an Inner Circle' }))
+    expect(onManage).toHaveBeenCalledTimes(1)
+  })
 })

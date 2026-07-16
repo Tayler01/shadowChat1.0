@@ -38,13 +38,14 @@ describe('member reporting entry points', () => {
 
   test('Shado Live exposes room, participant, and message reports with self-report guards', () => {
     const stage = source('src/features/entertainment/shado-live/real/ShadoLiveStage.tsx')
+    const messageRow = source('src/features/entertainment/shado-live/real/ShadoLiveMessageRow.tsx')
     expect(stage).toContain("type: 'live_room'")
     expect(stage).toContain("type: 'live_participant'")
     expect(stage).toContain("type: 'live_message'")
     expect(stage).toContain('Report this room')
-    expect(stage).toContain('Report message from')
+    expect(messageRow).toContain("label: 'Report message'")
     expect(stage).toContain('participant.userId === currentUserId')
-    expect(stage).toContain('message.senderId !== currentUserId')
+    expect(messageRow).toContain('message.senderId === currentUserId')
     expect(stage).toContain('!isHost')
   })
 

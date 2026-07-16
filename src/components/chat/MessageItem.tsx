@@ -1,5 +1,4 @@
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
-import { motion } from 'framer-motion'
 import {
   Pin,
   PinOff,
@@ -38,6 +37,7 @@ import { getBlockedActionMessage, type ChannelBanScope } from '../../lib/moderat
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { EmojiPickerOverlay } from './EmojiPickerOverlay'
 import { QuickReactionRail } from './QuickReactionRail'
+import { MessageReactions } from './MessageReactions'
 import { ChatImageRadialHeart } from './ChatImageRadialHeart'
 import { useOptionalHype } from '../../hooks/useHype'
 import { getHypeTier } from '../../lib/hypePresentation'
@@ -604,6 +604,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       <MessageHypeBadge count={hypeCount} users={hypeUsers} className="float-right ml-2" />
                       <MessageReactions
                         message={message}
+                        currentUserId={profile?.id}
                         onReact={handleReaction}
                         className="text-[0.65rem]"
                       />
@@ -667,6 +668,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       </div>
                       <MessageReactions
                         message={message}
+                        currentUserId={profile?.id}
                         onReact={handleReaction}
                         className="chat-media-frame__reactions pointer-events-auto absolute bottom-1.5 right-1.5 z-10 w-auto max-w-[calc(100%-0.75rem)] justify-end text-[0.65rem]"
                       />
@@ -824,46 +826,3 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
 )
 
 MessageItem.displayName = 'MessageItem'
-
-export const MessageReactions = React.memo(function MessageReactions({
-  message,
-  onReact,
-  className = '',
-}: {
-  message: Message
-  onReact: (emoji: string) => void
-  className?: string
-}) {
-  const { profile } = useAuth()
-  const reactions: Record<string, { count: number; users: string[] }> = message.reactions || {}
-  const hasReactions = Object.keys(reactions).length > 0
-
-  if (!hasReactions) return null
-
-  return (
-    <div className={cn('flex flex-wrap gap-1 w-full justify-end', className)}>
-      {Object.entries(reactions).map(([emoji, data]: [string, { count: number; users: string[] }]) => {
-        const isReacted = data.users?.includes(profile?.id ?? '')
-        return (
-          <motion.button
-            key={emoji}
-            initial={false}
-            animate={{ scale: 1 }}
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => onReact(emoji)}
-            className={`inline-flex items-center space-x-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors ${
-              isReacted
-                ? 'theme-accent-chip'
-                : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.08)]'
-            }`}
-            aria-label={`Reaction ${normalizeEmojiValue(emoji)} count ${data.count}`}
-          >
-            <span>{normalizeEmojiValue(emoji)}</span>
-            <span className="text-[0.5em]">{data.count}</span>
-          </motion.button>
-        )
-      })}
-    </div>
-  )
-})

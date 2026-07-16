@@ -3632,14 +3632,15 @@ function ShadowPinHome({
     feedModeState.selectMode(nextMode)
   }
 
-  const openConnectionsHub = (targetCircleId?: string) => {
+  const openConnectionsHub = (targetCircleId?: string, openCircles = Boolean(targetCircleId)) => {
     if (typeof window === 'undefined') return
     const url = new URL(window.location.href)
     url.searchParams.set('view', 'dms')
     url.searchParams.set('panel', 'connections')
-    if (targetCircleId) {
+    if (openCircles) {
       url.searchParams.set('section', 'circles')
-      url.searchParams.set('circle', targetCircleId)
+      if (targetCircleId) url.searchParams.set('circle', targetCircleId)
+      else url.searchParams.delete('circle')
     } else {
       url.searchParams.delete('section')
       url.searchParams.delete('circle')
@@ -3701,7 +3702,10 @@ function ShadowPinHome({
         {feedModeState.mode === 'connections' && (
           <button
             type="button"
-            onClick={() => setCircleFilterOpen(true)}
+            onClick={() => {
+              setCircleFilterOpen(true)
+              if (!circlesState.loading) circlesState.refresh()
+            }}
             className="mb-3 flex min-h-12 w-full items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--theme-accent-border-soft)] bg-[rgba(5,6,8,0.72)] px-4 text-left shadow-[var(--shadow-panel)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
             aria-haspopup="dialog"
             data-testid="shadow-pin-circle-filter-trigger"
@@ -4057,10 +4061,17 @@ function ShadowPinHome({
       <ShadowPinCircleFilterSheet
         open={circleFilterOpen}
         circles={circlesState.circles}
+        loading={circlesState.loading}
+        error={circlesState.error}
         selectedCircleId={initialCircleId ?? null}
         onSelect={circleId => {
           onCircleChange(circleId)
           setCircleFilterOpen(false)
+        }}
+        onRetry={circlesState.refresh}
+        onManage={() => {
+          setCircleFilterOpen(false)
+          openConnectionsHub(undefined, true)
         }}
         onClose={() => setCircleFilterOpen(false)}
       />

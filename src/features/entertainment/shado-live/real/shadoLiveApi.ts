@@ -7,6 +7,7 @@ import {
   normalizeShadoLiveRoomList,
   normalizeShadoLiveSession,
   normalizeShadoLiveTitle,
+  type ShadoLiveMessageReactionSummary,
   type ShadoLiveRoom,
   type ShadoLiveSession,
 } from './shadoLiveModel'
@@ -46,6 +47,62 @@ const assertRoomId = (roomId: string) => {
   return normalized
 }
 
+const assertMessageId = (messageId: string) => {
+  const normalized = messageId.trim()
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(normalized)) {
+    throw new Error('A valid Shado Live message is required.')
+  }
+  return normalized
+}
+
+const normalizeReactionEmoji = (emoji: string) => {
+  const normalized = emoji.trim()
+  if (!normalized || Array.from(normalized).length > 16 || /\s/u.test(normalized)) {
+    throw new Error('A valid message reaction is required.')
+  }
+  return normalized
+}
+
+type ShadoLiveReactionRow = {
+  message_id?: unknown
+  emoji?: unknown
+  reaction_count?: unknown
+  reacted_by_me?: unknown
+}
+
+const applyMessageReactions = (
+  room: ShadoLiveRoom,
+  rows: unknown
+): ShadoLiveRoom => {
+  if (!Array.isArray(rows) || room.messages.length === 0) return room
+
+  const reactionsByMessage = new Map<string, Record<string, ShadoLiveMessageReactionSummary>>()
+  rows.forEach(value => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return
+    const row = value as ShadoLiveReactionRow
+    const messageId = typeof row.message_id === 'string' ? row.message_id : null
+    const emoji = typeof row.emoji === 'string' ? row.emoji.trim() : ''
+    const reactionCount = typeof row.reaction_count === 'number'
+      ? Math.max(0, Math.floor(row.reaction_count))
+      : Number.parseInt(String(row.reaction_count ?? ''), 10)
+    if (!messageId || !emoji || !Number.isFinite(reactionCount) || reactionCount <= 0) return
+    const messageReactions = reactionsByMessage.get(messageId) ?? {}
+    messageReactions[emoji] = {
+      count: reactionCount,
+      reactedByCurrentUser: row.reacted_by_me === true,
+    }
+    reactionsByMessage.set(messageId, messageReactions)
+  })
+
+  return {
+    ...room,
+    messages: room.messages.map(message => ({
+      ...message,
+      reactions: reactionsByMessage.get(message.id) ?? {},
+    })),
+  }
+}
+
 const invoke = async (
   functionName: 'shado-live-session' | 'shado-live-command' | 'shado-live-reconcile',
   body: Record<string, unknown>
@@ -83,7 +140,45 @@ export const getMyShadoLiveRoom = async (roomId: string): Promise<ShadoLiveRoom>
   const source = Array.isArray(data) ? data[0] : data
   const room = normalizeShadoLiveRoom(source)
   if (!room) throw new Error('Shado Live returned an invalid room snapshot.')
-  return room
+  if (room.messages.length === 0) return room
+
+  const { data: reactionRows, error: reactionError } = await client.rpc(
+    'list_my_shado_live_message_reactions',
+    {
+      target_room_id: room.id,
+      target_message_ids: room.messages.map(message => message.id),
+    }
+  )
+  // Keep room entry backward-compatible while the additive reaction migration
+  // rolls out ahead of the new frontend.
+  if (reactionError) return room
+  return applyMessageReactions(room, reactionRows)
+}
+
+export const toggleMyShadoLiveMessageReaction = async (
+  messageId: string,
+  emoji: string
+) => {
+  const client = await getWorkingClient()
+  const normalizedMessageId = assertMessageId(messageId)
+  const normalizedEmoji = normalizeReactionEmoji(emoji)
+  const { data, error } = await client.rpc('toggle_my_shado_live_message_reaction', {
+    target_message_id: normalizedMessageId,
+    reaction_emoji: normalizedEmoji,
+  })
+  if (error) throw error
+  const source = Array.isArray(data) ? data[0] : data
+  const record = source && typeof source === 'object' && !Array.isArray(source)
+    ? source as Record<string, unknown>
+    : null
+  if (
+    record?.messageId !== normalizedMessageId
+    || record?.emoji !== normalizedEmoji
+    || typeof record.active !== 'boolean'
+  ) {
+    throw new Error('Shado Live did not confirm the message reaction.')
+  }
+  return record.active
 }
 
 export const openShadoLiveSession = async ({

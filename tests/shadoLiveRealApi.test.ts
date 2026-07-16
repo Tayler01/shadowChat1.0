@@ -6,6 +6,7 @@ import {
   openShadoLiveSession,
   reconcileShadoLive,
   sendShadoLiveCommand,
+  toggleMyShadoLiveMessageReaction,
 } from '../src/features/entertainment/shado-live/real/shadoLiveApi'
 
 jest.mock('../src/lib/supabase', () => ({ getWorkingClient: jest.fn() }))
@@ -21,6 +22,7 @@ const REQUEST_MESSAGE = '9f109586-eb22-448d-a1e0-6e5431a920d7'
 const REQUEST_LEAVE = 'a7e552c2-f553-4a64-aad8-f0922ca65dde'
 const REQUEST_START = '8ded445a-f602-4b5e-91c0-e183f8b3f984'
 const REQUEST_RECONCILE = 'a478a464-4ca8-4d39-94bb-f4a5d3d13f0f'
+const MESSAGE_ID = '67a00bf8-b0d6-489e-92b0-e58ed9b5450d'
 
 const roomRow = {
   roomId: ROOM_ID, revision: 4, title: 'Night Room', status: 'live',
@@ -41,6 +43,53 @@ test('uses bounded caller-visible room read RPCs', async () => {
   await expect(getMyShadoLiveRoom(ROOM_ID)).resolves.toMatchObject({ id: ROOM_ID, version: 4 })
   expect(rpc).toHaveBeenNthCalledWith(1, 'list_my_shado_live_rooms', { result_limit: 50 })
   expect(rpc).toHaveBeenNthCalledWith(2, 'get_my_shado_live_room', { target_room_id: ROOM_ID })
+})
+
+test('loads isolated live reaction aggregates and toggles them through guarded RPCs', async () => {
+  const rpc = jest.fn()
+    .mockResolvedValueOnce({
+      data: {
+        ...roomRow,
+        messages: [{
+          messageId: MESSAGE_ID,
+          sender: { id: HOST_ID, display_name: 'Tayler', username: 'tayler' },
+          body: 'React here',
+          createdAt: '2026-07-15T20:00:30Z',
+        }],
+      },
+      error: null,
+    })
+    .mockResolvedValueOnce({
+      data: [{
+        message_id: MESSAGE_ID,
+        emoji: '👍',
+        reaction_count: 2,
+        reacted_by_me: true,
+      }],
+      error: null,
+    })
+    .mockResolvedValueOnce({
+      data: { roomId: ROOM_ID, messageId: MESSAGE_ID, emoji: '👍', active: false },
+      error: null,
+    })
+  workingClient.mockResolvedValue({ rpc } as never)
+
+  await expect(getMyShadoLiveRoom(ROOM_ID)).resolves.toMatchObject({
+    messages: [{
+      id: MESSAGE_ID,
+      reactions: { '👍': { count: 2, reactedByCurrentUser: true } },
+    }],
+  })
+  await expect(toggleMyShadoLiveMessageReaction(MESSAGE_ID, '👍')).resolves.toBe(false)
+
+  expect(rpc).toHaveBeenNthCalledWith(2, 'list_my_shado_live_message_reactions', {
+    target_room_id: ROOM_ID,
+    target_message_ids: [MESSAGE_ID],
+  })
+  expect(rpc).toHaveBeenNthCalledWith(3, 'toggle_my_shado_live_message_reaction', {
+    target_message_id: MESSAGE_ID,
+    reaction_emoji: '👍',
+  })
 })
 
 test('opens listener media only through the authenticated session function', async () => {

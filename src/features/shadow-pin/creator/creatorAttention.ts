@@ -1,5 +1,5 @@
 import { getWorkingClient } from '../../../lib/supabase'
-import { loadCreatorLocalDraft } from './creatorLocalStore'
+import { clearCreatorLocalDraft, loadCreatorLocalDraft } from './creatorLocalStore'
 import type { CreatorLocalDraft } from './creatorModel'
 import type { ShadowPinCreatorDraftState } from './creatorTypes'
 
@@ -27,7 +27,9 @@ export const creatorLocalDraftNeedsAttention = (draft: CreatorLocalDraft | null)
 
 export async function hasCreatorDraftsNeedingAttention(userId: string) {
   if (!userId) return false
-  if (creatorLocalDraftNeedsAttention(loadCreatorLocalDraft(userId))) return true
+  const localDraft = loadCreatorLocalDraft(userId)
+  const localNeedsAttention = creatorLocalDraftNeedsAttention(localDraft)
+  if (localNeedsAttention && !localDraft?.draftId) return true
 
   const client = await getWorkingClient()
   const { data, error } = await client
@@ -38,5 +40,10 @@ export async function hasCreatorDraftsNeedingAttention(userId: string) {
     .limit(1)
 
   if (error) throw error
+  if (localNeedsAttention && localDraft?.draftId) {
+    const localDraftIsActive = data?.some((draft: { id: string }) => draft.id === localDraft.draftId)
+    if (localDraftIsActive) return true
+    clearCreatorLocalDraft(userId)
+  }
   return Boolean(data?.length)
 }

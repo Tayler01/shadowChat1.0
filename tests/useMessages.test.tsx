@@ -20,6 +20,7 @@ import {
   getRealtimeClient,
   isGeneralChatMessageWindowRpcUnavailable,
   isGeneralChatThreadRpcUnavailable,
+  resolveGeneralChatThreadId,
   refreshSessionLocked,
 } from '../src/lib/supabase';
 import type { Message } from '../src/lib/supabase';
@@ -59,6 +60,7 @@ jest.mock('../src/lib/supabase', () => {
     fetchGeneralChatThreadSummaries: jest.fn(),
     isGeneralChatMessageWindowRpcUnavailable: jest.fn(),
     isGeneralChatThreadRpcUnavailable: jest.fn(),
+    resolveGeneralChatThreadId: jest.fn(),
     refreshSessionLocked: jest.fn(),
     ensureSession: jest.fn(),
     withTimeout: jest.fn((promise: Promise<unknown>) => promise),
@@ -172,6 +174,7 @@ const configureWorkingClient = () => {
     message: 'Could not find function get_general_chat_threaded_window',
   });
   (fetchGeneralChatThreadSummaries as jest.Mock).mockResolvedValue(new Map());
+  (resolveGeneralChatThreadId as jest.Mock).mockResolvedValue(null);
   (isGeneralChatThreadRpcUnavailable as jest.Mock).mockImplementation((error: any) =>
     error?.code === 'PGRST202' || /general_chat_thread|could not find/i.test(error?.message || '')
   );
@@ -397,6 +400,57 @@ describe('message fetching windows', () => {
     })
 
     expect(result.current.messages.map(message => message.id)).toEqual(['root'])
+  })
+
+  it('refreshes the canonical root summary when a realtime reply arrives', async () => {
+    let messageInsertHandler: ((payload: any) => void) | undefined
+    workingClient.channel.mockImplementation(() => {
+      const channel: any = {
+        on: jest.fn((event: string, filter: any, handler: any) => {
+          if (
+            event === 'postgres_changes' &&
+            filter?.event === 'INSERT' &&
+            filter?.table === 'messages'
+          ) {
+            messageInsertHandler = handler
+          }
+          return channel
+        }),
+        subscribe: jest.fn(() => channel),
+        send: jest.fn(),
+        state: 'joined',
+      }
+      return channel
+    })
+
+    const root = makeDbMessage('root', '2026-05-03T12:00:00.000Z')
+    const { result } = await renderWithLatestWindow([root])
+    await waitFor(() => expect(messageInsertHandler).toBeDefined())
+
+    const reply = {
+      ...makeDbMessage('reply', '2026-05-03T12:01:00.000Z'),
+      user_id: 'other-user',
+      reply_to: root.id,
+    } as Message
+    const summary = {
+      reply_count: 1,
+      unread_count: 1,
+      latest_reply_id: reply.id,
+    }
+    workingClient.from.mockReturnValue(createQuery({
+      maybeSingle: jest.fn().mockResolvedValue({ data: reply, error: null }),
+    }) as any)
+    ;(resolveGeneralChatThreadId as jest.Mock).mockResolvedValue(root.id)
+    ;(fetchGeneralChatThreadSummaries as jest.Mock).mockResolvedValue(new Map([[root.id, summary]]))
+
+    act(() => {
+      messageInsertHandler?.({ new: { id: reply.id } })
+    })
+
+    await waitFor(() => expect(resolveGeneralChatThreadId).toHaveBeenCalledWith(reply.id))
+    await waitFor(() => expect(fetchGeneralChatThreadSummaries).toHaveBeenCalledWith([root.id]))
+    await waitFor(() => expect(result.current.messages[0].thread_summary).toEqual(summary))
+    expect(result.current.messages.map(message => message.id)).toEqual([root.id])
   })
 
   it('loads older history with a created_at and id keyset when timestamps collide', async () => {

@@ -9,6 +9,7 @@ import {
   openShadoLiveSession,
   reconcileShadoLive,
   sendShadoLiveCommand,
+  toggleMyShadoLiveMessageReaction,
   type ShadoLiveCommandAction,
 } from './shadoLiveApi'
 import { createLiveKitMediaSession, type ShadoLiveMediaSessionController } from './liveKitMediaSession'
@@ -63,6 +64,7 @@ export interface ShadoLiveRoomController {
   toggleMicrophone: () => Promise<void>
   toggleHand: () => Promise<void>
   sendMessage: (body: string) => Promise<void>
+  toggleMessageReaction: (messageId: string, emoji: string) => Promise<void>
   startRoom: () => Promise<void>
   promote: (userId: string) => Promise<void>
   demote: (userId: string) => Promise<void>
@@ -353,6 +355,16 @@ export function useShadoLiveRoom({
   }, [runCommand])
 
   const sendMessage = useCallback((body: string) => runCommand('send_message', { body }), [runCommand])
+  const toggleMessageReaction = useCallback(async (messageId: string, emoji: string) => {
+    setError(null)
+    try {
+      await toggleMyShadoLiveMessageReaction(messageId, emoji)
+      await refreshRoom()
+    } catch (caught) {
+      setError(getShadoLiveErrorMessage(caught, 'The message reaction could not be updated.'))
+      throw caught
+    }
+  }, [refreshRoom])
   const startRoom = useCallback(() => runCommand('start'), [runCommand])
   const promote = useCallback((userId: string) => runCommand('promote', { targetUserId: userId }), [runCommand])
   const demote = useCallback((userId: string) => runCommand('demote', { targetUserId: userId }), [runCommand])
@@ -535,6 +547,7 @@ export function useShadoLiveRoom({
     toggleMicrophone,
     toggleHand,
     sendMessage,
+    toggleMessageReaction,
     startRoom,
     promote,
     demote,

@@ -90,6 +90,11 @@ mapping rows and canonical message changes, then performs a short coalesced
 refresh so insert, edit, and delete changes settle through the same RLS-aware
 reader. Block visibility is re-evaluated whenever that reader refreshes.
 
+The root feed also treats a canonical reply `messages` insert as a redundant
+summary invalidation path: it resolves the server-owned mapping and refreshes
+the affected root. This keeps a newly started thread visible immediately if a
+mapping-table change event is delayed or missed while Realtime reconnects.
+
 Thread read state reuses owner-private `user_read_cursors` with:
 
 - `surface = 'general_chat_thread'`

@@ -117,6 +117,10 @@ an immediate update.
 - Loading, empty, retry, stale-snapshot refresh failure, truncated, and
   older-unread states are distinct.
 - The phone view preserves the fixed bottom navigation and safe-area padding.
+- Cards render the safe actor thumbnail already returned by the snapshot, with
+  initials as the image-error or missing-image fallback. The avatar is a
+  separate control that lazily opens the canonical public profile card without
+  opening or acknowledging the source item.
 - Controls use the shared phone touch baseline and visible focus treatment.
 - Counts and unread state use text in addition to color.
 - Loading animation remains essential status motion and all other motion stays

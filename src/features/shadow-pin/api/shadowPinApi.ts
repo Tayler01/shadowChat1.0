@@ -14,6 +14,7 @@ import type {
   ShadowPinFeedMode,
   ShadowPinFeedPage,
   ShadowPinFeedPreference,
+  ShadowPinCommentReactionSummary,
 } from '../types'
 import { embedPublicProfile } from '../../../../supabase/functions/_shared/public-profile'
 import {
@@ -1225,10 +1226,15 @@ const SHADOW_PIN_COMMENT_SELECT = `
   body,
   created_at,
   updated_at,
-  ${embedPublicProfile('author', 'users!author_id')}
+  ${embedPublicProfile('author', 'users!author_id')},
+  reaction_rows:shadow_pin_comment_reactions(emoji, user_id)
 `
 
 export const SHADOW_PIN_COMMENT_PAGE_SIZE = 40
+
+type ShadowPinCommentRecord = Omit<ShadowPinComment, 'reactions'> & {
+  reaction_rows?: Array<{ emoji?: string | null; user_id?: string | null }> | null
+}
 
 export type ShadowPinCommentCursor = {
   createdAt: string
@@ -1246,6 +1252,37 @@ const compareShadowPinComments = (first: ShadowPinComment, second: ShadowPinComm
   if (timeDifference !== 0) return timeDifference
   return first.id.localeCompare(second.id)
 }
+
+const normalizeShadowPinCommentReactions = (
+  rows?: Array<{ emoji?: string | null; user_id?: string | null }> | null
+): ShadowPinCommentReactionSummary => {
+  const reactions: ShadowPinCommentReactionSummary = {}
+  ;(rows ?? []).forEach(row => {
+    const emoji = row.emoji?.trim()
+    const userId = row.user_id
+    if (!emoji || !userId) return
+    const existing = reactions[emoji] ?? { count: 0, users: [] }
+    if (!existing.users.includes(userId)) {
+      existing.users.push(userId)
+      existing.count = existing.users.length
+    }
+    reactions[emoji] = existing
+  })
+  return reactions
+}
+
+export const normalizeShadowPinCommentRecord = (
+  record: ShadowPinCommentRecord
+): ShadowPinComment => {
+  const { reaction_rows: reactionRows, ...comment } = record
+  return {
+    ...comment,
+    reactions: normalizeShadowPinCommentReactions(reactionRows),
+  }
+}
+
+const normalizeShadowPinCommentRows = (rows: unknown[] | null | undefined) =>
+  (rows ?? []).map(row => normalizeShadowPinCommentRecord(row as ShadowPinCommentRecord))
 
 export async function fetchShadowPinComments(
   imageId: string,
@@ -1267,7 +1304,7 @@ export async function fetchShadowPinComments(
 
   const { data, error } = await query
   if (error) throw error
-  const pageRows = (data ?? []) as unknown as ShadowPinComment[]
+  const pageRows = normalizeShadowPinCommentRows(data)
   const hasMore = pageRows.length > SHADOW_PIN_COMMENT_PAGE_SIZE
   const visibleRows = pageRows.slice(0, SHADOW_PIN_COMMENT_PAGE_SIZE)
   const supplementalRows: ShadowPinComment[] = []
@@ -1280,7 +1317,7 @@ export async function fetchShadowPinComments(
       .eq('id', targetCommentId)
       .maybeSingle()
     if (targetError) throw targetError
-    if (target) supplementalRows.push(target as unknown as ShadowPinComment)
+    if (target) supplementalRows.push(normalizeShadowPinCommentRecord(target as unknown as ShadowPinCommentRecord))
   }
 
   const currentRows = [...visibleRows, ...supplementalRows]
@@ -1297,7 +1334,7 @@ export async function fetchShadowPinComments(
       .eq('image_id', imageId)
       .in('id', missingParentIds)
     if (parentError) throw parentError
-    supplementalRows.push(...((parents ?? []) as unknown as ShadowPinComment[]))
+    supplementalRows.push(...normalizeShadowPinCommentRows(parents))
   }
 
   const byId = new Map<string, ShadowPinComment>()
@@ -1328,19 +1365,10 @@ export async function createShadowPinComment(
       parent_comment_id: parentCommentId || null,
       body: normalizedBody,
     })
-    .select(`
-      id,
-      image_id,
-      author_id,
-      parent_comment_id,
-      body,
-      created_at,
-      updated_at,
-      ${embedPublicProfile('author', 'users!author_id')}
-    `)
+    .select(SHADOW_PIN_COMMENT_SELECT)
     .single()
   if (error) throw error
-  const comment = data as unknown as ShadowPinComment
+  const comment = normalizeShadowPinCommentRecord(data as unknown as ShadowPinCommentRecord)
   void triggerShadowPinCommentPushNotification(comment.id).catch(() => undefined)
   return comment
 }
@@ -1352,19 +1380,10 @@ export async function updateShadowPinComment(commentId: string, body: string) {
     .from('shadow_pin_comments')
     .update({ body: normalizedBody })
     .eq('id', commentId)
-    .select(`
-      id,
-      image_id,
-      author_id,
-      parent_comment_id,
-      body,
-      created_at,
-      updated_at,
-      ${embedPublicProfile('author', 'users!author_id')}
-    `)
+    .select(SHADOW_PIN_COMMENT_SELECT)
     .single()
   if (error) throw error
-  return data as unknown as ShadowPinComment
+  return normalizeShadowPinCommentRecord(data as unknown as ShadowPinCommentRecord)
 }
 
 export async function deleteShadowPinComment(commentId: string) {
@@ -1374,4 +1393,34 @@ export async function deleteShadowPinComment(commentId: string) {
     .delete()
     .eq('id', commentId)
   if (error) throw error
+}
+
+export async function toggleShadowPinCommentReaction(
+  commentId: string,
+  emoji: string
+): Promise<ShadowPinCommentReactionSummary> {
+  const normalizedEmoji = emoji.trim()
+  if (!normalizedEmoji || normalizedEmoji.length > 32) {
+    throw new Error('Choose a valid reaction.')
+  }
+
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('toggle_shadow_pin_comment_reaction', {
+    target_comment_id: commentId,
+    target_emoji: normalizedEmoji,
+  })
+  if (error) throw error
+
+  return ((data ?? []) as Array<{
+    emoji?: string | null
+    reaction_count?: number | string | null
+    user_ids?: string[] | null
+  }>).reduce<ShadowPinCommentReactionSummary>((summary, row) => {
+    const reactionEmoji = row.emoji?.trim()
+    if (!reactionEmoji) return summary
+    const users = Array.from(new Set(row.user_ids ?? []))
+    const count = Math.max(Number(row.reaction_count ?? users.length) || 0, users.length)
+    if (count > 0) summary[reactionEmoji] = { count, users }
+    return summary
+  }, {})
 }

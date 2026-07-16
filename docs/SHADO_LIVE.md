@@ -35,7 +35,8 @@ The beta is an intimate, phone-first audio room:
 - server-authoritative room, role, audience, block, restriction, and operator
   decisions;
 - recording disabled;
-- room chat with canonical server persistence;
+- room chat with canonical server persistence, flat General Chat-style message
+  rows, three-dot actions, and persistent tap-accessible reactions;
 - exact reconnecting, removed, ineligible, and room-ended states; and
 - live-room, participant, and message reporting with server-captured evidence.
 
@@ -85,6 +86,13 @@ Direct browser mutation is revoked. Reviewed private `SECURITY DEFINER`
 functions in `shado_live_private` are reached through narrow public invoker
 RPCs. `live_room_signals` and recipient-owned notification rows are the only
 RLS-filtered browser Realtime surfaces required for invalidation.
+
+Live message reactions stay inside `live_room_message_reactions`; they do not
+reuse General Chat or DM reaction rows. The caller-visible aggregate and atomic
+toggle RPCs enforce room access, chat restrictions, blocking, and live-room
+status. Reaction inserts and deletes touch the existing room signal so other
+participants refresh the canonical aggregate without changing the LiveKit
+audio session.
 
 LiveKit is the audio transport. Server-only credentials are named:
 
@@ -213,8 +221,10 @@ notifications, provider outbox, and webhook receipts.
 
 Frontend and Edge tests cover API normalization, safe public avatar/profile
 projection, LiveKit media state, remote-track attachment before audio unlock,
-host and listener controls, reconciliation cadence, reporting, operator
-actions, notification routing/dedupe, and signed provider boundaries. The
+host and listener controls, flat message presentation, movement-safe quick
+reactions, three-dot message actions, canonical reaction refresh,
+reconciliation cadence, reporting, operator actions, notification
+routing/dedupe, and signed provider boundaries. The
 production build verifier runs deterministic Pixel Chromium and iPhone WebKit
 host and listener flows with mounted remote audio, clickable profiles, exact
 phone geometry, 16px mobile composers, keyboard and safe-area checks, no

@@ -26,3 +26,17 @@ test('device storage failures never block the server-backed Creator draft', () =
     removeItem.mockRestore()
   }
 })
+
+test('a terminal publish receipt cannot repopulate local recovery after cleanup', () => {
+  const state = createInitialCreatorState('category-1')
+  state.values.title = 'Published Pin'
+  state.values.sourceMode = 'url'
+  state.values.sourceUrl = 'https://example.com/published.jpg'
+  window.localStorage.clear()
+
+  saveCreatorLocalDraft('user-1', state)
+  expect(loadCreatorLocalDraft('user-1')).not.toBeNull()
+
+  saveCreatorLocalDraft('user-1', { ...state, operation: 'published' })
+  expect(loadCreatorLocalDraft('user-1')).toBeNull()
+})

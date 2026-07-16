@@ -1,5 +1,5 @@
 {
-  "reviewed_on": "2026-07-15",
+  "reviewed_on": "2026-07-16",
   "expected_total_security_definers": 125,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
@@ -72,6 +72,7 @@
     "shado_live_private.get_shado_live_room_for_actor_impl(uuid,uuid)",
     "shado_live_private.list_my_shado_live_notifications_impl(integer,timestamp with time zone,uuid)",
     "shado_live_private.list_my_shado_live_reports_impl(integer,timestamp with time zone,uuid)",
+    "shado_live_private.list_my_shado_live_message_reactions_impl(uuid,uuid[])",
     "shado_live_private.list_my_shado_live_messages_impl(uuid,integer,timestamp with time zone,uuid)",
     "shado_live_private.list_my_shado_live_rooms_impl(integer)",
     "shado_live_private.list_shado_live_moderation_cases_impl(text,text,text,text,text,text,integer,timestamp with time zone,uuid)",
@@ -88,6 +89,7 @@
     "shado_live_private.shado_live_set_restriction_impl(uuid,uuid,text,boolean,timestamp with time zone,text)",
     "shado_live_private.shado_live_set_system_enabled_impl(uuid,boolean,text)",
     "shado_live_private.submit_shado_live_report_impl(text,uuid,text,uuid,text)",
+    "shado_live_private.toggle_my_shado_live_message_reaction_impl(uuid,text)",
     "shadow_pin_private.get_my_connection_feed_window_impl(uuid)",
     "shadow_pin_private.get_my_feed_mode_impl()",
     "shadow_pin_private.list_my_connection_feed_impl(integer,timestamp with time zone,uuid)",

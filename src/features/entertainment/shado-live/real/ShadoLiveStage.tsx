@@ -32,6 +32,7 @@ import { canPublishShadoLiveMicrophone, type ShadoLiveParticipant } from './shad
 import type { ShadoLiveRoomController } from './useShadoLiveRoom'
 import { ShadoLiveAudioRenderer } from './ShadoLiveAudioRenderer'
 import { useModerationReport } from '../../../moderation/useModerationReport'
+import { ShadoLiveMessageRow } from './ShadoLiveMessageRow'
 
 type RoomPanel = 'chat' | 'room' | 'safety'
 const PANELS: RoomPanel[] = ['chat', 'room', 'safety']
@@ -329,45 +330,30 @@ export function ShadoLiveStage({
 
           <div ref={panelScrollRef} id={`shado-live-real-panel-${panel}`} role="tabpanel" aria-labelledby={`shado-live-real-tab-${panel}`} tabIndex={0} className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#d7aa46] sm:p-4">
             {panel === 'chat' && (
-              <div className="space-y-4" data-testid="shado-live-real-chat-panel">
+              <div data-testid="shado-live-real-chat-panel">
                 {room.messages.length === 0 && <p className="text-sm leading-6 text-[#8f897e]">No messages yet. Messages appear only after the server stores them.</p>}
                 {room.messages.map(message => {
                   const participant = room.participants.find(candidate => candidate.userId === message.senderId)
                   const avatarUrl = message.senderAvatarUrl ?? participant?.avatarUrl ?? null
                   return (
-                    <div key={message.id} className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={() => onOpenProfile(message.senderId)}
-                        aria-label={`Open ${message.senderDisplayName}'s profile`}
-                        className="mt-0.5 h-fit shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]"
-                      >
-                        <Avatar src={avatarUrl || undefined} alt={message.senderDisplayName} fallback={message.senderDisplayName} userId={message.senderId} size="md" />
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => onOpenProfile(message.senderId)} className="min-w-0 flex-1 truncate rounded-sm text-left text-xs font-semibold text-[#e8bd58] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]">{message.senderDisplayName}</button>
-                          {message.senderId !== currentUserId && (
-                            <button
-                              type="button"
-                              aria-label={`Report message from ${message.senderDisplayName}`}
-                              onClick={() => openReport({
-                                type: 'live_message',
-                                id: message.id,
-                                label: `${message.senderDisplayName} in ${room.title}`,
-                                preview: message.body,
-                                subjectUserId: message.senderId,
-                                subjectLabel: message.senderDisplayName,
-                              })}
-                              className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-[#8f897e] focus:outline-none focus:ring-2 focus:ring-[#d7aa46]"
-                            >
-                              <Flag className="h-3.5 w-3.5" aria-hidden="true" />
-                            </button>
-                          )}
-                        </div>
-                        <p className="mt-0.5 break-words text-sm leading-5 text-[#d7d2c8]">{message.body}</p>
-                      </div>
-                    </div>
+                    <ShadoLiveMessageRow
+                      key={message.id}
+                      message={message}
+                      avatarUrl={avatarUrl}
+                      currentUserId={currentUserId}
+                      roomTitle={room.title}
+                      scrollContainerRef={panelScrollRef}
+                      onOpenProfile={onOpenProfile}
+                      onToggleReaction={controller.toggleMessageReaction}
+                      onReport={targetMessage => openReport({
+                        type: 'live_message',
+                        id: targetMessage.id,
+                        label: `${targetMessage.senderDisplayName} in ${room.title}`,
+                        preview: targetMessage.body,
+                        subjectUserId: targetMessage.senderId,
+                        subjectLabel: targetMessage.senderDisplayName,
+                      })}
+                    />
                   )
                 })}
               </div>

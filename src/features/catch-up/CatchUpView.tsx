@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AlertCircle, ArrowUpRight, Check, Inbox, Loader2, MessageCircle, RefreshCw, ShieldCheck, Sparkles, Users } from 'lucide-react'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
+import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
 import { useAuth } from '../../hooks/useAuth'
+import { getUserProfile } from '../../lib/auth'
+import type { User } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
 import { acknowledgeCatchUpEvents, fetchCatchUpSnapshot } from './catchUpApi'
 import {
@@ -13,6 +16,12 @@ import {
   type CatchUpItem,
   type CatchUpSnapshot,
 } from './catchUpModel'
+
+const PublicProfileDialog = lazy(() =>
+  import('../../components/profile/PublicProfileDialog').then(module => ({
+    default: module.PublicProfileDialog,
+  }))
+)
 
 type CatchUpViewProps = {
   currentView: AppView
@@ -45,16 +54,47 @@ const removeOpenedActivityItem = (snapshot: CatchUpSnapshot, item: CatchUpItem):
   return { ...snapshot, sections }
 }
 
-function CatchUpCard({ item, onOpen }: { item: CatchUpItem; onOpen: () => void }) {
+function CatchUpCard({
+  item,
+  onOpen,
+  onOpenProfile,
+  profileLoading,
+}: {
+  item: CatchUpItem
+  onOpen: () => void
+  onOpenProfile: (userId: string) => void
+  profileLoading: boolean
+}) {
   const domId = useId()
   const titleId = `${domId}-title`
   const detailsId = `${domId}-details`
+  const actorLabel = item.actor?.display_name || item.actor?.username || 'ShadowChat member'
   return (
-    <article className="group rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.026)] p-3 shadow-[0_14px_40px_rgba(0,0,0,0.14)] transition-[border-color,background-color] hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.04)]">
-      <button type="button" onClick={onOpen} data-catch-up-item-id={item.id} className="flex min-h-16 w-full items-center gap-3 rounded-[var(--radius-md)] text-left focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]" aria-labelledby={titleId} aria-describedby={detailsId}>
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-sm font-bold text-[var(--theme-accent-readable)]" style={item.actor?.color ? { borderColor: item.actor.color } : undefined} aria-hidden="true">
+    <article className="group flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.026)] p-3 shadow-[0_14px_40px_rgba(0,0,0,0.14)] transition-[border-color,background-color] hover:border-[var(--border-glow)] hover:bg-[rgba(255,255,255,0.04)]">
+      {item.actor ? (
+        <button
+          type="button"
+          onClick={() => onOpenProfile(item.actor!.id)}
+          disabled={profileLoading}
+          className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-65"
+          aria-label={`Open ${actorLabel}'s profile`}
+          aria-busy={profileLoading}
+        >
+          <Avatar
+            src={item.actor.avatar_thumbnail_url || item.actor.avatar_url || undefined}
+            alt={actorLabel}
+            fallback={getInitials(item)}
+            size="lg"
+            color={item.actor.color || undefined}
+            userId={item.actor.id}
+          />
+        </button>
+      ) : (
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-sm font-bold text-[var(--theme-accent-readable)]" aria-hidden="true">
           {getInitials(item)}
         </span>
+      )}
+      <button type="button" onClick={onOpen} data-catch-up-item-id={item.id} className="flex min-h-16 min-w-0 flex-1 items-center rounded-[var(--radius-md)] text-left focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]" aria-labelledby={titleId} aria-describedby={detailsId}>
         <span className="min-w-0 flex-1">
           <span className="flex items-start justify-between gap-3">
             <span id={titleId} className="truncate font-semibold text-[var(--text-primary)]">{item.title}</span>
@@ -79,11 +119,16 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   const [loading, setLoading] = useState(!cached.snapshot)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [profileError, setProfileError] = useState<string | null>(null)
+  const [selectedProfile, setSelectedProfile] = useState<User | null>(null)
+  const [loadingProfileId, setLoadingProfileId] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const snapshotRef = useRef(snapshot)
   const fetchedAtRef = useRef(cached.fetchedAt)
   const mountedRef = useRef(true)
+  const profileCacheRef = useRef(new Map<string, User>())
+  const profileRequestRef = useRef(0)
 
   useEffect(() => {
     snapshotRef.current = snapshot
@@ -151,6 +196,33 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   )
   const totalCount = sections.reduce((sum, section) => sum + section.totalCount, 0)
   const hasOlderUnread = sections.some(section => section.olderUnreadExists)
+
+  const openProfile = async (profileId: string) => {
+    const cachedProfile = profileCacheRef.current.get(profileId)
+    if (cachedProfile) {
+      setProfileError(null)
+      setSelectedProfile(cachedProfile)
+      return
+    }
+
+    const requestId = profileRequestRef.current + 1
+    profileRequestRef.current = requestId
+    setLoadingProfileId(profileId)
+    setProfileError(null)
+
+    try {
+      const profile = await getUserProfile(profileId)
+      if (requestId !== profileRequestRef.current) return
+      if (!profile) throw new Error('This profile is no longer available.')
+      profileCacheRef.current.set(profileId, profile)
+      setSelectedProfile(profile)
+    } catch (caught) {
+      if (requestId !== profileRequestRef.current) return
+      setProfileError(caught instanceof Error ? caught.message : 'Unable to open this profile.')
+    } finally {
+      if (requestId === profileRequestRef.current) setLoadingProfileId(null)
+    }
+  }
 
   const openItem = (item: CatchUpItem) => {
     if (snapshot) {
@@ -223,6 +295,11 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
             </div>
           ) : snapshot ? (
             <div className="mt-5 space-y-6">
+              {profileError && (
+                <p role="alert" className="rounded-[var(--radius-md)] border border-red-300/20 bg-red-950/15 px-4 py-3 text-sm text-red-100">
+                  {profileError}
+                </p>
+              )}
               {sections.filter(section => section.totalCount > 0).map(section => (
                 <section key={section.id} aria-labelledby={`catch-up-${section.id}`}>
                   <div className="mb-3 flex items-end justify-between gap-3 px-1">
@@ -236,7 +313,15 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
                     <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)]">{section.totalCount}</span>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
-                    {section.items.map(item => <CatchUpCard key={item.id} item={item} onOpen={() => openItem(item)} />)}
+                    {section.items.map(item => (
+                      <CatchUpCard
+                        key={item.id}
+                        item={item}
+                        onOpen={() => openItem(item)}
+                        onOpenProfile={profileId => void openProfile(profileId)}
+                        profileLoading={loadingProfileId === item.actor?.id}
+                      />
+                    ))}
                   </div>
                 </section>
               ))}
@@ -254,6 +339,16 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
           <p className="sr-only" aria-live="polite">{announcement}</p>
         </div>
       </div>
+
+      {selectedProfile && (
+        <Suspense fallback={null}>
+          <PublicProfileDialog
+            user={selectedProfile}
+            open
+            onClose={() => setSelectedProfile(null)}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

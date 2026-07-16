@@ -1,5 +1,5 @@
 import { useRef, type KeyboardEvent } from 'react'
-import { Check, CircleUserRound, UsersRound } from 'lucide-react'
+import { Check, CircleUserRound, Loader2, UsersRound } from 'lucide-react'
 import { Button } from '../../../components/ui/Button'
 import { cn } from '../../../lib/utils'
 import { InnerCircleSheet } from './InnerCircleSheet'
@@ -8,14 +8,22 @@ import type { InnerCircleSummary } from './types'
 export function ShadowPinCircleFilterSheet({
   open,
   circles,
+  loading = false,
+  error = null,
   selectedCircleId,
   onSelect,
+  onRetry,
+  onManage,
   onClose,
 }: {
   open: boolean
   circles: InnerCircleSummary[]
+  loading?: boolean
+  error?: string | null
   selectedCircleId: string | null
   onSelect: (circleId: string | null) => void
+  onRetry?: () => void
+  onManage?: () => void
   onClose: () => void
 }) {
   const options: Array<{ id: string | null; name: string; memberCount?: number }> = [
@@ -74,7 +82,27 @@ export function ShadowPinCircleFilterSheet({
           )
         })}
       </div>
-      {circles.length === 0 && <p className="mt-3 text-center text-sm text-[var(--text-muted)]">Create an Inner Circle from Connections to add another filter.</p>}
+      {loading && (
+        <div className="mt-3 flex min-h-12 items-center justify-center gap-2 text-sm text-[var(--text-muted)]" role="status">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Refreshing Inner Circles
+        </div>
+      )}
+      {!loading && error && (
+        <div className="mt-3 rounded-[var(--radius-md)] border border-red-400/30 bg-red-500/10 p-3 text-center text-sm text-red-100" role="alert">
+          <p>{error}</p>
+          {onRetry && <Button type="button" className="mt-3 w-full" variant="secondary" onClick={onRetry}>Try again</Button>}
+        </div>
+      )}
+      {!loading && !error && circles.length === 0 && (
+        <div className="mt-3 rounded-[var(--radius-md)] border border-dashed border-[var(--border-subtle)] p-3 text-center">
+          <p className="text-sm text-[var(--text-muted)]">Create an Inner Circle from Connections to add another filter.</p>
+          {onManage && <Button type="button" className="mt-3 w-full" variant="secondary" onClick={onManage}>Create an Inner Circle</Button>}
+        </div>
+      )}
+      {!loading && !error && circles.length > 0 && onManage && (
+        <Button type="button" className="mt-3 w-full" variant="secondary" onClick={onManage}>Manage Inner Circles</Button>
+      )}
     </InnerCircleSheet>
   )
 }
