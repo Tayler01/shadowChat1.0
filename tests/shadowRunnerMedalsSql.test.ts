@@ -14,7 +14,7 @@ const levelSixMigration = readFileSync(
   'utf8'
 )
 const levelSevenMigration = readFileSync(
-  path.join(process.cwd(), 'supabase/migrations/20260716020122_shadow_runner_level7_available.sql'),
+  path.join(process.cwd(), 'supabase/migrations/20260716040000_shadow_runner_level7_available.sql'),
   'utf8'
 )
 
