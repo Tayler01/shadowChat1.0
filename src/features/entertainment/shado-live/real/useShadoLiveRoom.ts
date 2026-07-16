@@ -4,6 +4,7 @@ import { getWorkingClient } from '../../../../lib/supabase'
 import { createRealtimeChannelName } from '../../../../lib/realtimeChannelName'
 import {
   getMyShadoLiveRoom,
+  isShadoLiveRoomUnavailableError,
   leaveShadoLiveSession,
   listMyShadoLiveRooms,
   openShadoLiveSession,
@@ -57,6 +58,7 @@ export interface ShadoLiveRoomController {
   refreshRoom: () => Promise<ShadoLiveRoom | null>
   createRoom: (title: string) => Promise<void>
   joinRoom: (roomId: string) => Promise<void>
+  resumeRoom: (roomId: string) => Promise<void>
   reconnectMedia: () => Promise<void>
   leaveRoom: () => Promise<void>
   returnToLobby: () => Promise<void>
@@ -102,6 +104,7 @@ export function useShadoLiveRoom({
   const mediaRef = useRef<ShadoLiveMediaSnapshot>(initialMediaSnapshot())
   const refreshInFlightRef = useRef<Promise<ShadoLiveRoom | null> | null>(null)
   const previousMediaStateRef = useRef(media.state)
+  const initialRoomAttemptRef = useRef<string | null>(null)
 
   useEffect(() => {
     roomRef.current = room
@@ -236,8 +239,23 @@ export function useShadoLiveRoom({
     }
   }, [connectSession, disconnectMedia, user?.id])
 
-  const createRoom = useCallback((title: string) => openSession('create', { title }), [openSession])
-  const joinRoom = useCallback((roomId: string) => openSession('join', { roomId }), [openSession])
+  const createRoom = useCallback(async (title: string) => {
+    try {
+      await openSession('create', { title })
+    } catch (caught) {
+      await refreshRooms().catch(() => undefined)
+      throw caught
+    }
+  }, [openSession, refreshRooms])
+  const joinRoom = useCallback(async (roomId: string) => {
+    try {
+      await openSession('join', { roomId })
+    } catch (caught) {
+      await refreshRooms().catch(() => undefined)
+      throw caught
+    }
+  }, [openSession, refreshRooms])
+  const resumeRoom = useCallback((roomId: string) => openSession('resume', { roomId }), [openSession])
   const reconnectMedia = useCallback(async () => {
     const activeRoom = roomRef.current
     if (!activeRoom) throw new Error('Open a Shado Live room before reconnecting audio.')
@@ -389,7 +407,15 @@ export function useShadoLiveRoom({
   }, [refreshRooms])
 
   useEffect(() => {
-    if (!initialRoomId || rooms.some(candidate => candidate.id === initialRoomId)) return
+    if (!initialRoomId) {
+      initialRoomAttemptRef.current = null
+      return
+    }
+    if (
+      rooms.some(candidate => candidate.id === initialRoomId)
+      || initialRoomAttemptRef.current === initialRoomId
+    ) return
+    initialRoomAttemptRef.current = initialRoomId
     let cancelled = false
     void getMyShadoLiveRoom(initialRoomId)
       .then(target => {
@@ -398,10 +424,38 @@ export function useShadoLiveRoom({
         }
       })
       .catch(caught => {
-        if (!cancelled && mountedRef.current) setError(getShadoLiveErrorMessage(caught, 'The linked live room is unavailable.'))
+        if (cancelled || !mountedRef.current) return
+        if (isShadoLiveRoomUnavailableError(caught)) {
+          setRooms(current => current.filter(candidate => candidate.id !== initialRoomId))
+          setError(null)
+          setNotice('That Shado Live room has ended or is no longer available.')
+          onRoomRoute?.('close', initialRoomId)
+          void refreshRooms()
+          return
+        }
+        setError(getShadoLiveErrorMessage(caught, 'The linked live room is unavailable.'))
       })
     return () => { cancelled = true }
-  }, [initialRoomId, rooms])
+  }, [initialRoomId, onRoomRoute, refreshRooms, rooms])
+
+  useEffect(() => {
+    if (!user?.id || room?.id) return
+    const refreshVisible = () => {
+      if (document.visibilityState !== 'hidden' && navigator.onLine !== false) {
+        void refreshRooms()
+      }
+    }
+    window.addEventListener('focus', refreshVisible)
+    window.addEventListener('online', refreshVisible)
+    document.addEventListener('visibilitychange', refreshVisible)
+    const interval = window.setInterval(refreshVisible, 15_000)
+    return () => {
+      window.clearInterval(interval)
+      window.removeEventListener('focus', refreshVisible)
+      window.removeEventListener('online', refreshVisible)
+      document.removeEventListener('visibilitychange', refreshVisible)
+    }
+  }, [refreshRooms, room?.id, user?.id])
 
   useEffect(() => {
     const roomId = room?.id
@@ -540,6 +594,7 @@ export function useShadoLiveRoom({
     refreshRoom,
     createRoom,
     joinRoom,
+    resumeRoom,
     reconnectMedia,
     leaveRoom,
     returnToLobby,

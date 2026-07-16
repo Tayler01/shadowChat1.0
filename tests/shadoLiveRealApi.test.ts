@@ -6,6 +6,7 @@ import {
   openShadoLiveSession,
   reconcileShadoLive,
   sendShadoLiveCommand,
+  ShadoLiveRoomUnavailableError,
   toggleMyShadoLiveMessageReaction,
 } from '../src/features/entertainment/shado-live/real/shadoLiveApi'
 
@@ -43,6 +44,38 @@ test('uses bounded caller-visible room read RPCs', async () => {
   await expect(getMyShadoLiveRoom(ROOM_ID)).resolves.toMatchObject({ id: ROOM_ID, version: 4 })
   expect(rpc).toHaveBeenNthCalledWith(1, 'list_my_shado_live_rooms', { result_limit: 50 })
   expect(rpc).toHaveBeenNthCalledWith(2, 'get_my_shado_live_room', { target_room_id: ROOM_ID })
+})
+
+test('distinguishes a private unavailable room from a malformed snapshot', async () => {
+  const rpc = jest.fn()
+    .mockResolvedValueOnce({ data: null, error: null })
+    .mockResolvedValueOnce({ data: { roomId: ROOM_ID }, error: null })
+  workingClient.mockResolvedValue({ rpc } as never)
+
+  await expect(getMyShadoLiveRoom(ROOM_ID)).rejects.toBeInstanceOf(ShadoLiveRoomUnavailableError)
+  await expect(getMyShadoLiveRoom(ROOM_ID)).rejects.toThrow('invalid room snapshot')
+})
+
+test('surfaces the structured Edge Function error instead of the generic SDK message', async () => {
+  const invoke = jest.fn().mockResolvedValue({
+    data: null,
+    error: {
+      message: 'Edge Function returned a non-2xx status code',
+      context: {
+        clone: () => ({
+          json: async () => ({
+            error: 'Shado Live is temporarily unavailable.',
+            code: 'live_unavailable',
+          }),
+        }),
+      },
+    },
+  })
+  workingClient.mockResolvedValue({ functions: { invoke } } as never)
+
+  await expect(reconcileShadoLive(REQUEST_RECONCILE)).rejects.toThrow(
+    'Shado Live is temporarily unavailable.'
+  )
 })
 
 test('loads isolated live reaction aggregates and toggles them through guarded RPCs', async () => {

@@ -37,6 +37,11 @@ jest.mock('../src/lib/supabase', () => ({
 
 jest.mock('../src/features/entertainment/shado-live/real/shadoLiveApi', () => ({
   getMyShadoLiveRoom: jest.fn(),
+  isShadoLiveRoomUnavailableError: (caught: unknown) => (
+    Boolean(caught)
+    && typeof caught === 'object'
+    && (caught as { code?: unknown }).code === 'room_unavailable'
+  ),
   leaveShadoLiveSession: jest.fn(async () => true),
   listMyShadoLiveRooms: jest.fn(),
   openShadoLiveSession: jest.fn(),
@@ -149,4 +154,37 @@ test('keeps authoritative controls available when Realtime times out but the can
     '👍'
   )
   expect(mockGetRoom).toHaveBeenCalled()
+})
+
+test('resumes a recoverable host room through the existing resume session action', async () => {
+  const { result } = renderHook(() => useShadoLiveRoom())
+  await waitFor(() => expect(mockListRooms).toHaveBeenCalled())
+
+  await act(async () => {
+    await result.current.resumeRoom(liveRoom().id)
+  })
+
+  expect(mockOpenSession).toHaveBeenCalledWith(expect.objectContaining({
+    action: 'resume',
+    roomId: liveRoom().id,
+  }))
+})
+
+test('clears an unavailable linked room once and refreshes the lobby', async () => {
+  const onRoomRoute = jest.fn()
+  mockGetRoom.mockRejectedValueOnce(Object.assign(
+    new Error('This Shado Live room has ended or is no longer available.'),
+    { code: 'room_unavailable' }
+  ))
+
+  const { result } = renderHook(() => useShadoLiveRoom({
+    initialRoomId: liveRoom().id,
+    onRoomRoute,
+  }))
+
+  await waitFor(() => expect(onRoomRoute).toHaveBeenCalledWith('close', liveRoom().id))
+  expect(onRoomRoute).toHaveBeenCalledTimes(1)
+  expect(result.current.error).toBeNull()
+  expect(result.current.notice).toMatch(/ended or is no longer available/i)
+  expect(mockListRooms.mock.calls.length).toBeGreaterThanOrEqual(2)
 })

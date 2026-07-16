@@ -120,6 +120,7 @@ export function ShadoLiveExperience({
           createButtonRef={createButtonRef}
           onCreate={createRoom}
           onJoin={joinRoom}
+          onResume={controller.resumeRoom}
           onRefresh={controller.refreshRooms}
           onOpenProfile={openProfile}
         />

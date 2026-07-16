@@ -257,6 +257,13 @@ const mapRpcError = (error: NonNullable<SupabaseRpcResult['error']>) => {
   if (/not found|not available/iu.test(message)) {
     return new ShadoLiveRequestError('This Shado Live room is not available.', 404, 'room_not_available')
   }
+  if (error.code === '55000' || /shado live is disabled/iu.test(message)) {
+    return new ShadoLiveRequestError(
+      'Shado Live is temporarily unavailable.',
+      503,
+      'live_unavailable',
+    )
+  }
   if (/forbidden|not allowed|not eligible|operator|host required|blocked|authentication/iu.test(message) || error.code === '42501') {
     return new ShadoLiveRequestError('This Shado Live action is not allowed.', 403, 'action_not_allowed')
   }

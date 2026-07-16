@@ -21,6 +21,15 @@ const betaAccessSql = fs.readFileSync(
   ),
   'utf8'
 )
+const productionReleaseSql = fs.readFileSync(
+  path.join(
+    process.cwd(),
+    'supabase',
+    'migrations',
+    '20260716224217_enable_shado_live_production.sql'
+  ),
+  'utf8'
+)
 const allowlist = JSON.parse(fs.readFileSync(
   path.join(process.cwd(), 'supabase', 'security-definer-allowlist.json'),
   'utf8'
@@ -68,6 +77,13 @@ describe('Shado Live database foundation', () => {
     expect(betaAccessSql).not.toMatch(/access_mode = 'enabled'/i)
     expect(betaAccessSql).not.toMatch(/insert into auth\./i)
     expect(betaAccessSql.match(/::uuid\)/gi)).toHaveLength(7)
+  })
+
+  test('moves the released production surface from beta allowlist to global enabled mode', () => {
+    expect(productionReleaseSql).toMatch(/access_mode = 'enabled'/i)
+    expect(productionReleaseSql).toMatch(/where singleton[\s\S]*access_mode = 'allowlist'/i)
+    expect(productionReleaseSql).toMatch(/enabled = true/i)
+    expect(productionReleaseSql).not.toMatch(/delete from public\.shado_live_access_members/i)
   })
 
   test('exposes narrow invoker RPCs through a dedicated unexposed authority schema', () => {

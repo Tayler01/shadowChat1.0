@@ -164,7 +164,11 @@ export function useUnreadScroll<TMessage>({
   const findFirstUnreadMessage = useCallback(() => {
     const explicitUnread = getUnreadMessages?.(messages)
     if (explicitUnread?.length) {
-      return explicitUnread[0] ?? null
+      if (!cursor) return explicitUnread[0] ?? null
+      return explicitUnread.find(message => isMessageAfterCursor({
+        created_at: getMessageCreatedAt(message),
+        id: getMessageId(message),
+      }, cursor)) ?? null
     }
 
     if (!cursor || messages.length === 0) {

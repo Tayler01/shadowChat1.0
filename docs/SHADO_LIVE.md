@@ -1,19 +1,19 @@
 # Shado Live
 
-## Status - Real Allowlisted Beta
+## Status - Production Audio Beta
 
 Shado Live is now implemented as a real, audio-first LiveKit experience on
-`codex/shadowchat-2.0`. It remains excluded from the default build and from
-production `main`. The real client is compiled only when
+production `main`. The production frontend compiles the real client with
 `VITE_FEATURE_SHADO_LIVE_REAL=true`; the preserved frontend-only prototype uses
 the separate `VITE_FEATURE_SHADO_LIVE_PROTOTYPE` flag and must remain false in
-the real beta build.
+the production build.
 
-The isolated beta uses the shared Supabase project through additive schema and
-Edge Functions, while access is server-gated to selected testers. A hidden
-production route or a forged feature flag does not grant access. The isolated
-frontend also restores deterministic Catch-Up with
-`VITE_FEATURE_CATCH_UP=true`.
+The production client uses the shared Supabase project through additive schema
+and Edge Functions. Server access is enabled for signed-in members; account,
+connection, block, restriction, room-state, and role checks remain authoritative.
+A hidden route or forged feature flag does not grant access. The preserved
+`allowlist` mode remains available for a future staged rollout or incident
+containment, and `disabled` remains the emergency stop.
 
 The accepted July 14 retro picker banner remains the real beta picker asset:
 `public/entertainment/shado-live/picker-banner.webp`. Its source dimensions,
@@ -23,8 +23,7 @@ The banner is intentionally limited to the Entertainment picker. The Live
 lobby uses the same compact, tokenized page chrome as the rest of ShadowChat
 instead of repeating a large decorative hero inside the feature.
 
-Production `main` and the production Netlify frontend remain unchanged until
-installed-phone acceptance and explicit merge approval.
+The real client was approved and released to production on July 16, 2026.
 
 ## V1 Product Contract
 
@@ -59,7 +58,7 @@ scheduled -> green_room -> live -> ending -> ended
 
 - `green_room` is visible only to its host. It is not advertised as a live
   room to other members.
-- `live` is discoverable only to eligible allowlisted members. Listeners receive
+- `live` is discoverable only to eligible signed-in members. Listeners receive
   short-lived, room-scoped media tokens.
 - `ending` rejects new joins while provider and audit state are finalized.
 - `ended` and `cancelled` are terminal. A stale token or reconnect cannot
@@ -121,11 +120,11 @@ document is visible and online, with no overlapping request.
 ## Access And Compatibility
 
 `shado_live_system_state.access_mode` supports `disabled`, `allowlist`, and
-future global `enabled`. The isolated beta is `allowlist`; tester membership is
-private and operator-managed. Production clients do not expose the real route,
-and older clients remain compatible with the additive schema.
+global `enabled`. Production uses `enabled`; private operator-managed tester
+membership is consulted only in `allowlist` mode. Older clients remain
+compatible with the additive schema.
 
-Selected beta accounts are seeded by
+The original selected beta accounts are preserved by
 `20260716030000_shado_live_beta_access.sql`. The migration inserts only IDs that
 already exist in `public.users`, so local resets and incomplete environments do
 not create placeholder identities.
@@ -246,11 +245,12 @@ webhook configuration/delivery path rather than the Edge Function signature
 or ingestion code. Use **Settings -> Webhooks -> Actions -> Send a test event**
 and confirm a receipt before treating provider webhooks as operational.
 
-The latest July 16 blocking-fix build is published only to the isolated test
-frontend at `https://shadowchat-2-0-wave-one.netlify.app` as immutable deploy
-`6a58e3618f587535ea7146d7`. Both mobile engines passed the deterministic proof
-against that deployed artifact, and the non-mocked provider gate passed from
-the stable URL. Production `main` remains unchanged until the approved merge.
+The July 16 release passed deterministic Pixel Chromium and iPhone WebKit proof
+plus the non-mocked LiveKit provider gate before it was merged to production.
+The post-release reliability patch adds structured Edge Function errors,
+authoritative stale-room recovery, host-room resume, host composer focus across
+media reconnects, and global signed-in-member access after the isolated tester
+period ended.
 
 Commands:
 
@@ -273,23 +273,23 @@ supabase db push --dry-run --linked
    webhook URL, choose the same signing API key, and send a test event.
 6. Verify provider room create/join/start/chat/end/cleanup with controlled beta
    accounts and confirm no provider room or test data remains.
-7. Build the isolated frontend with real Live enabled, prototype disabled, and
-   Catch-Up enabled; deploy only to `shadowchat-2-0-wave-one`.
+7. Build the production frontend with real Live enabled and the prototype
+   disabled; deploy from the verified `main` commit.
 8. Repeat authenticated Pixel Chromium/iPhone WebKit smoke against the exact
-   deploy and then perform installed iPhone/Android beta acceptance.
+   deploy and continue installed iPhone/Android acceptance.
 
-## Remaining Before Production
+## Remaining Reliability Work
 
 1. Complete installed iPhone and Android PWA testing for microphone permission,
    audio routing, speaker/listener handoff, Bluetooth/headphones, keyboard,
    safe areas, background/resume, lock/unlock, weak network, and accessibility.
 2. Correct the LiveKit Cloud webhook configuration and prove automatic
    room/participant/track receipts with a dashboard test event and a real room.
-3. Collect multi-tester feedback and repair reproducible beta issues.
+3. Continue multi-user production feedback and repair reproducible issues.
 4. Add OS push only through its separate notification reliability gate.
 5. Measure physical-device battery, thermal, memory, and network behavior.
-6. Merge and deploy to production only after explicit approval. Catch-Up stays
-   deterministic and source linked; the private AI trial remains separate.
+6. Keep Catch-Up deterministic and source linked; the private AI trial remains
+   separate.
 
 ## Preserved Prototype
 

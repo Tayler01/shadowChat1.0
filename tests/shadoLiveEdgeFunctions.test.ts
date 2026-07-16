@@ -71,6 +71,12 @@ describe('Shado Live Edge Function security contracts', () => {
     ])
   })
 
+  test('maps the emergency disabled state to a deliberate public error', () => {
+    expect(shared).toContain("error.code === '55000'")
+    expect(shared).toContain("'Shado Live is temporarily unavailable.'")
+    expect(shared).toContain("'live_unavailable'")
+  })
+
   test('command requests implement the exact action surface with stale-room protection', () => {
     for (const action of [
       'start',

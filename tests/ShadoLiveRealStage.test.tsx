@@ -40,6 +40,7 @@ const controller = (role: ShadoLiveRoom['myRole']): ShadoLiveRoomController => (
   },
   refreshRooms: jest.fn().mockResolvedValue(undefined), refreshRoom: jest.fn().mockResolvedValue(null),
   createRoom: jest.fn().mockResolvedValue(undefined), joinRoom: jest.fn().mockResolvedValue(undefined),
+  resumeRoom: jest.fn().mockResolvedValue(undefined),
   reconnectMedia: jest.fn().mockResolvedValue(undefined),
   leaveRoom: jest.fn().mockResolvedValue(undefined), returnToLobby: jest.fn().mockResolvedValue(undefined),
   startAudio: jest.fn().mockResolvedValue(undefined), toggleMicrophone: jest.fn().mockResolvedValue(undefined),
@@ -104,6 +105,29 @@ test('chat clears only after the persistent server command resolves', async () =
   fireEvent.change(composer, { target: { value: 'Next message' } })
   confirmMessage()
   await waitFor(() => expect(composer).toHaveValue('Next message'))
+})
+
+test('keeps the focused host draft editable while live media reconnects', () => {
+  const value = controller('host')
+  const { rerender } = render(
+    <ShadoLiveStage controller={value} currentUserId="host-1" onOpenProfile={jest.fn()} />
+  )
+  const composer = screen.getByRole('textbox', { name: 'Message the live room' })
+  composer.focus()
+  fireEvent.change(composer, { target: { value: 'Do not drop this draft' } })
+
+  const reconnecting = {
+    ...value,
+    controlsEnabled: false,
+    backendState: 'failed' as const,
+    media: { ...value.media, state: 'reconnecting' as const },
+  }
+  rerender(<ShadoLiveStage controller={reconnecting} currentUserId="host-1" onOpenProfile={jest.fn()} />)
+
+  expect(composer).toBeEnabled()
+  expect(composer).toHaveFocus()
+  expect(composer).toHaveValue('Do not drop this draft')
+  expect(screen.getByRole('button', { name: 'Send live room message' })).toBeDisabled()
 })
 
 test('renders real profile images and opens profiles from stage, chat, and room identities', () => {

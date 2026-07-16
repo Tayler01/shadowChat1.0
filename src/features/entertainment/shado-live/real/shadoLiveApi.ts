@@ -33,6 +33,24 @@ export interface ShadoLiveCommandInput {
   requestId?: string
 }
 
+export class ShadoLiveRoomUnavailableError extends Error {
+  readonly code = 'room_unavailable'
+
+  constructor() {
+    super('This Shado Live room has ended or is no longer available.')
+    this.name = 'ShadoLiveRoomUnavailableError'
+  }
+}
+
+export const isShadoLiveRoomUnavailableError = (caught: unknown) => (
+  caught instanceof ShadoLiveRoomUnavailableError
+  || (
+    Boolean(caught)
+    && typeof caught === 'object'
+    && (caught as { code?: unknown }).code === 'room_unavailable'
+  )
+)
+
 const unwrapFunctionData = (value: unknown) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return value
   const record = value as Record<string, unknown>
@@ -103,13 +121,43 @@ const applyMessageReactions = (
   }
 }
 
+const readFunctionErrorMessage = async (caught: unknown) => {
+  if (!caught || typeof caught !== 'object') return null
+  const context = (caught as {
+    context?: {
+      clone?: () => unknown
+      json?: () => Promise<unknown>
+    }
+  }).context
+  if (!context) return null
+
+  try {
+    const readable = typeof context.clone === 'function' ? context.clone() : context
+    if (!readable || typeof readable !== 'object') return null
+    const readJson = (readable as { json?: () => Promise<unknown> }).json
+    if (typeof readJson !== 'function') return null
+    const payload = await readJson.call(readable)
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null
+    const message = (payload as { error?: unknown; message?: unknown }).error
+      ?? (payload as { message?: unknown }).message
+    if (typeof message !== 'string') return null
+    const normalized = message.replace(/\s+/gu, ' ').trim()
+    return normalized ? normalized.slice(0, 500) : null
+  } catch {
+    return null
+  }
+}
+
 const invoke = async (
   functionName: 'shado-live-session' | 'shado-live-command' | 'shado-live-reconcile',
   body: Record<string, unknown>
 ) => {
   const client = await getWorkingClient()
   const { data, error } = await client.functions.invoke(functionName, { body })
-  if (error) throw new Error(getShadoLiveErrorMessage(error, 'Shado Live is unavailable right now.'))
+  if (error) {
+    const serverMessage = await readFunctionErrorMessage(error)
+    throw new Error(serverMessage ?? getShadoLiveErrorMessage(error, 'Shado Live is unavailable right now.'))
+  }
   return unwrapFunctionData(data)
 }
 
@@ -138,6 +186,7 @@ export const getMyShadoLiveRoom = async (roomId: string): Promise<ShadoLiveRoom>
   })
   if (error) throw error
   const source = Array.isArray(data) ? data[0] : data
+  if (source == null) throw new ShadoLiveRoomUnavailableError()
   const room = normalizeShadoLiveRoom(source)
   if (!room) throw new Error('Shado Live returned an invalid room snapshot.')
   if (room.messages.length === 0) return room

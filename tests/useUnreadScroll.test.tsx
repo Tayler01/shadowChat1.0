@@ -515,6 +515,42 @@ describe('useUnreadScroll', () => {
     document.body.removeChild(container)
   })
 
+  it('ignores stale explicit unread flags at or before the authoritative read cursor', async () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1200)
+    setRect(container, 0, 400)
+
+    const firstUnreadEl = document.createElement('div')
+    firstUnreadEl.id = 'message-m3'
+    firstUnreadEl.scrollIntoView = jest.fn()
+    setRect(firstUnreadEl, 80, 160)
+    container.appendChild(firstUnreadEl)
+
+    const messages = [makeMessage('m1', 1), makeMessage('m2', 2), makeMessage('m3', 3)]
+    const { result } = renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages,
+        loading: false,
+        cursor: makeCursor('m2', 2),
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'dm:conversation-1',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        getUnreadMessages: () => [messages[0], messages[2]],
+        onMarkReadToLatest: jest.fn(),
+      })
+    )
+
+    expect(result.current.firstUnreadMessageId).toBe('m3')
+    expect(firstUnreadEl.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' })
+    document.body.removeChild(container)
+  })
+
   it('uses the oldest loaded unread row when the stored cursor predates the loaded window', async () => {
     useFakeTimersWithImmediateRaf()
     const container = document.createElement('div')

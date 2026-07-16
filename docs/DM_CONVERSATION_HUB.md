@@ -111,3 +111,12 @@ This checkpoint is complete only after:
   Inbox, Unread, and Archived modes and passed the full authenticated DM,
   resume-send, mobile Back, and mobile refocus smoke. Production `main` remains
   unchanged.
+
+## Production Read-Position Reliability - July 16, 2026
+
+- The authoritative conversation read cursor now bounds per-message `read_by`
+  hints when selecting the first unread message after reopening a DM.
+- A stale missing `read_by` entry at or before the saved cursor can no longer
+  pull the conversation backward to an already-read message.
+- Explicit unread hints remain useful after the cursor, and a newer unread
+  message still receives the normal auto-advance target.

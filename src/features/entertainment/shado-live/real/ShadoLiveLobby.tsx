@@ -10,6 +10,7 @@ export interface ShadoLiveLobbyProps {
   createButtonRef?: RefObject<HTMLButtonElement>
   onCreate: (title: string) => Promise<void>
   onJoin: (roomId: string) => Promise<void>
+  onResume: (roomId: string) => Promise<void>
   onRefresh: () => Promise<void>
   onOpenProfile: (userId: string) => void
 }
@@ -29,6 +30,7 @@ export function ShadoLiveLobby({
   createButtonRef,
   onCreate,
   onJoin,
+  onResume,
   onRefresh,
   onOpenProfile,
 }: ShadoLiveLobbyProps) {
@@ -48,11 +50,12 @@ export function ShadoLiveLobby({
     }
   }
 
-  const join = async (roomId: string) => {
+  const join = async (room: ShadoLiveRoom) => {
     if (joiningRoomId) return
-    setJoiningRoomId(roomId)
+    setJoiningRoomId(room.id)
     try {
-      await onJoin(roomId)
+      if (room.myRole === 'host') await onResume(room.id)
+      else await onJoin(room.id)
     } finally {
       setJoiningRoomId(null)
     }
@@ -107,6 +110,10 @@ export function ShadoLiveLobby({
             {rooms.map(room => {
               const highlighted = initialRoomId === room.id
               const joining = joiningRoomId === room.id
+              const resumingAsHost = room.myRole === 'host'
+              const canEnter = resumingAsHost
+                ? room.status === 'green_room' || room.status === 'live'
+                : room.canJoin && room.status === 'live'
               return (
                 <article key={room.id} className={`rounded-[1.5rem] border bg-[var(--bg-panel)] p-4 shadow-[var(--shadow-panel)] ${highlighted ? 'border-[#d7aa46]/60' : 'border-[var(--border-panel)]'}`}>
                   <div className="flex items-start justify-between gap-3">
@@ -143,11 +150,11 @@ export function ShadoLiveLobby({
                   </div>
                   <button
                     type="button"
-                    onClick={() => void join(room.id)}
-                    disabled={!room.canJoin || joining || joiningRoomId !== null || room.status !== 'live'}
+                    onClick={() => void join(room)}
+                    disabled={!canEnter || joining || joiningRoomId !== null}
                     className="mt-4 min-h-12 w-full rounded-2xl bg-[#d7aa46] px-4 text-sm font-bold text-[#171108] focus:outline-none focus:ring-2 focus:ring-[#f4d985] focus:ring-offset-2 focus:ring-offset-black disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {joining ? 'Authorizing…' : room.canJoin && room.status === 'live' ? 'Join as listener' : 'Not available to join'}
+                    {joining ? 'Authorizing…' : resumingAsHost && canEnter ? 'Resume as host' : canEnter ? 'Join as listener' : 'Not available to join'}
                   </button>
                 </article>
               )

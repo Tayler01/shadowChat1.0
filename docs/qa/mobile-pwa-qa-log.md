@@ -6,7 +6,24 @@ Older artifact paths remain historical evidence. The July 10 web Release A is
 deployed, but its mobile/PWA-sensitive behavior still needs a fresh harness
 artifact and physical-device pass.
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
+
+## July 16 Shado Live And DM Production Hotfix Checkpoint
+
+- The deterministic real Shado Live browser verifier passed the fresh
+  production build across its Pixel Chromium and iPhone WebKit host/listener
+  flows. Evidence: `output/playwright/shado-live-real/summary.json`.
+- A fresh, non-reused production preview at `http://127.0.0.1:4176` passed the
+  authenticated DM smoke. Evidence:
+  `output/playwright/dm-read-position-hotfix/summary.json`.
+- Jest covers Live structured server errors, null/stale room recovery, host
+  resume, host composer focus during reconnect, global access migration, and
+  cursor-bounded DM auto-advance. The full gate passed 228 suites and 1,235
+  tests with 16 existing todos.
+- ESLint, app TypeScript, production build, paused-feature verification, bundle
+  budgets, the 28-function manifest, and the linked migration dry run passed.
+- Installed iPhone/Android microphone, keyboard, weak-network reconnect, and DM
+  reopen behavior remain the physical-device acceptance check after deploy.
 
 ## July 15 Final Acceptance Automated Checkpoint
 

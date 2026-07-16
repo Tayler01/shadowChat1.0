@@ -155,7 +155,6 @@ export function ShadoLiveStage({
   const canUseMicrophone = canPublishShadoLiveMicrophone(room.myRole)
   const microphoneReady = (controller.controlsEnabled || controller.startEnabled) && media.microphoneAllowed
   const handRaised = room.myStageRequestStatus === 'raised'
-  const composerEnabled = controller.controlsEnabled || controller.commandBusy === 'send_message'
   const canRetryMedia = media.state !== 'connected' && controller.backendState !== 'authorizing'
 
   return (
@@ -447,7 +446,7 @@ export function ShadoLiveStage({
 
           {panel === 'chat' && (
             <form onSubmit={submitMessage} className="flex shrink-0 items-end gap-2 border-t border-[var(--border-panel)] bg-[var(--bg-panel-strong)] p-2.5 sm:p-3" data-testid="shado-live-real-composer">
-              <label className="min-w-0 flex-1"><span className="sr-only">Message the live room</span><textarea ref={composerRef} value={draft} onChange={event => setDraft(event.target.value)} disabled={!composerEnabled} maxLength={500} rows={1} placeholder={composerEnabled ? 'Message the room' : 'Chat locked while room state syncs'} className="max-h-24 min-h-12 w-full resize-none rounded-2xl border border-[var(--border-subtle)] bg-white/[0.04] px-4 py-3 text-base text-white outline-none placeholder:text-[#777168] focus:border-[#d7aa46]/60 focus:ring-2 focus:ring-[#d7aa46]/20 disabled:opacity-55 md:text-sm" /></label>
+              <label className="min-w-0 flex-1"><span className="sr-only">Message the live room</span><textarea ref={composerRef} value={draft} onChange={event => setDraft(event.target.value)} maxLength={500} rows={1} placeholder={controller.controlsEnabled ? 'Message the room' : 'Keep drafting while the room reconnects'} className="max-h-24 min-h-12 w-full resize-none rounded-2xl border border-[var(--border-subtle)] bg-white/[0.04] px-4 py-3 text-base text-white outline-none placeholder:text-[#777168] focus:border-[#d7aa46]/60 focus:ring-2 focus:ring-[#d7aa46]/20 md:text-sm" /></label>
               <button
                 type="submit"
                 disabled={!controller.controlsEnabled || !draft.trim() || controller.commandBusy === 'send_message'}
