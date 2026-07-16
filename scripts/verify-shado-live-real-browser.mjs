@@ -743,7 +743,7 @@ const assertKeyboardGeometry = async (page, profile) => {
   await page.waitForTimeout(400)
   const geometry = await page.evaluate(value => {
     const inputElement = document.querySelector('[data-testid="shado-live-real-composer"] textarea')
-    const visualElement = document.querySelector('[data-testid="shado-live-real-stage-visual"]')
+    const visualElement = document.querySelector('[data-testid="shado-live-real-stage"] main')
     const dockElement = document.querySelector('.shado-live-control-dock')
     const input = inputElement?.getBoundingClientRect()
     return {
