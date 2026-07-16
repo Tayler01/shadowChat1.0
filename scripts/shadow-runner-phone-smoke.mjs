@@ -621,7 +621,7 @@ async function assertLevelSixGameplay(page, profile) {
 async function assertLevelSevenGameplay(page, profile) {
   const checkpoints = [
     { x: 2070, y: 616, id: 'causeway-first-bridge' },
-    { x: 4410, y: 616, id: 'causeway-shard-climb' },
+    { x: 4410, y: 604, id: 'causeway-shard-climb' },
     { x: 5530, y: 616, id: 'causeway-arrow-pocket' },
     { x: 7910, y: 616, id: 'causeway-moon-gauntlet' },
     { x: 8970, y: 616, id: 'causeway-final-archers' },
@@ -668,9 +668,69 @@ async function assertLevelSevenGameplay(page, profile) {
     `${profile.label}: Level 7 ${crouchSegment.label} stopped at x=${snapshot?.player?.x ?? 'missing'} before x=${crouchSegment.targetX}`,
   )
 
+  const crawlPickupSegment = { label: 'moon shard crawl pickups', x: 6265, y: 616, targetX: 6600 }
+  await page.evaluate(({ x, y }) => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(x, y)
+  }, crawlPickupSegment)
+  await delay(120)
+  const beforeCrawlPickup = await readShadowRunnerDebug(page)
+  await page.keyboard.down('KeyS')
+  await page.keyboard.down('KeyD')
+  await delay(4200)
+  await page.keyboard.up('KeyD')
+  await page.keyboard.up('KeyS')
+  snapshot = await readShadowRunnerDebug(page)
+  assert(
+    (snapshot?.player?.x ?? 0) >= crawlPickupSegment.targetX,
+    `${profile.label}: Level 7 ${crawlPickupSegment.label} stopped at x=${snapshot?.player?.x ?? 'missing'} before x=${crawlPickupSegment.targetX}`,
+  )
+  assert(
+    (snapshot?.player?.coins ?? 0) >= (beforeCrawlPickup?.player?.coins ?? 0) + 2,
+    `${profile.label}: Level 7 ${crawlPickupSegment.label} did not collect crawl-lane coins `
+      + `(coins ${beforeCrawlPickup?.player?.coins ?? 'missing'} -> ${snapshot?.player?.coins ?? 'missing'}, `
+      + `x=${snapshot?.player?.x ?? 'missing'}, bodyTop=${snapshot?.player?.bodyTop ?? 'missing'}, `
+      + `bodyBottom=${snapshot?.player?.bodyBottom ?? 'missing'})`,
+  )
+  assert(
+    (snapshot?.player?.moonShards ?? 0) >= (beforeCrawlPickup?.player?.moonShards ?? 0) + 1,
+    `${profile.label}: Level 7 ${crawlPickupSegment.label} did not collect the crawl-lane Moon Shard`,
+  )
+
+  const recoverySegments = [
+    { label: 'middle recovery chip', x: 4030, y: 616, targetX: 4400, targetBottom: 632, secondHopDelayMs: 900 },
+    { label: 'moon gauntlet recovery chip', x: 8360, y: 616, targetX: 8870, targetBottom: 644, secondHopDelayMs: 980 },
+    { label: 'final recovery chip', x: 9690, y: 616, targetX: 10120, targetBottom: 644, secondHopDelayMs: 920 },
+  ]
+
+  for (const segment of recoverySegments) {
+    await page.evaluate(({ x, y }) => {
+      window.__shadowRunnerQa?.restore()
+      window.__shadowRunnerQa?.teleport(x, y)
+    }, segment)
+    await delay(120)
+    await page.keyboard.down('KeyD')
+    await page.getByRole('button', { name: 'Jump' }).click()
+    await delay(280)
+    await page.getByRole('button', { name: 'Jump' }).click()
+    await delay(segment.secondHopDelayMs)
+    await page.getByRole('button', { name: 'Jump' }).click()
+    await delay(950)
+    await page.keyboard.up('KeyD')
+    snapshot = await readShadowRunnerDebug(page)
+    assert(
+      (snapshot?.player?.x ?? 0) >= segment.targetX,
+      `${profile.label}: Level 7 ${segment.label} stopped at x=${snapshot?.player?.x ?? 'missing'} before x=${segment.targetX} `
+        + `(bodyTop=${snapshot?.player?.bodyTop ?? 'missing'}, bodyBottom=${snapshot?.player?.bodyBottom ?? 'missing'})`,
+    )
+    assert(
+      (snapshot?.player?.bodyBottom ?? 999) <= segment.targetBottom,
+      `${profile.label}: Level 7 ${segment.label} ended below the recovery route at y=${snapshot?.player?.bodyBottom ?? 'missing'}`,
+    )
+  }
+
   const shards = [
-    { x: 3060, y: 246, expected: 1 },
-    { x: 6460, y: 576, expected: 2 },
+    { x: 3060, y: 246, expected: 2 },
     { x: 10180, y: 228, expected: 3 },
   ]
 

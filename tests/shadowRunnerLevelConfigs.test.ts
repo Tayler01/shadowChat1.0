@@ -105,6 +105,49 @@ describe('Shadow Runner level configuration contract', () => {
     expect(SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip).toContain('moon-shard-relic-4f-64.png')
   })
 
+  it('keeps Moonlit Causeway crawl pickups and recovery chips reachable', () => {
+    const levelSeven = SHADOW_RUNNER_LEVEL_CONFIGS['level-7']
+    const platformById = new Map(levelSeven.platforms.map(platform => [platform.id, platform]))
+    const spikeById = new Map(levelSeven.spikes.map(spike => [spike.id, spike]))
+    const coinById = new Map(levelSeven.coins.map(coin => [coin.id, coin]))
+    const shardById = new Map(levelSeven.moonShardPickups?.map(shard => [shard.id, shard]) ?? [])
+    const chronoById = new Map(levelSeven.chronoPickups?.map(chrono => [chrono.id, chrono]) ?? [])
+
+    ;([
+      ['causeway-mid-gap-chip', 'causeway-gap-f'],
+      ['causeway-moon-gauntlet-chip', 'causeway-gap-k'],
+      ['causeway-final-gap-chip', 'causeway-gap-l'],
+    ] as const).forEach(([chipId, gapId]) => {
+      const chip = platformById.get(chipId)!
+      const gap = spikeById.get(gapId)!
+
+      expect(chip.x).toBeGreaterThan(gap.x)
+      expect(chip.x + chip.width).toBeLessThan(gap.x + gap.width)
+      expect(chip.width).toBeGreaterThanOrEqual(100)
+      expect(chip.width).toBeLessThanOrEqual(170)
+      expect(chip.y).toBeLessThan(616)
+    })
+
+    const highRecovery = platformById.get('causeway-high-recovery-a')!
+    const shardCheckpoint = levelSeven.checkpoints?.find(checkpoint => checkpoint.id === 'causeway-shard-climb')
+
+    expect(highRecovery.y).toBe(604)
+    expect(highRecovery.height).toBeLessThanOrEqual(64)
+    expect(shardCheckpoint?.y).toBe(highRecovery.y)
+    expect(chronoById.get('chrono-causeway-climb')?.x).toBeGreaterThanOrEqual(highRecovery.x + 80)
+    expect(chronoById.get('chrono-causeway-climb')?.y).toBeGreaterThanOrEqual(568)
+
+    ;([
+      'coin-11', 'coin-12', 'coin-13',
+      'coin-27', 'coin-28', 'coin-29', 'coin-30',
+      'coin-40', 'coin-41', 'coin-42',
+      'coin-50', 'coin-51', 'coin-52',
+    ] as const).forEach(coinId => {
+      expect(coinById.get(coinId)?.y).toBeGreaterThanOrEqual(596)
+    })
+    expect(shardById.get('moon-shard-crawl-route')?.y).toBeGreaterThanOrEqual(596)
+  })
+
   it('adds safe recovery checkpoints to every long campaign route', () => {
     const expectedMinimums = new Map([
       ['level-1', 1],
