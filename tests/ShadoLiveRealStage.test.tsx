@@ -39,6 +39,7 @@ const controller = (role: ShadoLiveRoom['myRole']): ShadoLiveRoomController => (
   },
   refreshRooms: jest.fn().mockResolvedValue(undefined), refreshRoom: jest.fn().mockResolvedValue(null),
   createRoom: jest.fn().mockResolvedValue(undefined), joinRoom: jest.fn().mockResolvedValue(undefined),
+  reconnectMedia: jest.fn().mockResolvedValue(undefined),
   leaveRoom: jest.fn().mockResolvedValue(undefined), returnToLobby: jest.fn().mockResolvedValue(undefined),
   startAudio: jest.fn().mockResolvedValue(undefined), toggleMicrophone: jest.fn().mockResolvedValue(undefined),
   toggleHand: jest.fn().mockResolvedValue(undefined), sendMessage: jest.fn().mockResolvedValue(undefined),
@@ -115,4 +116,22 @@ test('renders real profile images and opens profiles from stage, chat, and room 
   fireEvent.click(screen.getByRole('tab', { name: 'Room' }))
   fireEvent.click(screen.getByRole('button', { name: "Open Jordan's profile" }))
   expect(openProfile).toHaveBeenCalledWith('listener-1')
+})
+
+test('does not repeat the active host in the secondary stage avatar list', () => {
+  const value = controller('host')
+  render(<ShadoLiveStage controller={value} currentUserId="host-1" onOpenProfile={jest.fn()} />)
+
+  expect(screen.queryByLabelText(/Other people on stage/i)).not.toBeInTheDocument()
+})
+
+test('offers an audio retry when the provider connection fails', () => {
+  const value = controller('host')
+  value.backendState = 'failed'
+  value.error = 'The LiveKit room could not connect.'
+  value.media = { ...value.media, state: 'idle' }
+  render(<ShadoLiveStage controller={value} currentUserId="host-1" onOpenProfile={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Retry audio' }))
+  expect(value.reconnectMedia).toHaveBeenCalledTimes(1)
 })

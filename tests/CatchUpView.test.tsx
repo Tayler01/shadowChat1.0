@@ -73,6 +73,8 @@ test('loads source-linked sections and acknowledges only the opened Activity eve
 
   expect(await screen.findByRole('heading', { name: 'Needs you' })).toBeInTheDocument()
   expect(screen.getByText('Source-linked / No AI')).toBeInTheDocument()
+  expect(screen.getByTestId('catch-up-compact-header')).toHaveClass('border-b')
+  expect(screen.getByTestId('catch-up-compact-header')).not.toHaveClass('rounded-[1.75rem]')
   fireEvent.click(screen.getByRole('button', { name: /You were mentioned/i }))
 
   expect(onOpenSource).toHaveBeenCalledWith(expect.objectContaining({

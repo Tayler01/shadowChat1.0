@@ -69,7 +69,7 @@ const formatCoordinate = (value: number) => value.toFixed(3)
 
 function DailyRow({ day, index }: { day: WeatherDailyForecast; index: number }) {
   return (
-    <div className="grid grid-cols-[3.3rem_2rem_minmax(0,1fr)_auto] items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] px-3 py-3 sm:grid-cols-[4rem_2.25rem_minmax(0,1fr)_6rem_auto]">
+    <div className="grid grid-cols-[3.3rem_2rem_minmax(0,1fr)_auto] items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] px-3 py-2.5 sm:grid-cols-[4rem_2.25rem_minmax(0,1fr)_6rem_auto]">
       <span className="text-sm font-semibold text-[var(--text-primary)]">{formatDay(day.date, index)}</span>
       <span className="text-[var(--theme-accent-readable)]">
         <WeatherIcon kind={day.condition.kind} className="h-5 w-5" />
@@ -381,7 +381,7 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
       )}
 
       <main className="min-h-0 flex-1 overflow-y-auto px-4 pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 md:pt-6">
-        <div className="mx-auto w-full max-w-4xl space-y-5">
+        <div className="mx-auto w-full max-w-4xl space-y-4">
           <header className="border-b border-[var(--border-subtle)] px-1 pb-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -420,7 +420,7 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
 
           </header>
 
-          <section className="glass-panel rounded-[var(--radius-lg)] border border-[var(--border-panel)] p-3" aria-label="Choose weather location">
+          <section className="glass-panel rounded-[var(--radius-md)] border border-[var(--border-panel)] p-2.5" aria-label="Choose weather location">
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
               <label className="relative block">
                 <span className="sr-only">Search city or postal code</span>
@@ -433,7 +433,7 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
                 />
                 {searching && <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[var(--theme-accent-readable)]" />}
               </label>
-              <button type="button" onClick={useCurrentLocation} disabled={locating || saving} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[var(--border-glow)] bg-[rgba(215,170,70,0.09)] px-4 font-semibold text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-55">
+              <button type="button" onClick={useCurrentLocation} disabled={locating || saving} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-[var(--border-glow)] bg-[rgba(215,170,70,0.09)] px-3.5 text-sm font-semibold text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-55">
                 {locating ? <Loader2 className="h-4 w-4 animate-spin" /> : <LocateFixed className="h-4 w-4" />}
                 Use current location
               </button>
@@ -487,22 +487,22 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
             </div>
           ) : (
             <>
-              <section className="rounded-[var(--radius-xl)] border border-[rgba(215,170,70,0.28)] bg-[linear-gradient(145deg,rgba(215,170,70,0.11),rgba(255,255,255,0.025))] p-5 sm:p-6" aria-labelledby="current-weather-title">
+              <section className="rounded-[var(--radius-lg)] border border-[rgba(215,170,70,0.28)] bg-[linear-gradient(145deg,rgba(215,170,70,0.11),rgba(255,255,255,0.025))] p-4" aria-labelledby="current-weather-title">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p id="current-weather-title" className="text-xs font-semibold uppercase tracking-[0.17em] text-[var(--text-muted)]">Right now</p>
-                    <p className="mt-3 text-6xl font-black tracking-[-0.06em] text-[var(--text-primary)] sm:text-7xl">{formatTemperature(forecast.current.temperature)}</p>
-                    <p className="mt-2 text-sm text-[var(--text-secondary)]">Feels like {formatTemperature(forecast.current.apparentTemperature)}</p>
+                    <p className="mt-2 text-5xl font-black tracking-[-0.055em] text-[var(--text-primary)] sm:text-6xl">{formatTemperature(forecast.current.temperature)}</p>
+                    <p className="mt-1.5 text-xs text-[var(--text-secondary)] sm:text-sm">Feels like {formatTemperature(forecast.current.apparentTemperature)}</p>
                   </div>
                   <div className="text-right">
-                    <span className="ml-auto grid h-16 w-16 place-items-center rounded-full border border-[var(--border-glow)] bg-[rgba(0,0,0,0.2)] text-[var(--theme-accent-readable)]">
-                      <WeatherIcon kind={forecast.current.condition.kind} isDay={forecast.current.isDay} className="h-8 w-8" />
+                    <span className="ml-auto grid h-14 w-14 place-items-center rounded-full border border-[var(--border-glow)] bg-[rgba(0,0,0,0.2)] text-[var(--theme-accent-readable)]">
+                      <WeatherIcon kind={forecast.current.condition.kind} isDay={forecast.current.isDay} className="h-7 w-7" />
                     </span>
-                    <p className="mt-2 font-semibold text-[var(--text-primary)]">{forecast.current.condition.label}</p>
+                    <p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">{forecast.current.condition.label}</p>
                   </div>
                 </div>
 
-                <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {[
                     { label: 'Humidity', value: `${Math.round(forecast.current.relativeHumidity)}%`, Icon: Droplets },
                     { label: 'Wind', value: `${Math.round(forecast.current.windSpeed)} ${forecast.windSpeedUnit}`, Icon: Wind },
@@ -513,19 +513,19 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
                     { label: 'Pressure', value: `${Math.round(forecast.current.pressure)} hPa`, Icon: Gauge },
                     { label: 'UV index', value: forecast.current.uvIndex.toFixed(1), Icon: Sunrise },
                   ].map(({ label, value, Icon }) => (
-                    <div key={label} className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.17)] p-3">
+                    <div key={label} className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.17)] p-2.5">
                       <p className="flex items-center gap-1.5 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]"><Icon className="h-3.5 w-3.5" />{label}</p>
-                      <p className="mt-2 font-semibold text-[var(--text-primary)]">{value}</p>
+                      <p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">{value}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => void toggleSavedLocation()} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] px-4 font-semibold text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]">
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => void toggleSavedLocation()} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] px-3.5 text-sm font-semibold text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]">
                     {currentSavedLocation ? <BookmarkCheck className="h-4 w-4 text-[var(--theme-accent-readable)]" /> : <Bookmark className="h-4 w-4" />}
                     {currentSavedLocation ? 'Saved' : 'Save location'}
                   </button>
-                  <button type="button" onClick={() => void shareWeather()} disabled={sharing} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] px-4 font-semibold text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-55">
+                  <button type="button" onClick={() => void shareWeather()} disabled={sharing} className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] px-3.5 text-sm font-semibold text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] disabled:opacity-55">
                     {sharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
                     Share to Chat
                   </button>
@@ -539,7 +539,7 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
 
               <section aria-labelledby="weather-alerts-title">
                 <div className="mb-3 flex items-center justify-between gap-3 px-1">
-                  <h2 id="weather-alerts-title" className="text-lg font-bold text-[var(--text-primary)]">Severe weather alerts</h2>
+                  <h2 id="weather-alerts-title" className="text-base font-bold text-[var(--text-primary)] sm:text-lg">Severe weather alerts</h2>
                   <span className="text-xs text-[var(--text-muted)]">US alerts from NWS</span>
                 </div>
                 {alertsLoading ? (
@@ -567,36 +567,36 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
               </section>
 
               <section aria-labelledby="hourly-forecast-title">
-                <h2 id="hourly-forecast-title" className="mb-3 px-1 text-lg font-bold text-[var(--text-primary)]">Next 24 hours</h2>
+                <h2 id="hourly-forecast-title" className="mb-3 px-1 text-base font-bold text-[var(--text-primary)] sm:text-lg">Next 24 hours</h2>
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {forecast.hourly.map(hour => (
-                    <article key={hour.time} className="min-w-[5.5rem] shrink-0 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] px-3 py-4 text-center">
+                    <article key={hour.time} className="min-w-[4.75rem] shrink-0 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] px-2.5 py-3 text-center">
                       <p className="text-xs font-medium text-[var(--text-muted)]">{formatHour(hour.time)}</p>
-                      <WeatherIcon kind={hour.condition.kind} className="mx-auto my-3 h-5 w-5 text-[var(--theme-accent-readable)]" />
-                      <p className="font-bold text-[var(--text-primary)]">{formatTemperature(hour.temperature)}</p>
-                      <p className="mt-2 text-[0.68rem] text-[#8ec8ed]">{hour.precipitationProbability ?? 0}% rain</p>
+                      <WeatherIcon kind={hour.condition.kind} className="mx-auto my-2.5 h-5 w-5 text-[var(--theme-accent-readable)]" />
+                      <p className="text-sm font-bold text-[var(--text-primary)]">{formatTemperature(hour.temperature)}</p>
+                      <p className="mt-1.5 text-[0.64rem] text-[#8ec8ed]">{hour.precipitationProbability ?? 0}% rain</p>
                     </article>
                   ))}
                 </div>
               </section>
 
               <section aria-labelledby="daily-forecast-title">
-                <h2 id="daily-forecast-title" className="mb-3 px-1 text-lg font-bold text-[var(--text-primary)]">10-day forecast</h2>
+                <h2 id="daily-forecast-title" className="mb-3 px-1 text-base font-bold text-[var(--text-primary)] sm:text-lg">10-day forecast</h2>
                 <div className="space-y-2">
                   {forecast.daily.map((day, index) => <DailyRow key={day.date} day={day} index={index} />)}
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-3"><p className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Sunrise className="h-4 w-4" /> Sunrise</p><p className="mt-2 font-semibold text-[var(--text-primary)]">{formatClock(forecast.daily[0]?.sunrise || null)}</p></div>
-                  <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-3"><p className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Sunset className="h-4 w-4" /> Sunset</p><p className="mt-2 font-semibold text-[var(--text-primary)]">{formatClock(forecast.daily[0]?.sunset || null)}</p></div>
-                  <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-3"><p className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Wind className="h-4 w-4" /> Peak wind</p><p className="mt-2 font-semibold text-[var(--text-primary)]">{Math.round(forecast.daily[0]?.windSpeedMax || 0)} {forecast.windSpeedUnit}</p></div>
-                  <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] p-3"><p className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><CloudRain className="h-4 w-4" /> Precipitation</p><p className="mt-2 font-semibold text-[var(--text-primary)]">{(forecast.daily[0]?.precipitationSum || 0).toFixed(2)} {forecast.precipitationUnit}</p></div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-2.5"><p className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Sunrise className="h-4 w-4" /> Sunrise</p><p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">{formatClock(forecast.daily[0]?.sunrise || null)}</p></div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-2.5"><p className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Sunset className="h-4 w-4" /> Sunset</p><p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">{formatClock(forecast.daily[0]?.sunset || null)}</p></div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-2.5"><p className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><Wind className="h-4 w-4" /> Peak wind</p><p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">{Math.round(forecast.daily[0]?.windSpeedMax || 0)} {forecast.windSpeedUnit}</p></div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-2.5"><p className="flex items-center gap-2 text-xs text-[var(--text-muted)]"><CloudRain className="h-4 w-4" /> Precipitation</p><p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">{(forecast.daily[0]?.precipitationSum || 0).toFixed(2)} {forecast.precipitationUnit}</p></div>
                 </div>
               </section>
 
               <section aria-labelledby="radar-title">
                 <div className="mb-3 flex items-center justify-between gap-3 px-1">
                   <div>
-                    <h2 id="radar-title" className="text-lg font-bold text-[var(--text-primary)]">Interactive radar</h2>
+                    <h2 id="radar-title" className="text-base font-bold text-[var(--text-primary)] sm:text-lg">Interactive radar</h2>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">Pan, zoom, and scrub observed and forecast frames.</p>
                   </div>
                   {!radarExpanded && (

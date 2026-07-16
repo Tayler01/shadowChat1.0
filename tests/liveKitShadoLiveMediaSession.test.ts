@@ -50,7 +50,10 @@ jest.mock('livekit-client', () => {
 
 const mockRoom = () => {
   const instances = (Room as unknown as { instances: Array<{
-  localParticipant: { setMicrophoneEnabled: jest.Mock }
+  localParticipant: {
+    permissions: { canPublish: boolean; canPublishSources: unknown[] }
+    setMicrophoneEnabled: jest.Mock
+  }
   connect: jest.Mock
   startAudio: jest.Mock
   emit: (event: string, ...args: unknown[]) => void
@@ -88,6 +91,24 @@ test('browser audio starts only through the explicit startAudio action', async (
   await session.startAudio()
   expect(mockRoom().startAudio).toHaveBeenCalledTimes(1)
   expect(session.getSnapshot().audioPlaybackEnabled).toBe(true)
+})
+
+test.each([
+  [[2], 'the numeric LiveKit microphone source'],
+  [['MICROPHONE'], 'the named LiveKit microphone source'],
+  [[], 'an unrestricted empty source list'],
+] as const)('recognizes %s as microphone publishing permission', async (sources, _label) => {
+  const session = createLiveKitMediaSession({ onSnapshot: jest.fn(), onTerminal: jest.fn() })
+  await session.connect({
+    serverUrl: 'wss://shadow.livekit.cloud',
+    participantToken: 'host-token',
+    expiresAt: '2026-07-15T20:05:00Z',
+  }, { allowAudioPlayback: false })
+  const room = mockRoom()
+  room.localParticipant.permissions = { canPublish: true, canPublishSources: [...sources] }
+  room.emit('participantPermissionsChanged', null, room.localParticipant)
+
+  expect(session.getSnapshot().microphoneAllowed).toBe(true)
 })
 
 test('mounts subscribed remote audio before invoking the browser unlock gesture', async () => {

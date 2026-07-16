@@ -80,6 +80,9 @@ export function ShadoLiveStage({
   const activeSpeaker = stageParticipants.find(participant => (
     mediaByIdentity.get(participant.providerIdentity)?.speaking
   )) ?? stageParticipants[0] ?? null
+  const secondaryStageParticipants = activeSpeaker
+    ? stageParticipants.filter(participant => participant.userId !== activeSpeaker.userId)
+    : stageParticipants
 
   useEffect(() => {
     if (panel !== 'chat') return
@@ -145,12 +148,14 @@ export function ShadoLiveStage({
     }
   }
 
-  const reconnecting = media.state === 'reconnecting' || controller.syncState === 'stale'
+  const reconnecting = media.state === 'reconnecting'
+  const syncDelayed = controller.syncState === 'stale' && controller.backendState === 'ready'
   const isHost = room.myRole === 'host'
   const canUseMicrophone = canPublishShadoLiveMicrophone(room.myRole)
   const microphoneReady = (controller.controlsEnabled || controller.startEnabled) && media.microphoneAllowed
   const handRaised = room.myStageRequestStatus === 'raised'
   const composerEnabled = controller.controlsEnabled || controller.commandBusy === 'send_message'
+  const canRetryMedia = media.state !== 'connected' && controller.backendState !== 'authorizing'
 
   return (
     <div className="flex h-[var(--shadowchat-app-height,var(--shadowchat-visual-viewport-height,100dvh))] min-h-0 w-full flex-1 touch-manipulation flex-col overflow-hidden bg-[var(--bg-app)] pb-[var(--shadowchat-mobile-scroll-keyboard-inset,0px)]" data-testid="shado-live-real-stage">
@@ -166,8 +171,8 @@ export function ShadoLiveStage({
         </button>
         <div className="min-w-0 flex-1 pb-0.5">
           <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${reconnecting || room.status === 'green_room' ? 'bg-[#d7aa46]' : 'bg-[#9f2a23]'}`} aria-hidden="true" />
-            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[#d7aa46]">{reconnecting ? 'Recovering' : room.status === 'green_room' ? 'Green room' : 'Live audio'}</span>
+            <span className={`h-2 w-2 rounded-full ${reconnecting || syncDelayed || room.status === 'green_room' ? 'bg-[#d7aa46]' : 'bg-[#9f2a23]'}`} aria-hidden="true" />
+            <span className="text-[0.62rem] font-semibold uppercase tracking-[0.18em] text-[#d7aa46]">{reconnecting ? 'Recovering audio' : syncDelayed ? 'Live / polling' : room.status === 'green_room' ? 'Green room' : 'Live audio'}</span>
           </div>
           <h1 className="truncate text-base font-bold text-white">{room.title}</h1>
         </div>
@@ -180,7 +185,16 @@ export function ShadoLiveStage({
         <div className={`shrink-0 border-b px-4 py-2 text-xs leading-5 ${controller.error ? 'border-[#a74135]/35 bg-[#4b1714]/45 text-[#ffd0c7]' : 'border-[#d7aa46]/25 bg-[#d7aa46]/8 text-[#f0d381]'}`} role={controller.error ? 'alert' : 'status'}>
           <div className="mx-auto flex max-w-5xl items-start justify-between gap-3">
             <span>{controller.error ?? controller.notice}</span>
-            {controller.error && <button type="button" onClick={controller.clearError} className="shrink-0 underline underline-offset-2">Dismiss</button>}
+            {controller.error && (
+              <span className="flex shrink-0 items-center gap-3">
+                {canRetryMedia && (
+                  <button type="button" onClick={() => run(controller.reconnectMedia())} className="font-semibold text-[#f4d985] underline underline-offset-2">
+                    Retry audio
+                  </button>
+                )}
+                <button type="button" onClick={controller.clearError} className="underline underline-offset-2">Dismiss</button>
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -220,13 +234,13 @@ export function ShadoLiveStage({
           <section className="relative min-h-0 overflow-hidden rounded-[var(--radius-xl)] border border-[var(--border-panel)] bg-[radial-gradient(circle_at_50%_20%,rgba(215,170,70,0.1),transparent_42%),var(--bg-panel)] shadow-[var(--shadow-panel)]" data-testid="shado-live-real-stage-visual">
             <div className="relative flex h-full min-h-[8rem] flex-col items-center justify-center px-4 py-3 text-center max-[360px]:hidden">
               {activeSpeaker ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => onOpenProfile(activeSpeaker.userId)}
-                    aria-label={`Open ${activeSpeaker.displayName}'s profile`}
-                    className={`rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] ${mediaByIdentity.get(activeSpeaker.providerIdentity)?.speaking ? 'shadow-[0_0_0_8px_rgba(232,189,88,0.09),0_18px_48px_rgba(0,0,0,0.5)]' : ''}`}
-                  >
+                <button
+                  type="button"
+                  onClick={() => onOpenProfile(activeSpeaker.userId)}
+                  aria-label={`Open ${activeSpeaker.displayName}'s profile`}
+                  className={`flex max-w-full flex-col items-center rounded-xl px-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] ${mediaByIdentity.get(activeSpeaker.providerIdentity)?.speaking ? 'drop-shadow-[0_0_16px_rgba(232,189,88,0.28)]' : ''}`}
+                >
+                  <span className="rounded-full">
                     <Avatar
                       src={activeSpeaker.avatarUrl || undefined}
                       alt={activeSpeaker.displayName}
@@ -234,38 +248,40 @@ export function ShadoLiveStage({
                       userId={activeSpeaker.userId}
                       size="xl"
                     />
-                  </button>
-                  <button type="button" onClick={() => onOpenProfile(activeSpeaker.userId)} className="mt-2 max-w-full truncate rounded-md px-1 text-lg font-bold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]">
+                  </span>
+                  <span className="mt-2 max-w-full truncate text-lg font-bold text-white">
                     {activeSpeaker.displayName}
-                  </button>
-                  <p className="text-xs text-[#b4ada0]">{roleLabel(activeSpeaker.role)}{mediaByIdentity.get(activeSpeaker.providerIdentity)?.speaking ? ' / speaking' : ' / muted'}</p>
-                </>
+                  </span>
+                  <span className="text-xs text-[#b4ada0]">{roleLabel(activeSpeaker.role)}{mediaByIdentity.get(activeSpeaker.providerIdentity)?.speaking ? ' / speaking' : ' / muted'}</span>
+                </button>
               ) : (
                 <><Headphones className="h-8 w-8 text-[#d7aa46]" aria-hidden="true" /><p className="mt-3 font-bold text-white">Waiting for the host</p></>
               )}
-              <div className="mt-3 flex -space-x-1.5" role="list" aria-label="People on stage">
-                {stageParticipants.map(participant => {
+              {secondaryStageParticipants.length > 0 && (
+                <ul className="mt-3 flex gap-1.5" aria-label="Other people on stage">
+                  {secondaryStageParticipants.map(participant => {
                   const speaking = mediaByIdentity.get(participant.providerIdentity)?.speaking === true
                   return (
-                    <button
-                      key={participant.userId}
-                      type="button"
-                      role="listitem"
-                      onClick={() => onOpenProfile(participant.userId)}
-                      aria-label={`Open ${participant.displayName}'s profile, ${roleLabel(participant.role)}${speaking ? ', speaking' : ''}`}
-                      className={`rounded-full border-2 bg-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] ${speaking ? 'border-[#f0d381]' : 'border-[#6d5730]'}`}
-                    >
-                      <Avatar
-                        src={participant.avatarUrl || undefined}
-                        alt={participant.displayName}
-                        fallback={participant.displayName}
-                        userId={participant.userId}
-                        size="md"
-                      />
-                    </button>
+                    <li key={participant.userId}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenProfile(participant.userId)}
+                        aria-label={`Open ${participant.displayName}'s profile, ${roleLabel(participant.role)}${speaking ? ', speaking' : ''}`}
+                        className={`inline-flex h-11 w-11 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] ${speaking ? 'drop-shadow-[0_0_10px_rgba(240,211,129,0.42)]' : ''}`}
+                      >
+                        <Avatar
+                          src={participant.avatarUrl || undefined}
+                          alt={participant.displayName}
+                          fallback={participant.displayName}
+                          userId={participant.userId}
+                          size="md"
+                        />
+                      </button>
+                    </li>
                   )
-                })}
-              </div>
+                  })}
+                </ul>
+              )}
             </div>
             <div className="relative hidden h-full min-h-0 items-center gap-3 px-4 max-[360px]:flex">
               {activeSpeaker ? (
@@ -282,7 +298,7 @@ export function ShadoLiveStage({
           <div className="no-scrollbar flex min-w-0 gap-2 overflow-x-auto pb-0.5" aria-label="Room status">
             <span className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[0.68rem] font-semibold text-[#cfc9bd]"><Headphones className="h-3.5 w-3.5 text-[#d7aa46]" aria-hidden="true" /> Audio-first</span>
             <span className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[0.68rem] font-semibold text-[#cfc9bd]"><ShieldCheck className="h-3.5 w-3.5 text-[#d7aa46]" aria-hidden="true" /> {room.recordingEnabled ? 'Recording on' : 'Recording off'}</span>
-            <span className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[0.68rem] font-semibold text-[#cfc9bd]"><Radio className="h-3.5 w-3.5 text-[#d7aa46]" aria-hidden="true" /> {controller.syncState === 'synced' ? 'Room verified' : 'Controls locked'}</span>
+            <span className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.035] px-3 text-[0.68rem] font-semibold text-[#cfc9bd]"><Radio className="h-3.5 w-3.5 text-[#d7aa46]" aria-hidden="true" /> {controller.syncState === 'synced' ? 'Room verified' : syncDelayed ? 'Verified / polling' : 'Controls locked'}</span>
           </div>
         </main>
 
@@ -369,7 +385,7 @@ export function ShadoLiveStage({
                           type="button"
                           onClick={() => onOpenProfile(participant.userId)}
                           aria-label={`Open ${participant.displayName}'s profile`}
-                          className={`shrink-0 rounded-full border-2 bg-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] ${live?.speaking ? 'border-[#f0d381]' : 'border-[#6d5730]'}`}
+                          className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)] ${live?.speaking ? 'drop-shadow-[0_0_10px_rgba(240,211,129,0.42)]' : ''}`}
                         >
                           <Avatar src={participant.avatarUrl || undefined} alt={participant.displayName} fallback={participant.displayName} userId={participant.userId} size="md" />
                         </button>
@@ -465,7 +481,7 @@ export function ShadoLiveStage({
 
       <div className="shado-live-control-dock flex shrink-0 items-center gap-2 border-t border-white/10 bg-[#080706]/96 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-12px_34px_rgba(0,0,0,0.44)] backdrop-blur-xl" aria-label="Live room controls">
         {canUseMicrophone && (
-          <button type="button" aria-pressed={media.microphoneEnabled} aria-label={media.microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'} disabled={!microphoneReady} onClick={() => run(controller.toggleMicrophone())} className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border focus:outline-none focus:ring-2 focus:ring-[#d7aa46] disabled:opacity-35 ${media.microphoneEnabled ? 'border-[#d7aa46]/50 bg-[#d7aa46]/14 text-[#f0d381]' : 'border-white/12 bg-white/[0.05] text-white'}`}>{media.microphoneEnabled ? <Mic className="h-5 w-5" aria-hidden="true" /> : <MicOff className="h-5 w-5" aria-hidden="true" />}</button>
+          <button type="button" aria-pressed={media.microphoneEnabled} aria-label={media.microphoneEnabled ? 'Mute microphone' : 'Unmute microphone'} disabled={!microphoneReady} onClick={() => run(controller.toggleMicrophone())} className={`grid h-11 w-11 shrink-0 place-items-center rounded-full border focus:outline-none focus:ring-2 focus:ring-[#d7aa46] disabled:opacity-55 ${media.microphoneEnabled ? 'border-[#d7aa46]/55 bg-[#d7aa46]/16 text-[#f0d381]' : microphoneReady ? 'border-[#d7aa46]/40 bg-[#d7aa46]/9 text-[#e8bd58]' : 'border-white/10 bg-white/[0.035] text-[#8f897e]'}`}>{media.microphoneEnabled ? <Mic className="h-5 w-5" aria-hidden="true" /> : <MicOff className="h-5 w-5" aria-hidden="true" />}</button>
         )}
         {room.myRole === 'listener' && (
           <button type="button" aria-pressed={handRaised} aria-label={handRaised ? 'Lower hand' : 'Raise hand'} disabled={!controller.controlsEnabled} onClick={() => run(controller.toggleHand())} className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[#d7aa46] disabled:opacity-35 ${handRaised ? 'border-[#d7aa46]/60 bg-[#d7aa46]/14 text-[#f0d381]' : 'border-white/12 bg-white/[0.05] text-white'}`}><Hand className="h-5 w-5" aria-hidden="true" /> {handRaised ? 'Hand raised' : 'Raise hand'}</button>

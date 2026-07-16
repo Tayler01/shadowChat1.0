@@ -67,6 +67,12 @@ scheduled -> green_room -> live -> ending -> ended
 Supabase remains the authority. LiveKit presence and webhooks reconcile media
 state but never grant a role, access, or room transition.
 
+The client follows the same boundary. A successful canonical room RPC makes
+controls usable; Supabase Realtime is only the fast invalidation path. If the
+room signal channel times out, the client immediately verifies the room through
+the canonical RPC and continues bounded foreground polling instead of leaving
+every control permanently gray.
+
 ## Backend And Provider Boundary
 
 The canonical domain is isolated from General Chat, DMs, ShadowPin, Shado TV,
@@ -186,6 +192,13 @@ badge, dedupe, block, and old-client compatibility pass extends `send-push`.
   Remote audio elements are mounted before LiveKit consumes that user gesture,
   and the renderer container is rebound across session creation and reconnect
   timing so iPhone and Android do not depend on detached autoplay.
+- Host and speaker microphone permission accepts LiveKit's protocol enum
+  (`MICROPHONE = 2`), its named forms, and the provider's unrestricted empty
+  source list. Client display state must not reinterpret an authorized provider
+  grant as microphone-forbidden.
+- A failed media connection keeps the canonical room route visible with a
+  `Retry audio` action that requests a fresh resume token instead of stranding
+  the member behind permanently disabled controls.
 - The real client lazy-loads `livekit-client`; the default build contains no
   LiveKit runtime chunk.
 - Camera APIs, display capture, recording, and egress are absent from the real
@@ -207,15 +220,33 @@ host and listener flows with mounted remote audio, clickable profiles, exact
 phone geometry, 16px mobile composers, keyboard and safe-area checks, no
 camera/recording requests, and zero residue.
 
-The July 16 mobile-polish acceptance build is published only to the isolated
-test frontend at `https://shadowchat-2-0-wave-one.netlify.app` under build ID
-`shado-live-polish-20260716`. Both mobile engines passed the same proof against
-the deployed URL, and production `main` remains unchanged.
+`npm run qa:shado-live:provider` is the non-mocked provider gate. It signs in
+the two controlled smoke accounts, creates a temporary accepted Connection,
+opens a real LiveKit room from the current frontend, publishes the host's fake
+microphone track, attaches it for the listener, verifies both participants and
+the audio publication through LiveKit, closes the room, removes the temporary
+Connection, and verifies no active provider room remains. Shado Live's
+append-only audit tables retain the ended `Provider QA` room/event evidence by
+design; the verifier creates no message or upload fixtures.
+
+The Supabase webhook endpoint independently accepts a correctly signed
+LiveKit event, but the July 16 real provider run produced no automatic LiveKit
+Cloud webhook receipts. That isolates the remaining gap to the LiveKit Cloud
+webhook configuration/delivery path rather than the Edge Function signature
+or ingestion code. Use **Settings -> Webhooks -> Actions -> Send a test event**
+and confirm a receipt before treating provider webhooks as operational.
+
+The latest July 16 blocking-fix build is published only to the isolated test
+frontend at `https://shadowchat-2-0-wave-one.netlify.app` as immutable deploy
+`6a58e3618f587535ea7146d7`. Both mobile engines passed the deterministic proof
+against that deployed artifact, and the non-mocked provider gate passed from
+the stable URL. Production `main` remains unchanged until the approved merge.
 
 Commands:
 
 ```powershell
 npm run qa:shado-live:real
+npm run qa:shado-live:provider
 npm run supabase:functions:verify
 supabase db push --dry-run --linked
 ```
@@ -242,10 +273,12 @@ supabase db push --dry-run --linked
 1. Complete installed iPhone and Android PWA testing for microphone permission,
    audio routing, speaker/listener handoff, Bluetooth/headphones, keyboard,
    safe areas, background/resume, lock/unlock, weak network, and accessibility.
-2. Collect multi-tester feedback and repair reproducible beta issues.
-3. Add OS push only through its separate notification reliability gate.
-4. Measure physical-device battery, thermal, memory, and network behavior.
-5. Merge and deploy to production only after explicit approval. Catch-Up stays
+2. Correct the LiveKit Cloud webhook configuration and prove automatic
+   room/participant/track receipts with a dashboard test event and a real room.
+3. Collect multi-tester feedback and repair reproducible beta issues.
+4. Add OS push only through its separate notification reliability gate.
+5. Measure physical-device battery, thermal, memory, and network behavior.
+6. Merge and deploy to production only after explicit approval. Catch-Up stays
    deterministic and source linked; the private AI trial remains separate.
 
 ## Preserved Prototype

@@ -311,6 +311,44 @@ explicitly excluded from v1.
   Bluetooth/headphone, lock/resume, and weak-network validation remains
   required before production approval.
 
+## Blocking Mobile Refinement - July 16, 2026
+
+- Catch-Up now uses the same compact, flat, border-bottom page identity as the
+  corrected Weather, Active Users, and Shado Live surfaces. The oversized
+  gradient blob, pill provenance badge, large title, and deep hero shadow are
+  removed while source provenance, snapshot time, and exact-source behavior
+  remain unchanged.
+- Weather density is reduced without bypassing Comfort scaling or iPhone's
+  16px input anti-zoom rule. Current conditions, metric tiles, hourly cards,
+  daily rows, action pills, and section headings now use the app's tighter
+  mobile rhythm.
+- Radar keeps the currently visible frame until the next tile layer finishes
+  loading, then crossfades it in and removes the old layer. Playback waits for
+  each promotion and uses a one-second dwell, eliminating the blank flash and
+  overdriven 650ms frame churn.
+- Shado Live no longer treats a delayed Supabase Realtime subscription as
+  command authority. Successful canonical room reads unlock controls, degraded
+  Realtime falls back to immediate and periodic RPC verification, and failed
+  media sessions expose a fresh-token `Retry audio` action.
+- LiveKit protocol microphone source `2`, named microphone sources, and
+  unrestricted empty source lists are normalized correctly. The active host is
+  excluded from the secondary stage avatar list, duplicate wrapper borders are
+  removed, and the ready-muted microphone control uses the app's brass state
+  instead of looking disabled.
+- The new non-mocked provider gate proved the real hosted path with two
+  controlled accounts: host connected, fake microphone audio published,
+  listener connected, a remote audio element attached, both provider
+  participants were visible, and no active LiveKit or temporary Connection
+  residue remained.
+- A separately signed test proved the Supabase provider-webhook endpoint and
+  signing key are valid. Automatic LiveKit Cloud delivery still produced zero
+  receipts, so the Cloud webhook entry must be corrected/tested in the LiveKit
+  dashboard before provider webhook reconciliation is accepted.
+- Immutable Netlify deploy `6a58e3618f587535ea7146d7` is published at the
+  isolated stable URL. The exact deployed artifact passed deterministic Pixel
+  Chromium/iPhone WebKit Shado Live QA and the real two-account LiveKit
+  provider gate before the approved production integration.
+
 ## Final-Track Polish - July 14, 2026
 
 - Shado Live now has a custom crop-safe retro picker banner and a cohesive

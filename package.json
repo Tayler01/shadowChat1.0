@@ -53,6 +53,7 @@
     "qa:inner-circles": "node scripts/verify-inner-circles-browser.mjs",
     "qa:shado-live": "node scripts/verify-shado-live-prototype-browser.mjs",
     "qa:shado-live:real": "node scripts/verify-shado-live-real-browser.mjs",
+    "qa:shado-live:provider": "node scripts/verify-shado-live-provider-browser.mjs",
     "qa:catch-up": "node scripts/verify-catch-up-browser.mjs",
     "qa:comfort": "node scripts/comfort-visual-qa.mjs",
     "qa:themes": "node scripts/theme-visual-qa.mjs",

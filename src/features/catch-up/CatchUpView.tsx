@@ -185,25 +185,25 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
 
       <div ref={scrollRef} role="region" aria-label="Catch-Up content" className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 md:pt-6">
         <div className="mx-auto w-full max-w-4xl">
-          <header className="relative overflow-hidden rounded-[1.75rem] border border-[rgba(215,170,70,0.3)] bg-[radial-gradient(circle_at_88%_12%,rgba(215,170,70,0.18),transparent_28%),linear-gradient(145deg,rgba(22,18,11,0.96),rgba(8,8,8,0.98))] p-5 shadow-[0_24px_70px_rgba(0,0,0,0.3)] sm:p-7">
+          <header className="border-b border-[var(--border-subtle)] px-1 pb-4" data-testid="catch-up-compact-header">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <span className="inline-flex min-h-7 items-center gap-1.5 rounded-full border border-[rgba(215,170,70,0.32)] bg-[rgba(215,170,70,0.09)] px-3 text-[0.64rem] font-semibold uppercase tracking-[0.15em] text-[var(--theme-accent-readable)]">
+              <div className="min-w-0">
+                <span className="inline-flex items-center gap-1.5 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-[var(--theme-accent-readable)]">
                   <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Source-linked / No AI
                 </span>
-                <h1 className="mt-4 text-3xl font-black tracking-[-0.035em] text-[var(--text-primary)] sm:text-4xl">Your Catch-Up</h1>
-                <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">The things that need you, unread conversations, new Chat roots, and ShadowPin posts - each linked to its exact source.</p>
+                <h1 className="mt-0.5 text-xl font-bold text-[var(--text-primary)] sm:text-2xl">Your Catch-Up</h1>
+                <p className="mt-1 max-w-xl text-sm leading-5 text-[var(--text-muted)]">Things that need you, unread conversations, new Chat roots, and ShadowPin posts - each linked to its exact source.</p>
+                {snapshot && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
+                    <Check className="h-3.5 w-3.5 text-[var(--theme-accent-readable)]" aria-hidden="true" />
+                    Through {new Date(snapshot.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} / {snapshot.lookbackHours / 24}-day activity window
+                  </p>
+                )}
               </div>
-              <button type="button" onClick={() => void load(true)} disabled={loading || refreshing} aria-label="Refresh Catch-Up" aria-busy={refreshing} className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)] disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]">
-                <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+              <button type="button" onClick={() => void load(true)} disabled={loading || refreshing} aria-label="Refresh Catch-Up" aria-busy={refreshing} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--theme-accent-readable)] transition-colors hover:border-[var(--border-glow)] hover:bg-[var(--theme-accent-soft)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]">
+                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
               </button>
             </div>
-            {snapshot && (
-              <p className="mt-5 flex items-center gap-2 text-xs text-[var(--text-muted)]">
-                <Check className="h-4 w-4 text-[var(--theme-accent-readable)]" aria-hidden="true" />
-                Through {new Date(snapshot.generatedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} / {snapshot.lookbackHours / 24}-day activity window
-              </p>
-            )}
           </header>
 
           {loading && !snapshot ? (

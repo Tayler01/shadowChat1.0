@@ -56,6 +56,7 @@ export interface ShadoLiveRoomController {
   refreshRoom: () => Promise<ShadoLiveRoom | null>
   createRoom: (title: string) => Promise<void>
   joinRoom: (roomId: string) => Promise<void>
+  reconnectMedia: () => Promise<void>
   leaveRoom: () => Promise<void>
   returnToLobby: () => Promise<void>
   startAudio: () => Promise<void>
@@ -156,11 +157,14 @@ export function useShadoLiveRoom({
       .then(nextRoom => {
         applyRoomSnapshot(nextRoom)
         setError(null)
+        setBackendState('ready')
+        setSyncState('synced')
         return nextRoom
       })
       .catch(caught => {
         if (mountedRef.current) {
           setError(getShadoLiveErrorMessage(caught, 'Room state could not be verified. Controls remain locked.'))
+          setBackendState('failed')
           setSyncState('stale')
         }
         return null
@@ -205,10 +209,11 @@ export function useShadoLiveRoom({
     mediaSessionRef.current = mediaSession
     mediaSession.setAudioContainer(audioContainerRef.current)
     await mediaSession.connect(mediaCredentials, { allowAudioPlayback: false })
+    if (mountedRef.current && generation === generationRef.current) setSyncState('synced')
   }, [disconnectMedia, onRoomRoute])
 
   const openSession = useCallback(async (
-    action: 'create' | 'join',
+    action: 'create' | 'join' | 'resume',
     options: { roomId?: string; title?: string }
   ) => {
     if (!user?.id) throw new Error('Sign in before opening Shado Live.')
@@ -231,6 +236,11 @@ export function useShadoLiveRoom({
 
   const createRoom = useCallback((title: string) => openSession('create', { title }), [openSession])
   const joinRoom = useCallback((roomId: string) => openSession('join', { roomId }), [openSession])
+  const reconnectMedia = useCallback(async () => {
+    const activeRoom = roomRef.current
+    if (!activeRoom) throw new Error('Open a Shado Live room before reconnecting audio.')
+    await openSession('resume', { roomId: activeRoom.id })
+  }, [openSession])
 
   const leaveRoom = useCallback(async () => {
     const activeRoom = roomRef.current
@@ -279,10 +289,16 @@ export function useShadoLiveRoom({
     action: ShadoLiveCommandAction,
     options: { targetUserId?: string; body?: string } = {}
   ) => {
-    const activeRoom = roomRef.current
+    let activeRoom = roomRef.current
     if (!activeRoom) throw new Error('Join a Shado Live room first.')
-    if (syncState !== 'synced' || mediaRef.current.state !== 'connected') {
-      throw new Error('Room controls are locked until media and room state are synchronized.')
+    if (mediaRef.current.state !== 'connected') {
+      throw new Error('Room controls are locked until live audio reconnects.')
+    }
+    if (syncState !== 'synced') {
+      activeRoom = await refreshRoom()
+      if (!activeRoom) {
+        throw new Error('Room controls are locked until the server verifies the latest room state.')
+      }
     }
     setCommandBusy(action)
     setError(null)
@@ -300,7 +316,7 @@ export function useShadoLiveRoom({
     } finally {
       if (mountedRef.current) setCommandBusy(null)
     }
-  }, [applyRoomSnapshot, syncState])
+  }, [applyRoomSnapshot, refreshRoom, syncState])
 
   const startAudio = useCallback(async () => {
     try {
@@ -317,8 +333,11 @@ export function useShadoLiveRoom({
     if (!activeRoom || !canPublishShadoLiveMicrophone(activeRoom.myRole)) {
       throw new Error('The server has not authorized you to speak.')
     }
-    if (syncState !== 'synced' || activeMedia.state !== 'connected') {
-      throw new Error('The microphone stays locked while the room reconnects.')
+    if (activeMedia.state !== 'connected') {
+      throw new Error('The microphone stays locked while live audio reconnects.')
+    }
+    if (!activeMedia.microphoneAllowed) {
+      throw new Error('The live audio provider has not authorized your microphone yet.')
     }
     try {
       await mediaSessionRef.current?.setMicrophoneEnabled(!activeMedia.microphoneEnabled)
@@ -326,7 +345,7 @@ export function useShadoLiveRoom({
       setError(getShadoLiveErrorMessage(caught, 'The microphone could not change state.'))
       throw caught
     }
-  }, [syncState])
+  }, [])
 
   const toggleHand = useCallback(() => {
     const action = roomRef.current?.myStageRequestStatus === 'raised' ? 'lower_hand' : 'raise_hand'
@@ -402,6 +421,7 @@ export function useShadoLiveRoom({
             void refreshRoom()
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             setSyncState('stale')
+            void refreshRoom()
           }
         })
     }).catch(() => {
@@ -414,10 +434,12 @@ export function useShadoLiveRoom({
     window.addEventListener('focus', refreshVisible)
     window.addEventListener('online', refreshVisible)
     document.addEventListener('visibilitychange', refreshVisible)
+    const fallbackInterval = window.setInterval(refreshVisible, 12_000)
 
     return () => {
       cancelled = true
       if (refreshTimer !== null) window.clearTimeout(refreshTimer)
+      window.clearInterval(fallbackInterval)
       window.removeEventListener('focus', refreshVisible)
       window.removeEventListener('online', refreshVisible)
       document.removeEventListener('visibilitychange', refreshVisible)
@@ -477,18 +499,18 @@ export function useShadoLiveRoom({
   const controlsEnabled = useMemo(() => (
     room?.status === 'live'
     && media.state === 'connected'
-    && syncState === 'synced'
+    && backendState === 'ready'
     && commandBusy === null
     && terminal === null
-  ), [commandBusy, media.state, room?.status, syncState, terminal])
+  ), [backendState, commandBusy, media.state, room?.status, terminal])
   const startEnabled = useMemo(() => (
     room?.status === 'green_room'
     && room.myRole === 'host'
     && media.state === 'connected'
-    && syncState === 'synced'
+    && backendState === 'ready'
     && commandBusy === null
     && terminal === null
-  ), [commandBusy, media.state, room?.myRole, room?.status, syncState, terminal])
+  ), [backendState, commandBusy, media.state, room?.myRole, room?.status, terminal])
 
   return {
     rooms,
@@ -506,6 +528,7 @@ export function useShadoLiveRoom({
     refreshRoom,
     createRoom,
     joinRoom,
+    reconnectMedia,
     leaveRoom,
     returnToLobby,
     startAudio,

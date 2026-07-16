@@ -92,12 +92,20 @@ const readString = (value: unknown) => typeof value === 'string' ? value : null
 const readBoolean = (value: unknown) => value === true
 const readNumber = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : 0
 
-const isMicrophoneSource = (value: unknown) => String(value).toLowerCase().includes('microphone')
+const LIVEKIT_MICROPHONE_SOURCE = 2
+const isMicrophoneSource = (value: unknown) => {
+  if (typeof value === 'number') return value === LIVEKIT_MICROPHONE_SOURCE
+  const normalized = String(value).trim().toLowerCase()
+  return normalized === String(LIVEKIT_MICROPHONE_SOURCE)
+    || normalized === 'mic'
+    || normalized.includes('microphone')
+}
 
 const canPublishMicrophone = (participant: ParticipantLike) => {
   const permissions = participant.permissions
   if (!permissions || permissions.canPublish === false) return false
   if (!Array.isArray(permissions.canPublishSources)) return permissions.canPublish === true
+  if (permissions.canPublishSources.length === 0) return permissions.canPublish === true
   return permissions.canPublishSources.some(isMicrophoneSource)
 }
 

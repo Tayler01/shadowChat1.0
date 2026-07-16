@@ -376,6 +376,26 @@ Latest focused pass: `node scripts/mobile-pwa-visual-qa.mjs --run-name=mobile-he
   Bluetooth/headphones, lock/unlock, weak-network recovery, and battery/thermal
   behavior remain under RD-030.
 
+## July 16 Blocking Surface And Provider Checkpoint
+
+- Catch-Up's current Pixel Chromium/iPhone WebKit captures show the oversized
+  hero removed and the provenance/title/refresh/snapshot identity compressed
+  into the standard flat mobile header.
+- Six focused suites (21 tests), all 225 Jest suites (1,197 passing tests),
+  lint, app TypeScript, build/budgets, and documentation integrity passed after
+  the Catch-Up, Weather, radar, and Shado Live changes.
+- The deterministic Shado Live browser gate passed Pixel Chromium and iPhone
+  WebKit host/listener, keyboard, reconnect, control, and zero-runtime-residue
+  checks in `output/playwright/shado-live-real/summary.json`.
+- `npm run qa:shado-live:provider` passed against the real Supabase and LiveKit
+  services with two controlled Chromium phone contexts. Host microphone
+  publishing, listener audio attachment, participant visibility, room close,
+  provider cleanup, and temporary Connection cleanup were verified.
+- Automatic LiveKit Cloud webhooks remain the one external failure: the
+  Supabase endpoint accepts a correctly signed synthetic LiveKit event, while
+  real room lifecycle runs still produce zero automatic receipts. Re-run the
+  LiveKit dashboard test event after correcting the webhook entry.
+
 ## Historical May Summary
 
 The automated mobile PWA visual loop passed across the core installed-home-screen simulations. Final required checks also passed: lint, typecheck, build, Jest, existing mobile smoke, full smoke, and the focused mobile PWA harness. Remaining mobile-specific risk is limited to real-device behavior that Playwright cannot fully reproduce: native keyboard animation, iOS standalone status bar behavior, home indicator safe-area behavior on physical devices, and touch comfort for dense secondary controls.
