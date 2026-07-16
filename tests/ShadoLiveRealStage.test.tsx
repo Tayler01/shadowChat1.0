@@ -91,10 +91,12 @@ test('chat clears only after the persistent server command resolves', async () =
   render(<ShadoLiveStage controller={value} currentUserId="listener-1" onOpenProfile={jest.fn()} />)
 
   const composer = screen.getByRole('textbox', { name: 'Message the live room' })
+  composer.focus()
   fireEvent.change(composer, { target: { value: 'Persist this' } })
   fireEvent.click(screen.getByRole('button', { name: 'Send live room message' }))
   expect(value.sendMessage).toHaveBeenCalledWith('Persist this')
   expect(composer).toHaveValue('Persist this')
+  expect(composer).toHaveFocus()
 
   fireEvent.change(composer, { target: { value: 'Next message' } })
   confirmMessage()

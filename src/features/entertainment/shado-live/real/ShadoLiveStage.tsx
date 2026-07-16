@@ -453,6 +453,7 @@ export function ShadoLiveStage({
                 onPointerDown={event => event.preventDefault()}
                 onMouseDown={event => event.preventDefault()}
                 onTouchStart={event => event.preventDefault()}
+                onClick={() => composerRef.current?.focus({ preventScroll: true })}
                 className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#d7aa46] text-black focus:outline-none focus:ring-2 focus:ring-[#f4d985] focus:ring-offset-2 focus:ring-offset-black disabled:opacity-35"
               >
                 {controller.commandBusy === 'send_message' ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Send className="h-5 w-5" aria-hidden="true" />}
