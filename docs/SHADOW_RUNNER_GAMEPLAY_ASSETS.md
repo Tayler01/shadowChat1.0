@@ -37,6 +37,11 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
 | Clockmaker Yard background | `public/games/shadow-runner/level-assets/level-6/background/clockmaker-yard-background.webp` | Level 6 moonlit clockwork workshop backdrop. |
 | Clockmaker Yard props sheet | `public/games/shadow-runner/level-assets/level-6/props/clockmaker-yard-props-v1-transparent.png` | Level 6 brass-and-stone floors, ledges, bridges, overhangs, rubble, switch, gear, and counterweight art registered as Phaser terrain frames. |
 | Chrono Lantern strip | `public/games/shadow-runner/level-assets/level-6/collectibles/chrono-lantern-4f-64.png` | Four-frame Level 6 power-up that restores health and temporarily slows patrols, projectiles, attack cadence, and tilt-bridge pressure. |
+| Moon Stalker strip | `public/games/shadow-runner/sprites/strips/moon-stalker-v1-5f-128.png` | Level 7 lunge enemy with patrol, burst-attack, hit, and defeated states. |
+| Moonlit Causeway background | `public/games/shadow-runner/level-assets/level-7/background/moonlit-causeway-background.webp` | Level 7 moonlit bridge-and-water backdrop. |
+| Moonlit Causeway props sheet | `public/games/shadow-runner/level-assets/level-7/props/moonlit-causeway-props-v1-transparent.png` | Level 7 bright moonstone floors, ledges, overhangs, relay gate, altar, chains, and pillar art registered as Phaser terrain frames. |
+| Shadow Surge sigil strip | `public/games/shadow-runner/level-assets/level-7/collectibles/shadow-surge-sigil-4f-64.png` | Four-frame Level 7 power-up that restores health, briefly increases movement/attack strength, and grants damage-resistance charges. |
+| Moon Shard relic strip | `public/games/shadow-runner/level-assets/level-7/collectibles/moon-shard-relic-4f-64.png` | Four-frame required Level 7 goal pickup; the relay gate remains locked until all three shards are collected. |
 
 ## Generated Audio Assets
 
@@ -84,6 +89,13 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   `source-assets/shadow-runner/level-assets/level-6/background/clockmaker-yard-background-source.png`,
   `source-assets/shadow-runner/level-assets/level-6/props/clockmaker-yard-props-v1-source.png`,
   and `source-assets/shadow-runner/level-assets/level-6/collectibles/chrono-lantern-4f-source.png`.
+- Moonlit Causeway generated sources:
+  `source-assets/shadow-runner/level-assets/level-7/background/moonlit-causeway-background-source.png`,
+  `source-assets/shadow-runner/level-assets/level-7/props/moonlit-causeway-props-v1-source.png`,
+  `source-assets/shadow-runner/sprites/raw/moon-stalker-v1-source.png`,
+  `source-assets/shadow-runner/sprites/strips/moon-stalker-v1-5f-128.png`,
+  `source-assets/shadow-runner/level-assets/level-7/collectibles/shadow-surge-sigil-source.png`,
+  and `source-assets/shadow-runner/level-assets/level-7/collectibles/moon-shard-relic-source.png`.
 
 ## Runtime Wiring
 
@@ -114,6 +126,11 @@ Status: first playable-prototype gameplay UI and enemy asset pass.
   Clock terrain has dedicated crop frames; three Chrono pickups heal without
   exceeding the 12-point maximum and temporarily slow enemies, projectiles,
   attack cadence, and tilt-bridge dump pressure.
+- Level 7 registers the generated Moonlit Causeway atlas, Moon Stalker enemy,
+  Shadow Surge sigil, and Moon Shard relic. The route requires three Moon
+  Shards before the relay gate completes, mixes old enemies with the new lunge
+  enemy, keeps shield pockets for multi-height volleys, and uses bright
+  moonstone terrain for contrast against the dark background.
 - The top HUD now separates three life hearts from a smooth 12-point health
   bar. Losing a life empties one heart; ordinary damage changes only the bar.
 - Lobby music is enabled by default on title/lobby/map surfaces and is stopped

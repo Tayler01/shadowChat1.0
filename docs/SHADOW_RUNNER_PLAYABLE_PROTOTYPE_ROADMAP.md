@@ -278,6 +278,30 @@ enemy, and reach a finish gate.
   `output/playwright/shadow-runner-audit-level-4-final/`, and
   `output/playwright/shadow-runner-audit-level-5-production/`.
 
+## July 16, 2026 - Moonlit Causeway Level 7
+
+- Added playable Campaign Level 7, `Moonlit Causeway`, at 12,740 world units
+  versus Clockmaker Yard's 10,260. The route uses six recovery checkpoints,
+  five aggressive tilt bridges, four required low-clearance gates, two high
+  shard climbs, 60 coins, and 15 enemies.
+- Generated a new moonlit causeway background, transparent moonstone terrain
+  atlas, level thumbnails, a Moon Stalker enemy strip, a Shadow Surge power-up
+  strip, and a Moon Shard goal-item strip.
+- Added the Moon Stalker enemy type: it patrols quickly, then lunges toward the
+  player when close on the same vertical band. Level 7 mixes Moon Stalkers
+  with old sentries, Lantern Bandits, Barrel Rollers, Tower Archers, and Candle
+  Jesters.
+- Added Shadow Surge: a high-value pickup that restores health, temporarily
+  increases movement/attack pressure, and grants damage-resistance charges
+  without replacing shield pickups or Chrono Lantern timing.
+- Added Moon Shards as required route goals. The relay gate does not complete
+  the level until all three shards are collected, making it impossible to clear
+  the map by simply reaching the far right edge.
+- Added Level 7 catalog availability migration, asset-manifest coverage,
+  level geometry/patrol/damage tests, simulation tests, medal migration tests,
+  and Level 7 phone-smoke checks for shards, Surge, crouch, route checkpoints,
+  projectile pools, and completion.
+
 ## July 10, 2026 - Clockmaker Yard Level 6 And Health Redesign
 
 - Added playable Campaign Level 6, `Clockmaker Yard`, at 10,260 world units

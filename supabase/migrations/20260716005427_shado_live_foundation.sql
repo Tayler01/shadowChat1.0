@@ -2365,7 +2365,6 @@ DECLARE
   restriction_row public.shado_live_restrictions%ROWTYPE;
   participant_row public.live_room_participants%ROWTYPE;
   room_row public.live_rooms%ROWTYPE;
-  operation_row public.live_provider_operations%ROWTYPE;
 BEGIN
   IF actor_user_id IS NULL OR NOT public.is_app_operator(actor_user_id) THEN
     RAISE EXCEPTION USING errcode = '42501', message = 'Operator access required';
@@ -2448,7 +2447,7 @@ BEGIN
             updated_at = now()
         WHERE rooms.id = room_row.id
         RETURNING * INTO room_row;
-        operation_row := private.enqueue_shado_live_provider_operation(
+        PERFORM private.enqueue_shado_live_provider_operation(
           room_row.id, actor_user_id, target_user_id, 'delete_room', gen_random_uuid(),
           room_row.revision,
           jsonb_build_object('roomName', room_row.provider_room_name, 'reason', 'live_restriction')
@@ -2465,7 +2464,7 @@ BEGIN
         UPDATE public.live_rooms rooms
         SET revision = rooms.revision + 1, updated_at = now()
         WHERE rooms.id = room_row.id RETURNING * INTO room_row;
-        operation_row := private.enqueue_shado_live_provider_operation(
+        PERFORM private.enqueue_shado_live_provider_operation(
           room_row.id, actor_user_id, target_user_id, 'remove_participant', gen_random_uuid(),
           room_row.revision,
           jsonb_build_object('participantIdentity', participant_row.provider_identity, 'reason', 'live_restriction')
@@ -2641,7 +2640,7 @@ CREATE POLICY live_room_signals_select_visible
   ON public.live_room_signals
   FOR SELECT
   TO authenticated
-  USING (shado_live_private.can_receive_shado_live_signal(auth.uid(), room_id));
+  USING (shado_live_private.can_receive_shado_live_signal((select auth.uid()), room_id));
 
 GRANT SELECT ON TABLE public.live_room_signals TO authenticated, service_role;
 ALTER PUBLICATION supabase_realtime ADD TABLE public.live_room_signals;

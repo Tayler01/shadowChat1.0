@@ -1336,7 +1336,7 @@ CREATE FUNCTION shado_live_private.get_shado_live_moderation_case_impl(
 )
 RETURNS jsonb
 LANGUAGE plpgsql
-STABLE
+VOLATILE
 SECURITY DEFINER
 SET search_path = ''
 AS $$

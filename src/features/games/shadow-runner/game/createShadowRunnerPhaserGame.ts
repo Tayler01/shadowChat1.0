@@ -14,8 +14,10 @@ import {
   type ShadowRunnerEnemyConfig,
   type ShadowRunnerEnemyKind,
   type ShadowRunnerLevelConfig,
+  type ShadowRunnerMoonShardPickup,
   type ShadowRunnerPlayableLevelId,
   type ShadowRunnerShieldPickup,
+  type ShadowRunnerSurgePickup,
   type ShadowRunnerTiltPlatform,
 } from './levels'
 import {
@@ -23,15 +25,19 @@ import {
   collectShadowRunnerBoost,
   collectShadowRunnerChrono,
   collectShadowRunnerCoin,
+  collectShadowRunnerMoonShard,
   collectShadowRunnerShield,
+  collectShadowRunnerSurge,
   createInitialShadowRunnerSimulation,
   damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
   getShadowRunnerHudState,
   getShadowRunnerChronoTimeScale,
+  getShadowRunnerSurgeSpeedMultiplier,
   isShadowRunnerBoostActive,
   isShadowRunnerChronoActive,
   isShadowRunnerShieldActive,
+  isShadowRunnerSurgeActive,
   restoreShadowRunnerPlayer,
   spendShadowRunnerLife,
   type ShadowRunnerEnemyState,
@@ -59,6 +65,7 @@ const BARREL_SCALE = 0.58
 const SCROLL_THIEF_SCALE = 0.62
 const TOWER_ARCHER_SCALE = 0.66
 const CANDLE_JESTER_SCALE = 0.64
+const MOON_STALKER_SCALE = 0.62
 const PLAYER_SPEED = 260
 const SENTRY_PATROL_SPEED = 82
 const BARREL_PATROL_SPEED = 132
@@ -100,6 +107,10 @@ interface ShadowRunnerDebugSnapshot {
     score: number
     chronoActive: boolean
     chronoRemainingMs: number
+    surgeActive: boolean
+    surgeRemainingMs: number
+    moonShards: number
+    totalMoonShards: number
   }
   enemies: Array<{
     id: string
@@ -216,6 +227,18 @@ const CLOCK_TERRAIN_CROPS: Record<string, TextureCrop> = {
   'clock-counterweight': { x: 1170, y: 530, width: 230, height: 280 },
 }
 
+const MOON_TERRAIN_CROPS: Record<string, TextureCrop> = {
+  'moon-wide-floor': { x: 34, y: 45, width: 1186, height: 196 },
+  'moon-medium-ledge': { x: 46, y: 315, width: 626, height: 150 },
+  'moon-narrow-bridge': { x: 60, y: 545, width: 552, height: 72 },
+  'moon-rubble-floor': { x: 48, y: 654, width: 616, height: 168 },
+  'moon-tall-overhang': { x: 735, y: 302, width: 428, height: 578 },
+  'moon-relay-gate': { x: 26, y: 852, width: 344, height: 332 },
+  'moon-shard-altar': { x: 430, y: 875, width: 285, height: 310 },
+  'moon-chain-anchor': { x: 770, y: 885, width: 160, height: 310 },
+  'moon-pillar-cap': { x: 987, y: 938, width: 190, height: 236 },
+}
+
 const TERRAIN_FRAME_PREFIX = 'terrain-'
 
 function getTerrainFrameKey(platformId: string) {
@@ -289,6 +312,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private boostPickups?: Phaser.Physics.Arcade.StaticGroup
   private shieldPickups?: Phaser.Physics.Arcade.StaticGroup
   private chronoPickups?: Phaser.Physics.Arcade.StaticGroup
+  private surgePickups?: Phaser.Physics.Arcade.StaticGroup
+  private moonShardPickups?: Phaser.Physics.Arcade.StaticGroup
   private candleHazards?: Phaser.Physics.Arcade.StaticGroup
   private crouchGates?: Phaser.Physics.Arcade.StaticGroup
   private archerProjectiles?: Phaser.Physics.Arcade.Group
@@ -299,6 +324,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private boostAura?: Phaser.GameObjects.Sprite
   private shieldAura?: Phaser.GameObjects.Graphics
   private chronoAura?: Phaser.GameObjects.Graphics
+  private surgeAura?: Phaser.GameObjects.Graphics
   private playerHealthBar?: Phaser.GameObjects.Graphics
   private enemyHealthBars: Phaser.GameObjects.Graphics[] = []
   private playerHealthFrame?: Phaser.GameObjects.Image
@@ -389,13 +415,34 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       frameWidth: 128,
       frameHeight: 128,
     })
-    if (this.level.id === 'level-6') {
+    if (this.level.id === 'level-6' || this.level.id === 'level-7') {
       this.load.spritesheet('lantern-bandit-scout', SHADOW_RUNNER_ASSETS.enemies.lanternBanditScoutStrip, {
         frameWidth: 128,
         frameHeight: 128,
       })
+    }
+    if (this.level.id === 'level-6') {
       this.load.image('shadow-runner-clock-terrain-atlas', SHADOW_RUNNER_ASSETS.levels.clockmakerYardProps)
       this.load.spritesheet('shadow-runner-chrono-lantern', SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+    }
+    if (this.level.id === 'level-7') {
+      this.load.spritesheet('moon-stalker', SHADOW_RUNNER_ASSETS.enemies.moonStalkerStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.image('shadow-runner-moon-terrain-atlas', SHADOW_RUNNER_ASSETS.levels.moonlitCausewayProps)
+      this.load.spritesheet('shadow-runner-chrono-lantern', SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-shadow-surge', SHADOW_RUNNER_ASSETS.levels.shadowSurgeSigilStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-moon-shard', SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip, {
         frameWidth: 64,
         frameHeight: 64,
       })
@@ -428,6 +475,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.boostAura = undefined
     this.shieldAura = undefined
     this.chronoAura = undefined
+    this.surgeAura = undefined
     this.wasOnFloor = false
     this.airborneStartY = null
     this.airbornePeakY = 0
@@ -469,6 +517,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.updateBoostAura(time)
     this.updateShieldAura(time)
     this.updateChronoAura(time)
+    this.updateSurgeAura(time)
     this.updateHealthBars()
     this.checkFinish()
     this.emitHud()
@@ -651,6 +700,32 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         repeat: 0,
       })
     }
+    if (this.textures.exists('moon-stalker')) {
+      this.anims.create({
+        key: 'stalker-run',
+        frames: this.anims.generateFrameNumbers('moon-stalker', { start: 0, end: 1 }),
+        frameRate: 8,
+        repeat: -1,
+      })
+      this.anims.create({
+        key: 'stalker-attack',
+        frames: [{ key: 'moon-stalker', frame: 2 }],
+        frameRate: 1,
+        repeat: 0,
+      })
+      this.anims.create({
+        key: 'stalker-hit',
+        frames: [{ key: 'moon-stalker', frame: 3 }],
+        frameRate: 1,
+        repeat: 0,
+      })
+      this.anims.create({
+        key: 'stalker-defeated',
+        frames: [{ key: 'moon-stalker', frame: 4 }],
+        frameRate: 1,
+        repeat: 0,
+      })
+    }
     this.anims.create({
       key: 'jester-dance',
       frames: this.anims.generateFrameNumbers('candle-jester', { start: 0, end: 1 }),
@@ -701,6 +776,22 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         repeat: -1,
       })
     }
+    if (this.textures.exists('shadow-runner-shadow-surge')) {
+      this.anims.create({
+        key: 'shadow-surge-spin',
+        frames: this.anims.generateFrameNumbers('shadow-runner-shadow-surge', { start: 0, end: 3 }),
+        frameRate: 8,
+        repeat: -1,
+      })
+    }
+    if (this.textures.exists('shadow-runner-moon-shard')) {
+      this.anims.create({
+        key: 'moon-shard-glow',
+        frames: this.anims.generateFrameNumbers('shadow-runner-moon-shard', { start: 0, end: 3 }),
+        frameRate: 7,
+        repeat: -1,
+      })
+    }
     this.anims.create({
       key: 'landing-dust',
       frames: this.anims.generateFrameNumbers('shadow-runner-landing-dust', { start: 0, end: 5 }),
@@ -728,12 +819,16 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.boostPickups = this.physics.add.staticGroup()
     this.shieldPickups = this.physics.add.staticGroup()
     this.chronoPickups = this.physics.add.staticGroup()
+    this.surgePickups = this.physics.add.staticGroup()
+    this.moonShardPickups = this.physics.add.staticGroup()
     this.candleHazards = this.physics.add.staticGroup({ maxSize: 24 })
     this.crouchGates = this.physics.add.staticGroup()
 
     this.level.platforms.forEach(platform => {
       const frameKey = getTerrainFrameKey(platform.visualId ?? platform.id)
-      const terrainTexture = platform.terrainSet === 'clock'
+      const terrainTexture = platform.terrainSet === 'moon'
+        ? 'shadow-runner-moon-terrain-atlas'
+        : platform.terrainSet === 'clock'
         ? 'shadow-runner-clock-terrain-atlas'
         : platform.terrainSet === 'bell'
           ? 'shadow-runner-bell-terrain-atlas'
@@ -872,6 +967,54 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       })
     })
 
+    this.level.surgePickups?.forEach((surge, index) => {
+      const surgeSprite = this.surgePickups!.create(
+        surge.x,
+        surge.y,
+        'shadow-runner-shadow-surge',
+      ) as Phaser.Physics.Arcade.Sprite
+      surgeSprite.setName(surge.id)
+      surgeSprite.setScale(0.9)
+      surgeSprite.setCircle(18, 14, 14)
+      surgeSprite.setImmovable(true)
+      surgeSprite.setDepth(17)
+      surgeSprite.setData('collected', false)
+      surgeSprite.play('shadow-surge-spin')
+      this.tweens.add({
+        targets: surgeSprite,
+        y: surge.y - 12,
+        duration: 650,
+        yoyo: true,
+        repeat: -1,
+        delay: index * 150,
+        ease: 'Sine.inOut',
+      })
+    })
+
+    this.level.moonShardPickups?.forEach((shard, index) => {
+      const shardSprite = this.moonShardPickups!.create(
+        shard.x,
+        shard.y,
+        'shadow-runner-moon-shard',
+      ) as Phaser.Physics.Arcade.Sprite
+      shardSprite.setName(shard.id)
+      shardSprite.setScale(0.92)
+      shardSprite.setCircle(18, 14, 14)
+      shardSprite.setImmovable(true)
+      shardSprite.setDepth(18)
+      shardSprite.setData('collected', false)
+      shardSprite.play('moon-shard-glow')
+      this.tweens.add({
+        targets: shardSprite,
+        y: shard.y - 13,
+        duration: 720,
+        yoyo: true,
+        repeat: -1,
+        delay: index * 190,
+        ease: 'Sine.inOut',
+      })
+    })
+
     this.level.spikes.forEach(spike => {
       const spikeVisual = addStaticPlatform(this, this.spikes!, spike, { texture: 'shadow-runner-spike-row' })
       const spikeCollider = spikeVisual.getData('platformCollider') as Phaser.GameObjects.Rectangle | undefined
@@ -899,19 +1042,22 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
 
     const finish = this.level.finish
-    const clockFinishFrame = getTerrainFrameKey(finish.visualId ?? '')
-    const hasClockFinish = finish.visualId
-      && this.textures.exists('shadow-runner-clock-terrain-atlas')
-      && this.textures.get('shadow-runner-clock-terrain-atlas').has(clockFinishFrame)
-    if (hasClockFinish) {
+    const finishFrame = getTerrainFrameKey(finish.visualId ?? '')
+    const finishTerrainTexture = finish.terrainSet === 'moon'
+      ? 'shadow-runner-moon-terrain-atlas'
+      : 'shadow-runner-clock-terrain-atlas'
+    const hasFinishTerrain = finish.visualId
+      && this.textures.exists(finishTerrainTexture)
+      && this.textures.get(finishTerrainTexture).has(finishFrame)
+    if (hasFinishTerrain) {
       const gate = this.add.image(
         finish.x + finish.width / 2,
         finish.y + finish.height,
-        'shadow-runner-clock-terrain-atlas',
-        clockFinishFrame,
+        finishTerrainTexture,
+        finishFrame,
       )
       gate.setOrigin(0.5, 1)
-      gate.setDisplaySize(116, 164)
+      gate.setDisplaySize(finish.terrainSet === 'moon' ? 156 : 116, finish.terrainSet === 'moon' ? 170 : 164)
       gate.setDepth(5)
     } else if (this.textures.exists('shadow-runner-east-gate')) {
       const gate = this.add.image(finish.x + finish.width / 2, finish.y + finish.height, 'shadow-runner-east-gate')
@@ -927,10 +1073,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   private createCrouchGate(gate: NonNullable<ShadowRunnerLevelConfig['crouchGates']>[number]) {
     const visualX = gate.x + gate.width / 2
+    const moonGate = gate.terrainSet === 'moon'
     const clockGate = gate.terrainSet === 'clock'
     const candleGate = isCandleTerrainSet(gate.terrainSet)
     const readableCandleGate = gate.terrainSet === 'candleBright' || gate.terrainSet === 'candleShelf'
-    const terrainTexture = clockGate
+    const terrainTexture = moonGate
+      ? 'shadow-runner-moon-terrain-atlas'
+      : clockGate
       ? 'shadow-runner-clock-terrain-atlas'
       : candleGate
         ? readableCandleGate && this.textures.exists('shadow-runner-candle-readable-terrain-atlas')
@@ -938,13 +1087,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
           : 'shadow-runner-candle-terrain-atlas'
         : 'shadow-runner-bell-terrain-atlas'
     const slabFrame = getTerrainFrameKey(
-      clockGate ? 'clock-overhang' : candleGate ? 'candle-lintel' : 'bell-wide-ledge',
+      moonGate ? 'moon-tall-overhang' : clockGate ? 'clock-overhang' : candleGate ? 'candle-lintel' : 'bell-wide-ledge',
     )
     const blockFrame = getTerrainFrameKey(candleGate ? 'candle-small-plank' : 'bell-small-block')
     const shelfFrame = getTerrainFrameKey(candleGate ? 'candle-high-shelf' : 'bell-scroll-shelf')
     const hasGateTerrain = this.textures.exists(terrainTexture)
       && this.textures.get(terrainTexture).has(slabFrame)
-      && (clockGate || (
+      && (clockGate || moonGate || (
         this.textures.get(terrainTexture).has(blockFrame)
         && this.textures.get(terrainTexture).has(shelfFrame)
       ))
@@ -952,9 +1101,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const supportY = gate.y + gate.height - 92
     const archiveStackY = gate.y + 46
 
-    if (clockGate && hasGateTerrain) {
+    if ((clockGate || moonGate) && hasGateTerrain) {
       const overhang = this.add.image(visualX, gate.y + gate.height / 2 - 16, terrainTexture, slabFrame)
-      overhang.setDisplaySize(gate.width + 40, gate.height + 92)
+      overhang.setDisplaySize(gate.width + (moonGate ? 58 : 40), gate.height + (moonGate ? 128 : 92))
       overhang.setDepth(7)
     } else if (hasGateTerrain) {
       const slab = this.add.image(visualX, undersideY, terrainTexture, slabFrame)
@@ -1023,6 +1172,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.chronoAura.setDepth(24)
     this.chronoAura.setVisible(false)
 
+    this.surgeAura = this.add.graphics()
+    this.surgeAura.setDepth(26)
+    this.surgeAura.setVisible(false)
+
     getShadowRunnerLevelEnemies(this.level).forEach(enemyStart => {
       const enemy = this.createEnemySprite(enemyStart)
       this.enemies.push(enemy)
@@ -1089,6 +1242,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.chronoPickups!, (_player, chrono) => {
       this.collectChrono(chrono as Phaser.Physics.Arcade.Sprite)
     })
+    this.physics.add.overlap(this.player, this.surgePickups!, (_player, surge) => {
+      this.collectSurge(surge as Phaser.Physics.Arcade.Sprite)
+    })
+    this.physics.add.overlap(this.player, this.moonShardPickups!, (_player, shard) => {
+      this.collectMoonShard(shard as Phaser.Physics.Arcade.Sprite)
+    })
   }
 
   private createEnemySprite(enemyStart: ShadowRunnerEnemyConfig) {
@@ -1102,7 +1261,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
             ? 'tower-archer'
             : enemyStart.kind === 'candle-jester'
               ? 'candle-jester'
-              : 'clockwork-sentry'
+              : enemyStart.kind === 'moon-stalker'
+                ? 'moon-stalker'
+                : 'clockwork-sentry'
     const enemy = this.physics.add.sprite(enemyStart.x, enemyStart.y, enemyTexture)
     enemy.setName(enemyStart.id)
     enemy.setData('enemyId', enemyStart.id)
@@ -1141,6 +1302,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       enemy.setOffset(42, 60)
       enemy.setMaxVelocity(168, 920)
       enemy.play('jester-dance')
+    } else if (enemyStart.kind === 'moon-stalker') {
+      enemy.setScale(MOON_STALKER_SCALE)
+      enemy.setSize(42, 66)
+      enemy.setOffset(43, 62)
+      enemy.setMaxVelocity(276, 920)
+      enemy.play('stalker-run')
     } else {
       enemy.setScale(SENTRY_SCALE)
       enemy.setSize(50, 70)
@@ -1231,6 +1398,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
               score: this.state.player.score,
               chronoActive: isShadowRunnerChronoActive(this.state, this.time.now),
               chronoRemainingMs: Math.max(0, this.state.player.chronoActiveUntil - this.time.now),
+              surgeActive: isShadowRunnerSurgeActive(this.state, this.time.now),
+              surgeRemainingMs: Math.max(0, this.state.player.surgeActiveUntil - this.time.now),
+              moonShards: this.state.player.moonShards,
+              totalMoonShards: this.level.moonShardPickups?.length ?? 0,
             }
           : undefined,
         enemies: this.enemies.map(enemy => {
@@ -1317,6 +1488,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
               ? 0
               : enemyState.kind === 'candle-jester'
                 ? 86
+                : enemyState.kind === 'moon-stalker'
+                  ? 184
                 : SENTRY_PATROL_SPEED)
   }
 
@@ -1371,6 +1544,16 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
             : 'jester-defeated'
     }
 
+    if (enemyKind === 'moon-stalker') {
+      return state === 'walk'
+        ? 'stalker-run'
+        : state === 'attack'
+          ? 'stalker-attack'
+          : state === 'hit'
+            ? 'stalker-hit'
+            : 'stalker-defeated'
+    }
+
     return state === 'walk'
       ? 'sentry-walk'
       : state === 'attack'
@@ -1383,7 +1566,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private setEnemyFacing(enemy: Phaser.Physics.Arcade.Sprite, direction: 1 | -1) {
     const enemyKind = this.getEnemyKind(enemy)
     enemy.setFlipX(
-      enemyKind === 'barrel-roller' || enemyKind === 'lantern-bandit-scout'
+      enemyKind === 'barrel-roller' || enemyKind === 'lantern-bandit-scout' || enemyKind === 'moon-stalker'
         ? direction < 0
         : direction > 0,
     )
@@ -1470,9 +1653,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     if (left !== right) {
       const direction = right ? 1 : -1
+      const speedMultiplier = getShadowRunnerSurgeSpeedMultiplier(this.state, time)
       this.state.player.facing = direction
       player.setFlipX(direction < 0)
-      player.setVelocityX((crouching ? CRAWL_SPEED : PLAYER_SPEED) * direction)
+      player.setVelocityX((crouching ? CRAWL_SPEED : PLAYER_SPEED * speedMultiplier) * direction)
     } else {
       player.setVelocityX(0)
     }
@@ -1643,6 +1827,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         this.tryCandleJesterThrow(time, enemy, enemyState)
       }
 
+      if (enemyKind === 'moon-stalker' && !recentlyHit && this.tryMoonStalkerLunge(time, enemy, enemyState)) {
+        return
+      }
+
       if (recentlyHit) {
         enemy.setVelocityX(body.velocity.x * 0.78)
       } else if (time < enemyState.attackUntil) {
@@ -1769,6 +1957,40 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     enemyState.attackUntil = time + 360
     this.setEnemyFacing(enemy, direction)
     this.createCandleProjectile(enemy, direction, projectileSpeed, enemyState.id)
+  }
+
+  private tryMoonStalkerLunge(time: number, enemy: Phaser.Physics.Arcade.Sprite, enemyState: ShadowRunnerEnemyState) {
+    if (!this.player) return false
+
+    const enemyConfig = getShadowRunnerLevelEnemies(this.level).find(config => config.id === enemyState.id)
+    const range = enemyConfig?.attackRange ?? 440
+    const cooldown = enemyConfig?.attackCooldownMs ?? 1100
+    const dx = Math.abs(this.player.x - enemy.x)
+    const dy = Math.abs(this.player.y - enemy.y)
+    const chronoScale = getShadowRunnerChronoTimeScale(this.state, time)
+    const effectiveCooldown = chronoScale < 1 ? cooldown / chronoScale : cooldown
+
+    if (time < enemyState.attackUntil) {
+      const direction = enemyState.direction
+      enemy.setVelocityX(direction * this.getEnemyPatrolSpeed(enemyState) * 1.62 * chronoScale)
+      this.setEnemyFacing(enemy, direction)
+      const attackAnimation = this.getEnemyAnimation('moon-stalker', 'attack')
+      if (enemy.anims.currentAnim?.key !== attackAnimation) {
+        enemy.play(attackAnimation, true)
+      }
+      return true
+    }
+
+    if (dx > range || dy > 96 || time - enemyState.lastShotAt < effectiveCooldown) return false
+
+    const direction = this.player.x >= enemy.x ? 1 : -1
+    enemyState.direction = direction
+    enemyState.lastShotAt = time
+    enemyState.attackUntil = time + 540
+    enemy.setVelocityX(direction * this.getEnemyPatrolSpeed(enemyState) * 1.7 * chronoScale)
+    this.setEnemyFacing(enemy, direction)
+    enemy.play(this.getEnemyAnimation('moon-stalker', 'attack'), true)
+    return true
   }
 
   private createArcherProjectile(
@@ -2062,13 +2284,14 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     const enemyState = this.getEnemyState(enemy)
     const boostActive = isShadowRunnerBoostActive(this.state, time)
-    const damaged = damageShadowRunnerEnemy(this.state, time, boostActive ? 2 : 1, this.getEnemyId(enemy))
+    const surgeActive = isShadowRunnerSurgeActive(this.state, time)
+    const damaged = damageShadowRunnerEnemy(this.state, time, boostActive || surgeActive ? 2 : 1, this.getEnemyId(enemy))
     if (damaged) {
       if (enemyState) {
         enemyState.attackUntil = time + 160
       }
       this.playSound('enemy-hit')
-      enemy.setVelocityX(facing * (boostActive ? 245 : 190))
+      enemy.setVelocityX(facing * (boostActive || surgeActive ? 245 : 190))
       this.addHitFlash(enemy.x, enemy.y - 42)
       if (!enemyState?.alive) {
         this.defeatEnemy(enemy)
@@ -2085,7 +2308,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const isStomp = body.velocity.y > 130 && player.y < enemy.y - 24
 
     if (isStomp) {
-      const stompDamage = isShadowRunnerBoostActive(this.state, time) ? 3 : 2
+      const stompDamage = isShadowRunnerBoostActive(this.state, time) || isShadowRunnerSurgeActive(this.state, time) ? 3 : 2
       const damaged = damageShadowRunnerEnemy(this.state, time, stompDamage, this.getEnemyId(enemy))
       player.setVelocityY(-390)
       enemyState.attackUntil = time + 160
@@ -2119,7 +2342,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private damagePlayerFromHazard(time: number, sourceX?: number, amount = 1) {
-    const resistedHit = isShadowRunnerBoostActive(this.state, time) && this.state.player.boostGuardCharges > 0
+    const resistedHit = (
+      isShadowRunnerBoostActive(this.state, time) && this.state.player.boostGuardCharges > 0
+    ) || isShadowRunnerSurgeActive(this.state, time)
     const damaged = damageShadowRunnerPlayer(this.state, time, amount)
     if (!damaged || !this.player) return false
 
@@ -2355,6 +2580,58 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.emitHud(true)
   }
 
+  private collectSurge(surgeSprite: Phaser.Physics.Arcade.Sprite) {
+    if (surgeSprite.getData('collected')) return
+
+    const surge: ShadowRunnerSurgePickup | undefined = this.level.surgePickups
+      ?.find(current => current.id === surgeSprite.name)
+    if (!surge) return
+
+    surgeSprite.setData('collected', true)
+    collectShadowRunnerSurge(this.state, this.time.now, surge)
+    this.playSound('coin')
+    this.addCoinSparkle(surgeSprite.x, surgeSprite.y)
+    this.addDustPuff(surgeSprite.x, surgeSprite.y + 18)
+    this.cameras.main.flash(100, 150, 232, 255, false)
+    this.tweens.add({
+      targets: surgeSprite,
+      scale: 1.58,
+      alpha: 0,
+      y: surgeSprite.y - 28,
+      duration: 230,
+      ease: 'Quad.easeOut',
+      onComplete: () => surgeSprite.disableBody(true, true),
+    })
+    this.emitHud(true)
+  }
+
+  private collectMoonShard(shardSprite: Phaser.Physics.Arcade.Sprite) {
+    if (shardSprite.getData('collected')) return
+
+    const shard: ShadowRunnerMoonShardPickup | undefined = this.level.moonShardPickups
+      ?.find(current => current.id === shardSprite.name)
+    const totalMoonShards = this.level.moonShardPickups?.length ?? 0
+    if (!shard || totalMoonShards <= 0) return
+
+    shardSprite.setData('collected', true)
+    collectShadowRunnerMoonShard(this.state, shard, totalMoonShards)
+    this.finishSparked = false
+    this.playSound('coin')
+    this.addCoinSparkle(shardSprite.x, shardSprite.y)
+    this.addDustPuff(shardSprite.x, shardSprite.y + 18)
+    this.cameras.main.flash(120, 210, 245, 255, false)
+    this.tweens.add({
+      targets: shardSprite,
+      scale: 1.64,
+      alpha: 0,
+      y: shardSprite.y - 30,
+      duration: 250,
+      ease: 'Quad.easeOut',
+      onComplete: () => shardSprite.disableBody(true, true),
+    })
+    this.emitHud(true)
+  }
+
   private defeatEnemy(enemy: Phaser.Physics.Arcade.Sprite) {
     const body = enemy.body as Phaser.Physics.Arcade.Body
     body.enable = false
@@ -2448,6 +2725,24 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.chronoAura.fillCircle(this.player.x, this.player.y - 46, 40 * pulse)
   }
 
+  private updateSurgeAura(time: number) {
+    if (!this.player || !this.surgeAura) return
+
+    const active = isShadowRunnerSurgeActive(this.state, time)
+    this.surgeAura.setVisible(active)
+    this.surgeAura.clear()
+
+    if (!active) return
+
+    const pulse = 1 + Math.sin(time / 90) * 0.045
+    this.surgeAura.lineStyle(3, 0xf0d381, 0.62)
+    this.surgeAura.strokeCircle(this.player.x, this.player.y - 46, 47 * pulse)
+    this.surgeAura.lineStyle(2, 0xa9efff, 0.66)
+    this.surgeAura.strokeEllipse(this.player.x, this.player.y - 46, 78 * pulse, 96 * pulse)
+    this.surgeAura.fillStyle(0x70e8ff, 0.1)
+    this.surgeAura.fillEllipse(this.player.x, this.player.y - 46, 62 * pulse, 82 * pulse)
+  }
+
   private updateHealthBars() {
     this.drawHealthBar(this.playerHealthBar, this.playerHealthFrame, this.player?.x ?? 0, (this.player?.y ?? 0) - 94, this.state.player.health, this.state.player.maxHealth)
 
@@ -2505,6 +2800,18 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const overlapsFinish = isShadowRunnerFinishOverlap(body, finish, { fallRespawnPending: this.fallRespawnPending })
 
     if (overlapsFinish) {
+      const totalMoonShards = this.level.moonShardPickups?.length ?? 0
+      if (totalMoonShards > 0 && this.state.player.moonShards < totalMoonShards) {
+        this.state.objective = `Moon Shards ${this.state.player.moonShards}/${totalMoonShards}`
+        if (!this.finishSparked) {
+          this.finishSparked = true
+          this.showCheckpointToast(`Moon Shards ${this.state.player.moonShards}/${totalMoonShards}`)
+          this.addHitFlash(finish.x + finish.width / 2, finish.y + 42)
+        }
+        this.emitHud(true)
+        return
+      }
+
       this.state.defeated = true
       this.state.objective = this.level.completionLine
       this.state.player.score += 300
@@ -2738,6 +3045,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.registerTerrainFrameSet('shadow-runner-candle-terrain-atlas', CANDLE_TERRAIN_CROPS)
     this.registerTerrainFrameSet('shadow-runner-candle-readable-terrain-atlas', CANDLE_READABLE_TERRAIN_CROPS)
     this.registerTerrainFrameSet('shadow-runner-clock-terrain-atlas', CLOCK_TERRAIN_CROPS)
+    this.registerTerrainFrameSet('shadow-runner-moon-terrain-atlas', MOON_TERRAIN_CROPS)
   }
 
   private registerTerrainFrameSet(textureKey: string, crops: Record<string, TextureCrop>) {

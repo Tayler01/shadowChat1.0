@@ -67,6 +67,87 @@ describe('Shadow Runner level configuration contract', () => {
     expect(SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip).toContain('chrono-lantern-4f-64.png')
   })
 
+  it('ships Moonlit Causeway as the longer and hardest playable Level 7 route', () => {
+    const levelSix = SHADOW_RUNNER_LEVEL_CONFIGS['level-6']
+    const levelSeven = SHADOW_RUNNER_LEVEL_CONFIGS['level-7']
+    const levelSevenEnemies = getShadowRunnerLevelEnemies(levelSeven)
+    const enemyKinds = new Set(levelSevenEnemies.map(enemy => enemy.kind))
+    const campaignLevelSeven = SHADOW_RUNNER_CAMPAIGN_LEVELS.find(level => level.id === 'level-7')
+
+    expect(levelSeven.title).toBe('Moonlit Causeway')
+    expect(levelSeven.campaignLevel).toBe(7)
+    expect(levelSeven.worldWidth).toBeGreaterThan(levelSix.worldWidth)
+    expect(levelSeven.coins.length).toBeGreaterThan(levelSix.coins.length)
+    expect(levelSeven.tiltPlatforms.length).toBeGreaterThan(levelSix.tiltPlatforms.length)
+    expect(levelSeven.checkpoints).toHaveLength(6)
+    expect(levelSeven.moonShardPickups).toHaveLength(3)
+    expect(levelSeven.surgePickups).toHaveLength(3)
+    expect(levelSeven.arrowVolleys).toHaveLength(8)
+    expect(levelSevenEnemies).toHaveLength(15)
+    expect([...enemyKinds]).toEqual(expect.arrayContaining([
+      'clockwork-sentry',
+      'lantern-bandit-scout',
+      'barrel-roller',
+      'tower-archer',
+      'candle-jester',
+      'moon-stalker',
+    ]))
+    expect(levelSevenEnemies.filter(enemy => enemy.kind === 'moon-stalker')).toHaveLength(4)
+    expect(new Set(levelSevenEnemies.map(getShadowRunnerEnemyContactDamage)).size).toBeGreaterThan(2)
+    expect(levelSeven.platforms.filter(platform => platform.terrainSet === 'moon').length)
+      .toBeGreaterThanOrEqual(24)
+    expect(campaignLevelSeven?.playableLevelId).toBe('level-7')
+    expect(campaignLevelSeven?.mechanicPreview).toContain('Shadow Surge')
+    expect(SHADOW_RUNNER_ASSETS.levels.moonlitCausewayBackground).toContain('moonlit-causeway-background.webp')
+    expect(SHADOW_RUNNER_ASSETS.levels.moonlitCausewayProps).toContain('moonlit-causeway-props-v1-transparent.png')
+    expect(SHADOW_RUNNER_ASSETS.enemies.moonStalkerStrip).toContain('moon-stalker-v1-5f-128.png')
+    expect(SHADOW_RUNNER_ASSETS.levels.shadowSurgeSigilStrip).toContain('shadow-surge-sigil-4f-64.png')
+    expect(SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip).toContain('moon-shard-relic-4f-64.png')
+  })
+
+  it('keeps Moonlit Causeway crawl pickups and recovery chips reachable', () => {
+    const levelSeven = SHADOW_RUNNER_LEVEL_CONFIGS['level-7']
+    const platformById = new Map(levelSeven.platforms.map(platform => [platform.id, platform]))
+    const spikeById = new Map(levelSeven.spikes.map(spike => [spike.id, spike]))
+    const coinById = new Map(levelSeven.coins.map(coin => [coin.id, coin]))
+    const shardById = new Map(levelSeven.moonShardPickups?.map(shard => [shard.id, shard]) ?? [])
+    const chronoById = new Map(levelSeven.chronoPickups?.map(chrono => [chrono.id, chrono]) ?? [])
+
+    ;([
+      ['causeway-mid-gap-chip', 'causeway-gap-f'],
+      ['causeway-moon-gauntlet-chip', 'causeway-gap-k'],
+      ['causeway-final-gap-chip', 'causeway-gap-l'],
+    ] as const).forEach(([chipId, gapId]) => {
+      const chip = platformById.get(chipId)!
+      const gap = spikeById.get(gapId)!
+
+      expect(chip.x).toBeGreaterThan(gap.x)
+      expect(chip.x + chip.width).toBeLessThan(gap.x + gap.width)
+      expect(chip.width).toBeGreaterThanOrEqual(100)
+      expect(chip.width).toBeLessThanOrEqual(170)
+      expect(chip.y).toBeLessThan(616)
+    })
+
+    const highRecovery = platformById.get('causeway-high-recovery-a')!
+    const shardCheckpoint = levelSeven.checkpoints?.find(checkpoint => checkpoint.id === 'causeway-shard-climb')
+
+    expect(highRecovery.y).toBe(604)
+    expect(highRecovery.height).toBeLessThanOrEqual(64)
+    expect(shardCheckpoint?.y).toBe(highRecovery.y)
+    expect(chronoById.get('chrono-causeway-climb')?.x).toBeGreaterThanOrEqual(highRecovery.x + 80)
+    expect(chronoById.get('chrono-causeway-climb')?.y).toBeGreaterThanOrEqual(568)
+
+    ;([
+      'coin-11', 'coin-12', 'coin-13',
+      'coin-27', 'coin-28', 'coin-29', 'coin-30',
+      'coin-40', 'coin-41', 'coin-42',
+      'coin-50', 'coin-51', 'coin-52',
+    ] as const).forEach(coinId => {
+      expect(coinById.get(coinId)?.y).toBeGreaterThanOrEqual(596)
+    })
+    expect(shardById.get('moon-shard-crawl-route')?.y).toBeGreaterThanOrEqual(596)
+  })
+
   it('adds safe recovery checkpoints to every long campaign route', () => {
     const expectedMinimums = new Map([
       ['level-1', 1],
@@ -75,6 +156,7 @@ describe('Shadow Runner level configuration contract', () => {
       ['level-4', 3],
       ['level-5', 4],
       ['level-6', 5],
+      ['level-7', 6],
     ])
 
     expectedMinimums.forEach((minimum, levelId) => {
@@ -91,8 +173,8 @@ describe('Shadow Runner level configuration contract', () => {
     })
   })
 
-  it('keeps Level 5 and Level 6 patrol routes on their supporting platforms', () => {
-    ;(['level-5', 'level-6'] as const).forEach(levelId => {
+  it('keeps Level 5 through Level 7 patrol routes on their supporting platforms', () => {
+    ;(['level-5', 'level-6', 'level-7'] as const).forEach(levelId => {
       const level = SHADOW_RUNNER_LEVEL_CONFIGS[levelId]
       const movingEnemies = getShadowRunnerLevelEnemies(level)
         .filter(enemy => (enemy.patrolSpeed ?? 1) > 0)

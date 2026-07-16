@@ -124,7 +124,9 @@ describe('Shado Live database foundation', () => {
   test('publishes only a privacy-safe RLS invalidation signal for realtime refetches', () => {
     expect(sql).toMatch(/create table public\.live_room_signals/i)
     expect(sql).toMatch(/alter table public\.live_room_signals enable row level security/i)
-    expect(sql).toMatch(/using \(shado_live_private\.can_receive_shado_live_signal\(auth\.uid\(\), room_id\)\)/i)
+    expect(sql).toMatch(
+      /using \(shado_live_private\.can_receive_shado_live_signal\(\(select auth\.uid\(\)\), room_id\)\)/i,
+    )
     expect(sql).toMatch(/alter publication supabase_realtime add table public\.live_room_signals/i)
     expect(sql).not.toMatch(/alter publication supabase_realtime add table public\.live_room_events/i)
     expect(sql).toMatch(/touch_shado_live_(?:room|participant|stage|message)_signal/i)

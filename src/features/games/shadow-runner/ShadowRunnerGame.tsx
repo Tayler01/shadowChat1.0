@@ -67,6 +67,12 @@ function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHud
     chronoActive: false,
     chronoRemainingMs: 0,
     chronoTimeScale: 1,
+    surgeActive: false,
+    surgeRemainingMs: 0,
+    surgeGuardCharges: 0,
+    moonShards: 0,
+    totalMoonShards: level.moonShardPickups?.length ?? 0,
+    moonShardGateOpen: (level.moonShardPickups?.length ?? 0) === 0,
     enemiesDefeated: 0,
     totalEnemies: getShadowRunnerLevelEnemies(level).length,
     objective: level.objective,
@@ -807,6 +813,47 @@ export function ShadowRunnerGame({
             />
             <span>Chrono</span>
             <span>{Math.ceil(hud.chronoRemainingMs / 1000)}s</span>
+          </div>
+        )}
+
+        {hud.surgeActive && (
+          <div
+            aria-label={`Shadow Surge ${Math.ceil(hud.surgeRemainingMs / 1000)} seconds remaining`}
+            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#a9efff]/45 bg-[#06101a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#d7f7ff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.shadowSurgeSigilStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Surge</span>
+            <span>{Math.ceil(hud.surgeRemainingMs / 1000)}s</span>
+            {hud.surgeGuardCharges > 0 && <span className="text-[#f8e8ad]">Guard {hud.surgeGuardCharges}</span>}
+          </div>
+        )}
+
+        {hud.totalMoonShards > 0 && (
+          <div
+            aria-label={`Moon Shards ${hud.moonShards} of ${hud.totalMoonShards}`}
+            className={`pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem] ${
+              hud.moonShardGateOpen
+                ? 'border-[#f0d381]/55 bg-[#191006]/82 text-[#f8e8ad]'
+                : 'border-[#9be6ff]/45 bg-[#06121a]/82 text-[#bdeaff]'
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Shards</span>
+            <span>{hud.moonShards}/{hud.totalMoonShards}</span>
           </div>
         )}
 
