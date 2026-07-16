@@ -44,8 +44,16 @@ Canonical detail and release gates live in:
 - Branch: `main`
 - Current checkpoint: direct Shadow Runner entry without an access-code gate,
   campaign level-map progression, reusable level configs, Level 1 through
-  Level 6 production routes, and mobile landscape/orientation handling.
+  Level 7 production routes, and mobile landscape/orientation handling.
 - Roadmap: [`docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md`](C:/repos/chat2.0/docs/SHADOW_RUNNER_PLAYABLE_PROTOTYPE_ROADMAP.md:1)
+- Latest pass, 2026-07-16: shipped playable Level 7 `Moonlit Causeway`, a
+  generated moonstone causeway asset set, the new Moon Stalker lunge enemy,
+  Shadow Surge power-ups, required Moon Shard goals, six checkpoints, 60 coins,
+  15 enemies, and a route longer/harder than Clockmaker Yard without allowing a
+  bottom-map bypass to count as completion.
+- Medal pass, 2026-07-16: added the Level 7 availability migration so the
+  public Shadow Runner knight medal now targets Moonlit Causeway and refreshes
+  stale medals through the existing catalog trigger/function contract.
 - Latest pass, 2026-07-10: shipped playable Level 6 `Clockmaker Yard`, a
   generated background/terrain/Chrono asset set, the new Lantern Bandit Scout,
   a time-slowing Chrono Lantern power-up, five recovery checkpoints, and a

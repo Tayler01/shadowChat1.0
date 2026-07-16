@@ -4,7 +4,9 @@ import type {
   ShadowRunnerEnemyConfig,
   ShadowRunnerEnemyKind,
   ShadowRunnerLevelConfig,
+  ShadowRunnerMoonShardPickup,
   ShadowRunnerShieldPickup,
+  ShadowRunnerSurgePickup,
 } from './levels'
 
 export interface ShadowRunnerHudState {
@@ -30,6 +32,12 @@ export interface ShadowRunnerHudState {
   chronoActive: boolean
   chronoRemainingMs: number
   chronoTimeScale: number
+  surgeActive: boolean
+  surgeRemainingMs: number
+  surgeGuardCharges: number
+  moonShards: number
+  totalMoonShards: number
+  moonShardGateOpen: boolean
   enemiesDefeated: number
   totalEnemies: number
   objective: string
@@ -69,6 +77,10 @@ export interface ShadowRunnerSimulationState {
     shieldGuardCharges: number
     chronoActiveUntil: number
     chronoTimeScale: number
+    surgeActiveUntil: number
+    surgeGuardCharges: number
+    surgeSpeedMultiplier: number
+    moonShards: number
     lastDamagedAt: number
   }
   enemy: ShadowRunnerEnemyState
@@ -78,6 +90,7 @@ export interface ShadowRunnerSimulationState {
     title: string
     subtitle: string
     completionLine: string
+    totalMoonShards: number
   }
   objective: string
   defeated: boolean
@@ -143,6 +156,10 @@ export function createInitialShadowRunnerSimulation(
       shieldGuardCharges: 0,
       chronoActiveUntil: 0,
       chronoTimeScale: 1,
+      surgeActiveUntil: 0,
+      surgeGuardCharges: 0,
+      surgeSpeedMultiplier: 1,
+      moonShards: 0,
       lastDamagedAt: Number.NEGATIVE_INFINITY,
     },
     enemy: primaryEnemy,
@@ -152,6 +169,7 @@ export function createInitialShadowRunnerSimulation(
       title: level.title,
       subtitle: level.subtitle,
       completionLine: level.completionLine,
+      totalMoonShards: level.moonShardPickups?.length ?? 0,
     },
     objective: level.objective,
     defeated: false,
@@ -177,8 +195,13 @@ export function getShadowRunnerHudState(
   const chronoRemainingMs = rawChronoRemainingMs > 0
     ? Math.ceil(rawChronoRemainingMs / 1000) * 1000
     : 0
+  const rawSurgeRemainingMs = Math.max(0, state.player.surgeActiveUntil - time)
+  const surgeRemainingMs = rawSurgeRemainingMs > 0
+    ? Math.ceil(rawSurgeRemainingMs / 1000) * 1000
+    : 0
   const totalEnemies = state.enemies.length
   const enemiesDefeated = state.enemies.filter(enemy => !enemy.alive).length
+  const totalMoonShards = state.level.totalMoonShards
 
   return {
     lives: state.player.lives,
@@ -203,6 +226,12 @@ export function getShadowRunnerHudState(
     chronoActive: chronoRemainingMs > 0,
     chronoRemainingMs,
     chronoTimeScale: chronoRemainingMs > 0 ? state.player.chronoTimeScale : 1,
+    surgeActive: surgeRemainingMs > 0,
+    surgeRemainingMs,
+    surgeGuardCharges: state.player.surgeGuardCharges,
+    moonShards: state.player.moonShards,
+    totalMoonShards,
+    moonShardGateOpen: totalMoonShards === 0 || state.player.moonShards >= totalMoonShards,
     enemiesDefeated,
     totalEnemies,
     objective: state.objective,
@@ -223,9 +252,19 @@ export function isShadowRunnerChronoActive(state: ShadowRunnerSimulationState, t
   return state.player.chronoActiveUntil > time
 }
 
+export function isShadowRunnerSurgeActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.surgeActiveUntil > time
+}
+
 export function getShadowRunnerChronoTimeScale(state: ShadowRunnerSimulationState, time: number) {
   return isShadowRunnerChronoActive(state, time)
     ? Math.min(1, Math.max(0.35, state.player.chronoTimeScale))
+    : 1
+}
+
+export function getShadowRunnerSurgeSpeedMultiplier(state: ShadowRunnerSimulationState, time: number) {
+  return isShadowRunnerSurgeActive(state, time)
+    ? Math.min(1.25, Math.max(1, state.player.surgeSpeedMultiplier))
     : 1
 }
 
@@ -247,9 +286,18 @@ export function damageShadowRunnerPlayer(state: ShadowRunnerSimulationState, tim
     return true
   }
 
-  const damageAmount = Math.max(1, Math.floor(amount))
+  let damageAmount = Math.max(1, Math.floor(amount))
+  if (isShadowRunnerSurgeActive(state, time)) {
+    if (state.player.surgeGuardCharges > 0) {
+      state.player.surgeGuardCharges -= 1
+    }
+    damageAmount = Math.max(1, Math.ceil(damageAmount / 2))
+  }
   state.player.health = Math.max(0, state.player.health - damageAmount)
-  state.player.score = Math.max(0, state.player.score - (isShadowRunnerBoostActive(state, time) ? 8 : 15) * damageAmount)
+  state.player.score = Math.max(
+    0,
+    state.player.score - (isShadowRunnerBoostActive(state, time) || isShadowRunnerSurgeActive(state, time) ? 8 : 15) * damageAmount,
+  )
   return true
 }
 
@@ -337,4 +385,31 @@ export function collectShadowRunnerChrono(
   state.player.chronoTimeScale = alreadyActive
     ? Math.min(state.player.chronoTimeScale, chrono.timeScale ?? 0.58)
     : chrono.timeScale ?? 0.58
+}
+
+export function collectShadowRunnerSurge(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  surge: ShadowRunnerSurgePickup,
+) {
+  state.player.score += surge.scoreValue ?? 220
+  state.player.health = Math.min(
+    state.player.maxHealth,
+    state.player.health + (surge.healthRestore ?? 4),
+  )
+  state.player.surgeActiveUntil = Math.max(state.player.surgeActiveUntil, time) + (surge.durationMs ?? 9500)
+  state.player.surgeGuardCharges = Math.max(state.player.surgeGuardCharges, surge.guardCharges ?? 3)
+  state.player.surgeSpeedMultiplier = surge.speedMultiplier ?? 1.12
+}
+
+export function collectShadowRunnerMoonShard(
+  state: ShadowRunnerSimulationState,
+  shard: ShadowRunnerMoonShardPickup,
+  totalMoonShards: number,
+) {
+  state.player.moonShards = Math.min(totalMoonShards, state.player.moonShards + 1)
+  state.player.score += shard.scoreValue ?? 275
+  state.objective = state.player.moonShards >= totalMoonShards
+    ? 'Moon relay open'
+    : `Moon Shards ${state.player.moonShards}/${totalMoonShards}`
 }

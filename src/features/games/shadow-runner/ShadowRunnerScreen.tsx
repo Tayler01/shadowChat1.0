@@ -457,10 +457,14 @@ function getShadowRunnerRouteImageSources(levelId: ShadowRunnerPlayableLevelId) 
     level.id === 'level-5' ? SHADOW_RUNNER_ASSETS.levels.candleFairPropsHazards : undefined,
     level.id === 'level-5' ? SHADOW_RUNNER_ASSETS.levels.candleFairTerrainReadable : undefined,
     level.id === 'level-6' ? SHADOW_RUNNER_ASSETS.levels.clockmakerYardProps : undefined,
-    level.id === 'level-6' ? SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip : undefined,
-    level.id === 'level-6' ? SHADOW_RUNNER_ASSETS.enemies.lanternBanditScoutStrip : undefined,
-    level.id === 'level-4' || level.id === 'level-5' || level.id === 'level-6' ? SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip : undefined,
-    level.id === 'level-4' || level.id === 'level-5' || level.id === 'level-6' ? SHADOW_RUNNER_ASSETS.levels.boostAuraStrip : undefined,
+    level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.moonlitCausewayProps : undefined,
+    level.id === 'level-6' || level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip : undefined,
+    level.id === 'level-6' || level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.enemies.lanternBanditScoutStrip : undefined,
+    level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.enemies.moonStalkerStrip : undefined,
+    level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.shadowSurgeSigilStrip : undefined,
+    level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip : undefined,
+    level.id === 'level-4' || level.id === 'level-5' || level.id === 'level-6' || level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip : undefined,
+    level.id === 'level-4' || level.id === 'level-5' || level.id === 'level-6' || level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.boostAuraStrip : undefined,
   ].filter((source): source is string => Boolean(source))
 
   return Array.from(new Set(routeSources))

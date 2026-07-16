@@ -7,7 +7,7 @@ export interface ShadowRunnerRect {
   width: number
   height: number
   visualId?: string
-  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock'
+  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock' | 'moon'
   hidden?: boolean
   damage?: number
 }
@@ -57,6 +57,18 @@ export interface ShadowRunnerChronoPickup extends ShadowRunnerPoint {
   timeScale?: number
 }
 
+export interface ShadowRunnerSurgePickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs?: number
+  healthRestore?: number
+  guardCharges?: number
+  speedMultiplier?: number
+}
+
+export interface ShadowRunnerMoonShardPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+}
+
 export interface ShadowRunnerCrouchGate extends ShadowRunnerRect {
   visualFrame?: number
   visualWidth?: number
@@ -75,7 +87,7 @@ export interface ShadowRunnerArrowVolley extends ShadowRunnerRect {
   damage?: number
 }
 
-export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'lantern-bandit-scout' | 'barrel-roller' | 'scroll-thief' | 'tower-archer' | 'candle-jester'
+export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'lantern-bandit-scout' | 'barrel-roller' | 'scroll-thief' | 'tower-archer' | 'candle-jester' | 'moon-stalker'
 
 export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   kind: ShadowRunnerEnemyKind
@@ -92,7 +104,7 @@ export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   projectileDamage?: number
 }
 
-export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3' | 'level-4' | 'level-5' | 'level-6'
+export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3' | 'level-4' | 'level-5' | 'level-6' | 'level-7'
 
 export interface ShadowRunnerLevelConfig {
   id: ShadowRunnerPlayableLevelId
@@ -115,6 +127,8 @@ export interface ShadowRunnerLevelConfig {
   boosts?: ShadowRunnerBoostPickup[]
   shieldPickups?: ShadowRunnerShieldPickup[]
   chronoPickups?: ShadowRunnerChronoPickup[]
+  surgePickups?: ShadowRunnerSurgePickup[]
+  moonShardPickups?: ShadowRunnerMoonShardPickup[]
   arrowVolleys?: ShadowRunnerArrowVolley[]
   enemy?: ShadowRunnerEnemyConfig
   enemies?: ShadowRunnerEnemyConfig[]
@@ -1116,6 +1130,234 @@ export const SHADOW_RUNNER_LEVEL_SIX: ShadowRunnerLevelConfig = {
   ],
 }
 
+export const SHADOW_RUNNER_LEVEL_SEVEN: ShadowRunnerLevelConfig = {
+  id: 'level-7',
+  campaignLevel: 7,
+  title: 'Moonlit Causeway',
+  subtitle: 'Campaign Route 7',
+  objective: 'Recover the three Moon Shards',
+  introLine: 'Recover every shard. Cross the moon road. Do not trust the bridges.',
+  completionLine: 'Moonlit Causeway cleared. The shard is whole again.',
+  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.moonlitCausewayBackground,
+  worldWidth: 12740,
+  worldHeight: 760,
+  playerStart: { id: 'start', x: 118, y: 584 },
+  checkpoints: [
+    { id: 'causeway-first-bridge', label: 'First Causeway', x: 2060, y: 616 },
+    { id: 'causeway-shard-climb', label: 'Shard Climb', x: 4400, y: 616 },
+    { id: 'causeway-arrow-pocket', label: 'Arrow Pocket', x: 5520, y: 616 },
+    { id: 'causeway-moon-gauntlet', label: 'Moon Gauntlet', x: 7900, y: 616 },
+    { id: 'causeway-final-archers', label: 'Final Archers', x: 8960, y: 616 },
+    { id: 'causeway-relay-approach', label: 'Relay Approach', x: 11280, y: 616 },
+  ],
+  enemies: [
+    {
+      id: 'causeway-stalker-a', kind: 'moon-stalker', x: 900, y: 616,
+      health: 5, maxHealth: 5, patrolLeft: 760, patrolRight: 1120, direction: -1,
+      patrolSpeed: 172, attackRange: 430, attackCooldownMs: 1150, contactDamage: 3,
+    },
+    {
+      id: 'causeway-sentry-a', kind: 'clockwork-sentry', x: 1510, y: 616,
+      health: 4, maxHealth: 4, patrolLeft: 1390, patrolRight: 1700, direction: 1,
+      patrolSpeed: 98, contactDamage: 2,
+    },
+    {
+      id: 'causeway-bandit-a', kind: 'lantern-bandit-scout', x: 2210, y: 616,
+      health: 4, maxHealth: 4, patrolLeft: 2070, patrolRight: 2420, direction: -1,
+      patrolSpeed: 184, contactDamage: 2,
+    },
+    {
+      id: 'causeway-jester-a', kind: 'candle-jester', x: 3000, y: 616,
+      health: 4, maxHealth: 4, patrolLeft: 2830, patrolRight: 3160, direction: 1,
+      patrolSpeed: 96, attackRange: 400, attackCooldownMs: 1100, projectileSpeed: 350,
+      contactDamage: 2, projectileDamage: 2,
+    },
+    {
+      id: 'causeway-barrel-a', kind: 'barrel-roller', x: 3770, y: 616,
+      health: 4, maxHealth: 4, patrolLeft: 3580, patrolRight: 4000, direction: -1,
+      patrolSpeed: 176, contactDamage: 4,
+    },
+    {
+      id: 'causeway-stalker-b', kind: 'moon-stalker', x: 4680, y: 616,
+      health: 5, maxHealth: 5, patrolLeft: 4480, patrolRight: 5100, direction: 1,
+      patrolSpeed: 182, attackRange: 470, attackCooldownMs: 1040, contactDamage: 3,
+    },
+    {
+      id: 'causeway-high-archer-a', kind: 'tower-archer', x: 5780, y: 285,
+      health: 4, maxHealth: 4, patrolLeft: 5710, patrolRight: 5880, direction: -1,
+      patrolSpeed: 0, attackRange: 840, attackCooldownMs: 1040, projectileSpeed: 540,
+      contactDamage: 1, projectileDamage: 3,
+    },
+    {
+      id: 'causeway-bandit-b', kind: 'lantern-bandit-scout', x: 6480, y: 616,
+      health: 4, maxHealth: 4, patrolLeft: 6320, patrolRight: 6720, direction: 1,
+      patrolSpeed: 188, contactDamage: 2,
+    },
+    {
+      id: 'causeway-barrel-b', kind: 'barrel-roller', x: 7240, y: 616,
+      health: 4, maxHealth: 4, patrolLeft: 7060, patrolRight: 7520, direction: -1,
+      patrolSpeed: 180, contactDamage: 4,
+    },
+    {
+      id: 'causeway-high-archer-b', kind: 'tower-archer', x: 7780, y: 340,
+      health: 4, maxHealth: 4, patrolLeft: 7710, patrolRight: 7900, direction: -1,
+      patrolSpeed: 0, attackRange: 880, attackCooldownMs: 980, projectileSpeed: 560,
+      contactDamage: 1, projectileDamage: 3,
+    },
+    {
+      id: 'causeway-stalker-c', kind: 'moon-stalker', x: 8160, y: 616,
+      health: 5, maxHealth: 5, patrolLeft: 7960, patrolRight: 8420, direction: 1,
+      patrolSpeed: 188, attackRange: 500, attackCooldownMs: 980, contactDamage: 3,
+    },
+    {
+      id: 'causeway-jester-b', kind: 'candle-jester', x: 9280, y: 616,
+      health: 4, maxHealth: 4, patrolLeft: 9040, patrolRight: 9660, direction: -1,
+      patrolSpeed: 104, attackRange: 420, attackCooldownMs: 1060, projectileSpeed: 360,
+      contactDamage: 2, projectileDamage: 2,
+    },
+    {
+      id: 'causeway-high-archer-c', kind: 'tower-archer', x: 10180, y: 260,
+      health: 4, maxHealth: 4, patrolLeft: 10120, patrolRight: 10320, direction: -1,
+      patrolSpeed: 0, attackRange: 940, attackCooldownMs: 960, projectileSpeed: 570,
+      contactDamage: 1, projectileDamage: 3,
+    },
+    {
+      id: 'causeway-stalker-d', kind: 'moon-stalker', x: 10460, y: 616,
+      health: 5, maxHealth: 5, patrolLeft: 10240, patrolRight: 10710, direction: 1,
+      patrolSpeed: 190, attackRange: 520, attackCooldownMs: 940, contactDamage: 3,
+    },
+    {
+      id: 'causeway-final-sentry', kind: 'clockwork-sentry', x: 11660, y: 616,
+      health: 5, maxHealth: 5, patrolLeft: 11400, patrolRight: 11930, direction: -1,
+      patrolSpeed: 112, contactDamage: 3,
+    },
+  ],
+  finish: {
+    id: 'causeway-relay-gate', visualId: 'moon-relay-gate', terrainSet: 'moon', x: 12526, y: 446, width: 88, height: 150,
+  },
+  platforms: [
+    { id: 'causeway-start-floor', visualId: 'moon-wide-floor', x: 0, y: 616, width: 560, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-first-floor', visualId: 'moon-wide-floor', x: 680, y: 616, width: 520, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-sentry-run', visualId: 'moon-rubble-floor', x: 1320, y: 616, width: 460, height: 72, terrainSet: 'moon' },
+    { id: 'causeway-first-landing', visualId: 'moon-wide-floor', x: 1980, y: 616, width: 520, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-low-step-a', visualId: 'moon-medium-ledge', x: 2360, y: 490, width: 220, height: 42, terrainSet: 'moon' },
+    { id: 'causeway-crawl-floor-a', visualId: 'moon-wide-floor', x: 2680, y: 616, width: 560, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-shard-ledge-a', visualId: 'moon-medium-ledge', x: 2700, y: 370, width: 210, height: 42, terrainSet: 'moon' },
+    { id: 'causeway-shard-perch-a', visualId: 'moon-narrow-bridge', x: 3020, y: 278, width: 260, height: 38, terrainSet: 'moon' },
+    { id: 'causeway-mid-floor', visualId: 'moon-rubble-floor', x: 3480, y: 616, width: 620, height: 72, terrainSet: 'moon' },
+    { id: 'causeway-high-recovery-a', visualId: 'moon-wide-floor', x: 4370, y: 616, width: 900, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-high-step-a', visualId: 'moon-medium-ledge', x: 5120, y: 500, width: 220, height: 42, terrainSet: 'moon' },
+    { id: 'causeway-high-step-b', visualId: 'moon-narrow-bridge', x: 5420, y: 390, width: 220, height: 38, terrainSet: 'moon' },
+    { id: 'causeway-high-archer-perch-a', visualId: 'moon-medium-ledge', x: 5700, y: 285, width: 250, height: 42, terrainSet: 'moon' },
+    { id: 'causeway-volley-pocket', visualId: 'moon-rubble-floor', x: 5480, y: 616, width: 520, height: 72, terrainSet: 'moon' },
+    { id: 'causeway-crawl-floor-b', visualId: 'moon-wide-floor', x: 6240, y: 616, width: 520, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-rubble-run', visualId: 'moon-rubble-floor', x: 6960, y: 616, width: 620, height: 72, terrainSet: 'moon' },
+    { id: 'causeway-archer-step-b', visualId: 'moon-medium-ledge', x: 7460, y: 470, width: 220, height: 42, terrainSet: 'moon' },
+    { id: 'causeway-high-archer-perch-b', visualId: 'moon-medium-ledge', x: 7700, y: 340, width: 250, height: 42, terrainSet: 'moon' },
+    { id: 'causeway-gauntlet-floor', visualId: 'moon-wide-floor', x: 7880, y: 616, width: 600, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-final-recovery', visualId: 'moon-rubble-floor', x: 8860, y: 616, width: 940, height: 72, terrainSet: 'moon' },
+    { id: 'causeway-final-step-a', visualId: 'moon-medium-ledge', x: 9550, y: 470, width: 220, height: 42, terrainSet: 'moon' },
+    { id: 'causeway-final-step-b', visualId: 'moon-narrow-bridge', x: 9860, y: 360, width: 220, height: 38, terrainSet: 'moon' },
+    { id: 'causeway-final-shard-perch', visualId: 'moon-medium-ledge', x: 10120, y: 260, width: 260, height: 42, terrainSet: 'moon' },
+    { id: 'causeway-final-approach', visualId: 'moon-wide-floor', x: 10160, y: 616, width: 620, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-relay-floor', visualId: 'moon-wide-floor', x: 11220, y: 616, width: 800, height: 76, terrainSet: 'moon' },
+    { id: 'causeway-finish-floor', visualId: 'moon-medium-ledge', x: 12220, y: 616, width: 420, height: 70, terrainSet: 'moon' },
+  ],
+  tiltPlatforms: [
+    { id: 'causeway-opening-tilt', x: 570, y: 552, width: 116, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 560, wobbleRotation: 0.235, slideForce: 2100, maxSlideSpeed: 324 },
+    { id: 'causeway-first-tilt', x: 1810, y: 552, width: 158, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 540, wobbleRotation: 0.24, slideForce: 2140, maxSlideSpeed: 334 },
+    { id: 'causeway-mid-tilt', x: 6060, y: 552, width: 160, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 520, wobbleRotation: 0.245, slideForce: 2200, maxSlideSpeed: 344 },
+    { id: 'causeway-gauntlet-tilt', x: 7640, y: 552, width: 164, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 510, wobbleRotation: 0.25, slideForce: 2240, maxSlideSpeed: 352 },
+    { id: 'causeway-final-tilt', x: 10950, y: 552, width: 172, height: 28, visualHeight: 52, visualOffsetY: -12, wobbleDurationMs: 500, wobbleRotation: 0.255, slideForce: 2300, maxSlideSpeed: 360 },
+  ],
+  crouchGates: [
+    { id: 'causeway-crawl-gate-a', visualId: 'moon-tall-overhang', x: 2790, y: 446, width: 300, height: 116, terrainSet: 'moon' },
+    { id: 'causeway-crawl-gate-b', visualId: 'moon-tall-overhang', x: 6320, y: 446, width: 280, height: 116, terrainSet: 'moon' },
+    { id: 'causeway-crawl-gate-c', visualId: 'moon-tall-overhang', x: 8940, y: 446, width: 330, height: 116, terrainSet: 'moon' },
+    { id: 'causeway-crawl-gate-d', visualId: 'moon-tall-overhang', x: 11310, y: 446, width: 270, height: 116, terrainSet: 'moon' },
+  ],
+  spikes: [
+    { id: 'causeway-gap-a', x: 560, y: 644, width: 120, height: 30, damage: 3 },
+    { id: 'causeway-gap-b', x: 1200, y: 644, width: 120, height: 30, damage: 3 },
+    { id: 'causeway-gap-c', x: 1780, y: 644, width: 200, height: 30, damage: 3 },
+    { id: 'causeway-gap-d', x: 2500, y: 644, width: 180, height: 30, damage: 3 },
+    { id: 'causeway-gap-e', x: 3240, y: 644, width: 240, height: 30, damage: 3 },
+    { id: 'causeway-gap-f', x: 4100, y: 644, width: 270, height: 30, damage: 3 },
+    { id: 'causeway-gap-g', x: 5270, y: 644, width: 210, height: 30, damage: 3 },
+    { id: 'causeway-gap-h', x: 6000, y: 644, width: 240, height: 30, damage: 3 },
+    { id: 'causeway-gap-i', x: 6760, y: 644, width: 200, height: 30, damage: 3 },
+    { id: 'causeway-gap-j', x: 7580, y: 644, width: 300, height: 30, damage: 3 },
+    { id: 'causeway-gap-k', x: 8480, y: 644, width: 380, height: 30, damage: 3 },
+    { id: 'causeway-gap-l', x: 9800, y: 644, width: 360, height: 30, damage: 3 },
+    { id: 'causeway-gap-m', x: 10780, y: 644, width: 440, height: 30, damage: 3 },
+    { id: 'causeway-gap-n', x: 12020, y: 644, width: 200, height: 30, damage: 3 },
+  ],
+  coins: [
+    { id: 'coin-1', x: 250, y: 532 }, { id: 'coin-2', x: 720, y: 532 },
+    { id: 'coin-3', x: 920, y: 532 }, { id: 'coin-4', x: 1110, y: 532 },
+    { id: 'coin-5', x: 1400, y: 532 }, { id: 'coin-6', x: 1600, y: 532 },
+    { id: 'coin-7', x: 1840, y: 490 }, { id: 'coin-8', x: 2070, y: 532 },
+    { id: 'coin-9', x: 2290, y: 532 }, { id: 'coin-10', x: 2460, y: 430 },
+    { id: 'coin-11', x: 2745, y: 558 }, { id: 'coin-12', x: 2845, y: 558 },
+    { id: 'coin-13', x: 2945, y: 558 }, { id: 'coin-14', x: 3070, y: 218 },
+    { id: 'coin-15', x: 3210, y: 218 }, { id: 'coin-16', x: 3540, y: 532 },
+    { id: 'coin-17', x: 3780, y: 532 }, { id: 'coin-18', x: 4030, y: 532 },
+    { id: 'coin-19', x: 4420, y: 532 }, { id: 'coin-20', x: 4660, y: 532 },
+    { id: 'coin-21', x: 4920, y: 532 }, { id: 'coin-22', x: 5200, y: 438 },
+    { id: 'coin-23', x: 5480, y: 330 }, { id: 'coin-24', x: 5760, y: 225 },
+    { id: 'coin-25', x: 5920, y: 225 }, { id: 'coin-26', x: 6140, y: 492 },
+    { id: 'coin-27', x: 6280, y: 558 }, { id: 'coin-28', x: 6380, y: 558 },
+    { id: 'coin-29', x: 6480, y: 558 }, { id: 'coin-30', x: 6580, y: 558 },
+    { id: 'coin-31', x: 7040, y: 532 }, { id: 'coin-32', x: 7280, y: 532 },
+    { id: 'coin-33', x: 7520, y: 532 }, { id: 'coin-34', x: 7520, y: 408 },
+    { id: 'coin-35', x: 7780, y: 278 }, { id: 'coin-36', x: 7920, y: 278 },
+    { id: 'coin-37', x: 8060, y: 532 }, { id: 'coin-38', x: 8300, y: 532 },
+    { id: 'coin-39', x: 8900, y: 532 }, { id: 'coin-40', x: 9020, y: 558 },
+    { id: 'coin-41', x: 9120, y: 558 }, { id: 'coin-42', x: 9220, y: 558 },
+    { id: 'coin-43', x: 9480, y: 532 }, { id: 'coin-44', x: 9620, y: 410 },
+    { id: 'coin-45', x: 9900, y: 302 }, { id: 'coin-46', x: 10160, y: 200 },
+    { id: 'coin-47', x: 10320, y: 200 }, { id: 'coin-48', x: 10500, y: 532 },
+    { id: 'coin-49', x: 11020, y: 492 }, { id: 'coin-50', x: 11330, y: 558 },
+    { id: 'coin-51', x: 11430, y: 558 }, { id: 'coin-52', x: 11530, y: 558 },
+    { id: 'coin-53', x: 11720, y: 532 }, { id: 'coin-54', x: 11920, y: 532 },
+    { id: 'coin-55', x: 12260, y: 532 }, { id: 'coin-56', x: 12420, y: 492 },
+    { id: 'coin-57', x: 2730, y: 308 }, { id: 'coin-58', x: 2870, y: 308 },
+    { id: 'coin-59', x: 5180, y: 438 }, { id: 'coin-60', x: 9890, y: 300 },
+  ],
+  boosts: [
+    { id: 'moonheart-causeway-high', x: 5740, y: 225, scoreValue: 190, durationMs: 9000, guardCharges: 2 },
+  ],
+  shieldPickups: [
+    { id: 'causeway-shield-first-volley', x: 5500, y: 552, scoreValue: 105, durationMs: 10200, guardCharges: 6 },
+    { id: 'causeway-shield-final-archers', x: 8900, y: 552, scoreValue: 110, durationMs: 10800, guardCharges: 6 },
+    { id: 'causeway-shield-relay', x: 11280, y: 552, scoreValue: 105, durationMs: 9600, guardCharges: 5 },
+  ],
+  chronoPickups: [
+    { id: 'chrono-causeway-climb', x: 4380, y: 552, scoreValue: 165, durationMs: 9000, healthRestore: 3, timeScale: 0.55 },
+    { id: 'chrono-causeway-gauntlet', x: 7860, y: 552, scoreValue: 170, durationMs: 9200, healthRestore: 3, timeScale: 0.52 },
+  ],
+  surgePickups: [
+    { id: 'shadow-surge-first-shard', x: 2520, y: 430, scoreValue: 220, durationMs: 9800, healthRestore: 5, guardCharges: 4, speedMultiplier: 1.12 },
+    { id: 'shadow-surge-gauntlet', x: 8140, y: 552, scoreValue: 230, durationMs: 10400, healthRestore: 4, guardCharges: 4, speedMultiplier: 1.15 },
+    { id: 'shadow-surge-final-perch', x: 9860, y: 300, scoreValue: 240, durationMs: 9600, healthRestore: 4, guardCharges: 3, speedMultiplier: 1.14 },
+  ],
+  moonShardPickups: [
+    { id: 'moon-shard-first-high', x: 3060, y: 218, scoreValue: 275 },
+    { id: 'moon-shard-crawl-route', x: 6460, y: 548, scoreValue: 275 },
+    { id: 'moon-shard-final-perch', x: 10180, y: 200, scoreValue: 325 },
+  ],
+  arrowVolleys: [
+    { id: 'causeway-volley-a-head', x: 4320, y: 170, width: 1760, height: 458, direction: -1, spawnX: 6220, laneY: 468, intervalMs: 1420, delayMs: 260, speed: 540, lifetimeMs: 4200, damage: 3 },
+    { id: 'causeway-volley-a-crouch', x: 4320, y: 170, width: 1760, height: 458, direction: -1, spawnX: 6220, laneY: 532, intervalMs: 1700, delayMs: 740, speed: 520, lifetimeMs: 4200, damage: 2 },
+    { id: 'causeway-volley-a-jump', x: 4320, y: 170, width: 1760, height: 458, direction: -1, spawnX: 6220, laneY: 340, intervalMs: 1920, delayMs: 1120, speed: 560, lifetimeMs: 4100, damage: 3 },
+    { id: 'causeway-volley-b-head', x: 7680, y: 180, width: 2200, height: 450, direction: -1, spawnX: 10020, laneY: 462, intervalMs: 1380, delayMs: 220, speed: 560, lifetimeMs: 4500, damage: 3 },
+    { id: 'causeway-volley-b-crouch', x: 7680, y: 180, width: 2200, height: 450, direction: -1, spawnX: 10020, laneY: 532, intervalMs: 1660, delayMs: 800, speed: 540, lifetimeMs: 4500, damage: 2 },
+    { id: 'causeway-volley-b-jump', x: 7680, y: 180, width: 2200, height: 450, direction: -1, spawnX: 10020, laneY: 322, intervalMs: 1880, delayMs: 1280, speed: 580, lifetimeMs: 4400, damage: 3 },
+    { id: 'causeway-volley-c-head', x: 10800, y: 180, width: 1460, height: 450, direction: -1, spawnX: 12380, laneY: 458, intervalMs: 1360, delayMs: 260, speed: 570, lifetimeMs: 3900, damage: 3 },
+    { id: 'causeway-volley-c-crouch', x: 10800, y: 180, width: 1460, height: 450, direction: -1, spawnX: 12380, laneY: 532, intervalMs: 1700, delayMs: 880, speed: 550, lifetimeMs: 3900, damage: 2 },
+  ],
+}
+
 export function getShadowRunnerLevelEnemies(level: ShadowRunnerLevelConfig) {
   return level.enemies ?? (level.enemy ? [level.enemy] : [])
 }
@@ -1127,6 +1369,7 @@ const DEFAULT_ENEMY_CONTACT_DAMAGE: Record<ShadowRunnerEnemyKind, number> = {
   'scroll-thief': 2,
   'tower-archer': 1,
   'candle-jester': 2,
+  'moon-stalker': 3,
 }
 
 const DEFAULT_ENEMY_PROJECTILE_DAMAGE: Partial<Record<ShadowRunnerEnemyKind, number>> = {
@@ -1165,6 +1408,7 @@ export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, Sh
   'level-4': SHADOW_RUNNER_LEVEL_FOUR,
   'level-5': SHADOW_RUNNER_LEVEL_FIVE,
   'level-6': SHADOW_RUNNER_LEVEL_SIX,
+  'level-7': SHADOW_RUNNER_LEVEL_SEVEN,
 }
 
 export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
@@ -1260,10 +1504,11 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyTier: 7,
     difficultyLabel: 'Causeway Chase',
     routeType: 'Timed Route',
-    mechanicPreview: 'Moving bridges, chase pressure, spike gaps',
-    thumbnail: SHADOW_RUNNER_ASSETS.home.background,
+    mechanicPreview: 'Moon Shards, Shadow Surge, Moon Stalkers, shield pockets, brutal tilt bridges',
+    thumbnail: SHADOW_RUNNER_ASSETS.levels.moonlitCausewayThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.moonlitCausewayLocationButton,
     mapPosition: { left: 78, top: 61 },
+    playableLevelId: 'level-7',
   },
   {
     id: 'level-8',

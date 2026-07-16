@@ -62,6 +62,19 @@ const LEVELS = {
       /Catch the clock\. Slow the yard\. Break the gear lock\./i,
     ],
   },
+  'level-7': {
+    title: 'Moonlit Causeway',
+    completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6'],
+    detailChecks: [
+      /Level 7/i,
+      /Causeway Chase/i,
+      /Moon Shards/i,
+      /Shadow Surge/i,
+    ],
+    gameplayChecks: [
+      /Recover every shard\. Cross the moon road\. Do not trust the bridges\./i,
+    ],
+  },
 }
 
 const PHONE_PROFILES = {
@@ -387,6 +400,8 @@ async function exerciseGameplayControls(page, level, profile) {
     await assertLevelFiveCheckpointAndPools(page, profile)
   } else if (config.levelId === 'level-6') {
     await assertLevelSixGameplay(page, profile)
+  } else if (config.levelId === 'level-7') {
+    await assertLevelSevenGameplay(page, profile)
   }
 
   await page.keyboard.press('Digit3')
@@ -599,6 +614,89 @@ async function assertLevelSixGameplay(page, profile) {
     checkpointId: snapshot?.checkpointId,
     hearts: heartState.hearts,
     healthAria: heartState.aria,
+    pools: snapshot?.pools,
+  })
+}
+
+async function assertLevelSevenGameplay(page, profile) {
+  const checkpoints = [
+    { x: 2070, y: 616, id: 'causeway-first-bridge' },
+    { x: 4410, y: 616, id: 'causeway-shard-climb' },
+    { x: 5530, y: 616, id: 'causeway-arrow-pocket' },
+    { x: 7910, y: 616, id: 'causeway-moon-gauntlet' },
+    { x: 8970, y: 616, id: 'causeway-final-archers' },
+    { x: 11290, y: 616, id: 'causeway-relay-approach' },
+  ]
+
+  for (const checkpoint of checkpoints) {
+    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), checkpoint)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().checkpointId === expected,
+      checkpoint.id,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+    if (checkpoint.id === 'causeway-arrow-pocket' || checkpoint.id === 'causeway-final-archers') {
+      await delay(160)
+      await capture(page, `${profile.label}-05-${checkpoint.id}.png`)
+    }
+  }
+
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(8140, 580)
+  })
+  await page.waitForFunction(() => window.__shadowRunnerDebug?.().player?.surgeActive === true, null, {
+    timeout: DEFAULT_TIMEOUT_MS,
+  })
+  let snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.player?.surgeRemainingMs ?? 0) > 0, `${profile.label}: Shadow Surge did not activate`)
+
+  const crouchSegment = { label: 'first moon overhang', x: 2768, y: 616, targetX: 3090 }
+  await page.evaluate(({ x, y }) => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(x, y)
+  }, crouchSegment)
+  await delay(120)
+  await page.keyboard.down('KeyS')
+  await page.keyboard.down('KeyD')
+  await delay(3600)
+  await page.keyboard.up('KeyD')
+  await page.keyboard.up('KeyS')
+  snapshot = await readShadowRunnerDebug(page)
+  assert(
+    (snapshot?.player?.x ?? 0) >= crouchSegment.targetX,
+    `${profile.label}: Level 7 ${crouchSegment.label} stopped at x=${snapshot?.player?.x ?? 'missing'} before x=${crouchSegment.targetX}`,
+  )
+
+  const shards = [
+    { x: 3060, y: 246, expected: 1 },
+    { x: 6460, y: 576, expected: 2 },
+    { x: 10180, y: 228, expected: 3 },
+  ]
+
+  for (const shard of shards) {
+    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), shard)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().player?.moonShards === expected,
+      shard.expected,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+  snapshot = await readShadowRunnerDebug(page)
+  assert(snapshot?.player?.moonShards === 3, `${profile.label}: Moon Shards did not reach 3/3`)
+  assert(snapshot?.player?.totalMoonShards === 3, `${profile.label}: Moon Shard total did not report 3`)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(8900, 616))
+  await delay(3000)
+  snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.pools?.projectiles.total ?? 99) <= 48, `${profile.label}: projectile pool exceeded its cap`)
+  assert((snapshot?.pools?.candleHazards.total ?? 99) <= 24, `${profile.label}: candle hazard pool exceeded its cap`)
+  await capture(page, `${profile.label}-06-level-7-routes.png`)
+
+  record(`${profile.label} level-7 shards, Surge, crouch, and route segments`, {
+    checkpointId: snapshot?.checkpointId,
+    moonShards: snapshot?.player?.moonShards,
+    surgeActive: snapshot?.player?.surgeActive,
     pools: snapshot?.pools,
   })
 }

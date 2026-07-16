@@ -17,6 +17,9 @@ describe('Shadow Runner phone smoke script', () => {
     expect(packageJson.scripts?.['qa:shadow-runner:level6']).toBe(
       'node scripts/shadow-runner-phone-smoke.mjs --level=level-6 --profiles=landscape,android',
     )
+    expect(packageJson.scripts?.['qa:shadow-runner:level7']).toBe(
+      'node scripts/shadow-runner-phone-smoke.mjs --level=level-7 --profiles=landscape,android',
+    )
   })
 
   it('uses local preview, phone profiles, screenshots, and canvas nonblank checks', () => {
@@ -53,6 +56,16 @@ describe('Shadow Runner phone smoke script', () => {
     expect(compactScript).toContain('losing a life did not remove one full heart')
     expect(compactScript).toContain('health 12 of 12')
     expect(compactScript).toContain('level-6 health, chrono lantern, and route segments')
+  })
+
+  it('asserts Level 7 Moon Shards, Shadow Surge, and route traversal before passing', () => {
+    expect(compactScript).toContain('moonlit causeway')
+    expect(compactScript).toContain('moon shards')
+    expect(compactScript).toContain('shadow surge')
+    expect(compactScript).toContain('causeway-relay-approach')
+    expect(compactScript).toContain('shadow surge did not activate')
+    expect(compactScript).toContain('moon shards did not reach 3/3')
+    expect(compactScript).toContain('level-7 shards, surge, crouch, and route segments')
   })
 
   it('bounds browser and preview cleanup so passed runs can exit', () => {

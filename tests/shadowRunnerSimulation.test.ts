@@ -4,12 +4,15 @@ import {
   collectShadowRunnerBoost,
   collectShadowRunnerChrono,
   collectShadowRunnerCoin,
+  collectShadowRunnerMoonShard,
   collectShadowRunnerShield,
+  collectShadowRunnerSurge,
   createInitialShadowRunnerSimulation,
   damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
   getShadowRunnerHudState,
   getShadowRunnerChronoTimeScale,
+  getShadowRunnerSurgeSpeedMultiplier,
   spendShadowRunnerLife,
 } from '../src/features/games/shadow-runner/game/simulation'
 
@@ -75,6 +78,44 @@ describe('Shadow Runner simulation', () => {
     expect(hud.chronoActive).toBe(true)
     expect(hud.chronoRemainingMs).toBeGreaterThan(0)
     expect(getShadowRunnerChronoTimeScale(state, 20_000)).toBe(1)
+  })
+
+  it('applies Shadow Surge healing, speed, guard charges, and damage resistance', () => {
+    const levelSeven = SHADOW_RUNNER_LEVEL_CONFIGS['level-7']
+    const state = createInitialShadowRunnerSimulation(levelSeven)
+    const surge = levelSeven.surgePickups![0]
+    state.player.health = 5
+
+    collectShadowRunnerSurge(state, 1000, surge)
+
+    expect(state.player.health).toBe(10)
+    expect(getShadowRunnerSurgeSpeedMultiplier(state, 1200)).toBe(surge.speedMultiplier)
+    expect(damageShadowRunnerPlayer(state, 2000, 4)).toBe(true)
+    expect(state.player.health).toBe(8)
+    expect(state.player.surgeGuardCharges).toBe((surge.guardCharges ?? 3) - 1)
+
+    const hud = getShadowRunnerHudState(state, levelSeven.coins.length, 2000)
+    expect(hud.surgeActive).toBe(true)
+    expect(hud.surgeRemainingMs).toBeGreaterThan(0)
+  })
+
+  it('tracks Moon Shards as required route goals separate from coins', () => {
+    const levelSeven = SHADOW_RUNNER_LEVEL_CONFIGS['level-7']
+    const state = createInitialShadowRunnerSimulation(levelSeven)
+    const [firstShard, secondShard, thirdShard] = levelSeven.moonShardPickups!
+
+    collectShadowRunnerMoonShard(state, firstShard, levelSeven.moonShardPickups!.length)
+    collectShadowRunnerMoonShard(state, secondShard, levelSeven.moonShardPickups!.length)
+    let hud = getShadowRunnerHudState(state, levelSeven.coins.length)
+    expect(hud.moonShards).toBe(2)
+    expect(hud.totalMoonShards).toBe(3)
+    expect(hud.moonShardGateOpen).toBe(false)
+    expect(state.player.coins).toBe(0)
+
+    collectShadowRunnerMoonShard(state, thirdShard, levelSeven.moonShardPickups!.length)
+    hud = getShadowRunnerHudState(state, levelSeven.coins.length)
+    expect(hud.moonShardGateOpen).toBe(true)
+    expect(state.objective).toBe('Moon relay open')
   })
 
   it('spends one HUD heart per lost life while keeping health separate', () => {
