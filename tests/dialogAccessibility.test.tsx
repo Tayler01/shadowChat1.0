@@ -74,6 +74,29 @@ test('non-dismissible dialog contains Escape without closing', async () => {
   expect(screen.getByRole('dialog', { name: 'Test dialog' })).toBeInTheDocument()
 })
 
+test('delayed initial focus does not override focus already moved inside the dialog', () => {
+  const onClose = jest.fn()
+  let focusCallback: FrameRequestCallback | null = null
+  const requestFrame = jest.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+    focusCallback = callback
+    return 1
+  })
+  const cancelFrame = jest.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined)
+
+  const view = render(<Harness open onClose={onClose} />)
+  const last = screen.getByRole('button', { name: 'Last action' })
+  last.focus()
+
+  act(() => {
+    focusCallback?.(0)
+  })
+
+  expect(last).toHaveFocus()
+  view.unmount()
+  requestFrame.mockRestore()
+  cancelFrame.mockRestore()
+})
+
 test('suspending a parent dialog does not steal focus from the nested dialog', async () => {
   const onClose = jest.fn()
   const opener = document.createElement('button')

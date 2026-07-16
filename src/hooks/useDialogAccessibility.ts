@@ -81,6 +81,8 @@ export function useDialogAccessibility<TElement extends HTMLElement = HTMLDivEle
     const focusFrame = window.requestAnimationFrame(() => {
       const root = dialogRef.current
       if (!root) return
+      const active = document.activeElement
+      if (active instanceof HTMLElement && root.contains(active)) return
       const target = initialFocusRefRef.current?.current ?? getFocusableElements(root)[0] ?? root
       if (target === root && root.tabIndex < 0) {
         root.tabIndex = -1
