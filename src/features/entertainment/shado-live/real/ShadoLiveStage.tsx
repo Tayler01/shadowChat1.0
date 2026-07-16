@@ -127,6 +127,7 @@ export function ShadoLiveStage({
     event.preventDefault()
     const body = draft.trim()
     if (!body || !controller.controlsEnabled) return
+    composerRef.current?.focus({ preventScroll: true })
     try {
       await controller.sendMessage(body)
       setDraft('')
@@ -440,6 +441,7 @@ export function ShadoLiveStage({
                 type="submit"
                 disabled={!controller.controlsEnabled || !draft.trim() || controller.commandBusy === 'send_message'}
                 aria-label="Send live room message"
+                onPointerDown={event => event.preventDefault()}
                 onMouseDown={event => event.preventDefault()}
                 onTouchStart={event => event.preventDefault()}
                 className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#d7aa46] text-black focus:outline-none focus:ring-2 focus:ring-[#f4d985] focus:ring-offset-2 focus:ring-offset-black disabled:opacity-35"

@@ -742,13 +742,16 @@ const assertKeyboardGeometry = async (page, profile) => {
   }, inset)
   await page.waitForTimeout(400)
   const geometry = await page.evaluate(value => {
-    const input = document.querySelector('textarea')?.getBoundingClientRect()
+    const inputElement = document.querySelector('[data-testid="shado-live-real-composer"] textarea')
+    const visualElement = document.querySelector('[data-testid="shado-live-real-stage-visual"]')
+    const dockElement = document.querySelector('.shado-live-control-dock')
+    const input = inputElement?.getBoundingClientRect()
     return {
       composerBottom: input?.bottom ?? Infinity,
-      composerFontSize: input ? Number.parseFloat(getComputedStyle(input).fontSize) : 0,
+      composerFontSize: inputElement ? Number.parseFloat(getComputedStyle(inputElement).fontSize) : 0,
       keyboardTop: innerHeight - value,
-      visualOpacity: getComputedStyle(document.querySelector('.shado-live-stage-visual')).opacity,
-      dockOpacity: getComputedStyle(document.querySelector('.shado-live-control-dock')).opacity,
+      visualOpacity: visualElement ? getComputedStyle(visualElement).opacity : 'missing',
+      dockOpacity: dockElement ? getComputedStyle(dockElement).opacity : 'missing',
       keyboardState: document.documentElement.dataset.shadowchatKeyboard,
       mobileMedia: matchMedia('(max-width: 767px)').matches,
     }
