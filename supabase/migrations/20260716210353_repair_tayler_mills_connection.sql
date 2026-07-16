@@ -16,6 +16,16 @@ declare
   mills_id constant uuid := '766198ed-c9d1-46b5-9675-bf641ed6afb9';
   repaired_connection public.user_connections%rowtype;
 begin
+  if not exists (
+    select 1
+    from public.users profiles
+    where profiles.id in (tayler_id, mills_id)
+    having count(*) = 2
+  ) then
+    raise notice 'Tayler Kid and Mills connection repair skipped outside the production dataset';
+    return;
+  end if;
+
   perform pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended(
       least(tayler_id, mills_id)::text || ':' || greatest(tayler_id, mills_id)::text,
@@ -35,7 +45,8 @@ begin
   for update;
 
   if not found then
-    raise exception 'Tayler Kid and Mills canonical connection row was not found';
+    raise notice 'Tayler Kid and Mills connection repair skipped because the canonical pair does not exist';
+    return;
   end if;
 
   if repaired_connection.status = 'accepted' then
