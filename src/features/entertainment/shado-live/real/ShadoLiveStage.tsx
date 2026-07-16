@@ -61,6 +61,7 @@ export function ShadoLiveStage({
   const { openReport } = useModerationReport()
   const panelScrollRef = useRef<HTMLDivElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
+  const restoreComposerFocusRef = useRef(false)
 
   const stageParticipants = useMemo(() => {
     if (!room) return []
@@ -96,6 +97,13 @@ export function ShadoLiveStage({
     if (draft) composer.style.height = `${Math.min(composer.scrollHeight, 96)}px`
   }, [draft])
 
+  useEffect(() => {
+    if (!restoreComposerFocusRef.current || controller.commandBusy || !controller.controlsEnabled) return
+    restoreComposerFocusRef.current = false
+    const frame = requestAnimationFrame(() => composerRef.current?.focus({ preventScroll: true }))
+    return () => cancelAnimationFrame(frame)
+  }, [controller.commandBusy, controller.controlsEnabled])
+
   if (!room) return null
 
   const selectPanel = (nextPanel: RoomPanel) => {
@@ -127,11 +135,11 @@ export function ShadoLiveStage({
     event.preventDefault()
     const body = draft.trim()
     if (!body || !controller.controlsEnabled) return
+    restoreComposerFocusRef.current = true
     composerRef.current?.focus({ preventScroll: true })
     try {
       await controller.sendMessage(body)
       setDraft('')
-      requestAnimationFrame(() => composerRef.current?.focus({ preventScroll: true }))
     } catch {
       // The hook exposes the authoritative failure; retain the draft for retry.
     }
