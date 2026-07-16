@@ -302,6 +302,11 @@ explicitly excluded from v1.
   explicit `Start listening` unlock call. The renderer node is retained across
   session timing, and audible Live playback no longer relies on generic media
   autoplay.
+- The accepted July 16 build is published only at
+  `https://shadowchat-2-0-wave-one.netlify.app` under build ID
+  `shado-live-polish-20260716`. Pixel Chromium and iPhone WebKit passed the
+  deployed host/listener, profile, audio-order, composer-focus, keyboard, and
+  zero-residue proof. Production `main` remains unchanged.
 - Physical two-device iPhone/Android microphone, speaker routing,
   Bluetooth/headphone, lock/resume, and weak-network validation remains
   required before production approval.

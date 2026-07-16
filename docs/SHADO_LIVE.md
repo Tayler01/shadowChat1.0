@@ -207,6 +207,11 @@ host and listener flows with mounted remote audio, clickable profiles, exact
 phone geometry, 16px mobile composers, keyboard and safe-area checks, no
 camera/recording requests, and zero residue.
 
+The July 16 mobile-polish acceptance build is published only to the isolated
+test frontend at `https://shadowchat-2-0-wave-one.netlify.app` under build ID
+`shado-live-polish-20260716`. Both mobile engines passed the same proof against
+the deployed URL, and production `main` remains unchanged.
+
 Commands:
 
 ```powershell
