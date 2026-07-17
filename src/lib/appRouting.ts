@@ -98,7 +98,7 @@ export type PlayExperience =
   | 'shado-live'
   | 'will-kirk'
 
-export type PlayRouteAction = 'push-experience' | 'push-item' | 'close-item' | 'close-experience'
+export type PlayRouteAction = 'push-experience' | 'push-item' | 'replace-item' | 'close-item' | 'close-experience'
 export type PlayHistoryLayer = 'play-experience' | 'play-item' | null
 export type PlayRouteMutation =
   | { method: 'back' }
@@ -115,6 +115,7 @@ const PLAY_EXPERIENCES = new Set<PlayExperience>([
 
 const SHADO_LIVE_ENABLED = SHADO_LIVE_REAL_ENABLED || SHADO_LIVE_PROTOTYPE_ENABLED
 const PLAY_EXPERIENCES_WITH_ITEMS = new Set<PlayExperience>([
+  'shadow-checkers',
   'shado-tv',
   'shadow-mystery',
   ...(SHADO_LIVE_REAL_ENABLED ? ['shado-live' as const] : []),
@@ -169,11 +170,11 @@ export const resolvePlayRouteMutation = ({
     return { method: 'replace', url, layer: currentLayer === 'play-item' ? 'play-experience' : currentLayer }
   }
 
-  if (action === 'push-item') {
+  if (action === 'push-item' || action === 'replace-item') {
     const nextItem = normalizePlayItem(item ?? null)
     if (!PLAY_EXPERIENCES_WITH_ITEMS.has(nextExperience) || !nextItem) return null
     url.searchParams.set('item', nextItem)
-    return { method: 'push', url, layer: 'play-item' }
+    return { method: action === 'push-item' ? 'push' : 'replace', url, layer: 'play-item' }
   }
 
   url.searchParams.delete('item')

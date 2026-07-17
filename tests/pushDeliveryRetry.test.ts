@@ -8,6 +8,7 @@ jest.mock('../src/lib/supabase', () => ({
 
 import {
   triggerDMPushNotification,
+  triggerShadowCheckersTurnPushNotification,
   triggerShadowPinPostPushNotification,
 } from '../src/lib/push'
 
@@ -44,5 +45,17 @@ describe('push delivery retry contract', () => {
 
     await expect(triggerDMPushNotification('dm-1')).rejects.toBe(error)
     expect(invoke).toHaveBeenCalledTimes(1)
+  })
+
+  test('sends a Shadow Checkers turn request with the canonical match identifier', async () => {
+    invoke.mockResolvedValue({
+      data: { deliveredCount: 1 },
+      error: null,
+    })
+
+    await expect(triggerShadowCheckersTurnPushNotification('match-1')).resolves.toEqual({ deliveredCount: 1 })
+    expect(invoke).toHaveBeenCalledWith('send-push', {
+      body: { type: 'shadow_checkers_turn', messageId: 'match-1' },
+    })
   })
 })

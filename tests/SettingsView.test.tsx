@@ -95,6 +95,7 @@ jest.mock('../src/hooks/usePushNotifications', () => ({
       shadow_pin_comment_enabled: true,
       shadow_pin_reply_enabled: true,
       connection_notifications_enabled: true,
+      checkers_turn_enabled: true,
       shado_live_in_app_enabled: true,
       presence_in_app_enabled: true,
       presence_push_enabled: true,
@@ -104,6 +105,7 @@ jest.mock('../src/hooks/usePushNotifications', () => ({
       badge_interactions_enabled: true,
       badge_connections_enabled: true,
       badge_shadow_pin_enabled: true,
+      badge_games_enabled: true,
       general_chat_muted: false,
       quiet_hours_start: null,
       quiet_hours_end: null,
@@ -289,17 +291,22 @@ test('settings exposes active-user audience and launcher badge controls', () => 
   render(<SettingsView onToggleSidebar={jest.fn()} />)
 
   fireEvent.click(screen.getByRole('button', { name: /notifications & audio/i }))
-  fireEvent.click(screen.getByRole('switch', { name: /toggle active users \(in-app\)/i }))
-  fireEvent.click(screen.getByRole('switch', { name: /toggle active users \(push\)/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle in-app alerts/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle phone alerts/i }))
   fireEvent.click(screen.getByRole('radio', { name: /everyone/i }))
   fireEvent.click(screen.getByRole('switch', { name: /^toggle shadowpin$/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle shadow checkers turns/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /^toggle games$/i }))
 
   expect(mockUpdatePreference).toHaveBeenCalledWith('presence_in_app_enabled', false)
   expect(mockUpdatePreference).toHaveBeenCalledWith('presence_push_enabled', false)
   expect(mockUpdatePreference).toHaveBeenCalledWith('presence_notification_scope', 'all')
   expect(mockUpdatePreference).toHaveBeenCalledWith('badge_shadow_pin_enabled', false)
+  expect(mockUpdatePreference).toHaveBeenCalledWith('checkers_turn_enabled', false)
+  expect(mockUpdatePreference).toHaveBeenCalledWith('badge_games_enabled', false)
   expect(screen.getByText(/offline for at least 15 minutes/i)).toBeInTheDocument()
   expect(screen.getByText(/visible count is capped at 99/i)).toBeInTheDocument()
+  expect(screen.getByText(/never both for the same event/i)).toBeInTheDocument()
 })
 
 test('settings exposes server-enforced global and General Chat mutes', () => {

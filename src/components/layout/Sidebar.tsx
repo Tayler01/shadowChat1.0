@@ -7,6 +7,7 @@ import { UserRoleBadge } from '../ui/UserRoleBadge';
 import { UserPresenceBadge } from '../ui/UserPresenceBadge';
 import { UserAchievementBadges } from '../ui/UserAchievementBadges';
 import { useAuth } from '../../hooks/useAuth';
+import { useAppBadgeState } from '../../hooks/useAppBadgeState';
 import { useDirectMessages } from '../../hooks/useDirectMessages';
 import { getPresenceStateLabel, usePresenceForUser } from '../../hooks/usePresence';
 import type { AppView } from '../../types/navigation';
@@ -34,6 +35,7 @@ export function Sidebar({
 }: SidebarProps) {
   const { user } = useAuth();
   const myPresence = usePresenceForUser(user?.id);
+  const badgeState = useAppBadgeState();
   const { conversations } = useDirectMessages();
   const activity = useOptionalActivity();
   const myPresenceState =
@@ -41,25 +43,26 @@ export function Sidebar({
     (user?.presence_visibility === 'invisible' ? 'invisible' : 'offline');
 
   const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
+  const catchUpUnread = badgeState.interactions + badgeState.connections;
 
   const navItems = [
     {
       id: 'chat' as const,
       label: 'Chat',
       icon: MessageSquare,
-      badge: null,
+      badge: badgeState.group || null,
     },
     {
       id: 'dms' as const,
       label: 'Direct Messages',
       icon: Users,
-      badge: totalUnread > 0 ? totalUnread : null,
+      badge: Math.max(totalUnread, badgeState.dm) || null,
     },
     ...(CATCH_UP_FEATURE_ENABLED ? [{
       id: 'catchup' as const,
       label: 'Catch-Up',
       icon: ListChecks,
-      badge: null,
+      badge: catchUpUnread || null,
     }] : []),
     ...(ACTIVITY_FEATURE_ENABLED ? [{
       id: 'activity' as const,
@@ -77,13 +80,13 @@ export function Sidebar({
       id: 'games' as const,
       label: 'Entertainment',
       icon: Gamepad2,
-      badge: null,
+      badge: badgeState.games || null,
     },
     {
       id: 'pins' as const,
       label: 'Pins',
       icon: Images,
-      badge: null,
+      badge: badgeState.shadow_pin || null,
     },
     {
       id: 'settings' as const,

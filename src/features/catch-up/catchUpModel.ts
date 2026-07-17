@@ -17,6 +17,7 @@ export type CatchUpTarget =
   | { kind: 'dm_message'; conversation_id: string; message_id: string }
   | { kind: 'pin'; pin_id: string }
   | { kind: 'pin_comment'; pin_id: string; comment_id: string }
+  | { kind: 'app_route'; route: string }
 
 export type CatchUpItem = {
   id: string
@@ -29,6 +30,7 @@ export type CatchUpItem = {
   manuallyUnread: boolean
   target: CatchUpTarget
   activityEventIds: string[]
+  notificationEventIds?: string[]
 }
 
 export type CatchUpSection = {
@@ -93,6 +95,10 @@ export const normalizeCatchUpTarget = (value: unknown): CatchUpTarget | null => 
     const pinId = asString(record.pin_id, 160)
     const commentId = asString(record.comment_id, 160)
     return pinId && commentId ? { kind, pin_id: pinId, comment_id: commentId } : null
+  }
+  if (kind === 'app_route') {
+    const route = asString(record.route, 2048)
+    return route?.startsWith('/') || route?.startsWith('?') ? { kind, route } : null
   }
   return null
 }
@@ -171,7 +177,10 @@ export const normalizeCatchUpSnapshot = (value: unknown): CatchUpSnapshot | null
 export const buildCatchUpTargetUrl = (target: CatchUpTarget, baseUrl: string) => {
   const url = new URL(baseUrl)
   url.search = ''
-  if (target.kind === 'connections') {
+  if (target.kind === 'app_route') {
+    const routedUrl = new URL(target.route, url)
+    return routedUrl.origin === url.origin ? routedUrl : url
+  } else if (target.kind === 'connections') {
     url.searchParams.set('view', 'dms')
     url.searchParams.set('panel', 'connections')
   } else if (target.kind === 'chat_message') {

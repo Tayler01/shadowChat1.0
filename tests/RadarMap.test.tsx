@@ -99,6 +99,10 @@ const leaflet = L as unknown as MockLeaflet
 beforeEach(() => {
   jest.useFakeTimers()
   jest.clearAllMocks()
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    value: 'visible',
+  })
   leaflet.__layers.splice(0)
   leaflet.__map.layers.clear()
   mockManifest.mockResolvedValue({
@@ -123,7 +127,7 @@ test('keeps the current radar frame visible until the next frame is loaded and f
   const firstRadarLayer = leaflet.__layers[1]
   act(() => {
     firstRadarLayer.emit('load')
-    jest.advanceTimersByTime(220)
+    jest.advanceTimersByTime(100)
   })
   expect(firstRadarLayer.setOpacity).toHaveBeenCalledWith(0.68)
 
@@ -136,10 +140,81 @@ test('keeps the current radar frame visible until the next frame is loaded and f
 
   act(() => {
     nextRadarLayer.emit('load')
-    jest.advanceTimersByTime(220)
+    jest.advanceTimersByTime(100)
   })
 
   expect(nextRadarLayer.setOpacity).toHaveBeenCalledWith(0.68)
   expect(leaflet.__map.removeLayer).toHaveBeenCalledWith(firstRadarLayer)
   expect(leaflet.__map.layers.has(nextRadarLayer)).toBe(true)
+})
+
+test('preloads the next frame, advances at least twice as fast, and keeps radar layers bounded', async () => {
+  render(<RadarMap latitude={36.17} longitude={-86.78} locationName="Nashville" />)
+
+  await waitFor(() => expect(leaflet.__layers).toHaveLength(2))
+  const firstRadarLayer = leaflet.__layers[1]
+  act(() => {
+    firstRadarLayer.emit('load')
+    jest.advanceTimersByTime(100)
+  })
+
+  fireEvent.click(screen.getByRole('button', { name: 'Play radar animation' }))
+  await waitFor(() => expect(leaflet.__layers).toHaveLength(3))
+  const preloadedLayer = leaflet.__layers[2]
+
+  act(() => {
+    preloadedLayer.emit('load')
+    jest.advanceTimersByTime(499)
+  })
+  expect(preloadedLayer.setOpacity).not.toHaveBeenCalledWith(0.68)
+  expect(leaflet.__map.layers.has(firstRadarLayer)).toBe(true)
+
+  act(() => {
+    jest.advanceTimersByTime(2)
+  })
+  expect(preloadedLayer.setOpacity).toHaveBeenCalledWith(0.68)
+
+  act(() => {
+    jest.advanceTimersByTime(100)
+  })
+  expect(leaflet.__map.removeLayer).toHaveBeenCalledWith(firstRadarLayer)
+  await waitFor(() => expect(leaflet.__layers.length).toBeGreaterThanOrEqual(4))
+  expect(leaflet.__map.layers.size).toBeLessThanOrEqual(3)
+})
+
+test('pauses frame work while the page is hidden and resumes preloading when visible', async () => {
+  render(<RadarMap latitude={36.17} longitude={-86.78} locationName="Nashville" />)
+
+  await waitFor(() => expect(leaflet.__layers).toHaveLength(2))
+  act(() => {
+    leaflet.__layers[1].emit('load')
+    jest.advanceTimersByTime(100)
+  })
+
+  fireEvent.click(screen.getByRole('button', { name: 'Play radar animation' }))
+  await waitFor(() => expect(leaflet.__layers).toHaveLength(3))
+  const hiddenPendingLayer = leaflet.__layers[2]
+  const layerCountBeforeHiding = leaflet.__layers.length
+
+  act(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+    jest.advanceTimersByTime(2_000)
+  })
+
+  expect(leaflet.__map.removeLayer).toHaveBeenCalledWith(hiddenPendingLayer)
+  expect(leaflet.__layers).toHaveLength(layerCountBeforeHiding)
+
+  act(() => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+
+  await waitFor(() => expect(leaflet.__layers).toHaveLength(layerCountBeforeHiding + 1))
 })

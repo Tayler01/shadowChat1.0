@@ -66,6 +66,20 @@ const formatClock = (time: string | null) => time
   ? new Date(time).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
   : '--'
 const formatCoordinate = (value: number) => value.toFixed(3)
+const WEATHER_SHARE_WIDTH = 360
+const WEATHER_SHARE_MIN_HEIGHT = 240
+
+const waitForWeatherSharePaint = async () => {
+  if (document.fonts?.ready) {
+    await document.fonts.ready.catch(() => undefined)
+  }
+
+  await new Promise<void>(resolve => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => resolve())
+    })
+  })
+}
 
 function DailyRow({ day, index }: { day: WeatherDailyForecast; index: number }) {
   return (
@@ -335,13 +349,46 @@ export function WeatherView({ currentView, onViewChange }: WeatherViewProps) {
     try {
       if (!messages) throw new Error('General Chat is still loading.')
       const target = shareRef.current
-      const height = Math.max(1, Math.ceil(target.scrollHeight || target.getBoundingClientRect().height))
+      await waitForWeatherSharePaint()
+      const rect = target.getBoundingClientRect()
+      const card = target.firstElementChild instanceof HTMLElement
+        ? target.firstElementChild
+        : null
+      const cardRect = card?.getBoundingClientRect()
+      const width = Math.ceil(Math.max(
+        target.scrollWidth,
+        rect.width,
+        card?.scrollWidth ?? 0,
+        cardRect?.width ?? 0,
+        WEATHER_SHARE_WIDTH,
+      ))
+      const height = Math.ceil(Math.max(
+        target.scrollHeight,
+        rect.height,
+        card?.scrollHeight ?? 0,
+        cardRect?.height ?? 0,
+      ))
+      if (height < WEATHER_SHARE_MIN_HEIGHT) {
+        throw new Error('Weather card is still preparing. Try sharing again.')
+      }
       const blob = await toBlob(target, {
         cacheBust: true,
-        width: 360,
+        width,
         height,
         pixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         backgroundColor: '#090a0c',
+        style: {
+          width: `${width}px`,
+          minWidth: `${width}px`,
+          maxWidth: `${width}px`,
+          height: `${height}px`,
+          maxHeight: 'none',
+          overflow: 'visible',
+          position: 'static',
+          left: 'auto',
+          top: 'auto',
+          transform: 'none',
+        },
       })
       if (!blob) throw new Error('Unable to capture weather')
       const asset = await uploadChatImageAsset(

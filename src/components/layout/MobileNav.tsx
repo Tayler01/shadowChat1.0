@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, ChevronLeft, ChevronRight, Gamepad2, Images, ListChecks, MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
 import { useOptionalClientReset } from '../../hooks/ClientResetContext'
+import { useAppBadgeState } from '../../hooks/useAppBadgeState'
 import { useDirectMessages } from '../../hooks/useDirectMessages'
 import { useOptionalActivity } from '../../features/activity/ActivityContext'
 import { ACTIVITY_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED } from '../../config/featureFlags'
@@ -38,6 +39,7 @@ export function MobileNav({
   boardsBadgeCount = 0,
 }: MobileNavProps) {
   const { conversations } = useDirectMessages()
+  const badgeState = useAppBadgeState()
   const activity = useOptionalActivity()
   const { status: resetStatus } = useOptionalClientReset()
   const [page, setPage] = useState<0 | 1>(() => currentView === 'active-users' || currentView === 'weather' ? 1 : 0)
@@ -45,16 +47,27 @@ export function MobileNav({
   const primaryPageRef = useRef<HTMLUListElement>(null)
   const toolsPageRef = useRef<HTMLUListElement>(null)
   const totalUnread = conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)
+  const catchUpUnread = badgeState.interactions + badgeState.connections
 
   const primaryItems = useMemo(() => [
-    { id: 'chat' as const, icon: MessageSquare, label: 'Chat', badge: null },
-    { id: 'dms' as const, icon: Users, label: 'DMs', badge: totalUnread || null },
-    ...(CATCH_UP_FEATURE_ENABLED ? [{ id: 'catchup' as const, icon: ListChecks, label: 'Catch-Up', badge: null }] : []),
+    { id: 'chat' as const, icon: MessageSquare, label: 'Chat', badge: badgeState.group || null },
+    { id: 'dms' as const, icon: Users, label: 'DMs', badge: Math.max(totalUnread, badgeState.dm) || null },
+    ...(CATCH_UP_FEATURE_ENABLED ? [{ id: 'catchup' as const, icon: ListChecks, label: 'Catch-Up', badge: catchUpUnread || null }] : []),
     ...(ACTIVITY_FEATURE_ENABLED ? [{ id: 'activity' as const, icon: Bell, label: 'Activity', badge: activity?.unreadCount || null }] : []),
     ...(boardsEnabled ? [{ id: 'boards' as const, icon: Newspaper, label: 'Boards', badge: boardsBadgeCount || null }] : []),
-    { id: 'pins' as const, icon: Images, label: 'Pins', badge: null },
-    { id: 'games' as const, icon: Gamepad2, label: 'Play', badge: null },
-  ], [activity?.unreadCount, boardsBadgeCount, boardsEnabled, totalUnread])
+    { id: 'pins' as const, icon: Images, label: 'Pins', badge: badgeState.shadow_pin || null },
+    { id: 'games' as const, icon: Gamepad2, label: 'Play', badge: badgeState.games || null },
+  ], [
+    activity?.unreadCount,
+    badgeState.dm,
+    badgeState.games,
+    badgeState.group,
+    badgeState.shadow_pin,
+    boardsBadgeCount,
+    boardsEnabled,
+    catchUpUnread,
+    totalUnread,
+  ])
 
   useEffect(() => {
     const resetForKeyboard = () => {

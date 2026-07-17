@@ -345,6 +345,8 @@ export function GamesHome({
         <div className="h-full min-h-0 overflow-hidden bg-black">
           <ShadowCheckersScreen
             onExit={exitShadowCheckers}
+            initialMatchId={initialItem}
+            onMatchRoute={(action, matchId) => onPlayRoute?.(action, 'shadow-checkers', matchId)}
             musicPlaying={musicPlaying}
             audioBlocked={audioBlocked}
             onToggleMusic={toggleMusic}

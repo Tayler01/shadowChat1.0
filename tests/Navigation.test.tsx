@@ -7,6 +7,25 @@ jest.mock('../src/hooks/useDirectMessages', () => ({
   useDirectMessages: () => ({ conversations: [] }),
 }))
 
+jest.mock('../src/config/featureFlags', () => ({
+  ACTIVITY_FEATURE_ENABLED: false,
+  CATCH_UP_FEATURE_ENABLED: true,
+}))
+
+const mockBadgeState = {
+  total: 15,
+  dm: 2,
+  group: 3,
+  interactions: 4,
+  connections: 1,
+  shadow_pin: 3,
+  games: 2,
+}
+
+jest.mock('../src/hooks/useAppBadgeState', () => ({
+  useAppBadgeState: () => mockBadgeState,
+}))
+
 jest.mock('../src/components/search/GlobalSearchButton', () => ({
   GlobalSearchButton: ({ variant }: { variant?: string }) => <button type="button" aria-label="Open search and saved messages">{variant === 'nav' ? 'Search' : null}</button>,
 }))
@@ -51,9 +70,19 @@ test('mobile navigation exposes four primary destinations and pauses Activity an
 test('mobile navigation exposes only the active destination as the current page', () => {
   render(<MobileNav currentView="dms" onViewChange={jest.fn()} />)
 
-  expect(screen.getByRole('button', { name: 'DMs' })).toHaveAttribute('aria-current', 'page')
-  expect(screen.getByRole('button', { name: 'Chat' })).not.toHaveAttribute('aria-current')
+  expect(screen.getByRole('button', { name: 'DMs, 2 unread' })).toHaveAttribute('aria-current', 'page')
+  expect(screen.getByRole('button', { name: 'Chat, 3 unread' })).not.toHaveAttribute('aria-current')
   expect(screen.getAllByRole('button').filter(button => button.hasAttribute('aria-current'))).toHaveLength(1)
+})
+
+test('mobile navigation makes every badge category findable at its source', () => {
+  render(<MobileNav currentView="chat" onViewChange={jest.fn()} />)
+
+  expect(screen.getByRole('button', { name: 'Chat, 3 unread' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'DMs, 2 unread' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Catch-Up, 5 unread' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Pins, 3 unread' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Play, 2 unread' })).toBeInTheDocument()
 })
 
 test('mobile navigation slides to utility controls and back', async () => {
@@ -128,7 +157,7 @@ test('sidebar exposes only the active destination as the current page', () => {
   )
 
   expect(screen.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page')
-  expect(screen.getByRole('button', { name: 'Chat' })).not.toHaveAttribute('aria-current')
+  expect(screen.getByRole('button', { name: 'Chat, 3 unread' })).not.toHaveAttribute('aria-current')
   expect(screen.getAllByRole('button').filter(button => button.hasAttribute('aria-current'))).toHaveLength(1)
 })
 

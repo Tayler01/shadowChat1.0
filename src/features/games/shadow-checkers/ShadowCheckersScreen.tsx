@@ -16,6 +16,8 @@ import { useShadowCheckers } from './hooks/useShadowCheckers'
 
 interface ShadowCheckersScreenProps {
   onExit?: () => void
+  initialMatchId?: string
+  onMatchRoute?: (action: 'push-item' | 'replace-item' | 'close-item', matchId?: string) => void
   musicPlaying?: boolean
   audioBlocked?: boolean
   onToggleMusic?: () => void
@@ -95,6 +97,8 @@ function normalizeBoardSkin(value?: string | null): ShadowCheckersBoardSkin {
 
 export function ShadowCheckersScreen({
   onExit,
+  initialMatchId,
+  onMatchRoute,
   musicPlaying = false,
   audioBlocked = false,
   onToggleMusic,
@@ -115,6 +119,10 @@ export function ShadowCheckersScreen({
   const [dismissedResultMatchId, setDismissedResultMatchId] = React.useState<string | null>(null)
   const [showYourTurnBanner, setShowYourTurnBanner] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement | null>(null)
+  const handleAutoSelectMatch = React.useCallback((matchId: string, routeMode: 'push' | 'replace') => {
+    if (matchId === initialMatchId) return
+    onMatchRoute?.(routeMode === 'replace' ? 'replace-item' : 'push-item', matchId)
+  }, [initialMatchId, onMatchRoute])
   const {
     sessions,
     matches,
@@ -128,7 +136,7 @@ export function ShadowCheckersScreen({
     busy,
     error,
     actions,
-  } = useShadowCheckers()
+  } = useShadowCheckers(initialMatchId, handleAutoSelectMatch)
 
   const state = React.useMemo(() => (
     activeMatch ? deserializeBoard(activeMatch.board_state as any) : null
@@ -218,6 +226,11 @@ export function ShadowCheckersScreen({
     } catch (err) {
       toast.error(formatCheckersActionError(err))
     }
+  }
+
+  const handleSelectMatch = (matchId: string | null) => {
+    actions.selectMatch(matchId)
+    onMatchRoute?.(matchId ? 'push-item' : 'close-item', matchId ?? undefined)
   }
 
   const handleSelectPiece = (piece: CheckersPiece) => {
@@ -581,7 +594,7 @@ export function ShadowCheckersScreen({
         </div>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {currentUserIsPlayer && (
-            <CheckersButton onClick={() => actions.selectMatch(match.id)}>
+            <CheckersButton onClick={() => handleSelectMatch(match.id)}>
               <Swords className="mr-2 h-4 w-4" />
               Continue
             </CheckersButton>
@@ -593,7 +606,7 @@ export function ShadowCheckersScreen({
             </CheckersButton>
           )}
           {match.status === 'active' && (
-            <CheckersButton variant="secondary" onClick={() => actions.selectMatch(match.id)}>
+            <CheckersButton variant="secondary" onClick={() => handleSelectMatch(match.id)}>
               <Eye className="mr-2 h-4 w-4" />
               {currentUserIsPlayer ? 'Open' : 'Spectate'}
             </CheckersButton>
@@ -640,7 +653,7 @@ export function ShadowCheckersScreen({
                 Create Public Match
               </CheckersButton>
               {myMatch && (
-                <CheckersButton variant="secondary" onClick={() => actions.selectMatch(myMatch.id)}>
+                <CheckersButton variant="secondary" onClick={() => handleSelectMatch(myMatch.id)}>
                   <Swords className="mr-2 h-4 w-4" />
                   Continue Current Match
                 </CheckersButton>
@@ -797,7 +810,7 @@ export function ShadowCheckersScreen({
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.58),rgba(0,0,0,0.20)_42%,rgba(0,0,0,0.84))]" />
       <header className="shadow-checkers-keyboard-collapse relative z-20 shrink-0 border-b border-[#b9934c]/35 bg-black/86 shadow-[0_16px_40px_rgba(0,0,0,0.58)]">
         <div className="flex min-h-[calc(env(safe-area-inset-top)_+_6.2rem)] items-center gap-1.5 px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)_+_0.35rem)]">
-          <button type="button" aria-label={selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Back to entertainment'} onClick={() => selectedMatchId ? actions.selectMatch(null) : onExit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
+          <button type="button" aria-label={selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Back to entertainment'} onClick={() => selectedMatchId ? handleSelectMatch(null) : onExit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-[5.35rem] min-w-0 flex-1 object-contain drop-shadow-[0_12px_28px_rgba(0,0,0,0.72)]" />

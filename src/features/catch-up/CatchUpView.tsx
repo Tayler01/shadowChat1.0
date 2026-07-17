@@ -5,9 +5,16 @@ import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
 import { useAuth } from '../../hooks/useAuth'
 import { getUserProfile } from '../../lib/auth'
+import { requestAppBadgeRefresh } from '../../lib/appBadge'
 import type { User } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
-import { acknowledgeCatchUpEvents, fetchCatchUpSnapshot } from './catchUpApi'
+import { clearNotificationEventFromSystemTray } from '../notifications/notificationApi'
+import {
+  acknowledgeCatchUpEvents,
+  acknowledgeNotificationInboxEvent,
+  fetchCatchUpSnapshot,
+  fetchNotificationInbox,
+} from './catchUpApi'
 import {
   CATCH_UP_SECTION_ORDER,
   formatCatchUpTime,
@@ -116,6 +123,9 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   const userId = user?.id ?? ''
   const [cached] = useState(() => readCatchUpCache(userId))
   const [snapshot, setSnapshot] = useState<CatchUpSnapshot | null>(cached.snapshot)
+  const [notificationInbox, setNotificationInbox] = useState<CatchUpItem[]>([])
+  const [notificationInboxLoading, setNotificationInboxLoading] = useState(true)
+  const [notificationInboxError, setNotificationInboxError] = useState<string | null>(null)
   const [loading, setLoading] = useState(!cached.snapshot)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -162,9 +172,23 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     }
   }, [userId])
 
+  const loadNotificationInbox = useCallback(async () => {
+    setNotificationInboxLoading(true)
+    setNotificationInboxError(null)
+    try {
+      const items = await fetchNotificationInbox()
+      if (mountedRef.current) setNotificationInbox(items)
+    } catch {
+      if (mountedRef.current) setNotificationInboxError('Notification inbox could not refresh.')
+    } finally {
+      if (mountedRef.current) setNotificationInboxLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (!cached.snapshot) void load()
     else if (Date.now() - cached.fetchedAt >= CACHE_TTL_MS) void load(true)
+    void loadNotificationInbox()
     const frame = requestAnimationFrame(() => {
       if (scrollRef.current && cached.scrollTop > 0) scrollRef.current.scrollTop = cached.scrollTop
       if (cached.focusItemId && typeof CSS !== 'undefined') {
@@ -174,7 +198,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
       }
     })
     return () => cancelAnimationFrame(frame)
-  }, [cached, load, userId])
+  }, [cached, load, loadNotificationInbox, userId])
 
   useEffect(() => {
     mountedRef.current = true
@@ -196,6 +220,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   )
   const totalCount = sections.reduce((sum, section) => sum + section.totalCount, 0)
   const hasOlderUnread = sections.some(section => section.olderUnreadExists)
+  const hasNotificationInboxItems = notificationInbox.length > 0
 
   const openProfile = async (profileId: string) => {
     const cachedProfile = profileCacheRef.current.get(profileId)
@@ -251,6 +276,29 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     onOpenSource(item)
   }
 
+  const openNotificationItem = (item: CatchUpItem) => {
+    const eventId = item.notificationEventIds?.[0]
+    onOpenSource(item)
+    if (!eventId) return
+
+    setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
+    void acknowledgeNotificationInboxEvent(eventId).then(() => {
+      void clearNotificationEventFromSystemTray({
+        notificationType: item.kind,
+        eventId,
+      })
+      requestAppBadgeRefresh()
+    }).catch(() => {
+      if (!mountedRef.current) return
+      setNotificationInboxError('The source opened, but this notification could not be cleared. Refresh to try again.')
+      void loadNotificationInbox()
+    })
+  }
+
+  const refreshAll = () => {
+    void Promise.all([load(true), loadNotificationInbox()])
+  }
+
   return (
     <div className="theme-app-surface flex h-full min-h-0 flex-col pb-[calc(env(safe-area-inset-bottom)+4.2rem)] text-sm md:pb-0" data-testid="catch-up-view">
       <MobileAppHeader currentView={currentView} onViewChange={onViewChange} title="Catch-Up" logo className="hidden md:flex" />
@@ -264,7 +312,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
                   <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Source-linked / No AI
                 </span>
                 <h1 className="mt-0.5 text-xl font-bold text-[var(--text-primary)] sm:text-2xl">Your Catch-Up</h1>
-                <p className="mt-1 max-w-xl text-sm leading-5 text-[var(--text-muted)]">Things that need you, unread conversations, new Chat roots, and ShadowPin posts - each linked to its exact source.</p>
+                <p className="mt-1 max-w-xl text-sm leading-5 text-[var(--text-muted)]">Your notification inbox, unread conversations, new Chat roots, and ShadowPin posts - each linked to its exact source.</p>
                 {snapshot && (
                   <p className="mt-1.5 flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                     <Check className="h-3.5 w-3.5 text-[var(--theme-accent-readable)]" aria-hidden="true" />
@@ -272,8 +320,8 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
                   </p>
                 )}
               </div>
-              <button type="button" onClick={() => void load(true)} disabled={loading || refreshing} aria-label="Refresh Catch-Up" aria-busy={refreshing} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--theme-accent-readable)] transition-colors hover:border-[var(--border-glow)] hover:bg-[var(--theme-accent-soft)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]">
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
+              <button type="button" onClick={refreshAll} disabled={loading || refreshing} aria-label="Refresh Catch-Up" aria-busy={refreshing || notificationInboxLoading} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-[var(--border-subtle)] bg-[var(--bg-panel-soft)] text-[var(--theme-accent-readable)] transition-colors hover:border-[var(--border-glow)] hover:bg-[var(--theme-accent-soft)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]">
+                <RefreshCw className={`h-4 w-4 ${refreshing || notificationInboxLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
               </button>
             </div>
           </header>
@@ -287,7 +335,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
               <p className="mt-2 text-sm text-[var(--text-muted)]">{error}</p>
               <Button type="button" variant="secondary" className="mt-4" onClick={() => void load()}>Try again</Button>
             </div>
-          ) : snapshot && totalCount === 0 && !hasOlderUnread ? (
+          ) : snapshot && totalCount === 0 && !hasOlderUnread && !hasNotificationInboxItems && !notificationInboxLoading && !notificationInboxError ? (
             <div className="mt-5 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] p-8 text-center">
               <Sparkles className="mx-auto h-9 w-9 text-[var(--theme-accent-readable)]" aria-hidden="true" />
               <h2 className="mt-4 text-xl font-bold text-[var(--text-primary)]">You are caught up</h2>
@@ -299,6 +347,31 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
                 <p role="alert" className="rounded-[var(--radius-md)] border border-red-300/20 bg-red-950/15 px-4 py-3 text-sm text-red-100">
                   {profileError}
                 </p>
+              )}
+              {hasNotificationInboxItems && (
+                <section aria-labelledby="catch-up-notification-inbox">
+                  <div className="mb-3 flex items-end justify-between gap-3 px-1">
+                    <div>
+                      <h2 id="catch-up-notification-inbox" className="flex items-center gap-2 text-lg font-bold text-[var(--text-primary)]">
+                        <Inbox className="h-5 w-5 text-[var(--theme-accent-readable)]" />
+                        Notification inbox
+                      </h2>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">Every unread app-icon count has a source you can open and clear here.</p>
+                    </div>
+                    <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)]">{notificationInbox.length}</span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {notificationInbox.map(item => (
+                      <CatchUpCard
+                        key={item.id}
+                        item={item}
+                        onOpen={() => openNotificationItem(item)}
+                        onOpenProfile={profileId => void openProfile(profileId)}
+                        profileLoading={loadingProfileId === item.actor?.id}
+                      />
+                    ))}
+                  </div>
+                </section>
               )}
               {sections.filter(section => section.totalCount > 0).map(section => (
                 <section key={section.id} aria-labelledby={`catch-up-${section.id}`}>
@@ -336,6 +409,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
           ) : null}
 
           {error && snapshot && <p className="mt-4 text-center text-xs text-red-200" role="status">Refresh failed; the last source snapshot is still shown.</p>}
+          {notificationInboxError && <p className="mt-4 text-center text-xs text-red-200" role="status">{notificationInboxError}</p>}
           <p className="sr-only" aria-live="polite">{announcement}</p>
         </div>
       </div>

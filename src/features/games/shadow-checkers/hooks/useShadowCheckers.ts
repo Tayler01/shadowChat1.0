@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getRealtimeClient, getWorkingClient } from '../../../../lib/supabase'
 import { runRealtimeRecovery } from '../../../../lib/realtimeRecovery'
+import { requestAppBadgeRefresh } from '../../../../lib/appBadge'
+import { triggerShadowCheckersTurnPushNotification } from '../../../../lib/push'
 import { useAuth } from '../../../../hooks/useAuth'
 import { useRealtimeRecovery } from '../../../../hooks/useRealtimeRecovery'
 import type { CheckersPosition } from '../engine/types'
@@ -17,6 +19,7 @@ import {
   fetchShadowCheckersSessions,
   joinShadowCheckersMatch,
   leaveShadowCheckersQueue,
+  markShadowCheckersTurnRead,
   postShadowCheckersChatMessage,
   queueShadowCheckersMatch,
   rematchShadowCheckersMatch,
@@ -44,15 +47,21 @@ function formatShadowCheckersHookError(label: string, error: unknown) {
   return message
 }
 
-export function useShadowCheckers() {
+type AutoSelectRouteMode = 'push' | 'replace'
+
+export function useShadowCheckers(
+  initialMatchId?: string,
+  onAutoSelectMatch?: (matchId: string, routeMode: AutoSelectRouteMode) => void,
+) {
   const { user } = useAuth()
   const [snapshot, setSnapshot] = useState<ShadowCheckersSnapshot>(emptySnapshot)
-  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null)
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(() => initialMatchId ?? null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const refreshTimerRef = useRef<number | null>(null)
+  const selectedMatchIdRef = useRef<string | null>(initialMatchId ?? null)
 
   const refresh = useCallback(async (nextSelectedMatchId = selectedMatchId) => {
     try {
@@ -89,6 +98,50 @@ export function useShadowCheckers() {
   useEffect(() => {
     void refresh().catch(() => {})
   }, [refresh])
+
+  useEffect(() => {
+    const nextInitialMatchId = initialMatchId ?? null
+    selectedMatchIdRef.current = nextInitialMatchId
+    setSelectedMatchId(nextInitialMatchId)
+  }, [initialMatchId])
+
+  const activeMatchId = snapshot.activeMatch?.id
+  const activeMatchStatus = snapshot.activeMatch?.status
+  const activeMatchTurnUserId = snapshot.activeMatch?.current_turn_user_id
+  const activeMatchMoveCount = snapshot.activeMatch?.move_count
+  const currentUserId = user?.id
+
+  useEffect(() => {
+    if (
+      !currentUserId
+      || !selectedMatchId
+      || activeMatchId !== selectedMatchId
+      || activeMatchStatus !== 'active'
+      || activeMatchTurnUserId !== currentUserId
+    ) {
+      return
+    }
+
+    let cancelled = false
+    void markShadowCheckersTurnRead(selectedMatchId)
+      .then(() => {
+        if (!cancelled) requestAppBadgeRefresh()
+      })
+      .catch(() => {
+        // Read-through is best-effort. A later route open or notification inbox action can retry it.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [
+    activeMatchId,
+    activeMatchMoveCount,
+    activeMatchStatus,
+    activeMatchTurnUserId,
+    currentUserId,
+    selectedMatchId,
+  ])
 
   const resetChannel = useCallback(async () => {
     await refresh().catch(() => emptySnapshot)
@@ -159,15 +212,24 @@ export function useShadowCheckers() {
   const runAction = useCallback(async <T,>(
     label: string,
     action: () => Promise<T>,
-    getSelectedMatchId?: (result: T) => string | null | undefined
+    getSelectedMatchId?: (result: T) => string | null | undefined,
+    autoSelectRouteMode?: AutoSelectRouteMode,
   ) => {
     setBusy(label)
     setError(null)
     try {
       const result = await action()
       const nextSelectedMatchId = getSelectedMatchId?.(result)
+      const selectionChanged = Boolean(
+        nextSelectedMatchId
+        && nextSelectedMatchId !== selectedMatchIdRef.current
+      )
       if (nextSelectedMatchId !== undefined) {
+        selectedMatchIdRef.current = nextSelectedMatchId
         setSelectedMatchId(nextSelectedMatchId)
+      }
+      if (nextSelectedMatchId && selectionChanged && autoSelectRouteMode) {
+        onAutoSelectMatch?.(nextSelectedMatchId, autoSelectRouteMode)
       }
       await refresh(nextSelectedMatchId).catch(() => emptySnapshot)
       return result
@@ -178,15 +240,23 @@ export function useShadowCheckers() {
     } finally {
       setBusy(null)
     }
-  }, [refresh])
+  }, [onAutoSelectMatch, refresh])
 
   const actions = useMemo(() => ({
     create: (characterKey: string, boardSkin: 'classic' | 'cinematic' = 'classic') =>
-      runAction('create', () => createShadowCheckersMatch(characterKey, boardSkin), result => result.matchId),
+      runAction('create', () => createShadowCheckersMatch(characterKey, boardSkin), result => result.matchId, 'push'),
     join: (sessionId: string, characterKey: string) =>
-      runAction('join', () => joinShadowCheckersMatch(sessionId, characterKey), result => result.matchId),
+      runAction('join', async () => {
+        const result = await joinShadowCheckersMatch(sessionId, characterKey)
+        void triggerShadowCheckersTurnPushNotification(result.matchId).catch(() => undefined)
+        return result
+      }, result => result.matchId, 'push'),
     submitMove: (matchId: string, pieceId: string, path: CheckersPosition[]) =>
-      runAction('move', () => submitShadowCheckersMove(matchId, pieceId, path)),
+      runAction('move', async () => {
+        const result = await submitShadowCheckersMove(matchId, pieceId, path)
+        void triggerShadowCheckersTurnPushNotification(result.matchId).catch(() => undefined)
+        return result
+      }),
     resign: (matchId: string) =>
       runAction('resign', () => resignShadowCheckersMatch(matchId)),
     cancel: (matchId: string) =>
@@ -196,12 +266,21 @@ export function useShadowCheckers() {
     leaveQueue: (sessionId: string) =>
       runAction('leaveQueue', () => leaveShadowCheckersQueue(sessionId)),
     rematch: (matchId: string) =>
-      runAction('rematch', () => rematchShadowCheckersMatch(matchId), result => result.matchId),
+      runAction('rematch', async () => {
+        const result = await rematchShadowCheckersMatch(matchId)
+        void triggerShadowCheckersTurnPushNotification(result.matchId).catch(() => undefined)
+        return result
+      }, result => result.matchId, 'replace'),
     nextChallenger: (matchId: string) =>
-      runAction('nextChallenger', () => startShadowCheckersNextChallenger(matchId), result => result.matchId),
+      runAction('nextChallenger', async () => {
+        const result = await startShadowCheckersNextChallenger(matchId)
+        void triggerShadowCheckersTurnPushNotification(result.matchId).catch(() => undefined)
+        return result
+      }, result => result.matchId, 'replace'),
     postChat: (matchId: string, body: string) =>
       runAction('chat', () => postShadowCheckersChatMessage(matchId, body)),
     selectMatch: (matchId: string | null) => {
+      selectedMatchIdRef.current = matchId
       setSelectedMatchId(matchId)
       void refresh(matchId).catch(() => {})
     },

@@ -139,19 +139,21 @@ describe('service worker app badge handling', () => {
     expect(setAppBadge).toHaveBeenCalledWith(99)
   })
 
-  it('suppresses presence push when a same-origin app window is visible', async () => {
+  it('suppresses every push type when a same-origin app window is visible', async () => {
     const { clients, listeners, showNotification } = loadServiceWorker()
+    const postMessage = jest.fn()
     clients.matchAll.mockResolvedValueOnce([{
       url: 'https://shadowchat.test/?view=chat',
       visibilityState: 'visible',
+      postMessage,
     }])
     const pending: Promise<unknown>[] = []
 
     listeners.push({
       data: {
         json: () => ({
-          title: 'JJ is active now',
-          data: { type: 'presence_active', url: '/?view=active-users' },
+          title: 'New DM',
+          data: { type: 'dm_message', url: '/?view=dms' },
         }),
       },
       waitUntil: (task: Promise<unknown>) => pending.push(task),
@@ -159,6 +161,10 @@ describe('service worker app badge handling', () => {
 
     await Promise.allSettled(pending)
     expect(showNotification).not.toHaveBeenCalled()
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'SHADOWCHAT_FOREGROUND_PUSH_SUPPRESSED',
+      data: { type: 'dm_message', url: '/?view=dms' },
+    })
   })
 
   it('closes only DM notifications for the conversation that was read', async () => {
@@ -292,6 +298,40 @@ describe('service worker app badge handling', () => {
     await Promise.allSettled(pending)
     expect(closePresented).toHaveBeenCalledTimes(1)
     expect(closeStillUnread).not.toHaveBeenCalled()
+  })
+
+  it('closes only the requested Shadow Checkers turn notification', async () => {
+    const { listeners, notifications } = loadServiceWorker()
+    const closeRequested = jest.fn()
+    const closeOther = jest.fn()
+    const pending: Promise<unknown>[] = []
+
+    notifications.push(
+      {
+        close: closeRequested,
+        data: { eventId: 'event-a', matchId: 'match-a', type: 'shadow_checkers_turn' },
+        tag: 'shadow-checkers-turn:match-a',
+      },
+      {
+        close: closeOther,
+        data: { eventId: 'event-b', matchId: 'match-b', type: 'shadow_checkers_turn' },
+        tag: 'shadow-checkers-turn:match-b',
+      }
+    )
+
+    listeners.message({
+      data: {
+        eventId: 'event-a',
+        matchId: 'match-a',
+        notificationType: 'shadow_checkers_turn',
+        type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+    expect(closeRequested).toHaveBeenCalledTimes(1)
+    expect(closeOther).not.toHaveBeenCalled()
   })
 
   it('classifies targeted and reaction notifications by their active chat surface', async () => {

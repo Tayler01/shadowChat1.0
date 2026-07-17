@@ -1,6 +1,6 @@
 # Shadow Checkers
 
-## Documentation Status - June 1, 2026
+## Documentation Status - July 17, 2026
 
 Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
@@ -37,6 +37,14 @@ adds:
 
 Critical game actions are server-resolved through RPCs. The browser does not
 directly write board state, winners, match results, stats, or crown badges.
+
+The notification reliability candidate adds server-authored turn events from
+the authoritative match transition. Events are deduplicated by match, move
+count, and recipient, expire quickly for push delivery, route to the exact
+match, and resolve as the turn advances or match ends. Members can independently
+control turn alerts and the Play/Home Screen badge in Notifications & Audio.
+The durable recovery worker is code-complete; production rollout must also
+activate its secure server-side schedule.
 
 ## Frontend
 

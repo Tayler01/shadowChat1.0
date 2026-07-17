@@ -78,6 +78,18 @@ captures it with `html-to-image`, uploads it through the existing chat image
 path, and sends it to General Chat. Sharing is explicit and does not expose the
 member's saved-location list.
 
+The July 17 reliability fix waits for fonts and two paint frames, measures both
+the capture wrapper and rendered card, supplies explicit capture geometry, and
+refuses suspicious captures shorter than 240 pixels. This prevents the
+off-screen fixed container from producing a black or one-pixel General Chat
+image. Authenticated phone-size automation verified readable 720x788 output in
+both iPhone WebKit and Android Chromium.
+
+Radar animation preloads the next RainViewer layer before a 100 ms crossfade,
+keeps the previous layer visible until the replacement is ready, uses a 500 ms
+frame dwell, and pauses while the document is hidden. This is at least twice
+the prior playback rate without blanking between frames.
+
 ## Frontend Map
 
 - [`src/features/weather/WeatherView.tsx`](../src/features/weather/WeatherView.tsx):

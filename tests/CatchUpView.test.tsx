@@ -1,12 +1,19 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { CatchUpView } from '../src/features/catch-up/CatchUpView'
 import { clearCatchUpCache, writeCatchUpCache, type CatchUpSnapshot } from '../src/features/catch-up/catchUpModel'
-import { acknowledgeCatchUpEvents, fetchCatchUpSnapshot } from '../src/features/catch-up/catchUpApi'
+import {
+  acknowledgeCatchUpEvents,
+  acknowledgeNotificationInboxEvent,
+  fetchCatchUpSnapshot,
+  fetchNotificationInbox,
+} from '../src/features/catch-up/catchUpApi'
 import { getUserProfile } from '../src/lib/auth'
 
 jest.mock('../src/features/catch-up/catchUpApi', () => ({
   acknowledgeCatchUpEvents: jest.fn(),
+  acknowledgeNotificationInboxEvent: jest.fn(),
   fetchCatchUpSnapshot: jest.fn(),
+  fetchNotificationInbox: jest.fn(),
 }))
 
 jest.mock('../src/components/layout/MobileAppHeader', () => ({
@@ -35,6 +42,8 @@ jest.mock('../src/lib/auth', () => ({
 
 const fetchSnapshot = fetchCatchUpSnapshot as jest.MockedFunction<typeof fetchCatchUpSnapshot>
 const acknowledge = acknowledgeCatchUpEvents as jest.MockedFunction<typeof acknowledgeCatchUpEvents>
+const acknowledgeNotification = acknowledgeNotificationInboxEvent as jest.MockedFunction<typeof acknowledgeNotificationInboxEvent>
+const fetchInbox = fetchNotificationInbox as jest.MockedFunction<typeof fetchNotificationInbox>
 const fetchProfile = getUserProfile as jest.MockedFunction<typeof getUserProfile>
 
 const section = (id: CatchUpSnapshot['sections'][keyof CatchUpSnapshot['sections']]['id'], title: string) => ({
@@ -89,7 +98,40 @@ beforeEach(() => {
   jest.clearAllMocks()
   clearCatchUpCache()
   acknowledge.mockResolvedValue(1)
+  acknowledgeNotification.mockResolvedValue(true)
+  fetchInbox.mockResolvedValue([])
   fetchProfile.mockResolvedValue(null)
+})
+
+test('shows canonical unread notifications and clears the exact event after opening its source', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([{
+    id: 'notification:event-9',
+    kind: 'shadow_checkers_turn',
+    occurredAt: '2026-07-14T01:50:00Z',
+    actor: null,
+    title: 'Your turn in Shadow Checkers',
+    preview: 'Mills moved. Open the match to make your play.',
+    unreadCount: 1,
+    manuallyUnread: false,
+    target: { kind: 'app_route', route: '/?view=games&experience=shadow-checkers&item=match-1' },
+    activityEventIds: [],
+    notificationEventIds: ['event-9'],
+  }])
+  const onOpenSource = jest.fn()
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={onOpenSource} />)
+
+  expect(await screen.findByRole('heading', { name: 'Notification inbox' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /Your turn in Shadow Checkers/i }))
+
+  expect(onOpenSource).toHaveBeenCalledWith(expect.objectContaining({
+    target: { kind: 'app_route', route: '/?view=games&experience=shadow-checkers&item=match-1' },
+  }))
+  await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledWith('event-9'))
+  expect(screen.queryByRole('heading', { name: 'Notification inbox' })).not.toBeInTheDocument()
 })
 
 test('loads source-linked sections and acknowledges only the opened Activity event', async () => {

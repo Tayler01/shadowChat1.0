@@ -301,6 +301,10 @@ test('Play URL state accepts typed experiences and bounded exact items', () => {
     playExperience: 'shadow-mystery',
     playItem: 'the-devil-s-school',
   })
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=shadow-checkers&item=match-1'))).toMatchObject({
+    playExperience: 'shadow-checkers',
+    playItem: 'match-1',
+  })
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=games&experience=shadow-runner&item=ignored'))).toMatchObject({
     playExperience: 'shadow-runner',
     playItem: null,
@@ -337,6 +341,28 @@ test('Play history mutations push warm layers and replace cold direct links', ()
   })
   expect(item).toMatchObject({ method: 'push', layer: 'play-item' })
   expect(item && item.method !== 'back' ? item.url.search : '').toBe('?view=games&experience=shado-tv&item=the-chicken-snatchers')
+
+  const checkersMatch = resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games&experience=shadow-checkers'),
+    currentLayer: 'play-experience',
+    action: 'push-item',
+    experience: 'shadow-checkers',
+    item: 'match-1',
+  })
+  expect(checkersMatch).toMatchObject({ method: 'push', layer: 'play-item' })
+  expect(checkersMatch && checkersMatch.method !== 'back' ? checkersMatch.url.search : '')
+    .toBe('?view=games&experience=shadow-checkers&item=match-1')
+
+  const checkersRematch = resolvePlayRouteMutation({
+    currentUrl: new URL('https://shadochat.online/?view=games&experience=shadow-checkers&item=match-1'),
+    currentLayer: 'play-item',
+    action: 'replace-item',
+    experience: 'shadow-checkers',
+    item: 'match-2',
+  })
+  expect(checkersRematch).toMatchObject({ method: 'replace', layer: 'play-item' })
+  expect(checkersRematch && checkersRematch.method !== 'back' ? checkersRematch.url.search : '')
+    .toBe('?view=games&experience=shadow-checkers&item=match-2')
 
   expect(resolvePlayRouteMutation({
     currentUrl: new URL('https://shadochat.online/?view=games&experience=shado-tv&item=the-chicken-snatchers'),

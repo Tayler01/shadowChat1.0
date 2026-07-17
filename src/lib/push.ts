@@ -15,6 +15,7 @@ export interface NotificationPreferences {
   shadow_pin_comment_enabled: boolean
   shadow_pin_reply_enabled: boolean
   connection_notifications_enabled: boolean
+  checkers_turn_enabled: boolean
   shado_live_in_app_enabled: boolean
   presence_in_app_enabled: boolean
   presence_push_enabled: boolean
@@ -24,6 +25,7 @@ export interface NotificationPreferences {
   badge_interactions_enabled: boolean
   badge_connections_enabled: boolean
   badge_shadow_pin_enabled: boolean
+  badge_games_enabled: boolean
   general_chat_muted: boolean
   quiet_hours_start: string | null
   quiet_hours_end: string | null
@@ -64,6 +66,7 @@ const DEFAULT_PREFERENCES = {
   shadow_pin_comment_enabled: true,
   shadow_pin_reply_enabled: true,
   connection_notifications_enabled: true,
+  checkers_turn_enabled: true,
   shado_live_in_app_enabled: true,
   presence_in_app_enabled: true,
   presence_push_enabled: true,
@@ -73,6 +76,7 @@ const DEFAULT_PREFERENCES = {
   badge_interactions_enabled: true,
   badge_connections_enabled: true,
   badge_shadow_pin_enabled: true,
+  badge_games_enabled: true,
   general_chat_muted: false,
   quiet_hours_start: null,
   quiet_hours_end: null,
@@ -93,6 +97,7 @@ const NOTIFICATION_PREFERENCE_SELECT = [
   'shadow_pin_comment_enabled',
   'shadow_pin_reply_enabled',
   'connection_notifications_enabled',
+  'checkers_turn_enabled',
   'shado_live_in_app_enabled',
   'presence_in_app_enabled',
   'presence_push_enabled',
@@ -102,6 +107,7 @@ const NOTIFICATION_PREFERENCE_SELECT = [
   'badge_interactions_enabled',
   'badge_connections_enabled',
   'badge_shadow_pin_enabled',
+  'badge_games_enabled',
   'general_chat_muted',
   'quiet_hours_start',
   'quiet_hours_end',
@@ -701,5 +707,12 @@ export const triggerShadowPinCommentPushNotification = async (commentId: string)
   return invokePushWithRetry({
     type: 'shadow_pin_comment',
     messageId: commentId,
+  })
+}
+
+export const triggerShadowCheckersTurnPushNotification = async (matchId: string) => {
+  return invokePushWithRetry({
+    type: 'shadow_checkers_turn',
+    messageId: matchId,
   })
 }

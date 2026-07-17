@@ -14,6 +14,7 @@ const normalizeBadgeCount = (count: number) => {
 }
 
 export const APP_BADGE_REFRESH_EVENT = 'shadowchat:app-badge-refresh'
+export const APP_BADGE_STATE_EVENT = 'shadowchat:app-badge-state'
 
 export interface AppBadgeState {
   total: number
@@ -22,16 +23,46 @@ export interface AppBadgeState {
   interactions: number
   connections: number
   shadow_pin: number
+  games: number
 }
 
-const EMPTY_BADGE_STATE: AppBadgeState = {
+export const EMPTY_APP_BADGE_STATE: AppBadgeState = {
   total: 0,
   dm: 0,
   group: 0,
   interactions: 0,
   connections: 0,
   shadow_pin: 0,
+  games: 0,
 }
+
+let cachedBadgeState: AppBadgeState = EMPTY_APP_BADGE_STATE
+let badgeStateRequest: Promise<AppBadgeState> | null = null
+
+const normalizeBadgeState = (value: unknown): AppBadgeState => {
+  const state = value && typeof value === 'object'
+    ? value as Partial<AppBadgeState>
+    : EMPTY_APP_BADGE_STATE
+  return {
+    total: normalizeBadgeCount(Number(state.total ?? 0)),
+    dm: normalizeBadgeCount(Number(state.dm ?? 0)),
+    group: normalizeBadgeCount(Number(state.group ?? 0)),
+    interactions: normalizeBadgeCount(Number(state.interactions ?? 0)),
+    connections: normalizeBadgeCount(Number(state.connections ?? 0)),
+    shadow_pin: normalizeBadgeCount(Number(state.shadow_pin ?? 0)),
+    games: normalizeBadgeCount(Number(state.games ?? 0)),
+  }
+}
+
+const publishBadgeState = (state: AppBadgeState) => {
+  cachedBadgeState = state
+  if (typeof window === 'undefined') return
+  window.dispatchEvent(new CustomEvent<AppBadgeState>(APP_BADGE_STATE_EVENT, {
+    detail: state,
+  }))
+}
+
+export const getCachedAppBadgeState = () => ({ ...cachedBadgeState })
 
 const postMessageToServiceWorker = async (message: Record<string, unknown>) => {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
@@ -117,40 +148,63 @@ export const clearGroupNotifications = async (
   })
 }
 
-export const fetchUnreadAppBadgeCount = async () => {
-  const workingClient = await getWorkingClient()
-  const {
-    data: { user },
-    error: userError,
-  } = await workingClient.auth.getUser()
+export const fetchAppBadgeState = async () => {
+  if (badgeStateRequest) return badgeStateRequest
 
-  if (userError || !user) {
-    return 0
-  }
+  badgeStateRequest = (async () => {
+    const workingClient = await getWorkingClient()
+    const {
+      data: { user },
+      error: userError,
+    } = await workingClient.auth.getUser()
 
-  const { data, error } = await workingClient.rpc('get_app_badge_state', {
-    target_user_id: user.id,
+    if (userError || !user) {
+      return EMPTY_APP_BADGE_STATE
+    }
+
+    const { data, error } = await workingClient.rpc('get_app_badge_state_v2', {
+      target_user_id: user.id,
+    })
+
+    if (error) {
+      throw error
+    }
+
+    return normalizeBadgeState(data)
+  })().finally(() => {
+    badgeStateRequest = null
   })
 
-  if (error) {
-    throw error
+  return badgeStateRequest
+}
+
+export const fetchUnreadAppBadgeCount = async () => {
+  const state = await fetchAppBadgeState()
+  return state.total
+}
+
+export const refreshAppBadgeState = async (
+  fallbackState: AppBadgeState = EMPTY_APP_BADGE_STATE
+) => {
+  let state: AppBadgeState
+  try {
+    state = await fetchAppBadgeState()
+  } catch {
+    state = normalizeBadgeState(fallbackState)
   }
 
-  const state = data && typeof data === 'object'
-    ? data as Partial<AppBadgeState>
-    : EMPTY_BADGE_STATE
-  return normalizeBadgeCount(Number(state.total ?? 0))
+  publishBadgeState(state)
+  await updateAppBadge(state.total)
+  return state
 }
 
 export const refreshAppBadge = async (fallbackCount = 0) => {
-  try {
-    const count = await fetchUnreadAppBadgeCount()
-    await updateAppBadge(count)
-    return count
-  } catch {
-    await updateAppBadge(fallbackCount)
-    return normalizeBadgeCount(fallbackCount)
+  const fallback = {
+    ...EMPTY_APP_BADGE_STATE,
+    total: normalizeBadgeCount(fallbackCount),
   }
+  const state = await refreshAppBadgeState(fallback)
+  return state.total
 }
 
 export const requestAppBadgeRefresh = () => {

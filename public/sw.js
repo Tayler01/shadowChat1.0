@@ -122,6 +122,22 @@ const notificationMatchesClearRequest = (notification, request) => {
     return false
   }
 
+  if (request.eventId && data.eventId !== request.eventId) {
+    return false
+  }
+
+  if (request.imageId && data.imageId !== request.imageId) {
+    return false
+  }
+
+  if (request.commentId && data.commentId !== request.commentId) {
+    return false
+  }
+
+  if (request.matchId && data.matchId !== request.matchId) {
+    return false
+  }
+
   return true
 }
 
@@ -171,16 +187,24 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil((async () => {
     const data = payload.data || payload
-    if (data.type === 'presence_active') {
-      const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-      const hasVisibleAppClient = clients.some((client) => {
-        try {
-          return client.visibilityState === 'visible' && new URL(client.url).origin === self.location.origin
-        } catch {
-          return false
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const visibleAppClients = clients.filter((client) => {
+      try {
+        return client.visibilityState === 'visible' && new URL(client.url).origin === self.location.origin
+      } catch {
+        return false
+      }
+    })
+    if (visibleAppClients.length > 0) {
+      visibleAppClients.forEach((client) => {
+        if ('postMessage' in client) {
+          client.postMessage({
+            type: 'SHADOWCHAT_FOREGROUND_PUSH_SUPPRESSED',
+            data,
+          })
         }
       })
-      if (hasVisibleAppClient) return
+      return
     }
 
     const title = payload.title || 'Shadow Chat'
@@ -223,6 +247,21 @@ self.addEventListener('notificationclick', (event) => {
       : '/?view=chat'
   } else if (data.type === 'presence_active') {
     targetUrl = '/?view=active-users'
+  } else if (
+    (data.type === 'shadow_pin_post' ||
+      data.type === 'shadow_pin_comment' ||
+      data.type === 'shadow_pin_reply') &&
+    data.imageId
+  ) {
+    targetUrl = `/?view=pins&pin=${encodeURIComponent(data.imageId)}`
+    if (data.type !== 'shadow_pin_post') {
+      targetUrl += '&panel=comments'
+      if (data.commentId) {
+        targetUrl += `&comment=${encodeURIComponent(data.commentId)}`
+      }
+    }
+  } else if (data.type === 'shadow_checkers_turn' && data.matchId) {
+    targetUrl = `/?view=games&experience=shadow-checkers&item=${encodeURIComponent(data.matchId)}`
   }
   const targetHref = new URL(targetUrl, self.location.origin).href
 

@@ -1,9 +1,10 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { ShadowCheckersScreen } from '../src/features/games/shadow-checkers/ShadowCheckersScreen'
 import { createInitialBoard, serializeBoard } from '../src/features/games/shadow-checkers/engine/checkers'
 import type { BasicUser, ShadowCheckersMatch } from '../src/lib/supabase'
 
 const mockUseShadowCheckers = jest.fn()
+const mockSelectMatch = jest.fn()
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
@@ -22,7 +23,10 @@ jest.mock('../src/hooks/useAdminAccess', () => ({
 }))
 
 jest.mock('../src/features/games/shadow-checkers/hooks/useShadowCheckers', () => ({
-  useShadowCheckers: () => mockUseShadowCheckers(),
+  useShadowCheckers: (
+    initialMatchId?: string,
+    onAutoSelectMatch?: (matchId: string, routeMode: 'push' | 'replace') => void,
+  ) => mockUseShadowCheckers(initialMatchId, onAutoSelectMatch),
 }))
 
 const playerOne = {
@@ -75,6 +79,8 @@ const activeMatch: ShadowCheckersMatch = {
 }
 
 beforeEach(() => {
+  mockSelectMatch.mockReset()
+  mockUseShadowCheckers.mockReset()
   mockUseShadowCheckers.mockReturnValue({
     sessions: [],
     matches: [activeMatch],
@@ -107,7 +113,7 @@ beforeEach(() => {
       rematch: jest.fn(),
       nextChallenger: jest.fn(),
       postChat: jest.fn(),
-      selectMatch: jest.fn(),
+      selectMatch: mockSelectMatch,
     },
   })
 })
@@ -123,4 +129,31 @@ test('prioritizes Shadow Checkers match chat during Android keyboard compression
   expect(document.querySelectorAll('.shadow-checkers-keyboard-collapse')).toHaveLength(3)
   expect(document.querySelector('.shadow-checkers-match-surface')).toBeInTheDocument()
   expect(document.querySelector('.shadow-checkers-match-chat-wrap')).toBeInTheDocument()
+})
+
+test('opens an exact routed match and closes back to the Checkers lobby route', () => {
+  const onMatchRoute = jest.fn()
+  render(<ShadowCheckersScreen initialMatchId="match-1" onMatchRoute={onMatchRoute} />)
+
+  expect(mockUseShadowCheckers).toHaveBeenCalledWith('match-1', expect.any(Function))
+
+  fireEvent.click(screen.getByRole('button', { name: /back to shadow checkers lobby/i }))
+  expect(mockSelectMatch).toHaveBeenCalledWith(null)
+  expect(onMatchRoute).toHaveBeenCalledWith('close-item', undefined)
+})
+
+test('auto-selected matches push from the lobby and replace an existing match route without duplicates', () => {
+  const onMatchRoute = jest.fn()
+  render(<ShadowCheckersScreen initialMatchId="match-1" onMatchRoute={onMatchRoute} />)
+
+  const onAutoSelectMatch = mockUseShadowCheckers.mock.calls[0]?.[1] as (
+    matchId: string,
+    routeMode: 'push' | 'replace',
+  ) => void
+
+  onAutoSelectMatch('match-1', 'push')
+  onAutoSelectMatch('match-2', 'replace')
+
+  expect(onMatchRoute).toHaveBeenCalledTimes(1)
+  expect(onMatchRoute).toHaveBeenCalledWith('replace-item', 'match-2')
 })

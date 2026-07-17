@@ -419,7 +419,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   } = usePushNotifications({ enabled: shouldLoadPushSettings })
 
   const updateBadgePreference = async (
-    key: 'badge_dm_enabled' | 'badge_group_enabled' | 'badge_interactions_enabled' | 'badge_connections_enabled' | 'badge_shadow_pin_enabled',
+    key: 'badge_dm_enabled' | 'badge_group_enabled' | 'badge_interactions_enabled' | 'badge_connections_enabled' | 'badge_shadow_pin_enabled' | 'badge_games_enabled',
     enabled: boolean
   ) => {
     await updatePreference(key, enabled)
@@ -456,87 +456,117 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       adminUser.email?.toLowerCase().includes(normalizedSearch)
     ))
   }, [adminAccessUsers, adminUserSearch])
-  const notificationPreferenceSettings = useMemo(
+  const notificationPreferenceGroups = useMemo(
     () => (
       preferences
         ? [
             {
-              label: 'Direct Messages',
-              description: 'Notify when you get a new direct message.',
-              enabled: preferences.dm_enabled,
-              onChange: (enabled: boolean) => updatePreference('dm_enabled', enabled),
+              title: 'Messages',
+              description: 'Direct conversations and General Chat activity.',
+              settings: [
+                {
+                  label: 'Direct Messages',
+                  description: 'Notify when you get a new direct message.',
+                  enabled: preferences.dm_enabled,
+                  onChange: (enabled: boolean) => updatePreference('dm_enabled', enabled),
+                },
+                {
+                  label: 'Group Chat',
+                  description: 'Notify for every General Chat message, not only targeted activity.',
+                  enabled: preferences.group_enabled,
+                  onChange: (enabled: boolean) => updatePreference('group_enabled', enabled),
+                },
+                {
+                  label: 'Mentions',
+                  description: 'Notify when someone @mentions you in General Chat.',
+                  enabled: preferences.mention_enabled,
+                  onChange: (enabled: boolean) => updatePreference('mention_enabled', enabled),
+                },
+                {
+                  label: 'Replies',
+                  description: 'Notify when someone replies to your General Chat message.',
+                  enabled: preferences.reply_enabled,
+                  onChange: (enabled: boolean) => updatePreference('reply_enabled', enabled),
+                },
+                {
+                  label: 'Reactions',
+                  description: 'Notify when someone reacts to your General Chat or DM messages.',
+                  enabled: preferences.reaction_enabled,
+                  onChange: (enabled: boolean) => updatePreference('reaction_enabled', enabled),
+                },
+                {
+                  label: 'Hype',
+                  description: 'Notify when the room starts celebrating.',
+                  enabled: preferences.hype_enabled,
+                  onChange: (enabled: boolean) => updatePreference('hype_enabled', enabled),
+                },
+              ],
             },
             {
-              label: 'Mentions',
-              description: 'Notify when someone @mentions you in General Chat.',
-              enabled: preferences.mention_enabled,
-              onChange: (enabled: boolean) => updatePreference('mention_enabled', enabled),
+              title: 'ShadowPin & Connections',
+              description: 'New posts, conversations on your pins, and connection activity.',
+              settings: [
+                {
+                  label: 'New ShadowPin Posts',
+                  description: 'Notify when another member publishes a new pin.',
+                  enabled: preferences.shadow_pin_new_post_enabled,
+                  onChange: (enabled: boolean) => updatePreference('shadow_pin_new_post_enabled', enabled),
+                },
+                {
+                  label: 'ShadowPin Comments',
+                  description: 'Notify when someone comments on one of your pins.',
+                  enabled: preferences.shadow_pin_comment_enabled,
+                  onChange: (enabled: boolean) => updatePreference('shadow_pin_comment_enabled', enabled),
+                },
+                {
+                  label: 'ShadowPin Replies',
+                  description: 'Notify when someone replies to your ShadowPin comment.',
+                  enabled: preferences.shadow_pin_reply_enabled,
+                  onChange: (enabled: boolean) => updatePreference('shadow_pin_reply_enabled', enabled),
+                },
+                {
+                  label: 'Connections',
+                  description: 'Notify when someone sends or accepts a connection request.',
+                  enabled: preferences.connection_notifications_enabled,
+                  onChange: (enabled: boolean) => updatePreference('connection_notifications_enabled', enabled),
+                },
+              ],
             },
             {
-              label: 'Replies',
-              description: 'Notify when someone replies to your General Chat message.',
-              enabled: preferences.reply_enabled,
-              onChange: (enabled: boolean) => updatePreference('reply_enabled', enabled),
+              title: 'Live & Play',
+              description: 'Rooms and turns that are ready for you.',
+              settings: [
+                ...(SHADO_LIVE_REAL_ENABLED ? [{
+                  label: 'Shado Live',
+                  description: 'Notify for eligible room starts, stage changes, and room endings.',
+                  enabled: preferences.shado_live_in_app_enabled,
+                  onChange: (enabled: boolean) => updatePreference('shado_live_in_app_enabled', enabled),
+                }] : []),
+                {
+                  label: 'Shadow Checkers Turns',
+                  description: 'Notify when an active match is waiting for your move.',
+                  enabled: preferences.checkers_turn_enabled,
+                  onChange: (enabled: boolean) => updatePreference('checkers_turn_enabled', enabled),
+                },
+              ],
             },
             {
-              label: 'Reactions',
-              description: 'Notify when someone reacts to your General Chat or DM messages.',
-              enabled: preferences.reaction_enabled,
-              onChange: (enabled: boolean) => updatePreference('reaction_enabled', enabled),
-            },
-            {
-              label: 'Group Chat',
-              description: 'Notify for every General Chat message, not only targeted activity.',
-              enabled: preferences.group_enabled,
-              onChange: (enabled: boolean) => updatePreference('group_enabled', enabled),
-            },
-            {
-              label: 'Hype',
-              description: 'Notify when the room starts celebrating.',
-              enabled: preferences.hype_enabled,
-              onChange: (enabled: boolean) => updatePreference('hype_enabled', enabled),
-            },
-            {
-              label: 'New ShadowPin Posts',
-              description: 'Notify when another member publishes a new pin.',
-              enabled: preferences.shadow_pin_new_post_enabled,
-              onChange: (enabled: boolean) => updatePreference('shadow_pin_new_post_enabled', enabled),
-            },
-            {
-              label: 'ShadowPin Comments',
-              description: 'Notify when someone comments on one of your pins.',
-              enabled: preferences.shadow_pin_comment_enabled,
-              onChange: (enabled: boolean) => updatePreference('shadow_pin_comment_enabled', enabled),
-            },
-            {
-              label: 'ShadowPin Replies',
-              description: 'Notify when someone replies to your ShadowPin comment.',
-              enabled: preferences.shadow_pin_reply_enabled,
-              onChange: (enabled: boolean) => updatePreference('shadow_pin_reply_enabled', enabled),
-            },
-            {
-              label: 'Connections (in-app)',
-              description: 'Show an in-app banner when someone sends or accepts a connection request.',
-              enabled: preferences.connection_notifications_enabled,
-              onChange: (enabled: boolean) => updatePreference('connection_notifications_enabled', enabled),
-            },
-            ...(SHADO_LIVE_REAL_ENABLED ? [{
-              label: 'Shado Live (in-app)',
-              description: 'Show an in-app banner for eligible Shado Live room starts, stage changes, and room endings.',
-              enabled: preferences.shado_live_in_app_enabled,
-              onChange: (enabled: boolean) => updatePreference('shado_live_in_app_enabled', enabled),
-            }] : []),
-            {
-              label: 'Active Users (in-app)',
-              description: 'Show an in-app banner when an eligible member becomes active.',
-              enabled: preferences.presence_in_app_enabled,
-              onChange: (enabled: boolean) => updatePreference('presence_in_app_enabled', enabled),
-            },
-            {
-              label: 'Active Users (push)',
-              description: 'Send a phone notification when an eligible member becomes active while this app is in the background.',
-              enabled: preferences.presence_push_enabled,
-              onChange: (enabled: boolean) => updatePreference('presence_push_enabled', enabled),
+              title: 'Active Users',
+              description: 'Choose how presence alerts reach you.',
+              settings: [
+                {
+                  label: 'In-app alerts',
+                  description: 'Show a banner while ShadowChat is in the foreground.',
+                  enabled: preferences.presence_in_app_enabled,
+                  onChange: (enabled: boolean) => updatePreference('presence_in_app_enabled', enabled),
+                },
+                {
+                  label: 'Phone alerts',
+                  description: 'Send a push while ShadowChat is in the background or closed.',
+                  enabled: preferences.presence_push_enabled,
+                  onChange: (enabled: boolean) => updatePreference('presence_push_enabled', enabled),
+                },
+              ],
             },
           ]
         : []
@@ -757,76 +787,69 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const renderNotificationsAudio = () => (
     <div className="space-y-5">
-      <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-        <div className="glass-panel rounded-[var(--radius-lg)] p-5">
-          <div className="mb-4 flex items-center gap-3">
-            <Bell className="h-5 w-5 text-[var(--text-muted)]" />
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Notifications</h2>
-          </div>
-          <div className="space-y-4">
-            <ToggleRow
-              label="Push Notifications"
-              description="Turn notifications on for this browser or installed app."
-              enabled={devicePushEnabled}
-              onChange={handlePushToggle}
-            />
-            <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm">
-              <p className="text-[var(--text-primary)]">
-                Status: {pushLoading ? 'Checking this device...' : devicePushEnabled ? 'Enabled on this device' : 'Not enabled on this device'}
-              </p>
-              <p className="mt-1 text-[var(--text-muted)]">Permission: {permission === 'unsupported' ? 'Unsupported' : permission}</p>
-              {supportReason && (!supported || !canPrompt) && (
-                <p className="mt-2 text-[var(--gold-4)]">{supportReason}</p>
-              )}
-              {pushError && <p className="mt-2 text-red-200/90">{pushError}</p>}
-              <div className="mt-4">
-                <Button onClick={() => setShowNotificationSetup(true)} variant="secondary" size="sm" className="justify-center">
-                  Notification Setup
-                </Button>
-              </div>
-            </div>
+      <div className="glass-panel rounded-[var(--radius-lg)] p-4 sm:p-5">
+        <div className="mb-4 flex items-center gap-3">
+          <Bell className="h-5 w-5 text-[var(--text-muted)]" />
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Delivery on this device</h2>
+            <p className="mt-1 text-sm leading-5 text-[var(--text-muted)]">
+              While you are using ShadowChat, alerts stay in the app. When it is in the background or closed, eligible alerts use phone push - never both for the same event.
+            </p>
           </div>
         </div>
-
-        <div className="glass-panel rounded-[var(--radius-lg)] p-5">
-          <div className="mb-4 flex items-center gap-3">
-            <Volume2 className="h-5 w-5 text-[var(--text-muted)]" />
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Audio</h2>
-          </div>
+        <div className="space-y-4">
           <ToggleRow
-            label="Sound Effects"
-            description="Play sounds for message notifications and app feedback."
-            enabled={sounds}
-            onChange={setSounds}
+            label="Phone Push Notifications"
+            description="Allow background alerts on this browser or installed app."
+            enabled={devicePushEnabled}
+            onChange={handlePushToggle}
           />
-          <div className="mt-3">
-            <ToggleRow
-              label="Hype Sounds"
-              description="Play dedicated bell and message celebration sounds."
-              enabled={hypeSounds}
-              onChange={setHypeSounds}
-            />
+          <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm">
+            <p className="text-[var(--text-primary)]">
+              Status: {pushLoading ? 'Checking this device...' : devicePushEnabled ? 'Enabled on this device' : 'Not enabled on this device'}
+            </p>
+            <p className="mt-1 text-[var(--text-muted)]">Permission: {permission === 'unsupported' ? 'Unsupported' : permission}</p>
+            {supportReason && (!supported || !canPrompt) && (
+              <p className="mt-2 text-[var(--gold-4)]">{supportReason}</p>
+            )}
+            {pushError && <p className="mt-2 text-red-200/90">{pushError}</p>}
+            <div className="mt-4">
+              <Button onClick={() => setShowNotificationSetup(true)} variant="secondary" size="sm" className="justify-center">
+                Notification Setup
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="glass-panel min-w-0 rounded-[var(--radius-lg)] p-4 sm:p-5">
-        <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Notification Types</h2>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {notificationPreferenceSettings.map(setting => (
-            <ToggleRow
-              key={setting.label}
-              label={setting.label}
-              description={setting.description}
-              enabled={setting.enabled}
-              disabled={pushSaving}
-              onChange={setting.onChange}
-            />
-          ))}
+      <div className="space-y-4">
+        <div className="px-1">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">What you hear about</h2>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Every alert type uses the same foreground-or-push delivery rule above.</p>
         </div>
+        {notificationPreferenceGroups.map(group => (
+          <section key={group.title} className="glass-panel min-w-0 rounded-[var(--radius-lg)] p-4 sm:p-5" aria-labelledby={`notification-group-${group.title.replace(/\W+/g, '-').toLowerCase()}`}>
+            <div className="mb-4">
+              <h3 id={`notification-group-${group.title.replace(/\W+/g, '-').toLowerCase()}`} className="font-semibold text-[var(--text-primary)]">{group.title}</h3>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">{group.description}</p>
+            </div>
+            <div className="space-y-3">
+              {group.settings.map(setting => (
+                <ToggleRow
+                  key={setting.label}
+                  label={setting.label}
+                  description={setting.description}
+                  enabled={setting.enabled}
+                  disabled={pushSaving}
+                  onChange={setting.onChange}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
 
         {preferences && (
-          <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4">
+          <div className="glass-panel rounded-[var(--radius-lg)] p-4 sm:p-5">
             <p className="text-sm font-semibold text-[var(--text-primary)]">Who can trigger Active User notifications?</p>
             <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
               A member must have been offline for at least 15 minutes. You can receive at most one alert from the same member per rolling hour.
@@ -903,6 +926,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               enabled={preferences.badge_shadow_pin_enabled}
               disabled={pushSaving}
               onChange={enabled => updateBadgePreference('badge_shadow_pin_enabled', enabled)}
+            />
+            <ToggleRow
+              label="Games"
+              description="Count active Shadow Checkers matches waiting for your move."
+              enabled={preferences.badge_games_enabled}
+              disabled={pushSaving}
+              onChange={enabled => updateBadgePreference('badge_games_enabled', enabled)}
             />
           </div>
         </div>
@@ -991,6 +1021,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       )}
+
+      <div className="glass-panel rounded-[var(--radius-lg)] p-4 sm:p-5">
+        <div className="mb-4 flex items-center gap-3">
+          <Volume2 className="h-5 w-5 text-[var(--text-muted)]" />
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">Sounds</h2>
+        </div>
+        <div className="space-y-3">
+          <ToggleRow
+            label="Sound Effects"
+            description="Play sounds for message notifications and app feedback."
+            enabled={sounds}
+            onChange={setSounds}
+          />
+          <ToggleRow
+            label="Hype Sounds"
+            description="Play dedicated bell and message celebration sounds."
+            enabled={hypeSounds}
+            onChange={setHypeSounds}
+          />
+        </div>
+      </div>
     </div>
   )
 

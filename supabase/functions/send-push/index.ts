@@ -22,7 +22,10 @@ import {
   getBearerToken,
   waitForEdgeRequestClaim,
 } from '../_shared/edge-guard.ts'
-import { embedPublicProfile } from '../_shared/public-profile.ts'
+import {
+  embedPublicProfile,
+  PUBLIC_PROFILE_SELECT,
+} from '../_shared/public-profile.ts'
 import {
   extractMentionUsernames,
   getNotificationSuppressionReason,
@@ -43,10 +46,13 @@ type PushEventType =
   | 'shadow_pin_post'
   | 'shadow_pin_comment'
   | 'presence_active'
+  | 'shadow_checkers_turn'
+  | 'notification_delivery_recovery'
 
 type SendPushRequestBody = {
   type?: PushEventType
   messageId?: string
+  matchId?: string
   eventId?: string
   activationId?: string
   emoji?: string
@@ -70,6 +76,8 @@ type NotificationPrefs = {
   shadow_pin_reply_enabled?: boolean
   presence_push_enabled?: boolean
   presence_in_app_enabled?: boolean
+  checkers_turn_enabled?: boolean
+  connection_notifications_enabled?: boolean
   general_chat_muted: boolean
   quiet_hours_start: string | null
   quiet_hours_end: string | null
@@ -102,6 +110,42 @@ type PresenceRecipientClaim = {
 type NotificationEventRow = {
   id: string
   sent_at: string | null
+}
+
+type PushDeliveryResult = {
+  deliveredCount: number
+  removedSubscriptions: number
+  attemptedCount: number
+  retryableFailures: number
+}
+
+type ShadowCheckersMatchRecord = {
+  id: string
+  session_id: string
+  status: string
+  player_one_id: string
+  player_two_id: string | null
+  current_turn_user_id: string | null
+  move_count: number
+}
+
+type NotificationDeliveryJobClaim = {
+  job_id: string
+  notification_event_id: string
+  user_id: string
+  event_type: string
+  entity_id: string
+  actor_id: string | null
+  route: string | null
+  payload: Record<string, unknown> | null
+  expires_at: string
+}
+
+type PublicActorProfile = {
+  id: string
+  username: string | null
+  display_name: string | null
+  [key: string]: unknown
 }
 const DEFAULT_PUSH_REQUESTS_PER_MINUTE = 120
 const PUSH_CLAIM_SCOPE = 'send-push'
@@ -249,6 +293,8 @@ const NOTIFICATION_PREFERENCE_SELECT = [
   'shadow_pin_reply_enabled',
   'presence_push_enabled',
   'presence_in_app_enabled',
+  'checkers_turn_enabled',
+  'connection_notifications_enabled',
   'general_chat_muted',
   'quiet_hours_start',
   'quiet_hours_end',
@@ -275,17 +321,20 @@ const authenticateRequest = async (req: Request, body: SendPushRequestBody) => {
   }
 
   if (serviceRoleKey && token === serviceRoleKey) {
+    if (body?.type === 'notification_delivery_recovery') {
+      return { userId: 'service_role', isServiceRole: true }
+    }
     const senderUserId = typeof body?.senderUserId === 'string' ? body.senderUserId : ''
     if (!senderUserId) {
       return { error: unauthorized('senderUserId is required for service-role push dispatch') }
     }
 
-    return { userId: senderUserId }
+    return { userId: senderUserId, isServiceRole: true }
   }
 
   try {
     const user = await authenticateEdgeUser(req)
-    return { userId: user.id }
+    return { userId: user.id, isServiceRole: false }
   } catch (error) {
     if (error instanceof EdgeAuthenticationError) {
       return { error: unauthorized(error.message) }
@@ -368,6 +417,15 @@ const getVapidKeys = (): VapidKeys => {
   }
 }
 
+const hasActiveForegroundLease = (
+  subscription: Pick<StoredSubscription, 'foreground_until'>,
+  now = Date.now()
+) => {
+  if (!subscription.foreground_until) return false
+  const foregroundUntil = new Date(subscription.foreground_until).getTime()
+  return Number.isFinite(foregroundUntil) && foregroundUntil > now
+}
+
 const getActiveSubscriptions = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   userId: string
@@ -382,7 +440,9 @@ const getActiveSubscriptions = async (
     throw error
   }
 
-  return (data ?? []) as StoredSubscription[]
+  const now = Date.now()
+  return ((data ?? []) as StoredSubscription[])
+    .filter(subscription => !hasActiveForegroundLease(subscription, now))
 }
 
 const getNotificationPreferences = async (
@@ -447,7 +507,7 @@ const getUnreadBadgeCount = async (
   supabase: ReturnType<typeof getSupabaseAdmin>,
   userId: string
 ) => {
-  const { data, error } = await supabase.rpc('get_app_badge_state', {
+  const { data, error } = await supabase.rpc('get_app_badge_state_v2', {
     target_user_id: userId,
   })
 
@@ -511,8 +571,8 @@ const deliverPushToSubscriptions = async (
   vapid: VapidKeys,
   subscriptions: StoredSubscription[],
   message: PushMessage,
-  options: { retryAttempts?: number } = {}
-) => {
+  options: { retryAttempts?: number; notificationEventId?: string } = {}
+): Promise<PushDeliveryResult> => {
   const results = await Promise.all(
     subscriptions.map(async (subscriptionRow) => {
       const subscription: PushSubscription = {
@@ -578,6 +638,34 @@ const deliverPushToSubscriptions = async (
     .filter((result) => result.invalid)
     .map((result) => result.id)
 
+  if (options.notificationEventId && results.length > 0) {
+    const { error: attemptError } = await supabase
+      .from('notification_delivery_attempts')
+      .insert(results.map(result => ({
+        notification_event_id: options.notificationEventId,
+        subscription_id: result.id,
+        response_status: result.status,
+        delivered: result.ok,
+        retryable: result.retryable,
+        error_message: 'error' in result ? result.error : null,
+      })))
+
+    if (attemptError) {
+      console.error('Failed to record push delivery attempts', attemptError)
+    }
+
+    await supabase
+      .from('notification_delivery_jobs')
+      .update({
+        last_attempt_at: new Date().toISOString(),
+        last_error: results.some(result => result.ok)
+          ? null
+          : results.find(result => 'error' in result)?.error || 'Push provider rejected delivery',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('notification_event_id', options.notificationEventId)
+  }
+
   if (invalidSubscriptionIds.length) {
     await supabase.from('push_subscriptions').delete().in('id', invalidSubscriptionIds)
   }
@@ -592,12 +680,15 @@ const deliverPushToSubscriptions = async (
     const retrySubscriptions = subscriptions.filter(subscription =>
       retryableSubscriptionIds.has(subscription.id)
     )
-    const retryDelivery = await deliverPushToSubscriptions(
+    const retryDelivery: PushDeliveryResult = await deliverPushToSubscriptions(
       supabase,
       vapid,
       retrySubscriptions,
       message,
-      { retryAttempts: retryAttempts - 1 }
+      {
+        retryAttempts: retryAttempts - 1,
+        notificationEventId: options.notificationEventId,
+      }
     )
 
     return {
@@ -712,6 +803,7 @@ const sendDmPush = async (
         body: preview,
         route,
         sender_id: authUserId,
+        actor: sender,
       },
     }, dedupeKey)
 
@@ -747,7 +839,13 @@ const sendDmPush = async (
           },
         }
 
-        delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+        delivery = await deliverPushToSubscriptions(
+          supabase,
+          vapid,
+          subscriptions,
+          pushMessage,
+          { notificationEventId: eventRecord.id }
+        )
 
         if (Number(delivery.deliveredCount ?? 0) > 0) {
           await supabase
@@ -793,6 +891,7 @@ const sendDmPush = async (
       body: `Sent DM: ${preview}`,
       route,
       sender_id: authUserId,
+      actor: sender,
       origin: 'bridge',
       bridge_device_id: bridgeDeviceId,
     },
@@ -844,7 +943,8 @@ const sendDmPush = async (
     supabase,
     vapid,
     senderSubscriptions,
-    bridgeSenderPushMessage
+    bridgeSenderPushMessage,
+    { notificationEventId: bridgeSenderEvent.id }
   )
 
   if (bridgeSenderDelivery.deliveredCount > 0) {
@@ -992,12 +1092,13 @@ const sendReactionPush = async (
 
   const { data: actor, error: actorError } = await supabase
     .from('users')
-    .select('username, display_name')
+    .select(PUBLIC_PROFILE_SELECT)
     .eq('id', authUserId)
     .maybeSingle()
   if (actorError) throw actorError
 
-  const actorLabel = getActorLabel(actor)
+  const actorProfile = actor as unknown as PublicActorProfile | null
+  const actorLabel = getActorLabel(actorProfile)
   const preview = getMessagePreview(reactionTarget)
   const title = `${actorLabel} reacted ${reaction.emoji}`
   const body = `To your ${isDm ? 'direct ' : ''}message: ${preview}`
@@ -1018,6 +1119,7 @@ const sendReactionPush = async (
       body,
       route,
       sender_id: authUserId,
+      actor: actorProfile,
       emoji: reaction.emoji,
       is_dm: isDm,
     },
@@ -1059,7 +1161,13 @@ const sendReactionPush = async (
     },
   }
 
-  const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+  const delivery = await deliverPushToSubscriptions(
+    supabase,
+    vapid,
+    subscriptions,
+    pushMessage,
+    { notificationEventId: eventRecord.id }
+  )
   if (delivery.deliveredCount > 0) {
     await supabase
       .from('notification_events')
@@ -1182,6 +1290,7 @@ const sendGroupPush = async (
             body,
             route,
             sender_id: authUserId,
+            actor: sender,
             notification_kind: kind,
             thread_id: threadId,
             origin: isBridgeSenderRecipient ? 'bridge' : undefined,
@@ -1244,7 +1353,13 @@ const sendGroupPush = async (
         },
       }
 
-      const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+      const delivery = await deliverPushToSubscriptions(
+        supabase,
+        vapid,
+        subscriptions,
+        pushMessage,
+        { notificationEventId: eventRecord.id }
+      )
 
       if (delivery.deliveredCount > 0) {
         await supabase
@@ -1414,7 +1529,13 @@ const sendShadowPinPostPush = async (
       },
     }
 
-    const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+    const delivery = await deliverPushToSubscriptions(
+      supabase,
+      vapid,
+      subscriptions,
+      pushMessage,
+      { notificationEventId: eventRecord.id }
+    )
     if (delivery.deliveredCount > 0) {
       await supabase
         .from('notification_events')
@@ -1539,26 +1660,32 @@ const sendShadowPinCommentPush = async (
     return json({ skipped: true, reason: 'No active push subscriptions' })
   }
 
-  const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, {
-    data: JSON.stringify({
-      title,
-      body,
-      tag: `${notificationType}:${comment.id}`,
-      badgeCount,
-      unreadCount: badgeCount,
-      data: {
-        url: route,
-        route,
-        type: notificationType,
-        imageId: comment.image_id,
-        commentId: comment.id,
-        senderId: authUserId,
+  const delivery = await deliverPushToSubscriptions(
+    supabase,
+    vapid,
+    subscriptions,
+    {
+      data: JSON.stringify({
+        title,
+        body,
+        tag: `${notificationType}:${comment.id}`,
         badgeCount,
         unreadCount: badgeCount,
-      },
-    }),
-    options: { ttl: 900, urgency: 'normal' },
-  })
+        data: {
+          url: route,
+          route,
+          type: notificationType,
+          imageId: comment.image_id,
+          commentId: comment.id,
+          senderId: authUserId,
+          badgeCount,
+          unreadCount: badgeCount,
+        },
+      }),
+      options: { ttl: 900, urgency: 'normal' },
+    },
+    { notificationEventId: eventRecord.id }
+  )
   if (delivery.deliveredCount > 0) {
     await supabase
       .from('notification_events')
@@ -1606,6 +1733,13 @@ const sendHypePush = async (
   const route = hypeEvent.message_id
     ? `/?view=chat&message=${hypeEvent.message_id}`
     : '/?view=chat'
+  const { data: actor, error: actorError } = await supabase
+    .from('users')
+    .select(PUBLIC_PROFILE_SELECT)
+    .eq('id', authUserId)
+    .maybeSingle()
+  if (actorError) throw actorError
+  const actorProfile = actor as unknown as PublicActorProfile | null
 
   const { data: recipientPreferences, error: prefsError } = await supabase
     .from('notification_preferences')
@@ -1649,11 +1783,13 @@ const sendHypePush = async (
           user_id: prefs.user_id,
           type: 'hype_event',
           entity_id: hypeEvent.id,
+          message_id: hypeEvent.message_id,
           payload: {
             title,
             body,
             route,
             sender_id: authUserId,
+            actor: actorProfile,
             event_id: hypeEvent.id,
             event_type: hypeEvent.event_type,
             stack_bucket: stackBucket,
@@ -1714,7 +1850,13 @@ const sendHypePush = async (
         },
       }
 
-      const delivery = await deliverPushToSubscriptions(supabase, vapid, subscriptions, pushMessage)
+      const delivery = await deliverPushToSubscriptions(
+        supabase,
+        vapid,
+        subscriptions,
+        pushMessage,
+        { notificationEventId: eventRecord.id }
+      )
 
       if (delivery.deliveredCount > 0) {
         await supabase
@@ -1752,13 +1894,335 @@ const sendHypePush = async (
   }, retryableFailures > 0 ? 503 : 200)
 }
 
-const hasActiveForegroundLease = (
-  subscription: Pick<StoredSubscription, 'foreground_until'>,
-  now = Date.now()
+const sendShadowCheckersTurnPush = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  vapid: VapidKeys,
+  authUserId: string,
+  matchId: string,
+  expectedMoveCount: number
 ) => {
-  if (!subscription.foreground_until) return false
-  const foregroundUntil = new Date(subscription.foreground_until).getTime()
-  return Number.isFinite(foregroundUntil) && foregroundUntil > now
+  const { data: matchData, error: matchError } = await supabase
+    .from('shadow_checkers_matches')
+    .select(
+      'id, session_id, status, player_one_id, player_two_id, current_turn_user_id, move_count'
+    )
+    .eq('id', matchId)
+    .maybeSingle()
+
+  if (matchError) throw matchError
+  if (!matchData) return json({ error: 'Shadow Checkers match not found' }, 404)
+
+  const match = matchData as ShadowCheckersMatchRecord
+  if (match.status !== 'active' || !match.current_turn_user_id || !match.player_two_id) {
+    return json({ skipped: true, reason: 'Shadow Checkers match is not awaiting a turn' })
+  }
+  if (match.move_count !== expectedMoveCount) {
+    return json({ skipped: true, reason: 'Shadow Checkers turn has already advanced' })
+  }
+
+  if (authUserId !== match.player_one_id && authUserId !== match.player_two_id) {
+    return unauthorized('Only match participants can send Shadow Checkers turn notifications')
+  }
+  if (authUserId === match.current_turn_user_id) {
+    return unauthorized('Only the opponent who completed the prior move can send this notification')
+  }
+
+  const recipientId = match.current_turn_user_id
+  const preferences = await getNotificationPreferences(supabase, recipientId)
+  const suppressionReason = getDeliverySuppressionReason(preferences)
+  if (!preferences?.checkers_turn_enabled || suppressionReason) {
+    return json({
+      skipped: true,
+      reason: !preferences?.checkers_turn_enabled
+        ? 'Recipient disabled Shadow Checkers turn notifications'
+        : suppressionReason,
+    })
+  }
+
+  const { data: eventRecord, error: eventError } = await supabase
+    .from('notification_events')
+    .select('id, sent_at')
+    .eq('user_id', recipientId)
+    .eq('type', 'shadow_checkers_turn')
+    .eq('entity_id', match.id)
+    .eq(
+      'dedupe_key',
+      `shadow_checkers_turn:${match.id}:${expectedMoveCount}:${recipientId}`
+    )
+    .is('read_at', null)
+    .is('resolved_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (eventError) throw eventError
+  if (!eventRecord) {
+    return json({ skipped: true, reason: 'No current Shadow Checkers turn event exists' })
+  }
+  if (eventRecord.sent_at) {
+    return json({ skipped: true, reason: 'Shadow Checkers turn notification already sent' })
+  }
+
+  const title = 'Your turn in Shadow Checkers'
+  const body = 'It is your turn. Open the match to make your play.'
+  const route = `/?view=games&experience=shadow-checkers&item=${encodeURIComponent(match.id)}`
+  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
+  const subscriptions = await getActiveSubscriptions(supabase, recipientId)
+  if (!subscriptions.length) {
+    return json({
+      skipped: true,
+      reason: 'Recipient has no background push subscriptions',
+    })
+  }
+
+  const delivery = await deliverPushToSubscriptions(
+    supabase,
+    vapid,
+    subscriptions,
+    {
+      data: JSON.stringify({
+        title,
+        body,
+        tag: `shadow-checkers-turn:${match.id}:${match.move_count}`,
+        badgeCount,
+        unreadCount: badgeCount,
+        data: {
+          url: route,
+          route,
+          type: 'shadow_checkers_turn',
+          eventId: eventRecord.id,
+          matchId: match.id,
+          sessionId: match.session_id,
+          moveCount: match.move_count,
+          senderId: authUserId,
+          badgeCount,
+          unreadCount: badgeCount,
+        },
+      }),
+      options: { ttl: 90, urgency: 'normal' },
+    },
+    { notificationEventId: eventRecord.id }
+  )
+
+  if (delivery.deliveredCount > 0) {
+    await supabase
+      .from('notification_events')
+      .update({ sent_at: new Date().toISOString() })
+      .eq('id', eventRecord.id)
+      .is('sent_at', null)
+  }
+
+  return deliveryResponse(delivery)
+}
+
+const isRecoveryEventPreferenceEnabled = (
+  preferences: NotificationPrefs | null,
+  eventType: string
+) => {
+  if (!preferences?.notifications_enabled) return false
+  if (eventType === 'dm_message') return preferences.dm_enabled !== false
+  if (eventType === 'group_message') return preferences.group_enabled === true
+  if (eventType === 'mention') return preferences.mention_enabled !== false
+  if (eventType === 'reply') return preferences.reply_enabled !== false
+  if (eventType === 'reaction') return preferences.reaction_enabled === true
+  if (eventType === 'hype_event') return preferences.hype_enabled === true
+  if (eventType === 'shadow_pin_post') return preferences.shadow_pin_new_post_enabled !== false
+  if (eventType === 'shadow_pin_comment') return preferences.shadow_pin_comment_enabled !== false
+  if (eventType === 'shadow_pin_reply') return preferences.shadow_pin_reply_enabled !== false
+  if (eventType === 'presence_active') return preferences.presence_push_enabled !== false
+  if (eventType === 'shadow_checkers_turn') return preferences.checkers_turn_enabled !== false
+  if (eventType === 'connection_request' || eventType === 'connection_accepted') {
+    return preferences.connection_notifications_enabled !== false
+  }
+  return false
+}
+
+const updateNotificationDeliveryJob = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  jobId: string,
+  values: {
+    status: 'pending' | 'delivered' | 'cancelled' | 'failed'
+    last_error?: string | null
+    retryAfterSeconds?: number
+  }
+) => {
+  const terminal = values.status !== 'pending'
+  const now = new Date()
+  const { error } = await supabase
+    .from('notification_delivery_jobs')
+    .update({
+      status: values.status,
+      available_at: values.retryAfterSeconds
+        ? new Date(now.getTime() + values.retryAfterSeconds * 1000).toISOString()
+        : now.toISOString(),
+      completed_at: terminal ? now.toISOString() : null,
+      last_error: values.last_error ?? null,
+      updated_at: now.toISOString(),
+    })
+    .eq('id', jobId)
+
+  if (error) throw error
+}
+
+const sendNotificationDeliveryRecovery = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  vapid: VapidKeys
+) => {
+  const { data, error } = await supabase.rpc('claim_notification_delivery_jobs', {
+    batch_size: 20,
+  })
+  if (error) throw error
+
+  const jobs = (data ?? []) as unknown as NotificationDeliveryJobClaim[]
+  const results = await Promise.all(jobs.map(async job => {
+    try {
+      const expiresAt = new Date(job.expires_at).getTime()
+      const remainingSeconds = Math.floor((expiresAt - Date.now()) / 1000)
+      if (!Number.isFinite(remainingSeconds) || remainingSeconds <= 0) {
+        await updateNotificationDeliveryJob(supabase, job.job_id, {
+          status: 'cancelled',
+          last_error: 'Notification presentation window expired',
+        })
+        return { delivered: false, retryable: false }
+      }
+
+      const preferences = await getNotificationPreferences(supabase, job.user_id)
+      const generalChatEvent = ['group_message', 'mention', 'reply', 'hype_event']
+        .includes(job.event_type)
+      const suppressionReason = getDeliverySuppressionReason(preferences, {
+        generalChat: generalChatEvent,
+      })
+      if (!isRecoveryEventPreferenceEnabled(preferences, job.event_type) || suppressionReason) {
+        await updateNotificationDeliveryJob(supabase, job.job_id, {
+          status: 'cancelled',
+          last_error: suppressionReason || 'Notification preference disabled',
+        })
+        return { delivered: false, retryable: false }
+      }
+
+      if (
+        job.actor_id &&
+        (await getBlockedCounterpartIds(supabase, job.user_id)).has(job.actor_id)
+      ) {
+        await updateNotificationDeliveryJob(supabase, job.job_id, {
+          status: 'cancelled',
+          last_error: 'Blocked relationship suppresses notification',
+        })
+        return { delivered: false, retryable: false }
+      }
+
+      const payload = job.payload ?? {}
+      if (job.event_type === 'shadow_checkers_turn') {
+        const { data: match, error: matchError } = await supabase
+          .from('shadow_checkers_matches')
+          .select('status, current_turn_user_id, move_count')
+          .eq('id', job.entity_id)
+          .maybeSingle()
+        if (matchError) throw matchError
+
+        const eventMoveCount = Number(payload.move_count)
+        if (
+          !match ||
+          match.status !== 'active' ||
+          match.current_turn_user_id !== job.user_id ||
+          !Number.isInteger(eventMoveCount) ||
+          match.move_count !== eventMoveCount
+        ) {
+          await updateNotificationDeliveryJob(supabase, job.job_id, {
+            status: 'cancelled',
+            last_error: 'Shadow Checkers turn already advanced',
+          })
+          return { delivered: false, retryable: false }
+        }
+      }
+
+      const title = getTextValue(payload.title) || 'Shadow Chat'
+      const body = getTextValue(payload.body)
+      const route = job.route || getTextValue(payload.route) || getTextValue(payload.url) || '/'
+      const subscriptions = await getActiveSubscriptions(supabase, job.user_id)
+      if (!subscriptions.length) {
+        await updateNotificationDeliveryJob(supabase, job.job_id, {
+          status: 'cancelled',
+          last_error: 'No background push subscriptions',
+        })
+        return { delivered: false, retryable: false }
+      }
+
+      const badgeCount = await getUnreadBadgeCount(supabase, job.user_id)
+      const isCheckers = job.event_type === 'shadow_checkers_turn'
+      const eventMoveCount = Number(payload.move_count)
+      const eventData = {
+        url: route,
+        route,
+        type: job.event_type,
+        eventId: job.notification_event_id,
+        entityId: job.entity_id,
+        senderId: job.actor_id,
+        conversationId: getTextValue(payload.conversation_id) || undefined,
+        messageId: getTextValue(payload.message_id) || undefined,
+        imageId: getTextValue(payload.image_id) || undefined,
+        commentId: getTextValue(payload.comment_id) || undefined,
+        matchId: isCheckers ? job.entity_id : undefined,
+        moveCount: isCheckers ? eventMoveCount : undefined,
+        badgeCount,
+        unreadCount: badgeCount,
+      }
+      const tag = isCheckers
+        ? `shadow-checkers-turn:${job.entity_id}:${eventMoveCount}`
+        : `notification:${job.event_type}:${job.entity_id}`
+
+      const delivery = await deliverPushToSubscriptions(
+        supabase,
+        vapid,
+        subscriptions,
+        {
+          data: JSON.stringify({
+            title,
+            body,
+            tag,
+            badgeCount,
+            unreadCount: badgeCount,
+            data: eventData,
+          }),
+          options: {
+            ttl: Math.max(1, Math.min(90, remainingSeconds)),
+            urgency: job.event_type === 'dm_message' ? 'high' : 'normal',
+          },
+        },
+        { notificationEventId: job.notification_event_id }
+      )
+
+      if (delivery.deliveredCount > 0) {
+        const { error: sentError } = await supabase
+          .from('notification_events')
+          .update({ sent_at: new Date().toISOString() })
+          .eq('id', job.notification_event_id)
+          .is('sent_at', null)
+        if (sentError) throw sentError
+        return { delivered: true, retryable: false }
+      }
+
+      const canRetry = delivery.retryableFailures > 0 && remainingSeconds > 20
+      await updateNotificationDeliveryJob(supabase, job.job_id, {
+        status: canRetry ? 'pending' : 'failed',
+        last_error: 'Push provider delivery failed',
+        retryAfterSeconds: canRetry ? 15 : undefined,
+      })
+      return { delivered: false, retryable: canRetry }
+    } catch (jobError) {
+      await updateNotificationDeliveryJob(supabase, job.job_id, {
+        status: 'failed',
+        last_error: jobError instanceof Error ? jobError.message : 'Recovery delivery failed',
+      }).catch(() => undefined)
+      return { delivered: false, retryable: false }
+    }
+  }))
+
+  return json({
+    claimed: jobs.length,
+    delivered: results.filter(result => result.delivered).length,
+    retryable: results.filter(result => result.retryable).length,
+  })
 }
 
 const sendPresenceActivePush = async (
@@ -1842,8 +2306,7 @@ const sendPresenceActivePush = async (
         }
       }
 
-      const subscriptions = (await getActiveSubscriptions(supabase, claim.recipient_id))
-        .filter(subscription => !hasActiveForegroundLease(subscription))
+      const subscriptions = await getActiveSubscriptions(supabase, claim.recipient_id)
       if (!subscriptions.length) {
         return {
           userId: claim.recipient_id,
@@ -1875,7 +2338,10 @@ const sendPresenceActivePush = async (
           }),
           options: { ttl: 300, urgency: 'normal' },
         },
-        { retryAttempts: 1 }
+        {
+          retryAttempts: 1,
+          notificationEventId: claim.event_id,
+        }
       )
 
       if (delivery.deliveredCount > 0) {
@@ -1938,7 +2404,21 @@ serve(async (req): Promise<Response> => {
     }
 
     const type = body?.type as PushEventType | undefined
+    if (type === 'notification_delivery_recovery') {
+      if (!auth.isServiceRole) {
+        return unauthorized('Notification delivery recovery requires service role')
+      }
+      return ensureResponse(
+        await sendNotificationDeliveryRecovery(getSupabaseAdmin(), getVapidKeys())
+      )
+    }
+
     const messageId = typeof body?.messageId === 'string' ? body.messageId : ''
+    const matchId = typeof body?.matchId === 'string'
+      ? body.matchId
+      : type === 'shadow_checkers_turn'
+      ? messageId
+      : ''
     const eventId = typeof body?.eventId === 'string' ? body.eventId : ''
     const activationId = typeof body?.activationId === 'string' ? body.activationId : ''
     const emoji = typeof body?.emoji === 'string' ? body.emoji.trim() : ''
@@ -1946,9 +2426,15 @@ serve(async (req): Promise<Response> => {
     const bridgeDeviceId = typeof body?.bridgeDeviceId === 'string' ? body.bridgeDeviceId : undefined
 
     if (
-      (type !== 'hype_event' && type !== 'presence_active' && !messageId) ||
+      (
+        type !== 'hype_event' &&
+        type !== 'presence_active' &&
+        type !== 'shadow_checkers_turn' &&
+        !messageId
+      ) ||
       (type === 'hype_event' && !eventId) ||
       (type === 'presence_active' && !activationId) ||
+      (type === 'shadow_checkers_turn' && !matchId) ||
       (type === 'reaction' && (!emoji || emoji.length > 32 || typeof body?.isDm !== 'boolean')) ||
       (
         type !== 'dm_message' &&
@@ -1957,13 +2443,31 @@ serve(async (req): Promise<Response> => {
         type !== 'reaction' &&
         type !== 'shadow_pin_post' &&
         type !== 'shadow_pin_comment' &&
-        type !== 'presence_active'
+        type !== 'presence_active' &&
+        type !== 'shadow_checkers_turn'
       )
     ) {
       return json({ error: 'Unsupported notification payload' }, 400)
     }
 
     const supabase = getSupabaseAdmin()
+    const { data: checkersClaimMatch, error: checkersClaimError } =
+      type === 'shadow_checkers_turn'
+        ? await supabase
+            .from('shadow_checkers_matches')
+            .select('move_count')
+            .eq('id', matchId)
+            .maybeSingle()
+        : { data: null, error: null }
+    if (checkersClaimError) throw checkersClaimError
+    if (type === 'shadow_checkers_turn' && !checkersClaimMatch) {
+      return json({ error: 'Shadow Checkers match not found' }, 404)
+    }
+    const moveCount = Number(checkersClaimMatch?.move_count ?? -1)
+    if (type === 'shadow_checkers_turn' && (!Number.isInteger(moveCount) || moveCount < 0)) {
+      return json({ error: 'Shadow Checkers move state is invalid' }, 409)
+    }
+
     const reaction = type === 'reaction'
       ? await getCurrentReaction(supabase, auth.userId, messageId, emoji, body.isDm === true)
       : null
@@ -1975,6 +2479,8 @@ serve(async (req): Promise<Response> => {
       ? eventId
       : type === 'presence_active'
       ? activationId
+      : type === 'shadow_checkers_turn'
+      ? `${matchId}:${moveCount}`
       : reaction?.id || messageId
     const requestKey = `${type}:${entityId}`
     const claim = await claimEdgeRequest(supabase, {
@@ -2042,6 +2548,16 @@ serve(async (req): Promise<Response> => {
       response = ensureResponse(await sendShadowPinCommentPush(supabase, vapid, auth.userId, messageId))
     } else if (type === 'presence_active') {
       response = ensureResponse(await sendPresenceActivePush(supabase, vapid, auth.userId, activationId))
+    } else if (type === 'shadow_checkers_turn') {
+      response = ensureResponse(
+        await sendShadowCheckersTurnPush(
+          supabase,
+          vapid,
+          auth.userId,
+          matchId,
+          moveCount
+        )
+      )
     } else {
       response = ensureResponse(await sendGroupPush(supabase, vapid, auth.userId, messageId, origin, bridgeDeviceId))
     }

@@ -84,10 +84,19 @@ test.each([
   [{ kind: 'dm_message' as const, conversation_id: 'conversation-1', message_id: 'message-2' }, '?view=dms&conversation=conversation-1&message=message-2'],
   [{ kind: 'pin' as const, pin_id: 'pin-1' }, '?view=pins&pin=pin-1'],
   [{ kind: 'pin_comment' as const, pin_id: 'pin-1', comment_id: 'comment-1' }, '?view=pins&pin=pin-1&panel=comments&comment=comment-1'],
+  [{ kind: 'app_route' as const, route: '/?view=games&experience=shadow-checkers&item=match-1' }, '?view=games&experience=shadow-checkers&item=match-1'],
 ])('builds the exact typed source URL for %o', (target, expectedSearch) => {
   const url = buildCatchUpTargetUrl(target, 'https://shadowchat.example/?view=catchup&stale=value')
   expect(url.origin).toBe('https://shadowchat.example')
   expect(url.search).toBe(expectedSearch)
+})
+
+test('does not let a notification source route leave the current origin', () => {
+  const url = buildCatchUpTargetUrl(
+    { kind: 'app_route', route: '//malicious.example/steal' },
+    'https://shadowchat.example/?view=catchup',
+  )
+  expect(url.href).toBe('https://shadowchat.example/')
 })
 
 test('keeps the latest snapshot and scroll position for Back navigation', () => {

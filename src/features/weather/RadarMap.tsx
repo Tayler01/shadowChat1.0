@@ -20,8 +20,8 @@ const formatFrameTime = (unixSeconds: number) => new Date(unixSeconds * 1000).to
 })
 
 const RADAR_OPACITY = 0.68
-const RADAR_FADE_MS = 220
-const RADAR_FRAME_DWELL_MS = 1_000
+const RADAR_FADE_MS = 100
+const RADAR_FRAME_DWELL_MS = 500
 const RADAR_LOAD_TIMEOUT_MS = 7_000
 
 export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
@@ -32,7 +32,10 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
   const pendingRadarLayerRef = useRef<TileLayer | null>(null)
   const radarRequestRef = useRef(0)
   const radarTransitionTimerRef = useRef<number | null>(null)
+  const radarDwellTimerRef = useRef<number | null>(null)
   const radarLoadTimerRef = useRef<number | null>(null)
+  const radarFrameNotBeforeRef = useRef(0)
+  const playingRef = useRef(false)
   const [manifest, setManifest] = useState<WeatherRadarManifest | null>(null)
   const [frameIndex, setFrameIndex] = useState(0)
   const [displayedFrameIndex, setDisplayedFrameIndex] = useState<number | null>(null)
@@ -40,6 +43,7 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [playing, setPlaying] = useState(false)
+  const [pageVisible, setPageVisible] = useState(() => document.visibilityState !== 'hidden')
 
   const frames = useMemo(() => manifest?.frames || [], [manifest?.frames])
   const frame = frames[frameIndex] || null
@@ -51,6 +55,7 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
       const nextManifest = await fetchWeatherRadarManifest()
       setManifest(nextManifest)
       const latestFrameIndex = Math.max(0, nextManifest.frames.length - 1)
+      radarFrameNotBeforeRef.current = 0
       setFrameIndex(latestFrameIndex)
       setDisplayedFrameIndex(null)
       setError(nextManifest.frames.length ? null : 'No radar frames are available right now.')
@@ -63,6 +68,16 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
 
   useEffect(() => {
     void refresh()
+  }, [])
+
+  useEffect(() => {
+    playingRef.current = playing
+  }, [playing])
+
+  useEffect(() => {
+    const syncVisibility = () => setPageVisible(document.visibilityState !== 'hidden')
+    document.addEventListener('visibilitychange', syncVisibility)
+    return () => document.removeEventListener('visibilitychange', syncVisibility)
   }, [])
 
   useEffect(() => {
@@ -94,6 +109,7 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
     return () => {
       radarRequestRef.current += 1
       if (radarTransitionTimerRef.current !== null) window.clearTimeout(radarTransitionTimerRef.current)
+      if (radarDwellTimerRef.current !== null) window.clearTimeout(radarDwellTimerRef.current)
       if (radarLoadTimerRef.current !== null) window.clearTimeout(radarLoadTimerRef.current)
       pendingRadarLayerRef.current = null
       radarLayerRef.current = null
@@ -110,9 +126,40 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
     const map = mapRef.current
     if (!map || !manifest || !frame) return
 
+    if (!pageVisible) {
+      radarRequestRef.current += 1
+      if (radarTransitionTimerRef.current !== null) {
+        window.clearTimeout(radarTransitionTimerRef.current)
+        radarTransitionTimerRef.current = null
+      }
+      if (radarDwellTimerRef.current !== null) {
+        window.clearTimeout(radarDwellTimerRef.current)
+        radarDwellTimerRef.current = null
+      }
+      if (radarLoadTimerRef.current !== null) {
+        window.clearTimeout(radarLoadTimerRef.current)
+        radarLoadTimerRef.current = null
+      }
+      if (pendingRadarLayerRef.current && map.hasLayer(pendingRadarLayerRef.current)) {
+        map.removeLayer(pendingRadarLayerRef.current)
+      }
+      pendingRadarLayerRef.current = null
+      setFrameLoading(false)
+      if (displayedFrameIndex !== null && frameIndex !== displayedFrameIndex) {
+        setFrameIndex(displayedFrameIndex)
+      }
+      return
+    }
+
+    if (radarLayerRef.current && displayedFrameIndex === frameIndex) {
+      setFrameLoading(false)
+      return
+    }
+
     const requestId = ++radarRequestRef.current
     setFrameLoading(true)
     if (radarTransitionTimerRef.current !== null) window.clearTimeout(radarTransitionTimerRef.current)
+    if (radarDwellTimerRef.current !== null) window.clearTimeout(radarDwellTimerRef.current)
     if (radarLoadTimerRef.current !== null) window.clearTimeout(radarLoadTimerRef.current)
     if (pendingRadarLayerRef.current) {
       map.removeLayer(pendingRadarLayerRef.current)
@@ -138,6 +185,10 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
       if (pendingRadarLayerRef.current === pendingLayer) pendingRadarLayerRef.current = null
       if (map.hasLayer(pendingLayer)) map.removeLayer(pendingLayer)
       setFrameLoading(false)
+      if (playingRef.current && displayedFrameIndex !== null && frames.length > 1) {
+        radarFrameNotBeforeRef.current = Date.now()
+        setFrameIndex((frameIndex + 1) % frames.length)
+      }
     }
 
     const promotePendingLayer = () => {
@@ -148,6 +199,12 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
       if (radarLoadTimerRef.current !== null) {
         window.clearTimeout(radarLoadTimerRef.current)
         radarLoadTimerRef.current = null
+      }
+
+      const waitMs = Math.max(0, radarFrameNotBeforeRef.current - Date.now())
+      if (waitMs > 0) {
+        radarDwellTimerRef.current = window.setTimeout(promotePendingLayer, waitMs)
+        return
       }
 
       const previousLayer = radarLayerRef.current
@@ -180,15 +237,39 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
         map.removeLayer(pendingLayer)
       }
     }
-  }, [frame, frameIndex, manifest])
+  }, [
+    displayedFrameIndex,
+    frame,
+    frameIndex,
+    frames.length,
+    latitude,
+    longitude,
+    manifest,
+    pageVisible,
+  ])
 
   useEffect(() => {
-    if (!playing || isReducedMotion || frameLoading || frames.length < 2) return undefined
-    const timer = window.setTimeout(() => {
-      setFrameIndex(index => (index + 1) % frames.length)
-    }, RADAR_FRAME_DWELL_MS)
-    return () => window.clearTimeout(timer)
-  }, [frameLoading, frameIndex, frames.length, isReducedMotion, playing])
+    if (
+      !playing
+      || isReducedMotion
+      || !pageVisible
+      || frameLoading
+      || displayedFrameIndex === null
+      || frameIndex !== displayedFrameIndex
+      || frames.length < 2
+    ) return
+
+    radarFrameNotBeforeRef.current = Date.now() + RADAR_FRAME_DWELL_MS
+    setFrameIndex((displayedFrameIndex + 1) % frames.length)
+  }, [
+    displayedFrameIndex,
+    frameIndex,
+    frameLoading,
+    frames.length,
+    isReducedMotion,
+    pageVisible,
+    playing,
+  ])
 
   useEffect(() => {
     if (isReducedMotion) setPlaying(false)
@@ -243,6 +324,7 @@ export function RadarMap({ latitude, longitude, locationName }: RadarMapProps) {
                 value={Math.min(frameIndex, Math.max(0, frames.length - 1))}
                 onChange={event => {
                   setPlaying(false)
+                  radarFrameNotBeforeRef.current = 0
                   setFrameIndex(Number(event.target.value))
                 }}
                 disabled={frames.length < 2}

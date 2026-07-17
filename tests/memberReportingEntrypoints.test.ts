@@ -49,11 +49,15 @@ describe('member reporting entry points', () => {
     expect(stage).toContain('!isHost')
   })
 
-  test('the Live notification bridge and operator center stay behind the real-stage flag', () => {
+  test('Live notifications use the unified coordinator while the operator center stays behind the real-stage flag', () => {
     const app = source('src/App.tsx')
+    const coordinator = source('src/features/notifications/notificationModel.ts')
+    const preservedBridge = source('src/features/entertainment/shado-live/real/ShadoLiveNotificationBridge.tsx')
     const settings = source('src/components/settings/SettingsView.tsx')
-    expect(app).toContain("lazy(() => import('./features/entertainment/shado-live/real/ShadoLiveNotificationBridge'))")
-    expect(app).toMatch(/SHADO_LIVE_REAL_ENABLED && ShadoLiveNotificationBridge/)
+    expect(app).not.toContain('ShadoLiveNotificationBridge')
+    expect(app).toContain('NotificationCoordinatorProvider')
+    expect(coordinator).toContain("case 'shado_live_room_started'")
+    expect(preservedBridge).toContain('export function ShadoLiveNotificationBridge')
     expect(settings).toContain("React.lazy(() => import('../../features/moderation/ShadoLiveCaseCenter'))")
     expect(settings).toMatch(/SHADO_LIVE_REAL_ENABLED && ShadoLiveCaseCenter/)
   })

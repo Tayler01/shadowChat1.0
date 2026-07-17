@@ -105,7 +105,9 @@ describe('Edge Function abuse and idempotency boundaries', () => {
     const handler = source.slice(source.indexOf('serve(async (req): promise<response> =>'))
     const claim = handler.indexOf('await claimedgerequest(supabase')
     const limit = handler.indexOf('await consumeedgeratelimit(supabase')
-    const vapid = handler.indexOf('getvapidkeys()')
+    // The service-role recovery route has its own VAPID lookup before the
+    // caller-owned idempotency path. Verify ordering within the latter.
+    const vapid = handler.indexOf('getvapidkeys()', limit)
     const delivery = handler.indexOf('await senddmpush(')
     const completion = handler.indexOf('await completeedgerequestclaim(supabase')
 

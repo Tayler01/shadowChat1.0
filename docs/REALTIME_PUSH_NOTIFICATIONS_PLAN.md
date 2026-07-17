@@ -1,6 +1,6 @@
 # Realtime Push Notifications Plan
 
-## Documentation Status - July 15, 2026
+## Documentation Status - July 17, 2026
 
 This file documents the notification architecture shipped in Release A rather
 than only the original plan. The deployed release includes targeted
@@ -11,6 +11,15 @@ in-app ShadowPin events. The isolated 2.0 trial now also includes server-owned
 active-user notifications, per-device foreground suppression, exact read
 clearing, and a unified launcher badge. Normal-device delivery proof remains
 pending; use the latest workflow and health manifest for release identity.
+
+The July 17 candidate replaces the remaining feature-local presenters with one
+foreground coordinator, adds universal visible-client suppression in the
+service worker and push worker, creates a durable delivery-job/retry ledger,
+normalizes exact routes and category badges, adds a Catch-Up notification
+inbox, rebuilds notification settings, mirrors Shado Live into the canonical
+ledger, and adds server-authored Shadow Checkers turn events. See
+[NOTIFICATION_RELIABILITY_REBUILD_2026-07-17.md](./NOTIFICATION_RELIABILITY_REBUILD_2026-07-17.md).
+It is locally accepted but not deployed.
 
 ## Goal
 
@@ -611,9 +620,11 @@ The public key is also exposed to the client as:
 
 ## Remaining Recommendation
 
-Keep Web Push and recipient-owned Supabase events as the web/PWA contract. Run
-the full preference/block/mute matrix on a preview or staging backend, then
-verify one installed iPhone Home Screen app, one Android PWA, and one desktop
-browser after production deployment. A later native APNs/FCM layer should reuse
-the server-side event eligibility and preference contract rather than creating
-an independent notification policy.
+Keep Web Push and recipient-owned Supabase events as the web/PWA contract.
+Before the July 17 candidate is released, deploy the migration and compatible
+`send-push` worker, activate a secure server-owned
+`notification_delivery_recovery` schedule, then ship the service worker and
+frontend. Run the full preference/block/mute and foreground/background matrix
+on one installed iPhone Home Screen app and one Android PWA. A later native
+APNs/FCM layer should reuse the same server-side event eligibility and
+preference contract rather than creating an independent notification policy.

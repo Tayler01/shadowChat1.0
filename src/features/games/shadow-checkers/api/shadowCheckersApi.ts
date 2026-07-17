@@ -141,6 +141,14 @@ export async function fetchShadowCheckersLeaderboard(): Promise<ShadowCheckersSt
   return (data ?? []) as ShadowCheckersStats[]
 }
 
+export async function markShadowCheckersTurnRead(matchId: string) {
+  const workingClient = await client()
+  const { error } = await workingClient.rpc('mark_my_checkers_turn_read', {
+    target_match_id: matchId,
+  })
+  if (error) throw error
+}
+
 export async function createShadowCheckersMatch(characterKey: string, boardSkin: 'classic' | 'cinematic' = 'classic') {
   const { workingClient } = await ensureShadowCheckersSession()
   const { data, error } = await workingClient.rpc('create_shadow_checkers_match', {

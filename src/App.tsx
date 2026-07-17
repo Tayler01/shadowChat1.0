@@ -8,11 +8,9 @@ import { DirectMessagesProvider } from './hooks/useDirectMessages'
 import { HypeProvider } from './hooks/useHype'
 import { MobileNav } from './components/layout/MobileNav'
 import { useIsDesktop } from './hooks/useIsDesktop'
-import { useMessageNotifications } from './hooks/useMessageNotifications'
 import { ClientResetProvider } from './hooks/ClientResetContext'
 import { SoundEffectsProvider } from './hooks/useSoundEffects'
 import { LoadingSpinner } from './components/ui/LoadingSpinner'
-import { AppBadgeSync } from './components/notifications/AppBadgeSync'
 import { PushSubscriptionSync } from './components/notifications/PushSubscriptionSync'
 import { PhoneInstallOnboarding } from './components/onboarding/PhoneInstallOnboarding'
 import { AppReleaseGate } from './components/releases/AppReleaseGate'
@@ -28,7 +26,6 @@ import {
   ACTIVITY_FEATURE_ENABLED,
   BOARDS_FEATURE_ENABLED,
   CATCH_UP_FEATURE_ENABLED,
-  SHADO_LIVE_REAL_ENABLED,
 } from './config/featureFlags'
 import {
   getLocationStateFromUrl,
@@ -55,12 +52,10 @@ import {
   type ChatThreadRouteAction,
 } from './lib/appRouting'
 import type { AppView as View } from './types/navigation'
-import { useShadowPinCommentNotifications } from './features/shadow-pin/hooks/useShadowPinCommentNotifications'
-import { useConnectionNotifications } from './features/connections/useConnectionNotifications'
-import { usePresenceNotifications } from './hooks/usePresenceNotifications'
 import type { ActivityTarget } from './features/activity/activityModel'
 import { buildCatchUpTargetUrl, type CatchUpItem } from './features/catch-up/catchUpModel'
 import { FirstRunActivationCoordinator } from './features/activation/FirstRunActivationCoordinator'
+import { NotificationCoordinatorProvider } from './features/notifications/NotificationCoordinator'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -138,10 +133,6 @@ const CatchUpView = CATCH_UP_FEATURE_ENABLED
     )
   : null
 
-const ShadoLiveNotificationBridge = SHADO_LIVE_REAL_ENABLED
-  ? lazy(() => import('./features/entertainment/shado-live/real/ShadoLiveNotificationBridge'))
-  : null
-
 const getInitialLocationState = (): LocationState => {
   if (typeof window === 'undefined') {
     return {
@@ -178,9 +169,6 @@ function ViewLoadingState() {
 function App() {
   useSessionResumeRecovery()
   useAdminRoleNotifications()
-  useShadowPinCommentNotifications()
-  useConnectionNotifications()
-  usePresenceNotifications()
   useChannelBanExpirySweep()
   const { scheme, setScheme, mode } = useTheme()
   const [currentView, setCurrentView] = useState<View>(() => getInitialLocationState().view)
@@ -367,12 +355,6 @@ function App() {
       navigator.serviceWorker?.removeEventListener('message', applyServiceWorkerNotificationClick)
     }
   }, [applyLocationState])
-
-  useMessageNotifications((conversationId) => {
-    setDmTarget(conversationId)
-    setMessageTarget(null)
-    setCurrentView('dms')
-  })
 
   const closeSidebar = () => setSidebarOpen(false)
 
@@ -848,7 +830,6 @@ function App() {
 
   const renderAppShell = (boardsBadgeCount: number) => (
     <WeatherProvider>
-      <AppBadgeSync />
       <PushSubscriptionSync />
       <FirstRunActivationCoordinator
         currentView={currentView}
@@ -914,7 +895,7 @@ function App() {
   }
 
   return (
-    <>
+    <NotificationCoordinatorProvider>
       <AuthGuard>
         <ClientResetProvider>
           <SoundEffectsProvider>
@@ -928,11 +909,6 @@ function App() {
           </SoundEffectsProvider>
         </ClientResetProvider>
       </AuthGuard>
-    {SHADO_LIVE_REAL_ENABLED && ShadoLiveNotificationBridge && (
-      <Suspense fallback={null}>
-        <ShadoLiveNotificationBridge />
-      </Suspense>
-    )}
     <Toaster
       position={isDesktop ? 'top-right' : 'top-center'}
       containerStyle={
@@ -987,7 +963,7 @@ function App() {
         },
       }}
     />
-    </>
+    </NotificationCoordinatorProvider>
   )
 }
 
