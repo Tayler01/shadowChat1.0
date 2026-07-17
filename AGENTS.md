@@ -2,7 +2,7 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
-## Documentation Status - July 15, 2026
+## Documentation Status - July 17, 2026
 
 This handbook is current through the July 10 production-alignment and Release A
 deployment: the paused-domain contract, Supabase
@@ -19,24 +19,17 @@ before editing. For the complete documentation inventory and freshness notes,
 read
 [docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md](C:/repos/chat2.0/docs/PROJECT_DOCUMENTATION_RUNDOWN_2026-06-01.md:1).
 
-On `codex/shadowchat-2.0`, all five Wave One candidate implementations remain
-preserved. Activity and member-facing report intake stay paused, while the
-operator Safety Case Center remains available. All four Wave Two candidates
-are implemented and passed their local, shared-backend, immutable-Netlify, and
-automated Pixel Chromium/iPhone WebKit gates. The cumulative 2.0 trial deploy is
-`6a5811bc762e6e6704058ca3`, published at the isolated stable test URL
-`https://shadowchat-2-0-wave-one.netlify.app`; production `main` remains
-unchanged while Tayler's installed-phone acceptance is pending. Wave Three
-Candidates 1-3 (Connections, ShadowPin Feed Modes, and Inner Circles) are
-implemented, linked, and independently accepted through two-account Pixel
-Chromium/iPhone WebKit lifecycle, realtime, routing, engagement, focus,
-geometry, and zero-residue proof. The combined Wave Three regression gate is
-accepted on `6a558acc257a6d21fa379fa2`. The gated frontend-only Shado Live
-prototype and deterministic source-linked Catch-Up are also implemented. The
-July 14 Shado Live visual/mobile cleanup is accepted on isolated deploy
-`6a561d93dc105334eca9a5f9`, published at the same stable test URL; the full
-Shado Live system and any private AI Catch-Up trial
-remain separately gated. Read
+The accepted ShadowChat 2.0 Wave One, Wave Two, and Wave Three work has now
+shipped through production `main`. Activity and member-facing report intake
+stay paused, while the operator Safety Case Center remains available.
+Connections, ShadowPin Feed Modes, Inner Circles, Universal Discovery,
+General Chat threads, Creator Studio, activation, deterministic source-linked
+Catch-Up, full Active Users and Weather pages, and the real audio-first Shado
+Live beta are production surfaces. The isolated
+`https://shadowchat-2-0-wave-one.netlify.app` deploy and its immutable
+acceptance builds remain historical test evidence, not the live release
+authority. Any private AI Catch-Up trial remains separately gated and has not
+started. Read
 [docs/SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
 before changing Wave Three, and read
 [docs/SHADOWCHAT_2_0_WAVE_TWO.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_TWO.md:1)
@@ -44,19 +37,17 @@ before changing that branch track; use
 [docs/SHADOWCHAT_2_0_WAVE_ONE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_ONE.md:1)
 for the preserved Wave One contract.
 
-The July 15 final-acceptance batch on `codex/shadowchat-2.0` adds the full
-Active Users and Weather routes, server-owned presence-return notifications,
-unified launcher badges, exact DM/General/thread read clearing, ShadowPin
-radial/draft fixes, and composer alignment. It is not production-approved.
-Read the July 15 section of
+The July 15 final-acceptance batch and July 17 notification reliability rebuild
+are now production-approved. They add the full Active Users and Weather
+routes, server-owned presence-return notifications, unified launcher badges,
+exact DM/General/thread read clearing, ShadowPin radial/draft fixes, composer
+alignment, durable foreground/push arbitration, Catch-Up notification inbox,
+and exact Play/ShadowPin destination drilldown. Read the July 15 section of
 [docs/SHADOWCHAT_2_0_WAVE_THREE.md](C:/repos/chat2.0/docs/SHADOWCHAT_2_0_WAVE_THREE.md:1)
 and [docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1)
-before changing this batch. Its additive migrations and `send-push` v41 are
-linked and verified; stable isolated deploy `6a5811bc762e6e6704058ca3`
-passed authenticated smoke plus Android Chromium and iPhone WebKit route,
-settings, geometry, and diagnostics checks. Physical PWA acceptance is still
-pending. Do not merge it to production `main` without Tayler's explicit
-approval.
+before changing this batch. Its additive migrations and classified Edge
+Functions are linked and verified. Physical installed-PWA notification
+delivery remains an ongoing iPhone/Android validation surface.
 
 ## Mission
 

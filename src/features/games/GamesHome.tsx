@@ -21,6 +21,7 @@ import { WILL_KIRK_ASSETS } from '../entertainment/will-kirk/assets/manifest'
 import { SHADO_LIVE_ASSETS } from '../entertainment/shado-live/assets/manifest'
 import { SHADO_LIVE_PROTOTYPE_ENABLED, SHADO_LIVE_REAL_ENABLED } from '../../config/featureFlags'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
+import { useAppBadgeState } from '../../hooks/useAppBadgeState'
 import type { AppView } from '../../types/navigation'
 import type { PlayExperience, PlayRouteAction } from '../../lib/appRouting'
 
@@ -120,6 +121,19 @@ function releaseShadowRunnerLandscapeMode() {
   }
 }
 
+function ExperienceUnreadBadge({ count, label }: { count: number; label: string }) {
+  if (count <= 0) return null
+  return (
+    <span
+      className="absolute right-3 top-3 z-20 inline-flex min-h-7 min-w-7 items-center justify-center rounded-full border border-[#f4d985]/65 bg-[#171108]/92 px-2 text-xs font-bold text-[#f4d985] shadow-[0_8px_24px_rgba(0,0,0,0.55)] backdrop-blur-sm"
+      aria-label={`${count} unread ${label} ${count === 1 ? 'update' : 'updates'}`}
+      data-testid={`play-unread-${label}`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
+
 export function GamesHome({
   currentView,
   onViewChange,
@@ -128,6 +142,7 @@ export function GamesHome({
   initialItem,
   onPlayRoute,
 }: GamesHomeProps) {
+  const badgeState = useAppBadgeState()
   const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(() => (
     initialExperience ?? readLocalPreviewEntertainment()
   ))
@@ -320,6 +335,9 @@ export function GamesHome({
 
   const pickerCardClass = 'group relative h-[8.25rem] w-full shrink-0 overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:h-[10rem]'
   const pickerCardContentClass = 'relative flex h-full items-center gap-4 px-5 py-4 md:px-8'
+  const unreadForExperience = (experience: PlayExperience) => badgeState.gameDestinations
+    .filter(destination => destination.experience === experience)
+    .reduce((total, destination) => total + destination.unreadCount, 0)
 
   return (
     <>
@@ -350,6 +368,11 @@ export function GamesHome({
             musicPlaying={musicPlaying}
             audioBlocked={audioBlocked}
             onToggleMusic={toggleMusic}
+            unreadMatchCounts={Object.fromEntries(
+              badgeState.gameDestinations
+                .filter(destination => destination.experience === 'shadow-checkers')
+                .map(destination => [destination.itemId, destination.unreadCount])
+            )}
           />
         </div>
       ) : selectedEntertainment === 'shado-tv' ? (
@@ -383,6 +406,9 @@ export function GamesHome({
                 'shado-live',
                 roomId,
               )}
+              unreadRooms={badgeState.gameDestinations.filter(
+                destination => destination.experience === 'shado-live'
+              )}
             />
           </Suspense>
         </div>
@@ -413,6 +439,7 @@ export function GamesHome({
           onClick={enterShadoLive}
           className={pickerCardClass}
         >
+          <ExperienceUnreadBadge count={unreadForExperience('shado-live')} label="Shado Live" />
           <img
             src={SHADO_LIVE_ASSETS.pickerBanner}
             alt="Shado Live"
@@ -527,6 +554,7 @@ export function GamesHome({
           onClick={enterShadowWar}
           className={pickerCardClass}
         >
+          <ExperienceUnreadBadge count={unreadForExperience('shadow-war')} label="Shadow War" />
           <img
             src={SHADOW_WAR_ASSETS.pickerBattlefield}
             alt=""
@@ -565,6 +593,7 @@ export function GamesHome({
           onClick={enterShadowCheckers}
           className={pickerCardClass}
         >
+          <ExperienceUnreadBadge count={unreadForExperience('shadow-checkers')} label="Shadow Checkers" />
           <img
             src={SHADOW_CHECKERS_ASSETS.pickerArt}
             alt=""

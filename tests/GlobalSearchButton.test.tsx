@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { GlobalSearchButton } from '../src/components/search/GlobalSearchButton'
+import { UniversalDiscoveryView } from '../src/features/discovery/UniversalDiscoveryDialog'
 import {
   createMessageCollection,
   listMessageCollections,
@@ -58,6 +59,16 @@ const searchItem = {
   collectionId: null,
 }
 
+const renderDiscovery = (route = 'http://localhost/?view=discover') => {
+  window.history.replaceState({}, '', route)
+  return render(
+    <UniversalDiscoveryView
+      currentView="discover"
+      onViewChange={jest.fn()}
+    />
+  )
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   ;(listMessageCollections as jest.Mock).mockResolvedValue([
@@ -81,8 +92,7 @@ beforeEach(() => {
 })
 
 test('searches visible messages and saves a result to the private Library', async () => {
-  render(<GlobalSearchButton />)
-  fireEvent.click(screen.getByRole('button', { name: 'Open search and saved messages' }))
+  renderDiscovery()
 
   await waitFor(() => expect(listMessageCollections).toHaveBeenCalled())
   fireEvent.change(screen.getByPlaceholderText('Search General Chat and your DMs'), {
@@ -101,11 +111,9 @@ test('searches visible messages and saves a result to the private Library', asyn
 })
 
 test('opens saved messages through the existing URL deep-link contract', async () => {
-  window.history.replaceState({}, '', 'http://localhost/')
   ;(listSavedMessages as jest.Mock).mockResolvedValue([{ ...searchItem, isSaved: true, savedId: 'saved-1' }])
 
-  render(<GlobalSearchButton />)
-  fireEvent.click(screen.getByRole('button', { name: 'Open search and saved messages' }))
+  renderDiscovery()
   await waitFor(() => expect(listMessageCollections).toHaveBeenCalled())
   fireEvent.click(screen.getByRole('tab', { name: 'Library' }))
   fireEvent.click(await screen.findByText('The hidden archive clue'))
@@ -126,8 +134,7 @@ test('keeps successful result groups usable when other discovery providers fail'
   }])
   ;(searchPlayDiscovery as jest.Mock).mockRejectedValue(new Error('play unavailable'))
 
-  render(<GlobalSearchButton />)
-  fireEvent.click(screen.getByRole('button', { name: 'Open search and saved messages' }))
+  renderDiscovery()
   fireEvent.change(screen.getByPlaceholderText('Search General Chat and your DMs'), { target: { value: 'archive' } })
 
   expect(await screen.findByText('Archive map')).toBeInTheDocument()
@@ -136,7 +143,7 @@ test('keeps successful result groups usable when other discovery providers fail'
   expect(screen.getByText('The hidden archive clue')).toBeInTheDocument()
 })
 
-test('saves and opens a Pin, then Browser Back restores the same Discover state', async () => {
+test('saves and opens a Pin while preserving the routed Discover state for Browser Back', async () => {
   const saveDiscoveryItemToLibrary = jest.requireMock('../src/lib/messageLibrary').saveDiscoveryItemToLibrary as jest.Mock
   saveDiscoveryItemToLibrary.mockResolvedValue('saved-pin-1')
   ;(searchShadowPinImages as jest.Mock).mockResolvedValue([{
@@ -148,8 +155,7 @@ test('saves and opens a Pin, then Browser Back restores the same Discover state'
     updated_at: '2026-07-12T00:00:00.000Z',
   }])
 
-  render(<GlobalSearchButton />)
-  fireEvent.click(screen.getByRole('button', { name: 'Open search and saved messages' }))
+  const view = renderDiscovery()
   fireEvent.click(screen.getByRole('tab', { name: 'pins' }))
   fireEvent.change(screen.getByPlaceholderText('Search General Chat and your DMs'), { target: { value: 'archive' } })
 
@@ -160,12 +166,29 @@ test('saves and opens a Pin, then Browser Back restores the same Discover state'
     targetId: 'pin-1',
   }))
 
+  await waitFor(() => {
+    const route = new URL(window.location.href)
+    expect(route.searchParams.get('view')).toBe('discover')
+    expect(route.searchParams.get('scope')).toBe('pins')
+    expect(route.searchParams.get('q')).toBe('archive')
+  })
+  const discoveryRoute = window.location.href
+
   fireEvent.click(screen.getByText('Archive map'))
   expect(new URL(window.location.href).searchParams.get('pin')).toBe('pin-1')
-  expect(screen.queryByRole('dialog', { name: 'Discover' })).not.toBeInTheDocument()
 
-  act(() => window.dispatchEvent(new PopStateEvent('popstate', { state: { shadowchatDiscovery: true } })))
-  expect(await screen.findByRole('dialog', { name: 'Discover' })).toBeInTheDocument()
+  view.unmount()
+  renderDiscovery(discoveryRoute)
   expect(screen.getByDisplayValue('archive')).toBeInTheDocument()
   expect(screen.getByRole('tab', { name: 'pins' })).toHaveAttribute('aria-selected', 'true')
+})
+
+test('opens Discover as an active routed navigation control', () => {
+  const onOpen = jest.fn()
+  render(<GlobalSearchButton variant="nav" active onOpen={onOpen} />)
+
+  const button = screen.getByRole('button', { name: 'Open search and saved messages' })
+  expect(button).toHaveAttribute('aria-current', 'page')
+  fireEvent.click(button)
+  expect(onOpen).toHaveBeenCalledTimes(1)
 })

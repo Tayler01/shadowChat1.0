@@ -9,6 +9,8 @@ import {
 } from '../src/features/catch-up/catchUpApi'
 import { getUserProfile } from '../src/lib/auth'
 
+let mockMotionPreference: 'full' | 'reduced' | 'none' = 'none'
+
 jest.mock('../src/features/catch-up/catchUpApi', () => ({
   acknowledgeCatchUpEvents: jest.fn(),
   acknowledgeNotificationInboxEvent: jest.fn(),
@@ -34,6 +36,12 @@ jest.mock('../src/components/profile/PublicProfileDialog', () => ({
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
+}))
+
+jest.mock('../src/hooks/useComfortPreferences', () => ({
+  useComfortPreferences: () => ({
+    effectivePreferences: { motion: mockMotionPreference },
+  }),
 }))
 
 jest.mock('../src/lib/auth', () => ({
@@ -101,6 +109,7 @@ beforeEach(() => {
   acknowledgeNotification.mockResolvedValue(true)
   fetchInbox.mockResolvedValue([])
   fetchProfile.mockResolvedValue(null)
+  mockMotionPreference = 'none'
 })
 
 test('shows canonical unread notifications and clears the exact event after opening its source', async () => {
@@ -189,8 +198,57 @@ test('swipes a notification left to mark it read without opening its source', as
 
   await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledWith('event-10'))
   expect(onOpenSource).not.toHaveBeenCalled()
-  expect(screen.queryByRole('heading', { name: 'Notification inbox' })).not.toBeInTheDocument()
+  await waitFor(() => {
+    expect(screen.queryByRole('heading', { name: 'Notification inbox' })).not.toBeInTheDocument()
+  })
   expect(screen.getByText('New comment on your Pin marked as read.')).toBeInTheDocument()
+})
+
+test('tracks a full-width swipe continuously instead of stopping at the action width', async () => {
+  mockMotionPreference = 'full'
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([{
+    id: 'notification:event-wide-swipe',
+    kind: 'shadow_pin_post',
+    occurredAt: '2026-07-17T12:00:00Z',
+    actor: null,
+    title: 'A new Pin',
+    preview: 'Open the new Pin.',
+    unreadCount: 1,
+    manuallyUnread: false,
+    target: { kind: 'app_route', route: '/?view=pins&pin=pin-1' },
+    activityEventIds: [],
+    notificationEventIds: ['event-wide-swipe'],
+  }])
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+  const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-wide-swipe')
+  fireEvent.pointerDown(swipeSurface, {
+    pointerId: 4,
+    pointerType: 'touch',
+    clientX: 300,
+    clientY: 120,
+  })
+  fireEvent.pointerMove(swipeSurface, {
+    pointerId: 4,
+    pointerType: 'touch',
+    clientX: 250,
+    clientY: 121,
+  })
+  expect(Number(swipeSurface.getAttribute('data-swipe-offset'))).toBeLessThanOrEqual(-50)
+  fireEvent.pointerMove(swipeSurface, {
+    pointerId: 4,
+    pointerType: 'touch',
+    clientX: 130,
+    clientY: 122,
+  })
+  expect(Number(swipeSurface.getAttribute('data-swipe-offset'))).toBeLessThanOrEqual(-170)
+  expect(screen.getByTestId('notification-row-notification:event-wide-swipe')).toHaveAttribute(
+    'data-dismiss-phase',
+    'dragging'
+  )
 })
 
 test('loads source-linked sections and acknowledges only the opened Activity event', async () => {

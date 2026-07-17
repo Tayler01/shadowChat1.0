@@ -11,10 +11,12 @@ export function ShadowPinFeedModeTabs({
   mode,
   onChange,
   disabled = false,
+  discoverUnreadCount = 0,
 }: {
   mode: ShadowPinFeedMode
   onChange: (mode: ShadowPinFeedMode) => void
   disabled?: boolean
+  discoverUnreadCount?: number
 }) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([])
 
@@ -69,7 +71,18 @@ export function ShadowPinFeedModeTabs({
                 : 'border-transparent text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.055)] hover:text-[var(--text-primary)]'
             )}
           >
-            {candidate.label}
+            <span className="inline-flex items-center justify-center gap-2">
+              {candidate.label}
+              {candidate.id === 'discover' && discoverUnreadCount > 0 && (
+                <span
+                  className="inline-flex min-h-6 min-w-6 items-center justify-center rounded-full border border-[var(--theme-accent-border-soft)] bg-[rgba(4,5,6,0.72)] px-1.5 text-[0.68rem] font-bold text-[var(--theme-accent-readable)]"
+                  aria-label={`${discoverUnreadCount} unread ShadowPin ${discoverUnreadCount === 1 ? 'update' : 'updates'}`}
+                  data-testid="shadow-pin-discover-unread"
+                >
+                  {discoverUnreadCount > 99 ? '99+' : discoverUnreadCount}
+                </span>
+              )}
+            </span>
           </button>
         )
       })}

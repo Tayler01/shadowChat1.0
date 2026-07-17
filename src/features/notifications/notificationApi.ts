@@ -1,4 +1,5 @@
 import { getDefaultNotificationPreferences } from '../../lib/push'
+import { requestAppBadgeRefresh } from '../../lib/appBadge'
 import { getWorkingClient } from '../../lib/supabase'
 import type {
   NotificationCoordinatorPreferences,
@@ -82,13 +83,14 @@ export const markNotificationEventRead = async (eventId: string) => {
 }
 
 export const clearNotificationEventFromSystemTray = async (message: {
-  notificationType: string
+  notificationType?: string
   eventId: string
   conversationId?: string | null
   messageId?: string | null
   imageId?: string | null
   commentId?: string | null
   matchId?: string | null
+  roomId?: string | null
 }) => {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
 
@@ -104,4 +106,30 @@ export const clearNotificationEventFromSystemTray = async (message: {
   } catch {
     // Clearing a system notification is best-effort and must not block routing.
   }
+}
+
+export const markNotificationDestinationRead = async (
+  eventIds: string[],
+  trayContext: {
+    imageId?: string
+    commentId?: string
+    matchId?: string
+    roomId?: string
+  } = {},
+) => {
+  const uniqueEventIds = Array.from(new Set(eventIds.filter(Boolean)))
+  if (uniqueEventIds.length === 0) return true
+
+  const results = await Promise.allSettled(
+    uniqueEventIds.map(async eventId => {
+      const marked = await markNotificationEventRead(eventId)
+      if (!marked) throw new Error('Notification could not be marked as read')
+      await clearNotificationEventFromSystemTray({
+        eventId,
+        ...trayContext,
+      })
+    }),
+  )
+  requestAppBadgeRefresh()
+  return results.every(result => result.status === 'fulfilled')
 }

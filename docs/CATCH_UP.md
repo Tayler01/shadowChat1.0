@@ -13,11 +13,16 @@ payload. System notifications without a user actor retain the branded initials
 fallback and do not invent a profile target.
 
 Unread notification cards can be swiped left past a deliberate threshold to
-mark the exact event read without opening its source. The revealed `Read`
-control provides the same action for keyboard and assistive-technology users.
-Opening a card still opens its exact source and marks that same event read.
-Both paths clear the matching system notification and request a unified app
-badge refresh.
+mark the exact event read without opening its source. The card now follows the
+finger across its full measured width, accepts a deliberate distance or fast
+flick, and completes with a restrained gold-particle dissolve before the
+remaining cards reflow upward. Vertical intent keeps native page scrolling,
+cancelled/short gestures settle smoothly, and reduced/no-motion Comfort modes
+replace the decorative dissolve with a brief or immediate removal. The
+revealed `Read` control provides the same action for keyboard and
+assistive-technology users. Opening a card still opens its exact source and
+marks that same event read. Both paths clear the matching system notification
+and request a unified app badge refresh.
 
 ## Product Contract
 

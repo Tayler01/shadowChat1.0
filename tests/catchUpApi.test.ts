@@ -80,6 +80,8 @@ test('hydrates notification actors from the current safe public profile relation
       payload: {
         title: 'New comment',
         body: 'Mills commented on your Pin.',
+        image_id: 'pin-1',
+        comment_id: 'comment-1',
         actor: {
           id: 'actor-1',
           display_name: 'Old name',
@@ -114,6 +116,10 @@ test('hydrates notification actors from the current safe public profile relation
         avatar_url: 'https://example.com/mills-full.jpg',
         avatar_thumbnail_url: 'https://example.com/mills-thumb.jpg',
         color: '#d7aa46',
+      },
+      target: {
+        kind: 'app_route',
+        route: '/?view=pins&pin=pin-1&panel=comments&comment=comment-1',
       },
     }),
   ])

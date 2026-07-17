@@ -109,6 +109,12 @@ const WeatherView = lazy(() =>
   }))
 )
 
+const UniversalDiscoveryView = lazy(() =>
+  import('./features/discovery/UniversalDiscoveryDialog').then(module => ({
+    default: module.UniversalDiscoveryView,
+  }))
+)
+
 const ActivityView = ACTIVITY_FEATURE_ENABLED
   ? lazy(() =>
       import('./features/activity/ActivityView').then(module => ({
@@ -791,6 +797,13 @@ function App() {
             onPinRoute={handlePinRoute}
             onFeedModeChange={handlePinFeedModeChange}
             onCircleChange={handlePinCircleChange}
+          />
+        )
+      case 'discover':
+        return (
+          <UniversalDiscoveryView
+            currentView={currentView}
+            onViewChange={handleViewChange}
           />
         )
       case 'active-users':

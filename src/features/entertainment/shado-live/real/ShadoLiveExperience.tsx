@@ -4,6 +4,8 @@ import toast from 'react-hot-toast'
 import { useAuth } from '../../../../hooks/useAuth'
 import { getUserProfile } from '../../../../lib/auth'
 import type { User } from '../../../../lib/supabase'
+import type { GameBadgeDestination } from '../../../../lib/appBadge'
+import { markNotificationDestinationRead } from '../../../notifications/notificationApi'
 import { ShadoLiveLobby } from './ShadoLiveLobby'
 import { ShadoLiveStage } from './ShadoLiveStage'
 import { ShadoLiveTerminalDialog } from './ShadoLiveTerminalDialog'
@@ -22,12 +24,14 @@ export interface ShadoLiveExperienceProps {
   onExit: () => void
   initialRoomId?: string
   onRoomRoute?: (action: ShadoLiveRoomRouteAction, roomId?: string) => void
+  unreadRooms?: GameBadgeDestination[]
 }
 
 export function ShadoLiveExperience({
   onExit,
   initialRoomId,
   onRoomRoute,
+  unreadRooms = [],
 }: ShadoLiveExperienceProps) {
   const { user } = useAuth()
   const controller = useShadoLiveRoom({ initialRoomId, onRoomRoute })
@@ -63,6 +67,19 @@ export function ShadoLiveExperience({
   const joinRoom = async (roomId: string) => {
     rememberLobbyFocus()
     await controller.joinRoom(roomId)
+    const destination = unreadRooms.find(candidate => candidate.itemId === roomId)
+    if (destination) {
+      void markNotificationDestinationRead(destination.eventIds, { roomId })
+    }
+  }
+
+  const resumeRoom = async (roomId: string) => {
+    rememberLobbyFocus()
+    await controller.resumeRoom(roomId)
+    const destination = unreadRooms.find(candidate => candidate.itemId === roomId)
+    if (destination) {
+      void markNotificationDestinationRead(destination.eventIds, { roomId })
+    }
   }
 
   const openProfile = async (userId: string) => {
@@ -120,9 +137,12 @@ export function ShadoLiveExperience({
           createButtonRef={createButtonRef}
           onCreate={createRoom}
           onJoin={joinRoom}
-          onResume={controller.resumeRoom}
+          onResume={resumeRoom}
           onRefresh={controller.refreshRooms}
           onOpenProfile={openProfile}
+          unreadCountByRoomId={Object.fromEntries(
+            unreadRooms.map(destination => [destination.itemId, destination.unreadCount])
+          )}
         />
       )}
 

@@ -8,6 +8,31 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-17
 
+## July 17 Destination Badges, Catch-Up Motion, And Discover Page Checkpoint
+
+- Catch-Up notification cards now track the finger across the measured card
+  width, accept deliberate distance or fast-flick intent, dissolve with a
+  restrained gold-particle finish, and reflow the remaining list. Comfort
+  reduced/no-motion modes keep the read action without decorative motion.
+- Play unread state now drills from the bottom badge to Shado Live or Shadow
+  Checkers, then to the exact room or match. ShadowPin drills from the bottom
+  badge to Discover, category, exact Pin, and separate post/discussion state.
+  Exact destination loads clear only their represented event IDs.
+- Universal Discover is now the first-class `?view=discover` page. It uses the
+  standard themed backdrop and leaves the phone bottom menu visible instead of
+  mounting a modal portal.
+- The focused notification/Play/Pins/Discover regression set passed 13 suites
+  and 134 tests. The full Jest gate passed 235 suites and 1,282 tests with 16
+  existing todos. ESLint, TypeScript, production build/budgets, documentation
+  integrity, all 43 Node contracts, clean local migration replay, local/linked
+  database lint, and the local security contract passed.
+- The authenticated Pixel Chromium and iPhone WebKit Universal Discover gate
+  passed standard-surface, routed-page, persistent-menu, result, Library,
+  diagnostics, and overflow checks. The authenticated read-only Catch-Up gate
+  passed both engines with zero acknowledgements or test residue. Evidence:
+  `output/playwright/wave2-candidate1-discovery/summary.json` and
+  `output/playwright/catch-up/summary.json`.
+
 ## July 17 Notification Center PFP And Swipe Checkpoint
 
 - Notification-inbox events now resolve `actor_id` through the current

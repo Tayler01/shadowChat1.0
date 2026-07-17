@@ -23,6 +23,16 @@ also support swipe-left mark-as-read without source navigation, with an
 equivalent revealed Read button. Both open-and-read and swipe-and-read paths
 clear the matching system notification and refresh unified badges.
 
+The destination follow-up in
+`20260717233421_notification_destination_badges.sql` makes every nonzero Pins
+or Play badge traceable in the UI. Play shows unread counts on the owning
+experience and then the exact Checkers match or Shado Live room. ShadowPin
+shows unread counts on Discover, the owning category, and the exact Pin, with
+post and discussion event IDs kept separate. Opening the exact match/room,
+meaningfully viewing the Pin, or successfully loading its comments marks only
+that represented destination read. `notification_events` UPDATE Realtime
+refreshes the shared badge state across open tabs and devices.
+
 ## Product Contract
 
 For one event on one device:

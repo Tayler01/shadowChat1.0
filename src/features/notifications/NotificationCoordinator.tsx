@@ -370,6 +370,18 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
               void handleEvent(payload.new as NotificationEventRecord)
             },
           )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'notification_events',
+              filter: `user_id=eq.${user.id}`,
+            },
+            () => {
+              requestAppBadgeRefresh()
+            },
+          )
           .subscribe((status: string) => {
             if (disposed || channel !== next) return
             if (status === 'SUBSCRIBED') {

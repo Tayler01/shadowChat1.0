@@ -1,6 +1,6 @@
 # Message Library
 
-## Documentation Status - July 12, 2026
+## Documentation Status - July 17, 2026
 
 Universal message search, private saves, and personal collections shipped in
 the July 10 Release A backend-first deployment, including
@@ -11,13 +11,13 @@ grant correction.
 
 ## Product Behavior
 
-The July 12 Wave Two branch extends this foundation through Universal Discovery
-without changing the shipped message contracts. See
+Universal Discovery extends this foundation without changing the shipped
+message contracts. See
 [UNIVERSAL_DISCOVERY_LIBRARY.md](C:/repos/chat2.0/docs/UNIVERSAL_DISCOVERY_LIBRARY.md:1).
 
-On production `main`, the app-header search control opens the original
-mobile-first message dialog. On the Wave Two branch, the same utility entry
-opens Discover with message search and a unified Library:
+On production `main`, app-header and phone-tool search controls open the
+first-class `?view=discover` page with the standard app backdrop and persistent
+navigation. It includes message search and a unified Library:
 
 - **Messages** searches caller-visible General Chat and DM message text.
 - **Library** lists the caller's saved messages alongside eligible Pins and
@@ -77,8 +77,7 @@ search cursor even where the first UI does not yet expose every field.
 
 ## Frontend Source Map
 
-- `src/components/search/GlobalSearchButton.tsx`: lazy Discover launcher and
-  Back restoration
+- `src/components/search/GlobalSearchButton.tsx`: lazy routed Discover launcher
 - `src/features/discovery/UniversalDiscoveryDialog.tsx`: discovery scopes,
   collections, save/move/remove actions, and exact result routing
 - `src/lib/messageLibrary.ts`: authenticated search/save/collection client API
@@ -93,6 +92,6 @@ npx jest --runInBand tests/messageLibrarySql.test.ts tests/discoveryLibrarySql.t
 ```
 
 For browser QA, verify General Chat and DM matches, save/move/remove behavior,
-collection deletion, deep links, blocked-user filtering, keyboard focus, and
-phone-sized dialog overflow. Test data must be removed before the run is called
-complete.
+collection deletion, deep links, blocked-user filtering, keyboard focus,
+safe-area layout, the persistent phone menu, and zero horizontal overflow.
+Test data must be removed before the run is called complete.

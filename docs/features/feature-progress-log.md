@@ -31,6 +31,21 @@ Canonical detail and release gates live in:
 - [REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1)
 - [DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
 
+## July 17 Production Notification Follow-Up
+
+- Catch-Up swipe-to-read now follows the full gesture, supports distance and
+  flick commitment, respects Comfort motion preferences, and provides a clear
+  dissolve/reflow completion.
+- Migration `20260717233421_notification_destination_badges.sql` extends the
+  compatible app-badge RPC with exact ShadowPin and Play destinations. The UI
+  exposes the owning experience/category/item and clears only exact event IDs.
+- Universal Discover is a standard routed app page with the themed app
+  backdrop and persistent desktop/phone navigation, rather than a modal.
+- Pre-release proof: 235 Jest suites / 1,282 passing tests, 43 Node contracts,
+  clean lint/typecheck/build/docs, clean local migration replay and security
+  contract, clean local/linked database lint, and authenticated Pixel
+  Chromium/iPhone WebKit Discover and Catch-Up gates with zero data residue.
+
 ## Current Goal
 
 ### ShadowChat 2.0 Wave Three
@@ -44,17 +59,14 @@ Canonical detail and release gates live in:
   audio-first LiveKit successor is implemented behind a separate server-gated
   flag with dedicated safety and in-app notification paths. Deterministic
   source-linked Catch-Up remains intact and no private AI trial has started.
-  Production `main` remains unchanged.
+  The accepted cumulative frontend and backend have shipped to production
+  `main`; the isolated test site remains historical acceptance evidence.
 - Final acceptance batch: Active Users and Weather full pages, presence-return
   notifications, unified launcher badges, exact notification/read clearing,
-  ShadowPin radial/draft corrections, and composer alignment are implemented on
-  the trial branch. Four additive migrations and `send-push` v41 are linked;
-  dry-run, database lint, security-definer, and 24-function manifest checks are
-  clean. Stable isolated deploy `6a5811bc762e6e6704058ca3` passed authenticated
-  settings smoke and dedicated Android Chromium/iPhone WebKit route, geometry,
-  settings, and diagnostics proof with no test-data residue. It is published at
-  `https://shadowchat-2-0-wave-one.netlify.app`. Physical iPhone/Android
-  acceptance remains pending. Production `main` remains unchanged.
+  ShadowPin radial/draft corrections, and composer alignment are production.
+  The isolated deploy `6a5811bc762e6e6704058ca3` remains historical
+  Android Chromium/iPhone WebKit acceptance evidence. Physical installed-PWA
+  notification behavior remains an ongoing iPhone/Android validation surface.
 - Backend boundary: reciprocal caller-private relationships, no public graph or
   counts, personal-block teardown with no restore, and compatibility with the
   unchanged production frontend sharing Supabase.

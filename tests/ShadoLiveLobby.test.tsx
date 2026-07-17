@@ -44,3 +44,21 @@ test('offers the host a recovery action for an existing green room', async () =>
   fireEvent.click(screen.getByRole('button', { name: 'Resume as host' }))
   await waitFor(() => expect(onResume).toHaveBeenCalledWith(hostGreenRoom.id))
 })
+
+test('identifies the exact live room that owns unread Play updates', () => {
+  render(
+    <ShadoLiveLobby
+      rooms={[hostGreenRoom]}
+      backendState="idle"
+      unreadCountByRoomId={{ [hostGreenRoom.id]: 2 }}
+      onCreate={jest.fn().mockResolvedValue(undefined)}
+      onJoin={jest.fn().mockResolvedValue(undefined)}
+      onResume={jest.fn().mockResolvedValue(undefined)}
+      onRefresh={jest.fn().mockResolvedValue(undefined)}
+      onOpenProfile={jest.fn()}
+    />
+  )
+
+  expect(screen.getByTestId(`shado-live-unread-${hostGreenRoom.id}`)).toHaveTextContent('2 new')
+  expect(screen.getByLabelText('2 unread updates for this live room')).toBeInTheDocument()
+})

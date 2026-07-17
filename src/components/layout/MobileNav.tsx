@@ -42,8 +42,8 @@ export function MobileNav({
   const badgeState = useAppBadgeState()
   const activity = useOptionalActivity()
   const { status: resetStatus } = useOptionalClientReset()
-  const [page, setPage] = useState<0 | 1>(() => currentView === 'active-users' || currentView === 'weather' ? 1 : 0)
-  const [toolsMounted, setToolsMounted] = useState(() => currentView === 'active-users' || currentView === 'weather')
+  const [page, setPage] = useState<0 | 1>(() => currentView === 'active-users' || currentView === 'weather' || currentView === 'discover' ? 1 : 0)
+  const [toolsMounted, setToolsMounted] = useState(() => currentView === 'active-users' || currentView === 'weather' || currentView === 'discover')
   const primaryPageRef = useRef<HTMLUListElement>(null)
   const toolsPageRef = useRef<HTMLUListElement>(null)
   const totalUnread = conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)
@@ -83,7 +83,7 @@ export function MobileNav({
   }, [])
 
   useEffect(() => {
-    if (currentView !== 'active-users' && currentView !== 'weather') return
+    if (currentView !== 'active-users' && currentView !== 'weather' && currentView !== 'discover') return
     setToolsMounted(true)
     setPage(1)
   }, [currentView])
@@ -123,6 +123,12 @@ export function MobileNav({
     setToolsMounted(true)
     setPage(1)
     onViewChange('weather')
+  }
+
+  const openDiscover = () => {
+    setToolsMounted(true)
+    setPage(1)
+    onViewChange('discover')
   }
 
   const navSurface = embedded
@@ -208,7 +214,11 @@ export function MobileNav({
           <li className="min-w-0">
             {toolsMounted ? (
               <Suspense fallback={<span className="block h-full w-full" aria-hidden="true" />}>
-                <LazyGlobalSearchButton variant="nav" />
+                <LazyGlobalSearchButton
+                  variant="nav"
+                  active={currentView === 'discover'}
+                  onOpen={openDiscover}
+                />
               </Suspense>
             ) : null}
           </li>

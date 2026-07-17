@@ -334,6 +334,38 @@ describe('service worker app badge handling', () => {
     expect(closeOther).not.toHaveBeenCalled()
   })
 
+  it('closes only notifications for the Shado Live room that was opened', async () => {
+    const { listeners, notifications } = loadServiceWorker()
+    const closeRequested = jest.fn()
+    const closeOther = jest.fn()
+    const pending: Promise<unknown>[] = []
+
+    notifications.push(
+      {
+        close: closeRequested,
+        data: { eventId: 'live-a', roomId: 'room-a', type: 'shado_live_room_started' },
+        tag: 'shado-live:room-a',
+      },
+      {
+        close: closeOther,
+        data: { eventId: 'live-b', roomId: 'room-b', type: 'shado_live_room_started' },
+        tag: 'shado-live:room-b',
+      }
+    )
+
+    listeners.message({
+      data: {
+        roomId: 'room-a',
+        type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+    expect(closeRequested).toHaveBeenCalledTimes(1)
+    expect(closeOther).not.toHaveBeenCalled()
+  })
+
   it('classifies targeted and reaction notifications by their active chat surface', async () => {
     const { listeners, notifications } = loadServiceWorker()
     const closeMention = jest.fn()

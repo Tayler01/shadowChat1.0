@@ -1,9 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { animate, motion, useMotionValue, useTransform } from 'framer-motion'
 import { AlertCircle, ArrowUpRight, Check, Inbox, Loader2, MessageCircle, RefreshCw, ShieldCheck, Sparkles, Users } from 'lucide-react'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import { Avatar } from '../../components/ui/Avatar'
 import { Button } from '../../components/ui/Button'
 import { useAuth } from '../../hooks/useAuth'
+import { useComfortPreferences } from '../../hooks/useComfortPreferences'
 import { getUserProfile } from '../../lib/auth'
 import { requestAppBadgeRefresh } from '../../lib/appBadge'
 import type { User } from '../../lib/supabase'
@@ -38,7 +40,29 @@ type CatchUpViewProps = {
 
 const CACHE_TTL_MS = 30_000
 const SWIPE_ACTION_WIDTH_PX = 96
-const SWIPE_DISMISS_THRESHOLD_PX = 64
+const SWIPE_DISMISS_MIN_PX = 72
+const SWIPE_DISMISS_MAX_PX = 120
+const SWIPE_DISMISS_RATIO = 0.28
+const SWIPE_FLICK_MIN_DISTANCE_PX = 28
+const SWIPE_FLICK_VELOCITY_PX_MS = -0.65
+const SWIPE_VERTICAL_LOCK_PX = 10
+const SWIPE_HORIZONTAL_LOCK_RATIO = 1.2
+const SWIPE_EXIT_OVERSHOOT_PX = 24
+
+type SwipePhase = 'idle' | 'dragging' | 'settling' | 'dismissing' | 'collapsing'
+
+const DISINTEGRATION_FRAGMENTS = [
+  { left: 38, top: 18, size: 2, x: -18, y: -8, rotate: -24, delay: 0 },
+  { left: 52, top: 72, size: 3, x: -28, y: 10, rotate: 34, delay: 0.015 },
+  { left: 63, top: 35, size: 2, x: -36, y: -13, rotate: -42, delay: 0.03 },
+  { left: 72, top: 84, size: 2, x: -24, y: 8, rotate: 28, delay: 0.045 },
+  { left: 79, top: 14, size: 3, x: -44, y: -7, rotate: -36, delay: 0.06 },
+  { left: 84, top: 58, size: 2, x: -32, y: 13, rotate: 46, delay: 0.075 },
+  { left: 89, top: 30, size: 2, x: -52, y: -11, rotate: -52, delay: 0.09 },
+  { left: 92, top: 76, size: 3, x: -38, y: 9, rotate: 38, delay: 0.105 },
+  { left: 95, top: 46, size: 2, x: -58, y: -4, rotate: -60, delay: 0.12 },
+  { left: 97, top: 22, size: 2, x: -46, y: -14, rotate: 54, delay: 0.135 },
+] as const
 
 const getInitials = (item: CatchUpItem) => {
   const label = item.actor?.display_name || item.actor?.username || item.title
@@ -122,119 +146,335 @@ function CatchUpCard({
 
 function SwipeToReadNotification({
   item,
-  onDismiss,
+  motionPreference,
+  onReadStart,
+  onDismissComplete,
   children,
 }: {
   item: CatchUpItem
-  onDismiss: () => void
+  motionPreference: 'full' | 'reduced' | 'none'
+  onReadStart: () => void
+  onDismissComplete: () => void
   children: React.ReactNode
 }) {
-  const [offset, setOffset] = useState(0)
+  const [phase, setPhase] = useState<SwipePhase>('idle')
+  const x = useMotionValue(0)
+  const readActionOpacity = useTransform(x, [-SWIPE_ACTION_WIDTH_PX, -12, 0], [1, 0.2, 0])
+  const readActionScale = useTransform(x, [-SWIPE_ACTION_WIDTH_PX, -12, 0], [1, 0.9, 0.82])
+  const rootRef = useRef<HTMLDivElement>(null)
+  const surfaceRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef(0)
+  const maxTravelRef = useRef(344)
+  const phaseRef = useRef<SwipePhase>('idle')
+  const settleAnimationRef = useRef<ReturnType<typeof animate> | null>(null)
+  const phaseTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null)
+  const dismissStartedRef = useRef(false)
+  const dismissCompletedRef = useRef(false)
   const gestureRef = useRef<{
     pointerId: number
     startX: number
     startY: number
+    lastX: number
+    lastAt: number
+    velocityX: number
     dragging: boolean
     cancelled: boolean
   } | null>(null)
   const suppressClickRef = useRef(false)
 
-  const updateOffset = (next: number) => {
-    const bounded = Math.max(-SWIPE_ACTION_WIDTH_PX, Math.min(0, next))
-    offsetRef.current = bounded
-    setOffset(bounded)
+  const setSwipePhase = (next: SwipePhase) => {
+    phaseRef.current = next
+    setPhase(next)
   }
 
-  const resetGesture = () => {
+  const updateOffset = (next: number) => {
+    const bounded = Math.max(-maxTravelRef.current, Math.min(0, next))
+    offsetRef.current = bounded
+    x.set(bounded)
+    surfaceRef.current?.setAttribute('data-swipe-offset', String(Math.round(bounded)))
+  }
+
+  const clearPhaseTimer = () => {
+    if (phaseTimerRef.current === null) return
+    globalThis.clearTimeout(phaseTimerRef.current)
+    phaseTimerRef.current = null
+  }
+
+  const settleTo = (target: number) => {
+    settleAnimationRef.current?.stop()
+    const duration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 0.08 : 0.18
+    settleAnimationRef.current = animate(x, target, {
+      duration,
+      ease: [0.22, 0.72, 0.24, 1],
+      onUpdate: latest => {
+        offsetRef.current = latest
+        surfaceRef.current?.setAttribute('data-swipe-offset', String(Math.round(latest)))
+      },
+    })
+  }
+
+  const resetGesture = (animated = true) => {
     gestureRef.current = null
-    updateOffset(0)
-    globalThis.setTimeout(() => {
+    setSwipePhase(animated ? 'settling' : 'idle')
+    if (animated) settleTo(0)
+    else updateOffset(0)
+    clearPhaseTimer()
+    phaseTimerRef.current = globalThis.setTimeout(() => {
+      if (phaseRef.current === 'settling') setSwipePhase('idle')
       suppressClickRef.current = false
-    }, 0)
+    }, motionPreference === 'full' && animated ? 190 : motionPreference === 'reduced' && animated ? 90 : 0)
+  }
+
+  const finishDismissal = () => {
+    if (dismissCompletedRef.current) return
+    dismissCompletedRef.current = true
+    onDismissComplete()
+  }
+
+  const beginCollapse = () => {
+    if (phaseRef.current !== 'dismissing') return
+    setSwipePhase('collapsing')
+    const collapseDuration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 90 : 190
+    clearPhaseTimer()
+    phaseTimerRef.current = globalThis.setTimeout(finishDismissal, collapseDuration + 40)
+  }
+
+  const beginDismissal = () => {
+    if (dismissStartedRef.current) return
+    dismissStartedRef.current = true
+    suppressClickRef.current = true
+    gestureRef.current = null
+    setSwipePhase('dismissing')
+    onReadStart()
+    settleAnimationRef.current?.stop()
+
+    const departureDuration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 0.08 : 0.24
+    settleAnimationRef.current = animate(x, -maxTravelRef.current, {
+      duration: departureDuration,
+      ease: [0.22, 0.72, 0.24, 1],
+      onUpdate: latest => {
+        offsetRef.current = latest
+        surfaceRef.current?.setAttribute('data-swipe-offset', String(Math.round(latest)))
+      },
+    })
+    clearPhaseTimer()
+    phaseTimerRef.current = globalThis.setTimeout(
+      beginCollapse,
+      Math.round(departureDuration * 1_000) + 16
+    )
   }
 
   const finishGesture = (pointerId: number) => {
     const gesture = gestureRef.current
     if (!gesture || gesture.pointerId !== pointerId) return
-    const shouldDismiss = gesture.dragging && offsetRef.current <= -SWIPE_DISMISS_THRESHOLD_PX
+    const width = Math.max(1, maxTravelRef.current - SWIPE_EXIT_OVERSHOOT_PX)
+    const threshold = Math.min(
+      SWIPE_DISMISS_MAX_PX,
+      Math.max(SWIPE_DISMISS_MIN_PX, width * SWIPE_DISMISS_RATIO)
+    )
+    const distanceCommitted = gesture.dragging && offsetRef.current <= -threshold
+    const flickCommitted = gesture.dragging
+      && offsetRef.current <= -SWIPE_FLICK_MIN_DISTANCE_PX
+      && gesture.velocityX <= SWIPE_FLICK_VELOCITY_PX_MS
     gestureRef.current = null
-    if (shouldDismiss) {
-      suppressClickRef.current = true
-      onDismiss()
+    if (distanceCommitted || flickCommitted) {
+      beginDismissal()
       return
     }
     resetGesture()
   }
 
+  useEffect(() => () => {
+    settleAnimationRef.current?.stop()
+    clearPhaseTimer()
+  }, [])
+
+  const collapseDuration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 0.09 : 0.19
+  const layoutTransition = motionPreference === 'none'
+    ? { duration: 0 }
+    : motionPreference === 'reduced'
+      ? { duration: 0.08 }
+      : { type: 'spring' as const, stiffness: 500, damping: 42, mass: 0.55 }
+  const isDeparting = phase === 'dismissing' || phase === 'collapsing'
+  const showDust = phase === 'dismissing' && motionPreference === 'full'
+
   return (
-    <div className="relative overflow-hidden rounded-[var(--radius-lg)]">
-      <button
-        type="button"
-        onClick={onDismiss}
-        onFocus={() => updateOffset(-SWIPE_ACTION_WIDTH_PX)}
-        onBlur={() => updateOffset(0)}
-        className="absolute inset-y-0 right-0 grid w-24 place-items-center bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-focus-ring)]"
-        aria-label={`Mark ${item.title} as read`}
-      >
-        <span className="flex flex-col items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.1em]">
-          <Check className="h-5 w-5" aria-hidden="true" />
-          Read
-        </span>
-      </button>
-      <div
-        data-testid={`notification-swipe-${item.id}`}
-        style={{
-          transform: `translate3d(${offset}px, 0, 0)`,
-          touchAction: 'pan-y',
-        }}
-        className="relative z-[1] bg-[var(--bg-app)] transition-transform duration-150 ease-out"
-        onClickCapture={event => {
-          if (!suppressClickRef.current) return
-          event.preventDefault()
-          event.stopPropagation()
-          suppressClickRef.current = false
-        }}
-        onPointerDown={event => {
-          if (event.pointerType === 'mouse' && event.button !== 0) return
-          gestureRef.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            dragging: false,
-            cancelled: false,
-          }
-        }}
-        onPointerMove={event => {
-          const gesture = gestureRef.current
-          if (!gesture || gesture.pointerId !== event.pointerId || gesture.cancelled) return
-          const deltaX = event.clientX - gesture.startX
-          const deltaY = event.clientY - gesture.startY
-          if (!gesture.dragging) {
-            if (Math.abs(deltaY) > 8 && Math.abs(deltaY) > Math.abs(deltaX)) {
-              gesture.cancelled = true
-              updateOffset(0)
-              return
+    <motion.div
+      ref={rootRef}
+      layout={motionPreference === 'none' ? false : 'position'}
+      data-testid={`notification-row-${item.id}`}
+      data-notification-swipe-id={item.id}
+      data-dismiss-phase={phase}
+      data-motion-preference={motionPreference}
+      animate={phase === 'collapsing'
+        ? { height: 0, opacity: 0, marginTop: -8 }
+        : { height: 'auto', opacity: 1, marginTop: 0 }}
+      transition={{
+        height: { duration: collapseDuration, ease: [0.22, 0.72, 0.24, 1] },
+        opacity: { duration: collapseDuration * 0.72 },
+        marginTop: { duration: collapseDuration, ease: [0.22, 0.72, 0.24, 1] },
+        layout: layoutTransition,
+      }}
+      onAnimationComplete={() => {
+        if (phaseRef.current === 'collapsing') finishDismissal()
+      }}
+      className={`relative rounded-[var(--radius-lg)] ${phase === 'collapsing' ? 'overflow-hidden' : 'overflow-visible'}`}
+    >
+      <div className="relative overflow-hidden rounded-[var(--radius-lg)]">
+        <motion.button
+          type="button"
+          onClick={beginDismissal}
+          onFocus={() => {
+            if (dismissStartedRef.current) return
+            setSwipePhase('settling')
+            settleTo(-SWIPE_ACTION_WIDTH_PX)
+          }}
+          onBlur={() => {
+            if (!dismissStartedRef.current) resetGesture()
+          }}
+          disabled={isDeparting}
+          style={{ opacity: readActionOpacity }}
+          className="absolute inset-0 flex items-center justify-end bg-[linear-gradient(90deg,rgba(201,154,58,0.06),var(--theme-accent-soft))] pr-5 text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-focus-ring)] disabled:pointer-events-none"
+          aria-label={`Mark ${item.title} as read`}
+        >
+          <motion.span
+            style={{ scale: readActionScale }}
+            className="flex flex-col items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.1em]"
+          >
+            <Check className="h-5 w-5" aria-hidden="true" />
+            Read
+          </motion.span>
+        </motion.button>
+        <motion.div
+          ref={surfaceRef}
+          data-testid={`notification-swipe-${item.id}`}
+          data-swipe-offset="0"
+          style={{
+            x,
+            touchAction: 'pan-y',
+            willChange: phase === 'dragging' || isDeparting ? 'transform' : 'auto',
+          }}
+          className="relative z-[1] bg-[var(--bg-app)]"
+          onClickCapture={event => {
+            if (!suppressClickRef.current) return
+            event.preventDefault()
+            event.stopPropagation()
+            if (!isDeparting) suppressClickRef.current = false
+          }}
+          onPointerDown={event => {
+            if (isDeparting || (event.pointerType === 'mouse' && event.button !== 0)) return
+            settleAnimationRef.current?.stop()
+            clearPhaseTimer()
+            const measuredWidth = surfaceRef.current?.getBoundingClientRect().width || 320
+            maxTravelRef.current = Math.max(240, measuredWidth + SWIPE_EXIT_OVERSHOOT_PX)
+            const now = globalThis.performance?.now?.() ?? Date.now()
+            gestureRef.current = {
+              pointerId: event.pointerId,
+              startX: event.clientX,
+              startY: event.clientY,
+              lastX: event.clientX,
+              lastAt: now,
+              velocityX: 0,
+              dragging: false,
+              cancelled: false,
             }
-            if (deltaX >= -8 || Math.abs(deltaX) <= Math.abs(deltaY)) return
-            gesture.dragging = true
-            suppressClickRef.current = true
-            event.currentTarget.setPointerCapture?.(event.pointerId)
-          }
-          event.preventDefault()
-          updateOffset(deltaX)
-        }}
-        onPointerUp={event => finishGesture(event.pointerId)}
-        onPointerCancel={event => finishGesture(event.pointerId)}
-      >
-        {children}
+          }}
+          onPointerMove={event => {
+            const gesture = gestureRef.current
+            if (!gesture || gesture.pointerId !== event.pointerId || gesture.cancelled) return
+            const deltaX = event.clientX - gesture.startX
+            const deltaY = event.clientY - gesture.startY
+            if (!gesture.dragging) {
+              if (
+                Math.abs(deltaY) > SWIPE_VERTICAL_LOCK_PX
+                && Math.abs(deltaY) > Math.abs(deltaX) * SWIPE_HORIZONTAL_LOCK_RATIO
+              ) {
+                gesture.cancelled = true
+                updateOffset(0)
+                return
+              }
+              if (
+                deltaX >= -8
+                || Math.abs(deltaX) <= Math.abs(deltaY) * SWIPE_HORIZONTAL_LOCK_RATIO
+              ) return
+              gesture.dragging = true
+              suppressClickRef.current = true
+              setSwipePhase('dragging')
+              event.currentTarget.setPointerCapture?.(event.pointerId)
+            }
+
+            const now = globalThis.performance?.now?.() ?? Date.now()
+            const elapsed = Math.max(1, now - gesture.lastAt)
+            const instantaneousVelocity = (event.clientX - gesture.lastX) / elapsed
+            gesture.velocityX = (gesture.velocityX * 0.35) + (instantaneousVelocity * 0.65)
+            gesture.lastX = event.clientX
+            gesture.lastAt = now
+            event.preventDefault()
+            updateOffset(deltaX)
+          }}
+          onPointerUp={event => finishGesture(event.pointerId)}
+          onPointerCancel={event => {
+            const gesture = gestureRef.current
+            if (!gesture || gesture.pointerId !== event.pointerId) return
+            gesture.cancelled = true
+            resetGesture()
+          }}
+        >
+          <motion.div
+            animate={isDeparting
+              ? { opacity: motionPreference === 'none' ? 0 : 0.12, scale: motionPreference === 'full' ? 0.975 : 1 }
+              : { opacity: 1, scale: 1 }}
+            transition={{
+              duration: motionPreference === 'full' ? 0.22 : motionPreference === 'reduced' ? 0.08 : 0,
+              ease: [0.22, 0.72, 0.24, 1],
+            }}
+          >
+            {children}
+          </motion.div>
+        </motion.div>
       </div>
-    </div>
+
+      {showDust && (
+        <div
+          data-testid={`notification-disintegration-${item.id}`}
+          className="pointer-events-none absolute inset-0 z-[2] overflow-visible"
+          aria-hidden="true"
+        >
+          {DISINTEGRATION_FRAGMENTS.map(fragment => (
+            <motion.span
+              key={`${fragment.left}-${fragment.top}`}
+              initial={{ opacity: 0, x: 0, y: 0, rotate: 0, scale: 0.7 }}
+              animate={{
+                opacity: [0, 0.9, 0],
+                x: fragment.x,
+                y: fragment.y,
+                rotate: fragment.rotate,
+                scale: [0.7, 1, 0.15],
+              }}
+              transition={{
+                duration: 0.28,
+                delay: fragment.delay,
+                times: [0, 0.28, 1],
+                ease: [0.22, 0.72, 0.24, 1],
+              }}
+              className="absolute rounded-[1px] bg-[var(--theme-accent-readable)] shadow-[0_0_8px_rgba(215,170,70,0.35)]"
+              style={{
+                left: `${fragment.left}%`,
+                top: `${fragment.top}%`,
+                width: fragment.size,
+                height: fragment.size,
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </motion.div>
   )
 }
 
 export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUpViewProps) {
   const { user } = useAuth()
+  const { effectivePreferences } = useComfortPreferences()
   const userId = user?.id ?? ''
   const [cached] = useState(() => readCatchUpCache(userId))
   const [snapshot, setSnapshot] = useState<CatchUpSnapshot | null>(cached.snapshot)
@@ -254,6 +494,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   const mountedRef = useRef(true)
   const profileCacheRef = useRef(new Map<string, User>())
   const profileRequestRef = useRef(0)
+  const notificationAcknowledgeRef = useRef(new Set<string>())
 
   useEffect(() => {
     snapshotRef.current = snapshot
@@ -391,13 +632,10 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     onOpenSource(item)
   }
 
-  const clearNotificationItem = (item: CatchUpItem, openSource: boolean) => {
+  const acknowledgeNotificationItem = (item: CatchUpItem, openSource: boolean) => {
     const eventId = item.notificationEventIds?.[0]
-    if (openSource) onOpenSource(item)
-    if (!eventId) return
-
-    setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
-    if (!openSource) setAnnouncement(`${item.title} marked as read.`)
+    if (!eventId || notificationAcknowledgeRef.current.has(eventId)) return
+    notificationAcknowledgeRef.current.add(eventId)
     void acknowledgeNotificationInboxEvent(eventId).then(() => {
       void clearNotificationEventFromSystemTray({
         notificationType: item.kind,
@@ -405,6 +643,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
       })
       requestAppBadgeRefresh()
     }).catch(() => {
+      notificationAcknowledgeRef.current.delete(eventId)
       if (!mountedRef.current) return
       setNotificationInboxError(
         openSource
@@ -416,7 +655,18 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   }
 
   const openNotificationItem = (item: CatchUpItem) => {
-    clearNotificationItem(item, true)
+    onOpenSource(item)
+    setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
+    acknowledgeNotificationItem(item, true)
+  }
+
+  const beginNotificationDismissal = (item: CatchUpItem) => {
+    setAnnouncement(`${item.title} marked as read.`)
+    acknowledgeNotificationItem(item, false)
+  }
+
+  const finishNotificationDismissal = (item: CatchUpItem) => {
+    setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
   }
 
   const refreshAll = () => {
@@ -489,7 +739,9 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
                       <SwipeToReadNotification
                         key={item.id}
                         item={item}
-                        onDismiss={() => clearNotificationItem(item, false)}
+                        motionPreference={effectivePreferences.motion}
+                        onReadStart={() => beginNotificationDismissal(item)}
+                        onDismissComplete={() => finishNotificationDismissal(item)}
                       >
                         <CatchUpCard
                           item={item}

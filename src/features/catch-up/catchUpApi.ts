@@ -56,9 +56,32 @@ const categoryTitle = (category: string | null) => {
   return 'ShadowChat update'
 }
 
+const getNotificationInboxRoute = (
+  raw: RawNotificationEvent,
+  payload: Record<string, unknown>,
+) => {
+  if (
+    raw.type === 'shadow_pin_post'
+    || raw.type === 'shadow_pin_comment'
+    || raw.type === 'shadow_pin_reply'
+  ) {
+    const imageId = asText(payload.image_id) || asText(payload.imageId)
+    const commentId = asText(payload.comment_id) || asText(payload.commentId)
+    if (imageId) {
+      const params = new URLSearchParams({ view: 'pins', pin: imageId })
+      if (commentId) {
+        params.set('panel', 'comments')
+        params.set('comment', commentId)
+      }
+      return `/?${params.toString()}`
+    }
+  }
+  return asText(raw.route) || asText(payload.route) || asText(payload.url)
+}
+
 const normalizeNotificationInboxItem = (raw: RawNotificationEvent): CatchUpItem | null => {
   const payload = asRecord(raw.payload) ?? {}
-  const route = asText(raw.route) || asText(payload.route) || asText(payload.url)
+  const route = getNotificationInboxRoute(raw, payload)
   if (!raw.id || !raw.type || !route || (!route.startsWith('/') && !route.startsWith('?'))) return null
   const actor = notificationActor(payload, raw.actor_id, raw.actor)
   return {

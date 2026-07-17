@@ -21,6 +21,7 @@ interface ShadowCheckersScreenProps {
   musicPlaying?: boolean
   audioBlocked?: boolean
   onToggleMusic?: () => void
+  unreadMatchCounts?: Record<string, number>
 }
 
 function CheckersButton({
@@ -102,6 +103,7 @@ export function ShadowCheckersScreen({
   musicPlaying = false,
   audioBlocked = false,
   onToggleMusic,
+  unreadMatchCounts = {},
 }: ShadowCheckersScreenProps) {
   const { user } = useAuth()
   const { isAdmin } = useAdminAccess()
@@ -567,6 +569,7 @@ export function ShadowCheckersScreen({
     const canQueue = match.status === 'active' && !currentUserIsPlayer
     const isCreator = match.player_one_id === user?.id
     const canCancel = (isCreator && match.status === 'waiting') || (isAdmin && (match.status === 'waiting' || match.status === 'active'))
+    const unreadCount = unreadMatchCounts[match.id] ?? 0
 
     return (
       <article
@@ -584,9 +587,20 @@ export function ShadowCheckersScreen({
               {displayName(match.player_one, 'Creator')} vs {match.player_two ? displayName(match.player_two) : 'Open seat'}
             </p>
           </div>
-          <span className="rounded-full border border-[#d7aa46]/30 bg-[#d7aa46]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#f0d381]">
-            {match.status}
-          </span>
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            {unreadCount > 0 && (
+              <span
+                className="rounded-full border border-[#f4d985]/55 bg-[#d7aa46]/16 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-[#f4d985]"
+                aria-label={`${unreadCount} unread ${unreadCount === 1 ? 'update' : 'updates'} for this match`}
+                data-testid={`checkers-unread-${match.id}`}
+              >
+                {unreadCount > 99 ? '99+' : unreadCount} new
+              </span>
+            )}
+            <span className="rounded-full border border-[#d7aa46]/30 bg-[#d7aa46]/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#f0d381]">
+              {match.status}
+            </span>
+          </div>
         </div>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <PlayerChip name={displayName(match.player_one, 'Creator')} characterKey={match.player_one_character_key} crown={shouldShowLegacyAchievementBadges(match.player_one) && match.player_one?.checkers_crown} />

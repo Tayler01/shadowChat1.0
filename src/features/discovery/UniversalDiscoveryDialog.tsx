@@ -12,8 +12,9 @@ import {
   X,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
 import type { User } from '../../lib/supabase'
+import type { AppView } from '../../types/navigation'
+import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import {
   createMessageCollection,
   deleteMessageCollection,
@@ -47,6 +48,13 @@ const PublicProfileDialog = lazy(() => import('../../components/profile/PublicPr
 })))
 
 const DISCOVERY_SCOPES: readonly DiscoveryScope[] = ['all', 'messages', 'people', 'pins', 'play', 'library']
+const DISCOVERY_QUERY_PARAM = 'q'
+const DISCOVERY_SCOPE_PARAM = 'scope'
+
+const clearDiscoveryRouteState = (url: URL) => {
+  url.searchParams.delete(DISCOVERY_QUERY_PARAM)
+  url.searchParams.delete(DISCOVERY_SCOPE_PARAM)
+}
 
 const authorLabel = (item: MessageLibraryItem) => {
   const displayName = typeof item.author.display_name === 'string' ? item.author.display_name : ''
@@ -69,6 +77,7 @@ const openUrlState = (mutate: (url: URL) => void) => {
 }
 
 const openMessage = (item: MessageLibraryItem) => openUrlState(url => {
+  clearDiscoveryRouteState(url)
   url.searchParams.set('view', item.source === 'dm' ? 'dms' : 'chat')
   url.searchParams.set('message', item.messageId)
   if (item.source === 'dm' && item.conversationId) url.searchParams.set('conversation', item.conversationId)
@@ -76,6 +85,7 @@ const openMessage = (item: MessageLibraryItem) => openUrlState(url => {
 })
 
 const openPin = (pin: ShadowPinImage) => openUrlState(url => {
+  clearDiscoveryRouteState(url)
   url.searchParams.set('view', 'pins')
   url.searchParams.set('pin', pin.id)
   url.searchParams.delete('message')
@@ -83,6 +93,7 @@ const openPin = (pin: ShadowPinImage) => openUrlState(url => {
 })
 
 const openPlay = (item: PlayDiscoveryEntry) => openUrlState(url => {
+  clearDiscoveryRouteState(url)
   url.searchParams.set('view', 'games')
   url.searchParams.set('experience', item.experience)
   if (item.item) url.searchParams.set('item', item.item)
@@ -217,17 +228,22 @@ function DiscoveryLibraryCard({
   )
 }
 
-export function UniversalDiscoveryDialog({
-  open,
-  onClose,
-  onNavigate,
+export function UniversalDiscoveryView({
+  currentView,
+  onViewChange,
 }: {
-  open: boolean
-  onClose: () => void
-  onNavigate: () => void
+  currentView: AppView
+  onViewChange: (view: AppView) => void
 }) {
-  const [scope, setScope] = useState<DiscoveryScope>('all')
-  const [query, setQuery] = useState('')
+  const [scope, setScope] = useState<DiscoveryScope>(() => {
+    if (typeof window === 'undefined') return 'all'
+    const value = new URL(window.location.href).searchParams.get(DISCOVERY_SCOPE_PARAM)
+    return DISCOVERY_SCOPES.includes(value as DiscoveryScope) ? value as DiscoveryScope : 'all'
+  })
+  const [query, setQuery] = useState(() => {
+    if (typeof window === 'undefined') return ''
+    return new URL(window.location.href).searchParams.get(DISCOVERY_QUERY_PARAM)?.slice(0, 200) ?? ''
+  })
   const [response, setResponse] = useState<DiscoverySearchResponse>({
     requestId: '',
     query: '',
@@ -243,10 +259,8 @@ export function UniversalDiscoveryDialog({
   const [libraryError, setLibraryError] = useState<string | null>(null)
   const [savingId, setSavingId] = useState<string | null>(null)
   const [profileUser, setProfileUser] = useState<User | null>(null)
-  const closeRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const requestRef = useRef(0)
-  const dialogRef = useDialogAccessibility({ open, onClose, initialFocusRef: searchRef })
 
   const refreshCollections = useCallback(async () => {
     const next = await listMessageCollections()
@@ -272,26 +286,25 @@ export function UniversalDiscoveryDialog({
   }, [selectedCollectionId])
 
   useEffect(() => {
-    if (!open || scope === 'library') return
+    if (scope === 'library') return
     void listSavedDiscoveryItems().then(setSavedDiscoveryItems).catch(() => {
       // The Library surface reports this error when opened; discovery remains usable.
     })
-  }, [open, scope])
+  }, [scope])
 
   useEffect(() => {
-    if (!open) return
     void refreshCollections().catch(error => {
       setLibraryError(error instanceof Error ? error.message : 'Unable to load collections.')
     })
-  }, [open, refreshCollections])
+  }, [refreshCollections])
 
   useEffect(() => {
-    if (!open || scope !== 'library') return
+    if (scope !== 'library') return
     void refreshLibrary(selectedCollectionId)
-  }, [open, refreshLibrary, scope, selectedCollectionId])
+  }, [refreshLibrary, scope, selectedCollectionId])
 
   useEffect(() => {
-    if (!open || scope === 'library') return
+    if (scope === 'library') return
     const normalized = query.trim()
     if (normalized.length < 2) {
       setResponse({ requestId: String(requestRef.current), query: normalized, groups: createEmptyDiscoveryGroups(), errors: {} })
@@ -335,7 +348,18 @@ export function UniversalDiscoveryDialog({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [open, query, scope])
+  }, [query, scope])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    if (url.searchParams.get('view') !== 'discover') return
+    if (query.trim()) url.searchParams.set(DISCOVERY_QUERY_PARAM, query.slice(0, 200))
+    else url.searchParams.delete(DISCOVERY_QUERY_PARAM)
+    if (scope !== 'all') url.searchParams.set(DISCOVERY_SCOPE_PARAM, scope)
+    else url.searchParams.delete(DISCOVERY_SCOPE_PARAM)
+    window.history.replaceState(window.history.state ?? {}, '', url)
+  }, [query, scope])
 
   const visibleProviders = useMemo<DiscoveryProvider[]>(() => (
     scope === 'all' ? ['messages', 'people', 'pins', 'play'] : scope === 'library' ? [] : [scope]
@@ -344,7 +368,6 @@ export function UniversalDiscoveryDialog({
 
   const closeAndOpen = (action: () => void) => {
     action()
-    onNavigate()
   }
 
   const saveMessage = async (item: MessageLibraryItem) => {
@@ -446,12 +469,14 @@ export function UniversalDiscoveryDialog({
   const openSavedDiscoveryItem = (item: SavedDiscoveryItem) => {
     if (item.targetKind === 'shadow_pin') {
       openUrlState(url => {
+        clearDiscoveryRouteState(url)
         url.searchParams.set('view', 'pins')
         url.searchParams.set('pin', item.targetId)
       })
       return
     }
     openUrlState(url => {
+      clearDiscoveryRouteState(url)
       url.searchParams.set('view', 'games')
       url.searchParams.set('experience', item.targetKind === 'shado_tv_video' ? 'shado-tv' : 'shadow-mystery')
       url.searchParams.set('item', item.targetSlug || item.targetId)
@@ -495,27 +520,27 @@ export function UniversalDiscoveryDialog({
     }
   }
 
-  if (!open) return null
-
   return (
     <>
-      <div className="fixed inset-0 z-[120] flex items-stretch justify-center bg-[var(--bg-overlay)] backdrop-blur-md sm:items-center sm:px-4 sm:py-6">
-        <div
-          ref={dialogRef}
-          role="dialog"
-          aria-modal="true"
+      <div className="theme-app-surface flex h-full min-h-0 flex-col pb-[calc(env(safe-area-inset-bottom)+4.2rem)] text-sm md:pb-0" data-testid="universal-discovery-view">
+        <MobileAppHeader
+          currentView={currentView}
+          onViewChange={onViewChange}
+          title="Discover"
+          logo
+          showSearch={false}
+          className="hidden md:flex"
+        />
+        <section
           aria-labelledby="universal-discovery-title"
-          className="popup-surface flex h-[var(--shadowchat-visual-viewport-height,100dvh)] w-full flex-col overflow-hidden rounded-none border-[var(--border-panel)] sm:h-[min(92dvh,54rem)] sm:max-w-3xl sm:rounded-[var(--radius-xl)] sm:border"
+          className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col overflow-hidden"
         >
-          <header className="border-b border-[var(--border-subtle)] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.6rem)] sm:pt-4">
+          <header className="border-b border-[var(--border-subtle)] px-4 pb-3 pt-[calc(env(safe-area-inset-top)+1rem)] md:pt-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className="text-[0.66rem] uppercase tracking-[0.18em] text-[var(--theme-accent-readable)]">ShadowChat</p>
-                <h2 id="universal-discovery-title" className="text-xl font-semibold text-[var(--text-primary)]">Discover</h2>
+                <h1 id="universal-discovery-title" className="text-xl font-semibold text-[var(--text-primary)]">Discover</h1>
               </div>
-              <button ref={closeRef} type="button" onClick={onClose} className="inline-flex h-12 w-12 items-center justify-center rounded-full text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]" aria-label="Close Discover">
-                <X className="h-5 w-5" />
-              </button>
             </div>
             {scope !== 'library' && (
               <label className="relative mt-3 block">
@@ -568,7 +593,7 @@ export function UniversalDiscoveryDialog({
             </div>
           )}
 
-          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
+          <main className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-5 pt-4">
             <p className="sr-only" aria-live="polite">
               {loading ? 'Searching messages, people, Pins, and Play' : `${resultCount} discovery results`}
             </p>
@@ -594,7 +619,7 @@ export function UniversalDiscoveryDialog({
               </div>
             )}
           </main>
-        </div>
+        </section>
       </div>
       <Suspense fallback={null}>
         {profileUser && <PublicProfileDialog user={profileUser} open onClose={() => setProfileUser(null)} />}

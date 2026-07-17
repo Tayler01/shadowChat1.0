@@ -48,7 +48,9 @@ import { ZoomableImageFrame } from '../../components/ui/ZoomableImageFrame'
 import { useAuth } from '../../hooks/useAuth'
 import { useAdminAccess } from '../../hooks/useAdminAccess'
 import { useComfortPreferences } from '../../hooks/useComfortPreferences'
+import { useAppBadgeState } from '../../hooks/useAppBadgeState'
 import { useOptionalMessages } from '../../hooks/MessagesContext'
+import type { ShadowPinBadgeDestination } from '../../lib/appBadge'
 import { getBlockedActionMessage } from '../../lib/moderation'
 import { PERSONAL_BLOCKS_CHANGED_EVENT } from '../../lib/personalBlocking'
 import { showActionErrorToast } from '../../lib/toastNotifications'
@@ -68,6 +70,7 @@ import { ShadowPinImmersiveViewer } from './components/ShadowPinImmersiveViewer'
 import { buildViewerSequence, createShadowPinPermalink } from './immersiveViewerModel'
 import { useModerationReport } from '../moderation/useModerationReport'
 import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
+import { markNotificationDestinationRead } from '../notifications/notificationApi'
 import { rankShadowPinCategories } from './categorySearch'
 import { ShadowPinFeedModeTabs } from './components/ShadowPinFeedModeTabs'
 import { useShadowPinConnectionFeed } from './hooks/useShadowPinConnectionFeed'
@@ -131,6 +134,29 @@ const getDisplayName = (item: { creator?: ShadowPinCategory['creator'] }) =>
   item.creator?.display_name || item.creator?.username || 'ShadowChat'
 
 const formatCount = (count: number) => count > 999 ? `${Math.floor(count / 100) / 10}k` : String(count)
+
+function ShadowPinUnreadBadge({
+  count,
+  label,
+  className,
+}: {
+  count: number
+  label: string
+  className?: string
+}) {
+  if (count <= 0) return null
+  return (
+    <span
+      className={cn(
+        'inline-flex min-h-7 min-w-7 items-center justify-center rounded-full border border-[var(--theme-accent-border)] bg-[rgba(12,10,6,0.9)] px-2 text-xs font-bold text-[var(--theme-accent-readable)] shadow-[0_8px_22px_rgba(0,0,0,0.5)] backdrop-blur-sm',
+        className
+      )}
+      aria-label={`${count} unread ${label} ${count === 1 ? 'update' : 'updates'}`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
 
 const canManage = (
   item: { creator_id?: string | null },
@@ -1168,6 +1194,7 @@ function useLongPress(action: () => void) {
 
 function CategoryCard({
   category,
+  unreadCount,
   canManageCategory,
   onOpen,
   onDetails,
@@ -1175,6 +1202,7 @@ function CategoryCard({
   onHeart,
 }: {
   category: ShadowPinCategory
+  unreadCount: number
   canManageCategory: boolean
   onOpen: () => void
   onDetails: () => void
@@ -1204,6 +1232,11 @@ function CategoryCard({
         )}
       </div>
       <div className="relative aspect-[4/3] overflow-hidden bg-[rgba(255,255,255,0.05)]">
+        <ShadowPinUnreadBadge
+          count={unreadCount}
+          label={`${category.title} Pin`}
+          className="absolute right-2 top-2 z-20"
+        />
         <img
           src={getCategoryImageUrl(category)}
           alt={category.title}
@@ -1698,6 +1731,8 @@ function PinActionFeedback({ feedback }: { feedback: PinActionFeedbackState | nu
 
 function ImageCard({
   image,
+  unreadCount,
+  discussionUnreadCount,
   canManageImage,
   columnSide,
   activeVideoId,
@@ -1721,6 +1756,8 @@ function ImageCard({
   onVisible,
 }: {
   image: ShadowPinImage
+  unreadCount: number
+  discussionUnreadCount: number
   canManageImage: boolean
   columnSide: PinColumnSide
   activeVideoId: string | null
@@ -2392,6 +2429,20 @@ function ImageCard({
       onPointerCancel={handlePointerCancel}
     >
       <div className="relative overflow-hidden" style={{ aspectRatio }}>
+        <ShadowPinUnreadBadge
+          count={unreadCount}
+          label={`${image.title}`}
+          className="pointer-events-none absolute right-2 top-2 z-30"
+        />
+        {discussionUnreadCount > 0 && (
+          <span
+            className="pointer-events-none absolute right-2 top-11 z-30 inline-flex min-h-7 items-center gap-1 rounded-full border border-[var(--theme-accent-border-soft)] bg-[rgba(12,10,6,0.9)] px-2 text-[0.68rem] font-bold text-[var(--theme-accent-readable)] shadow-[0_8px_22px_rgba(0,0,0,0.45)]"
+            aria-label={`${discussionUnreadCount} unread ${discussionUnreadCount === 1 ? 'comment' : 'comments'}`}
+          >
+            <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+            {discussionUnreadCount > 99 ? '99+' : discussionUnreadCount}
+          </span>
+        )}
         <button
           type="button"
           data-shadow-pin-media-opener="true"
@@ -2660,6 +2711,7 @@ function PinShareSheet({
 
 function ShadowPinMasonryGrid({
   images,
+  unreadDestinations,
   label,
   testId = 'shadow-pin-feed',
   onViewer,
@@ -2671,6 +2723,7 @@ function ShadowPinMasonryGrid({
   onVisible,
 }: {
   images: ShadowPinImage[]
+  unreadDestinations: ShadowPinBadgeDestination[]
   label: string
   testId?: string
   onViewer: (image: ShadowPinImage) => void
@@ -2794,6 +2847,8 @@ function ShadowPinMasonryGrid({
             >
               <ImageCard
                 image={image}
+                unreadCount={unreadDestinations.find(destination => destination.imageId === image.id)?.unreadCount ?? 0}
+                discussionUnreadCount={unreadDestinations.find(destination => destination.imageId === image.id)?.discussionCount ?? 0}
                 canManageImage={canManage(image, user?.id, adminRole)}
                 columnSide={getPinColumnSide(columnIndex, masonryColumnCount)}
                 activeVideoId={activeVideoId}
@@ -3014,6 +3069,9 @@ function ShadowPinHome({
   initialCircleId,
   onCircleChange,
   tracker,
+  unreadDestinations,
+  onPostViewed,
+  onDiscussionViewed,
 }: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & {
   onOpenCategory: (category: ShadowPinCategory) => void
   onOpenPin: (image: ShadowPinImage) => void
@@ -3032,6 +3090,9 @@ function ShadowPinHome({
   initialCircleId?: string
   onCircleChange: (circleId: string | null) => void
   tracker: ShadowPinActivityTracker
+  unreadDestinations: ShadowPinBadgeDestination[]
+  onPostViewed: (imageId: string) => void
+  onDiscussionViewed: (imageId: string) => void
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
@@ -3697,6 +3758,10 @@ function ShadowPinHome({
             mode={feedModeState.mode}
             onChange={selectFeedMode}
             disabled={feedModeState.loading}
+            discoverUnreadCount={unreadDestinations.reduce(
+              (total, destination) => total + destination.unreadCount,
+              0
+            )}
           />
         </div>
         {feedModeState.mode === 'connections' && (
@@ -3883,6 +3948,9 @@ function ShadowPinHome({
                 <CategoryCard
                   key={category.id}
                   category={category}
+                  unreadCount={unreadDestinations
+                    .filter(destination => destination.categoryId === category.id)
+                    .reduce((total, destination) => total + destination.unreadCount, 0)}
                   canManageCategory={manage}
                   onOpen={() => openCategory(category)}
                   onDetails={() => setModal({ type: 'category-details', category })}
@@ -3980,6 +4048,7 @@ function ShadowPinHome({
                 )}
                 <ShadowPinMasonryGrid
                   images={activeConnectionsState.images}
+                  unreadDestinations={unreadDestinations}
                   label={selectedCircle ? `Pins from ${selectedCircle.name}` : 'Pins from your Connections'}
                   testId="shadow-pin-feed"
                   onViewer={openConnectionImageViewer}
@@ -3988,7 +4057,10 @@ function ShadowPinHome({
                   onComments={openConnectionImageComments}
                   onShare={image => tracker.recordShareTapped(image, null)}
                   onShareToGroupChat={messagesApi ? shareConnectionImageToGroupChat : undefined}
-                  onVisible={image => tracker.recordPinViewed(image, null)}
+                  onVisible={image => {
+                    tracker.recordPinViewed(image, null)
+                    onPostViewed(image.id)
+                  }}
                 />
                 {activeConnectionsState.hasMore && (
                   <div className="mt-4 flex justify-center">
@@ -4110,7 +4182,10 @@ function ShadowPinHome({
             onPinRoute('replace-viewer', image.id)
           }}
           onLoadMore={activeConnectionsState.loadMore}
-          onSettled={image => tracker.recordPinOpened(image, null)}
+          onSettled={image => {
+            tracker.recordPinOpened(image, null)
+            onPostViewed(image.id)
+          }}
           onHeart={toggleConnectionImageHeart}
           onComments={image => openConnectionImageComments(image, true)}
           onShare={image => { void shareConnectionImage(image) }}
@@ -4127,6 +4202,7 @@ function ShadowPinHome({
           image={commentsImage}
           initialCommentId={initialCommentId}
           open
+          onLoaded={() => onDiscussionViewed(commentsImage.id)}
           onClose={() => {
             setCommentsImage(null)
             onPinRoute('close-comments', connectionsViewerImage?.id || commentsImage.id)
@@ -4160,6 +4236,9 @@ function ShadowPinCategoryScreen({
   onPinRoute,
   onViewerClose,
   onViewerImageResolved,
+  unreadDestinations,
+  onPostViewed,
+  onDiscussionViewed,
 }: {
   currentView: AppView
   onViewChange: (view: AppView) => void
@@ -4174,6 +4253,9 @@ function ShadowPinCategoryScreen({
   onPinRoute: (action: PinRouteAction, imageId?: string, commentId?: string) => void
   onViewerClose?: () => void
   onViewerImageResolved?: (image: ShadowPinImage) => void
+  unreadDestinations: ShadowPinBadgeDestination[]
+  onPostViewed: (imageId: string) => void
+  onDiscussionViewed: (imageId: string) => void
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
@@ -4408,6 +4490,7 @@ function ShadowPinCategoryScreen({
           <>
             <ShadowPinMasonryGrid
               images={imagesState.images}
+              unreadDestinations={unreadDestinations}
               label="ShadowPin pin masonry grid"
               onViewer={openImageViewer}
               onEdit={image => { setCreatorTargetImage(image); setCreatorOpen(true) }}
@@ -4415,7 +4498,10 @@ function ShadowPinCategoryScreen({
               onComments={openImageComments}
               onShare={image => tracker.recordShareTapped(image, imagesState.category)}
               onShareToGroupChat={messagesApi ? shareImageToGroupChat : undefined}
-              onVisible={image => tracker.recordPinViewed(image, imagesState.category)}
+              onVisible={image => {
+                tracker.recordPinViewed(image, imagesState.category)
+                onPostViewed(image.id)
+              }}
             />
             {imagesState.hasMore && (
               <div className="mt-4 flex justify-center">
@@ -4489,7 +4575,10 @@ function ShadowPinCategoryScreen({
             onPinRoute('replace-viewer', image.id)
           }}
           onLoadMore={imagesState.loadMore}
-          onSettled={image => tracker.recordPinOpened(image, imagesState.category)}
+          onSettled={image => {
+            tracker.recordPinOpened(image, imagesState.category)
+            onPostViewed(image.id)
+          }}
           onHeart={toggleImageHeart}
           onComments={image => openImageComments(image, true)}
           onShare={image => { void shareViewerImage(image) }}
@@ -4506,6 +4595,7 @@ function ShadowPinCategoryScreen({
           image={commentsImage}
           initialCommentId={initialCommentId}
           open
+          onLoaded={() => onDiscussionViewed(commentsImage.id)}
           onClose={() => {
             setCommentsImage(null)
             onPinRoute('close-comments', viewerImage?.id || commentsImage.id)
@@ -4539,6 +4629,7 @@ export function ShadowPin({
   onFeedModeChange = NOOP_SHADOW_PIN_FEED_MODE_CHANGE,
   onCircleChange = NOOP_SHADOW_PIN_CIRCLE_CHANGE,
 }: ShadowPinProps) {
+  const badgeState = useAppBadgeState()
   const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null)
   const [returnHomeAfterViewerClose, setReturnHomeAfterViewerClose] = useState(false)
   const [initialImage, setInitialImage] = useState<ShadowPinImage | null>(null)
@@ -4554,6 +4645,38 @@ export function ShadowPin({
     restoreMode: null,
   })
   const tracker = useShadowPinActivityTracker()
+  const notificationReadInFlightRef = useRef(new Set<string>())
+
+  const markDestinationEventsRead = useCallback((
+    imageId: string,
+    eventIds: string[],
+    kind: 'post' | 'discussion'
+  ) => {
+    const pendingIds = eventIds.filter(eventId => !notificationReadInFlightRef.current.has(eventId))
+    if (pendingIds.length === 0) return
+    pendingIds.forEach(eventId => notificationReadInFlightRef.current.add(eventId))
+    void markNotificationDestinationRead(pendingIds, { imageId }).then(success => {
+      if (success) return
+      pendingIds.forEach(eventId => notificationReadInFlightRef.current.delete(eventId))
+    }).catch(() => {
+      pendingIds.forEach(eventId => notificationReadInFlightRef.current.delete(eventId))
+      toast.error(`Unable to clear this Pin's unread ${kind === 'post' ? 'status' : 'comments'}`)
+    })
+  }, [])
+
+  const markPostViewed = useCallback((imageId: string) => {
+    const destination = badgeState.shadowPinDestinations.find(candidate => candidate.imageId === imageId)
+    if (destination?.postEventIds.length) {
+      markDestinationEventsRead(imageId, destination.postEventIds, 'post')
+    }
+  }, [badgeState.shadowPinDestinations, markDestinationEventsRead])
+
+  const markDiscussionViewed = useCallback((imageId: string) => {
+    const destination = badgeState.shadowPinDestinations.find(candidate => candidate.imageId === imageId)
+    if (destination?.discussionEventIds.length) {
+      markDestinationEventsRead(imageId, destination.discussionEventIds, 'discussion')
+    }
+  }, [badgeState.shadowPinDestinations, markDestinationEventsRead])
 
   useEffect(() => {
     let cancelled = false
@@ -4719,6 +4842,9 @@ export function ShadowPin({
           setInitialNeighbors([])
           setActiveCategoryId(null)
         } : undefined}
+        unreadDestinations={badgeState.shadowPinDestinations}
+        onPostViewed={markPostViewed}
+        onDiscussionViewed={markDiscussionViewed}
       />
     )
   }
@@ -4765,6 +4891,9 @@ export function ShadowPin({
       initialCircleId={initialCircleId}
       onCircleChange={onCircleChange}
       tracker={tracker}
+      unreadDestinations={badgeState.shadowPinDestinations}
+      onPostViewed={markPostViewed}
+      onDiscussionViewed={markDiscussionViewed}
     />
   )
 }

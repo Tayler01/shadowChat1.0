@@ -157,3 +157,17 @@ test('auto-selected matches push from the lobby and replace an existing match ro
   expect(onMatchRoute).toHaveBeenCalledTimes(1)
   expect(onMatchRoute).toHaveBeenCalledWith('replace-item', 'match-2')
 })
+
+test('identifies the exact Checkers match that owns an unread Play update', () => {
+  const currentState = mockUseShadowCheckers()
+  mockUseShadowCheckers.mockReturnValue({
+    ...currentState,
+    activeMatch: null,
+    selectedMatchId: null,
+  })
+
+  render(<ShadowCheckersScreen unreadMatchCounts={{ [activeMatch.id]: 1 }} />)
+
+  expect(screen.getByTestId(`checkers-unread-${activeMatch.id}`)).toHaveTextContent('1 new')
+  expect(screen.getByLabelText('1 unread update for this match')).toBeInTheDocument()
+})

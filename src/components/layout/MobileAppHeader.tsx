@@ -128,7 +128,10 @@ export function MobileAppHeader({
           {actions}
           {showSearch && (
             <Suspense fallback={<span className="h-11 w-11" aria-hidden="true" />}>
-              <LazyGlobalSearchButton />
+              <LazyGlobalSearchButton
+                active={currentView === 'discover'}
+                onOpen={() => onViewChange('discover')}
+              />
             </Suspense>
           )}
           {showSettings && (

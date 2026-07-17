@@ -54,6 +54,10 @@ test('active routes and message targets keep their expected shape', () => {
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=weather'))).toMatchObject({
     view: 'weather',
   })
+  expect(normalizeViewParam('discover')).toBe('discover')
+  expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=discover&q=archive&scope=pins'))).toMatchObject({
+    view: 'discover',
+  })
 
   expect(getLocationStateFromUrl(new URL('https://shadochat.online/?view=dms&conversation=dm-1&message=message-2'))).toEqual({
     view: 'dms',

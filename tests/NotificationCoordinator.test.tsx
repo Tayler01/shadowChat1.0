@@ -44,14 +44,17 @@ jest.mock('../src/features/notifications/notificationApi', () => ({
 
 describe('NotificationCoordinatorProvider', () => {
   let insertHandler: ((payload: { new: unknown }) => void) | undefined
+  let updateHandler: ((payload: { new: unknown }) => void) | undefined
   let channel: { on: jest.Mock; subscribe: jest.Mock }
   let client: { channel: jest.Mock; removeChannel: jest.Mock }
 
   beforeEach(() => {
     insertHandler = undefined
+    updateHandler = undefined
     channel = {
       on: jest.fn((_kind, filter, handler) => {
         if (filter?.event === 'INSERT') insertHandler = handler
+        if (filter?.event === 'UPDATE') updateHandler = handler
         return channel
       }),
       subscribe: jest.fn((statusHandler?: (status: string) => void) => {
@@ -96,7 +99,7 @@ describe('NotificationCoordinatorProvider', () => {
     )
     await waitFor(() => expect(insertHandler).toBeDefined())
     expect(client.channel).toHaveBeenCalledTimes(1)
-    expect(channel.on).toHaveBeenCalledTimes(1)
+    expect(channel.on).toHaveBeenCalledTimes(2)
 
     act(() => {
       insertHandler?.({
@@ -134,6 +137,21 @@ describe('NotificationCoordinatorProvider', () => {
       conversationId: 'conversation-1',
       messageId: 'message-1',
     }))
+  })
+
+  it('refreshes destination badges when an event is read in another tab', async () => {
+    render(
+      <NotificationCoordinatorProvider>
+        <main>App</main>
+      </NotificationCoordinatorProvider>,
+    )
+    await waitFor(() => expect(updateHandler).toBeDefined())
+
+    act(() => {
+      updateHandler?.({ new: { id: 'event-read' } })
+    })
+
+    expect(requestAppBadgeRefresh).toHaveBeenCalled()
   })
 
   it('presents a current foreground event even when another device delivery set sent_at', async () => {

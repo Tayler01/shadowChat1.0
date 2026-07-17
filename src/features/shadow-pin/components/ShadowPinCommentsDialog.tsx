@@ -301,12 +301,14 @@ export function ShadowPinCommentsDialog({
   onClose,
   onCountChange,
   initialCommentId,
+  onLoaded,
 }: {
   image: ShadowPinImage
   open: boolean
   onClose: () => void
   onCountChange?: (count: number) => void
   initialCommentId?: string
+  onLoaded?: () => void
 }) {
   const { user } = useAuth()
   const { openReport } = useModerationReport()
@@ -327,7 +329,12 @@ export function ShadowPinCommentsDialog({
   const viewportFrameRef = useRef<HTMLDivElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const canonicalCountRef = useRef(Math.max(0, image.comment_count ?? 0))
+  const onLoadedRef = useRef(onLoaded)
   const dialogRef = useDialogAccessibility({ open: open && !profileUser, onClose, initialFocusRef: closeRef })
+
+  useEffect(() => {
+    onLoadedRef.current = onLoaded
+  }, [onLoaded])
 
   const syncViewportFrame = useCallback(() => {
     const frame = viewportFrameRef.current
@@ -401,6 +408,7 @@ export function ShadowPinCommentsDialog({
       setComments(page.comments)
       setOlderCursor(page.nextCursor)
       setHasOlder(page.hasMore)
+      onLoadedRef.current?.()
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load comments.')
     } finally {

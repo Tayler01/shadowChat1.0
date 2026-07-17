@@ -138,6 +138,10 @@ const notificationMatchesClearRequest = (notification, request) => {
     return false
   }
 
+  if (request.roomId && data.roomId !== request.roomId) {
+    return false
+  }
+
   return true
 }
 

@@ -96,14 +96,25 @@ for (const profile of profiles) {
     await openDiscover.waitFor({ timeout: 15_000 })
     await openDiscover.click()
 
-    const dialog = page.getByRole('dialog', { name: 'Discover' })
-    await dialog.waitFor()
+    const discover = page.getByTestId('universal-discovery-view')
+    await discover.waitFor()
+    const mobileNav = page.getByRole('navigation', { name: 'Primary and utility navigation' })
+    await mobileNav.waitFor()
+    if (await page.getByRole('dialog', { name: 'Discover' }).count()) {
+      throw new Error('Discover still renders as a modal dialog.')
+    }
+    if (!await discover.evaluate(element => element.classList.contains('theme-app-surface'))) {
+      throw new Error('Discover is missing the standard themed app surface.')
+    }
+    if (new URL(page.url()).searchParams.get('view') !== 'discover') {
+      throw new Error(`Discover did not use its routed page URL: ${page.url()}`)
+    }
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}-01-empty.png`) })
 
     const search = page.getByLabel('Search ShadowChat')
     await search.fill('shadow')
     await page.getByText('Shadow Mystery', { exact: true }).first().waitFor({ timeout: 20_000 })
-    const firstMessageCard = dialog.locator('section[aria-label="Messages"] article').first()
+    const firstMessageCard = discover.locator('section[aria-label="Messages"] article').first()
     const messageCardDiagnostics = await firstMessageCard.isVisible().then(visible => visible
       ? firstMessageCard.evaluate(element => ({
           height: element.getBoundingClientRect().height,
@@ -148,14 +159,20 @@ for (const profile of profiles) {
     const messageCardHeight = messageCardDiagnostics?.height ?? null
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}-02-all-results.png`) })
 
-    const geometry = await dialog.evaluate(element => ({
+    const geometry = await discover.evaluate(element => ({
       width: element.getBoundingClientRect().width,
       height: element.getBoundingClientRect().height,
       viewportWidth: window.innerWidth,
       viewportHeight: window.visualViewport?.height ?? window.innerHeight,
       pageScrollWidth: document.documentElement.scrollWidth,
+      menuVisible: (() => {
+        const nav = document.querySelector('nav[aria-label="Primary and utility navigation"]')
+        if (!(nav instanceof HTMLElement)) return false
+        const rect = nav.getBoundingClientRect()
+        return rect.height > 0 && rect.bottom <= window.innerHeight + 1
+      })(),
     }))
-    if (geometry.width > geometry.viewportWidth + 1 || geometry.height > geometry.viewportHeight + 1 || geometry.pageScrollWidth > geometry.viewportWidth + 1) {
+    if (geometry.width > geometry.viewportWidth + 1 || geometry.height > geometry.viewportHeight + 1 || geometry.pageScrollWidth > geometry.viewportWidth + 1 || !geometry.menuVisible) {
       throw new Error(`Discover overflow: ${JSON.stringify(geometry)}`)
     }
     if (messageCardHeight && messageCardHeight > 360) {
@@ -181,10 +198,10 @@ for (const profile of profiles) {
     await page.getByRole('tab', { name: /library/i }).click()
     await page.getByLabel('Filter saved messages by collection').waitFor({ timeout: 20_000 })
     await page.getByText('Loading your Library').waitFor({ state: 'hidden', timeout: 20_000 })
-    if (await dialog.locator('.text-red-100').isVisible().catch(() => false)) {
-      throw new Error(`Library error: ${await dialog.locator('.text-red-100').innerText()}`)
+    if (await discover.locator('.text-red-100').isVisible().catch(() => false)) {
+      throw new Error(`Library error: ${await discover.locator('.text-red-100').innerText()}`)
     }
-    const libraryHeaderGeometry = await dialog.locator('header').evaluate(header => {
+    const libraryHeaderGeometry = await discover.locator('header').last().evaluate(header => {
       const title = header.querySelector('#universal-discovery-title')
       const headerRect = header.getBoundingClientRect()
       const titleRect = title?.getBoundingClientRect()
@@ -200,7 +217,7 @@ for (const profile of profiles) {
       throw new Error(`Library header moved outside the viewport: ${JSON.stringify(libraryHeaderGeometry)}`)
     }
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}-04-library.png`) })
-    await dialog.locator('header').screenshot({ path: path.join(artifactDir, `${profile.name}-04-library-header.png`) })
+    await discover.locator('header').last().screenshot({ path: path.join(artifactDir, `${profile.name}-04-library-header.png`) })
 
     if (consoleErrors.length || pageErrors.length) {
       throw new Error(`Browser errors: ${JSON.stringify({ consoleErrors, pageErrors })}`)

@@ -16,6 +16,23 @@ const normalizeBadgeCount = (count: number) => {
 export const APP_BADGE_REFRESH_EVENT = 'shadowchat:app-badge-refresh'
 export const APP_BADGE_STATE_EVENT = 'shadowchat:app-badge-state'
 
+export interface ShadowPinBadgeDestination {
+  categoryId: string
+  imageId: string
+  unreadCount: number
+  postCount: number
+  discussionCount: number
+  postEventIds: string[]
+  discussionEventIds: string[]
+}
+
+export interface GameBadgeDestination {
+  experience: 'shadow-checkers' | 'shado-live' | 'shadow-war'
+  itemId: string
+  unreadCount: number
+  eventIds: string[]
+}
+
 export interface AppBadgeState {
   total: number
   dm: number
@@ -24,6 +41,8 @@ export interface AppBadgeState {
   connections: number
   shadow_pin: number
   games: number
+  shadowPinDestinations: ShadowPinBadgeDestination[]
+  gameDestinations: GameBadgeDestination[]
 }
 
 export const EMPTY_APP_BADGE_STATE: AppBadgeState = {
@@ -34,15 +53,67 @@ export const EMPTY_APP_BADGE_STATE: AppBadgeState = {
   connections: 0,
   shadow_pin: 0,
   games: 0,
+  shadowPinDestinations: [],
+  gameDestinations: [],
 }
 
 let cachedBadgeState: AppBadgeState = EMPTY_APP_BADGE_STATE
 let badgeStateRequest: Promise<AppBadgeState> | null = null
 
-const normalizeBadgeState = (value: unknown): AppBadgeState => {
-  const state = value && typeof value === 'object'
-    ? value as Partial<AppBadgeState>
-    : EMPTY_APP_BADGE_STATE
+const asRecord = (value: unknown): Record<string, unknown> | null => (
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null
+)
+
+const normalizeIdList = (value: unknown) => (
+  Array.isArray(value)
+    ? value.filter((candidate): candidate is string => typeof candidate === 'string' && candidate.length > 0)
+    : []
+)
+
+const normalizeShadowPinDestinations = (value: unknown): ShadowPinBadgeDestination[] => {
+  if (!Array.isArray(value)) return []
+  return value.flatMap(candidate => {
+    const record = asRecord(candidate)
+    if (!record) return []
+    const categoryId = record?.category_id
+    const imageId = record?.image_id
+    if (typeof categoryId !== 'string' || typeof imageId !== 'string') return []
+    return [{
+      categoryId,
+      imageId,
+      unreadCount: normalizeBadgeCount(Number(record.unread_count ?? 0)),
+      postCount: normalizeBadgeCount(Number(record.post_count ?? 0)),
+      discussionCount: normalizeBadgeCount(Number(record.discussion_count ?? 0)),
+      postEventIds: normalizeIdList(record.post_event_ids),
+      discussionEventIds: normalizeIdList(record.discussion_event_ids),
+    }]
+  })
+}
+
+const normalizeGameDestinations = (value: unknown): GameBadgeDestination[] => {
+  if (!Array.isArray(value)) return []
+  return value.flatMap(candidate => {
+    const record = asRecord(candidate)
+    if (!record) return []
+    const experience = record?.experience
+    const itemId = record?.item_id
+    if (
+      (experience !== 'shadow-checkers' && experience !== 'shado-live' && experience !== 'shadow-war')
+      || typeof itemId !== 'string'
+    ) return []
+    return [{
+      experience,
+      itemId,
+      unreadCount: normalizeBadgeCount(Number(record.unread_count ?? 0)),
+      eventIds: normalizeIdList(record.event_ids),
+    }]
+  })
+}
+
+export const normalizeBadgeState = (value: unknown): AppBadgeState => {
+  const state: Record<string, unknown> = asRecord(value) ?? { ...EMPTY_APP_BADGE_STATE }
   return {
     total: normalizeBadgeCount(Number(state.total ?? 0)),
     dm: normalizeBadgeCount(Number(state.dm ?? 0)),
@@ -51,6 +122,8 @@ const normalizeBadgeState = (value: unknown): AppBadgeState => {
     connections: normalizeBadgeCount(Number(state.connections ?? 0)),
     shadow_pin: normalizeBadgeCount(Number(state.shadow_pin ?? 0)),
     games: normalizeBadgeCount(Number(state.games ?? 0)),
+    shadowPinDestinations: normalizeShadowPinDestinations(state.shadow_pin_destinations),
+    gameDestinations: normalizeGameDestinations(state.game_destinations),
   }
 }
 

@@ -10,6 +10,7 @@ const mockUseShadowPinFeedMode = jest.fn()
 const mockUseShadowPinConnectionFeed = jest.fn()
 const mockUseInnerCircles = jest.fn()
 const mockUseInnerCircleFeed = jest.fn()
+const mockMarkNotificationDestinationRead = jest.fn()
 const mockHasCreatorDraftsNeedingAttention = jest.fn()
 const mockToggleCategoryHeart = jest.fn()
 const mockToggleImageHeart = jest.fn()
@@ -30,6 +31,25 @@ let mockAuthUser = {
 }
 let mockAdminRole: 'admin' | 'sub_admin' | null = null
 let mockShouldAutoplayMedia = true
+let mockAppBadgeState = {
+  total: 0,
+  dm: 0,
+  group: 0,
+  interactions: 0,
+  connections: 0,
+  shadow_pin: 0,
+  games: 0,
+  shadowPinDestinations: [] as Array<{
+    categoryId: string
+    imageId: string
+    unreadCount: number
+    postCount: number
+    discussionCount: number
+    postEventIds: string[]
+    discussionEventIds: string[]
+  }>,
+  gameDestinations: [],
+}
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
@@ -41,6 +61,15 @@ jest.mock('../src/hooks/useAdminAccess', () => ({
   useAdminAccess: () => ({
     role: mockAdminRole,
   }),
+}))
+
+jest.mock('../src/hooks/useAppBadgeState', () => ({
+  useAppBadgeState: () => mockAppBadgeState,
+}))
+
+jest.mock('../src/features/notifications/notificationApi', () => ({
+  markNotificationDestinationRead: (...args: unknown[]) =>
+    mockMarkNotificationDestinationRead(...args),
 }))
 
 jest.mock('../src/components/chat/WeatherWidget', () => ({
@@ -191,6 +220,14 @@ const openPinFromCard = (card: Element) => {
 beforeEach(() => {
   window.history.replaceState({}, '', '/')
   mockShouldAutoplayMedia = true
+  mockAppBadgeState = {
+    ...mockAppBadgeState,
+    shadow_pin: 0,
+    shadowPinDestinations: [],
+    gameDestinations: [],
+  }
+  mockMarkNotificationDestinationRead.mockReset()
+  mockMarkNotificationDestinationRead.mockResolvedValue(true)
   mockAuthUser = {
     id: 'user-1',
     admin_role: null,
@@ -289,6 +326,31 @@ test('shows the drafts attention pill only when unfinished creator work exists',
   render(<ShadowPin />)
 
   expect(await screen.findByText('Drafts & needs attention')).toBeInTheDocument()
+})
+
+test('drills unread ShadowPin state from Discover category to the exact Pin', () => {
+  mockAppBadgeState = {
+    ...mockAppBadgeState,
+    shadow_pin: 3,
+    shadowPinDestinations: [{
+      categoryId: category.id,
+      imageId: 'one',
+      unreadCount: 3,
+      postCount: 1,
+      discussionCount: 2,
+      postEventIds: ['post-event'],
+      discussionEventIds: ['comment-event', 'reply-event'],
+    }],
+  }
+
+  render(<ShadowPin />)
+
+  expect(screen.getByLabelText('3 unread ShadowPin updates')).toBeInTheDocument()
+  expect(screen.getByLabelText('3 unread Fam & Friends Pin updates')).toBeInTheDocument()
+  fireEvent.click(screen.getByText('Fam & Friends'))
+
+  expect(screen.getByLabelText('3 unread Pin one updates')).toBeInTheDocument()
+  expect(screen.getByLabelText('2 unread comments')).toBeInTheDocument()
 })
 
 test('Connections mode renders only the Connections feed and preserves its Theater route', () => {

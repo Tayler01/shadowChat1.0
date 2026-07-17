@@ -13,6 +13,7 @@ export interface ShadoLiveLobbyProps {
   onResume: (roomId: string) => Promise<void>
   onRefresh: () => Promise<void>
   onOpenProfile: (userId: string) => void
+  unreadCountByRoomId?: Record<string, number>
 }
 
 const statusLabel = (room: ShadoLiveRoom) => {
@@ -33,6 +34,7 @@ export function ShadoLiveLobby({
   onResume,
   onRefresh,
   onOpenProfile,
+  unreadCountByRoomId = {},
 }: ShadoLiveLobbyProps) {
   const [title, setTitle] = useState('')
   const [creating, setCreating] = useState(false)
@@ -114,6 +116,7 @@ export function ShadoLiveLobby({
               const canEnter = resumingAsHost
                 ? room.status === 'green_room' || room.status === 'live'
                 : room.canJoin && room.status === 'live'
+              const unreadCount = unreadCountByRoomId[room.id] ?? 0
               return (
                 <article key={room.id} className={`rounded-[1.5rem] border bg-[var(--bg-panel)] p-4 shadow-[var(--shadow-panel)] ${highlighted ? 'border-[#d7aa46]/60' : 'border-[var(--border-panel)]'}`}>
                   <div className="flex items-start justify-between gap-3">
@@ -136,9 +139,20 @@ export function ShadoLiveLobby({
                         <span className="truncate">Hosted by {room.hostDisplayName}</span>
                       </button>
                     </div>
-                    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-xs text-[#c9c3b7]">
-                      <Users className="h-3.5 w-3.5" aria-hidden="true" /> {room.listenerCount}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      {unreadCount > 0 && (
+                        <span
+                          className="rounded-full border border-[#f4d985]/55 bg-[#d7aa46]/15 px-2.5 py-1 text-[0.64rem] font-bold uppercase tracking-[0.12em] text-[#f4d985]"
+                          aria-label={`${unreadCount} unread ${unreadCount === 1 ? 'update' : 'updates'} for this live room`}
+                          data-testid={`shado-live-unread-${room.id}`}
+                        >
+                          {unreadCount > 99 ? '99+' : unreadCount} new
+                        </span>
+                      )}
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.035] px-2.5 py-1.5 text-xs text-[#c9c3b7]">
+                        <Users className="h-3.5 w-3.5" aria-hidden="true" /> {room.listenerCount}
+                      </span>
+                    </div>
                   </div>
                   <div className="mt-4 flex items-center gap-2">
                     <span className="inline-flex min-h-9 items-center gap-2 rounded-full border border-white/10 px-3 text-[0.68rem] font-semibold text-[#cfc9bd]">

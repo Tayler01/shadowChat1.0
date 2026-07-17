@@ -1,15 +1,16 @@
 # Universal Discovery & Library
 
-## Status - Wave Two Candidate 1
+## Status - Production
 
-Implemented and locally verified on `codex/shadowchat-2.0`. This candidate is
-not a production `main` feature until Wave Two completes its combined trial
-gate and Tayler approves the installed-phone build.
+Universal Discovery and Library are part of the production app. On July 17,
+2026, Discover moved from a full-screen modal portal to the first-class
+`?view=discover` app route.
 
 ## Product Behavior
 
 The existing Search utility opens a full-height, safe-area-aware **Discover**
-surface. It keeps primary navigation unchanged and provides six scopes:
+page. It uses the standard themed app backdrop, leaves the desktop sidebar and
+phone bottom menu visible, and provides six scopes:
 
 - **All**: bounded grouped previews from every searchable source
 - **Messages**: caller-visible General Chat and DM messages
@@ -31,8 +32,9 @@ Opening a result uses exact URL state:
 - ShadowPin Theater: `?view=pins&pin=<id>`
 - Play: `?view=games&experience=<typed-id>&item=<optional-id-or-slug>`
 
-The private query, scope, and scroll state are not written into the URL.
-Browser Back from a result restores the same Discover session.
+Query and scope are encoded only while the Discover page is active as `q` and
+`scope`. Opening a result clears those parameters from the destination URL,
+while Browser Back restores the prior Discover route and search state.
 
 ## Library Behavior
 
@@ -72,10 +74,9 @@ still remove the private save after its source becomes unavailable.
 
 ## Source Map
 
-- `src/components/search/GlobalSearchButton.tsx`: lazy utility launcher and
-  Discover history restoration
+- `src/components/search/GlobalSearchButton.tsx`: routed utility launcher
 - `src/features/discovery/UniversalDiscoveryDialog.tsx`: phone-first UI,
-  grouped results, exact handoffs, and Library management
+  standard page shell, grouped results, exact handoffs, and Library management
 - `src/features/discovery/discoveryApi.ts`: bounded multi-provider orchestration
 - `src/features/discovery/playDiscoveryApi.ts`: indexed Play RPC adapter
 - `src/features/discovery/playDiscoveryCatalog.ts`: compact non-media Play
@@ -87,7 +88,7 @@ still remove the private save after its source becomes unavailable.
 
 ## Verification
 
-The Candidate 1 checkpoint requires:
+The production checkpoint requires:
 
 ```powershell
 npx supabase db reset --local --no-seed --yes

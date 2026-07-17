@@ -1,4 +1,4 @@
-import { Bell, Gamepad2, Images, ListChecks, MessageSquare, Users, Newspaper, Settings, Moon, Sun, X } from 'lucide-react';
+import { Bell, Gamepad2, Images, ListChecks, MessageSquare, Users, Newspaper, Search, Settings, Moon, Sun, X } from 'lucide-react';
 import { useOptionalActivity } from '../../features/activity/ActivityContext';
 import { formatActivityBadge } from '../../features/activity/activityModel';
 import { ACTIVITY_FEATURE_ENABLED, CATCH_UP_FEATURE_ENABLED } from '../../config/featureFlags';
@@ -87,6 +87,12 @@ export function Sidebar({
       label: 'Pins',
       icon: Images,
       badge: badgeState.shadow_pin || null,
+    },
+    {
+      id: 'discover' as const,
+      label: 'Discover',
+      icon: Search,
+      badge: null,
     },
     {
       id: 'settings' as const,
