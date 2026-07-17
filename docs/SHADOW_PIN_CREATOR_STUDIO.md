@@ -2,14 +2,15 @@
 
 ## Status
 
-Wave Two Candidate 3 is implemented, locally hardened, and authenticated-live
-verified on `codex/shadowchat-2.0` as of July 13, 2026. The production `main`
-frontend and production Netlify site remain unchanged. Seven focused model,
-history, API, component, lazy-entry, media, and SQL contract suites pass
-locally with 46 tests; the broader Candidate 3 route/ShadowPin set passes 9
-suites and 107 tests. The hardening backend gate also passes a fresh local
-reset, expanded rollback verifier, database lint/advisors, Deno/Node checks,
-and 3 focused suites with 21 tests.
+Creator Studio is enabled on production `main`. Its original Wave Two
+candidate, hardening, authenticated browser, and real-device evidence remains
+the foundation for the production workflow.
+
+As of July 17, 2026, tags are explicitly optional in both the phone UI and the
+validated client/server contract. A Pin still requires ready media, a visible
+category, and a title; it may publish with an empty tag array. The database
+normalizes `NULL` or empty tag input to an empty array, and finalization safely
+applies that empty set.
 
 The expanded two-account workflow passed against final immutable isolated
 Netlify deploy `6a5547c57eceb4541037f4b3` on Pixel Chromium `412x915` and
@@ -66,7 +67,7 @@ The phone-first Studio has four stages:
    YouTube posters, and authenticated link-preview images form a bounded
    fallback chain. Validation retains the established image/video limits.
 2. **Details** - choose a visible category, add title and description, and
-   enter up to eight normalized comma-separated tags. Meaningful changes are
+   optionally enter up to eight normalized comma-separated tags. Meaningful changes are
    autosaved with visible saving, saved, recovery, or needs-attention state.
 3. **Preview** - inspect a phone-first ShadowPin-style media card with its
    metadata before anything is public.

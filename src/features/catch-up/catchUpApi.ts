@@ -1,4 +1,5 @@
 import { supabase } from '../../lib/supabase'
+import { embedPublicProfile } from '../../../supabase/functions/_shared/public-profile'
 import {
   normalizeCatchUpSnapshot,
   type CatchUpActor,
@@ -14,6 +15,7 @@ type RawNotificationEvent = {
   route: string | null
   payload: unknown
   created_at: string
+  actor: unknown
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null => (
@@ -28,9 +30,10 @@ const asText = (value: unknown) => typeof value === 'string' && value.trim()
 
 const notificationActor = (
   payload: Record<string, unknown>,
-  actorId: string | null
+  actorId: string | null,
+  currentActor: unknown
 ): CatchUpActor | null => {
-  const raw = asRecord(payload.actor)
+  const raw = asRecord(currentActor) ?? asRecord(payload.actor)
   const id = asText(raw?.id) || actorId
   if (!id) return null
   return {
@@ -57,7 +60,7 @@ const normalizeNotificationInboxItem = (raw: RawNotificationEvent): CatchUpItem 
   const payload = asRecord(raw.payload) ?? {}
   const route = asText(raw.route) || asText(payload.route) || asText(payload.url)
   if (!raw.id || !raw.type || !route || (!route.startsWith('/') && !route.startsWith('?'))) return null
-  const actor = notificationActor(payload, raw.actor_id)
+  const actor = notificationActor(payload, raw.actor_id, raw.actor)
   return {
     id: `notification:${raw.id}`,
     kind: raw.type,
@@ -96,7 +99,16 @@ export async function acknowledgeCatchUpEvents(eventIds: string[]) {
 export async function fetchNotificationInbox(): Promise<CatchUpItem[]> {
   const { data, error } = await supabase
     .from('notification_events')
-    .select('id, type, category, actor_id, route, payload, created_at')
+    .select(`
+      id,
+      type,
+      category,
+      actor_id,
+      route,
+      payload,
+      created_at,
+      ${embedPublicProfile('actor', 'users!notification_events_actor_id_fkey')}
+    `)
     .is('read_at', null)
     .is('resolved_at', null)
     .order('created_at', { ascending: false })

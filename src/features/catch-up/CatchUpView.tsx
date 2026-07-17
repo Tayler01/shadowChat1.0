@@ -37,6 +37,8 @@ type CatchUpViewProps = {
 }
 
 const CACHE_TTL_MS = 30_000
+const SWIPE_ACTION_WIDTH_PX = 96
+const SWIPE_DISMISS_THRESHOLD_PX = 64
 
 const getInitials = (item: CatchUpItem) => {
   const label = item.actor?.display_name || item.actor?.username || item.title
@@ -115,6 +117,119 @@ function CatchUpCard({
         </span>
       </button>
     </article>
+  )
+}
+
+function SwipeToReadNotification({
+  item,
+  onDismiss,
+  children,
+}: {
+  item: CatchUpItem
+  onDismiss: () => void
+  children: React.ReactNode
+}) {
+  const [offset, setOffset] = useState(0)
+  const offsetRef = useRef(0)
+  const gestureRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    dragging: boolean
+    cancelled: boolean
+  } | null>(null)
+  const suppressClickRef = useRef(false)
+
+  const updateOffset = (next: number) => {
+    const bounded = Math.max(-SWIPE_ACTION_WIDTH_PX, Math.min(0, next))
+    offsetRef.current = bounded
+    setOffset(bounded)
+  }
+
+  const resetGesture = () => {
+    gestureRef.current = null
+    updateOffset(0)
+    globalThis.setTimeout(() => {
+      suppressClickRef.current = false
+    }, 0)
+  }
+
+  const finishGesture = (pointerId: number) => {
+    const gesture = gestureRef.current
+    if (!gesture || gesture.pointerId !== pointerId) return
+    const shouldDismiss = gesture.dragging && offsetRef.current <= -SWIPE_DISMISS_THRESHOLD_PX
+    gestureRef.current = null
+    if (shouldDismiss) {
+      suppressClickRef.current = true
+      onDismiss()
+      return
+    }
+    resetGesture()
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-[var(--radius-lg)]">
+      <button
+        type="button"
+        onClick={onDismiss}
+        onFocus={() => updateOffset(-SWIPE_ACTION_WIDTH_PX)}
+        onBlur={() => updateOffset(0)}
+        className="absolute inset-y-0 right-0 grid w-24 place-items-center bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-focus-ring)]"
+        aria-label={`Mark ${item.title} as read`}
+      >
+        <span className="flex flex-col items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.1em]">
+          <Check className="h-5 w-5" aria-hidden="true" />
+          Read
+        </span>
+      </button>
+      <div
+        data-testid={`notification-swipe-${item.id}`}
+        style={{
+          transform: `translate3d(${offset}px, 0, 0)`,
+          touchAction: 'pan-y',
+        }}
+        className="relative z-[1] bg-[var(--bg-app)] transition-transform duration-150 ease-out"
+        onClickCapture={event => {
+          if (!suppressClickRef.current) return
+          event.preventDefault()
+          event.stopPropagation()
+          suppressClickRef.current = false
+        }}
+        onPointerDown={event => {
+          if (event.pointerType === 'mouse' && event.button !== 0) return
+          gestureRef.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            startY: event.clientY,
+            dragging: false,
+            cancelled: false,
+          }
+        }}
+        onPointerMove={event => {
+          const gesture = gestureRef.current
+          if (!gesture || gesture.pointerId !== event.pointerId || gesture.cancelled) return
+          const deltaX = event.clientX - gesture.startX
+          const deltaY = event.clientY - gesture.startY
+          if (!gesture.dragging) {
+            if (Math.abs(deltaY) > 8 && Math.abs(deltaY) > Math.abs(deltaX)) {
+              gesture.cancelled = true
+              updateOffset(0)
+              return
+            }
+            if (deltaX >= -8 || Math.abs(deltaX) <= Math.abs(deltaY)) return
+            gesture.dragging = true
+            suppressClickRef.current = true
+            event.currentTarget.setPointerCapture?.(event.pointerId)
+          }
+          event.preventDefault()
+          updateOffset(deltaX)
+        }}
+        onPointerUp={event => finishGesture(event.pointerId)}
+        onPointerCancel={event => finishGesture(event.pointerId)}
+      >
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -276,12 +391,13 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     onOpenSource(item)
   }
 
-  const openNotificationItem = (item: CatchUpItem) => {
+  const clearNotificationItem = (item: CatchUpItem, openSource: boolean) => {
     const eventId = item.notificationEventIds?.[0]
-    onOpenSource(item)
+    if (openSource) onOpenSource(item)
     if (!eventId) return
 
     setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
+    if (!openSource) setAnnouncement(`${item.title} marked as read.`)
     void acknowledgeNotificationInboxEvent(eventId).then(() => {
       void clearNotificationEventFromSystemTray({
         notificationType: item.kind,
@@ -290,9 +406,17 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
       requestAppBadgeRefresh()
     }).catch(() => {
       if (!mountedRef.current) return
-      setNotificationInboxError('The source opened, but this notification could not be cleared. Refresh to try again.')
+      setNotificationInboxError(
+        openSource
+          ? 'The source opened, but this notification could not be cleared. Refresh to try again.'
+          : 'This notification could not be marked as read. Refresh to try again.'
+      )
       void loadNotificationInbox()
     })
+  }
+
+  const openNotificationItem = (item: CatchUpItem) => {
+    clearNotificationItem(item, true)
   }
 
   const refreshAll = () => {
@@ -362,13 +486,18 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {notificationInbox.map(item => (
-                      <CatchUpCard
+                      <SwipeToReadNotification
                         key={item.id}
                         item={item}
-                        onOpen={() => openNotificationItem(item)}
-                        onOpenProfile={profileId => void openProfile(profileId)}
-                        profileLoading={loadingProfileId === item.actor?.id}
-                      />
+                        onDismiss={() => clearNotificationItem(item, false)}
+                      >
+                        <CatchUpCard
+                          item={item}
+                          onOpen={() => openNotificationItem(item)}
+                          onOpenProfile={profileId => void openProfile(profileId)}
+                          profileLoading={loadingProfileId === item.actor?.id}
+                        />
+                      </SwipeToReadNotification>
                     ))}
                   </div>
                 </section>

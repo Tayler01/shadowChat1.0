@@ -1,18 +1,23 @@
 # Catch-Up
 
-## Status - Deterministic V1
+## Status - Production Deterministic V1
 
-Catch-Up is a lazy, source-linked, non-AI summary surface for the isolated
-ShadowChat 2.0 frontend. It is compiled behind
-`VITE_FEATURE_CATCH_UP=true` and routed at `?view=catchup`. The default build
-keeps the flag false and contains no Catch-Up navigation or runtime fetch.
+Catch-Up is the production, lazy, source-linked, non-AI notification center at
+`?view=catchup`.
 
-Production `main` and the production Netlify frontend remain unchanged. The
-shared Supabase addition is additive and does not change an existing RPC,
-table policy, trigger, or old-client behavior.
+As of July 17, 2026, notification-inbox cards join their `actor_id` to the
+current API-safe public profile projection. Every notification with a user
+actor therefore uses the member's current PFP, name, fallback color, and
+clickable canonical profile action instead of depending on an older event
+payload. System notifications without a user actor retain the branded initials
+fallback and do not invent a profile target.
 
-Accepted isolated trial deploy: `6a55a76aa3ae37c5d2d35a6e` at
-`https://shadowchat-2-0-wave-one.netlify.app`.
+Unread notification cards can be swiped left past a deliberate threshold to
+mark the exact event read without opening its source. The revealed `Read`
+control provides the same action for keyboard and assistive-technology users.
+Opening a card still opens its exact source and marks that same event read.
+Both paths clear the matching system notification and request a unified app
+badge refresh.
 
 ## Product Contract
 
@@ -121,6 +126,11 @@ an immediate update.
   initials as the image-error or missing-image fallback. The avatar is a
   separate control that lazily opens the canonical public profile card without
   opening or acknowledging the source item.
+- Notification-inbox actor media is refreshed through the live safe public
+  profile relationship, so changing a PFP does not leave old inbox cards
+  permanently stale.
+- Notification cards support vertical scrolling without gesture conflict and
+  a horizontal swipe-left read action with an explicit accessible equivalent.
 - Controls use the shared phone touch baseline and visible focus treatment.
 - Counts and unread state use text in addition to color.
 - Loading animation remains essential status motion and all other motion stays

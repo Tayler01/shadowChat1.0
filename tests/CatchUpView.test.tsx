@@ -125,13 +125,72 @@ test('shows canonical unread notifications and clears the exact event after open
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={onOpenSource} />)
 
   expect(await screen.findByRole('heading', { name: 'Notification inbox' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /Your turn in Shadow Checkers/i }))
+  fireEvent.click(screen.getByRole('button', { name: 'Your turn in Shadow Checkers' }))
 
   expect(onOpenSource).toHaveBeenCalledWith(expect.objectContaining({
     target: { kind: 'app_route', route: '/?view=games&experience=shadow-checkers&item=match-1' },
   }))
   await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledWith('event-9'))
   expect(screen.queryByRole('heading', { name: 'Notification inbox' })).not.toBeInTheDocument()
+})
+
+test('swipes a notification left to mark it read without opening its source', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([{
+    id: 'notification:event-10',
+    kind: 'shadow_pin_comment',
+    occurredAt: '2026-07-17T12:00:00Z',
+    actor: {
+      id: 'actor-1',
+      display_name: 'Mills',
+      username: 'mills',
+      avatar_url: 'https://example.com/mills-full.jpg',
+      avatar_thumbnail_url: 'https://example.com/mills-thumb.jpg',
+      color: '#d7aa46',
+    },
+    title: 'New comment on your Pin',
+    preview: 'Mills left a comment.',
+    unreadCount: 1,
+    manuallyUnread: false,
+    target: { kind: 'app_route', route: '/?view=shadowpin&item=pin-1' },
+    activityEventIds: [],
+    notificationEventIds: ['event-10'],
+  }])
+  const onOpenSource = jest.fn()
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={onOpenSource} />)
+
+  expect(await screen.findByRole('button', { name: "Open Mills's profile" })).toBeInTheDocument()
+  expect(screen.getByTestId('catch-up-avatar')).toHaveAttribute(
+    'data-src',
+    'https://example.com/mills-thumb.jpg'
+  )
+  const swipeSurface = screen.getByTestId('notification-swipe-notification:event-10')
+  fireEvent.pointerDown(swipeSurface, {
+    pointerId: 1,
+    pointerType: 'touch',
+    clientX: 240,
+    clientY: 120,
+  })
+  fireEvent.pointerMove(swipeSurface, {
+    pointerId: 1,
+    pointerType: 'touch',
+    clientX: 150,
+    clientY: 122,
+  })
+  fireEvent.pointerUp(swipeSurface, {
+    pointerId: 1,
+    pointerType: 'touch',
+    clientX: 150,
+    clientY: 122,
+  })
+
+  await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledWith('event-10'))
+  expect(onOpenSource).not.toHaveBeenCalled()
+  expect(screen.queryByRole('heading', { name: 'Notification inbox' })).not.toBeInTheDocument()
+  expect(screen.getByText('New comment on your Pin marked as read.')).toBeInTheDocument()
 })
 
 test('loads source-linked sections and acknowledges only the opened Activity event', async () => {

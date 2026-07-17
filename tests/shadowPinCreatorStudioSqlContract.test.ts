@@ -85,6 +85,13 @@ describe('ShadowPin Creator Studio backend source contract', () => {
     expect(sql).toMatch(/finalize_shadow_pin_creator_draft\( target_draft_id uuid, target_expected_revision integer, target_publish_idempotency_key uuid \)/)
   })
 
+  test('keeps ShadowPin tags optional from draft creation through publish', () => {
+    expect(sql).toContain('tags text[] not null default array[]::text[]')
+    expect(sql).toContain('unnest(coalesce(target_tags, array[]::text[]))')
+    expect(sql).toContain('perform public.set_shadow_pin_image_tags(image_row.id, draft_row.tags)')
+    expect(sql).not.toMatch(/cardinality\(tags\)\s*>\s*0/)
+  })
+
   test('denies anonymous access and direct authenticated asset-ledger mutation', () => {
     expect(sql).toMatch(
       /revoke all on table public\.shadow_pin_creator_drafts\s*,\s*public\.shadow_pin_draft_assets[\s\S]*?from public\s*,\s*anon/

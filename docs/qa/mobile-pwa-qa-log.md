@@ -6,7 +6,26 @@ Older artifact paths remain historical evidence. The July 10 web Release A is
 deployed, but its mobile/PWA-sensitive behavior still needs a fresh harness
 artifact and physical-device pass.
 
-Last updated: 2026-07-16
+Last updated: 2026-07-17
+
+## July 17 Notification Center PFP And Swipe Checkpoint
+
+- Notification-inbox events now resolve `actor_id` through the current
+  API-safe public-profile relationship, so user-originated cards use current
+  PFPs and clickable canonical profile actions; system events retain initials.
+- Phone cards support swipe-left mark-as-read without opening the source.
+  Vertical movement remains native scrolling, short horizontal gestures snap
+  back, and the revealed Read button provides a keyboard-accessible equivalent.
+- ShadowPin Creator Studio and its SQL contract explicitly accept a blank tag
+  list; the phone field now says `Tags (optional)`.
+- Focused component/API/model/SQL suites passed 28 tests. The full Jest gate
+  passed 233 suites and 1,271 tests with 16 existing todos. ESLint, TypeScript,
+  production build/budgets, documentation integrity, and all 43 Node contract
+  tests passed.
+- The authenticated read-only Catch-Up browser gate passed the same production
+  build in Pixel Chromium and iPhone WebKit with no horizontal overflow,
+  runtime diagnostics, acknowledgements, fixtures, uploads, or database
+  residue. Evidence: `output/playwright/catch-up/summary.json`.
 
 ## July 16 Shado Live And DM Production Hotfix Checkpoint
 

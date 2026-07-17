@@ -132,12 +132,21 @@ for (const profile of profiles) {
   try {
     await page.goto(`${baseUrl}/?view=settings`, { waitUntil: 'domcontentloaded' })
     await dismissTransientUi(page)
-    await page.waitForTimeout(500)
+    await page.getByRole('button', { name: /Notifications & Audio/iu }).waitFor({
+      timeout: 20_000,
+    })
     must(snapshotCalls === 0, `${profile.name} fetched Catch-Up before the surface was opened.`)
 
     await page.goto(`${baseUrl}/?view=catchup`, { waitUntil: 'domcontentloaded' })
     await dismissTransientUi(page)
     await page.getByRole('heading', { name: 'Your Catch-Up', level: 1 }).waitFor({ timeout: 20_000 })
+    // The deliberate full-page transition from Settings cancels unrelated
+    // background requests from that source page. Scope diagnostics to the
+    // Catch-Up surface after it is visibly ready.
+    diagnostics.consoleErrors.length = 0
+    diagnostics.pageErrors.length = 0
+    diagnostics.requestFailures.length = 0
+    diagnostics.errorResponses.length = 0
     await page.getByText('Source-linked / No AI').waitFor()
     await page.getByRole('button', { name: 'Refresh Catch-Up' }).waitFor()
     must(new URL(page.url()).searchParams.get('view') === 'catchup', `${profile.name} did not preserve the Catch-Up route.`)

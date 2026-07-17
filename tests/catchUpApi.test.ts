@@ -1,11 +1,16 @@
 import { supabase } from '../src/lib/supabase'
-import { acknowledgeCatchUpEvents, fetchCatchUpSnapshot } from '../src/features/catch-up/catchUpApi'
+import {
+  acknowledgeCatchUpEvents,
+  fetchCatchUpSnapshot,
+  fetchNotificationInbox,
+} from '../src/features/catch-up/catchUpApi'
 
 jest.mock('../src/lib/supabase', () => ({
-  supabase: { rpc: jest.fn() },
+  supabase: { from: jest.fn(), rpc: jest.fn() },
 }))
 
 const rpc = supabase.rpc as jest.Mock
+const from = supabase.from as jest.Mock
 
 const emptySection = (id: string, title: string) => ({
   id,
@@ -62,4 +67,60 @@ test('deduplicates and bounds caller-owned Activity acknowledgements', async () 
 test('rejects malformed backend snapshots instead of rendering invented content', async () => {
   rpc.mockResolvedValue({ data: { schema_version: 1, ai_generated: true }, error: null })
   await expect(fetchCatchUpSnapshot()).rejects.toThrow('invalid source snapshot')
+})
+
+test('hydrates notification actors from the current safe public profile relationship', async () => {
+  const limit = jest.fn().mockResolvedValue({
+    data: [{
+      id: 'event-1',
+      type: 'shadow_pin_comment',
+      category: 'shadow_pin',
+      actor_id: 'actor-1',
+      route: '/?view=shadowpin&item=pin-1',
+      payload: {
+        title: 'New comment',
+        body: 'Mills commented on your Pin.',
+        actor: {
+          id: 'actor-1',
+          display_name: 'Old name',
+          avatar_thumbnail_url: null,
+        },
+      },
+      created_at: '2026-07-17T12:00:00.000Z',
+      actor: {
+        id: 'actor-1',
+        display_name: 'Mills',
+        username: 'mills',
+        avatar_url: 'https://example.com/mills-full.jpg',
+        avatar_thumbnail_url: 'https://example.com/mills-thumb.jpg',
+        color: '#d7aa46',
+      },
+    }],
+    error: null,
+  })
+  const order = jest.fn(() => ({ limit }))
+  const resolvedIs = jest.fn(() => ({ order }))
+  const readIs = jest.fn(() => ({ is: resolvedIs }))
+  const select = jest.fn((_query: string) => ({ is: readIs }))
+  from.mockReturnValue({ select })
+
+  await expect(fetchNotificationInbox()).resolves.toEqual([
+    expect.objectContaining({
+      id: 'notification:event-1',
+      actor: {
+        id: 'actor-1',
+        display_name: 'Mills',
+        username: 'mills',
+        avatar_url: 'https://example.com/mills-full.jpg',
+        avatar_thumbnail_url: 'https://example.com/mills-thumb.jpg',
+        color: '#d7aa46',
+      },
+    }),
+  ])
+  expect(from).toHaveBeenCalledWith('notification_events')
+  expect(select.mock.calls[0][0]).toContain(
+    'actor:users!notification_events_actor_id_fkey('
+  )
+  expect(readIs).toHaveBeenCalledWith('read_at', null)
+  expect(resolvedIs).toHaveBeenCalledWith('resolved_at', null)
 })

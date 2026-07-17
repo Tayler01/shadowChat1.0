@@ -2,23 +2,26 @@
 
 ## Status - July 17, 2026
 
-This is the implementation and acceptance contract for the notification
-reliability rebuild on
-`codex/notification-reliability-rebuild-20260717`. It is not a production
-deployment record. Production remains unchanged until the complete candidate
-passes the local, linked-backend, mobile-browser, and physical-device gates and
-Tayler explicitly approves rollout.
+This is the production implementation and acceptance contract for the
+notification reliability rebuild. Tayler approved the complete rollout to
+`main` on July 17, 2026.
 
 The rebuild preserves the notification features users already have while
 replacing the piecemeal foreground presentation, launcher-badge, and read-state
 behavior with one recipient-owned contract.
 
-Local implementation proof is complete. The full Jest and Node contract suites,
-production build gates, clean local migration replay, local and linked database
-lint, local security contract, and authenticated iPhone WebKit/Android Chromium
-checks pass. Production rollout is still gated on Tayler's explicit approval,
-the server-side recovery schedule described below, and installed-phone delivery
-acceptance.
+The full Jest and Node contract suites, production build gates, clean local
+migration replay, local and linked database lint, local security contract, and
+authenticated iPhone WebKit/Android Chromium checks passed before rollout.
+Installed-phone delivery behavior remains an ongoing operational validation
+surface.
+
+The July 17 notification-center follow-up makes actor identity dependable at
+read time: unread events join their `actor_id` to the current API-safe public
+profile, and every resulting PFP opens the canonical profile card. Inbox cards
+also support swipe-left mark-as-read without source navigation, with an
+equivalent revealed Read button. Both open-and-read and swipe-and-read paths
+clear the matching system notification and refresh unified badges.
 
 ## Product Contract
 

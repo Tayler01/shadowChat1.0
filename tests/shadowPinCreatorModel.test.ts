@@ -106,6 +106,21 @@ describe('ShadowPin Creator Studio model', () => {
       .toContain('Use a public http or https URL.')
   })
 
+  test('allows a complete Pin to publish without tags', () => {
+    const tagless = {
+      ...createInitialCreatorState().values,
+      categoryId: 'category-1',
+      title: 'A tag-free Pin',
+      sourceMode: 'url' as const,
+      sourceUrl: 'https://example.com/pin.jpg',
+      tags: [],
+    }
+
+    expect(validateCreatorStep('details', tagless)).toEqual([])
+    expect(validateCreatorStep('preview', tagless)).toEqual([])
+    expect(validateCreatorStep('publish', tagless)).toEqual([])
+  })
+
   test('infers supported upload and URL source kinds', () => {
     const base = createInitialCreatorState().values
     expect(inferCreatorSourceKind({ ...base, file: new File(['x'], 'pin.webp', { type: 'image/webp' }) }))
