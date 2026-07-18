@@ -34,9 +34,8 @@ Touch input uses a native non-passive listener on the active gesture so mobile
 Safari and Chrome cannot cancel the swipe before the React pointer layer sees
 it; touch-generated pointer compatibility events are ignored to prevent double
 handling, and multi-touch remains available for pinch zoom.
-Full Comfort motion uses a stronger deterministic fracture-and-ash
-finish; reduced and none keep the same confirmed-read behavior without the
-decorative particles.
+Full Comfort motion uses a deterministic rasterized sand finish; reduced and
+none keep the same confirmed-read behavior without capture or particles.
 
 The July 18 persistence follow-up distinguishes the bounded 30-card page from
 the complete unread ledger. Production evidence showed that exact reads
@@ -46,12 +45,15 @@ Y`, offers a caller-scoped `Mark all read` transaction, invalidates its
 deterministic cache after confirmed reads, and checks interrupted retry IDs by
 exact canonical unread state even when they are beyond the first page.
 
-The full-motion finish now affects the real notification card rather than only
-an overlay: a six-keyframe jagged polygon erodes the complete surface from
-right to left while a full-height fracture front and wave-delayed fragments
-track the boundary. The list reflows only after the read is server-confirmed and
-the dissolve completes. Reduced motion uses a short fade, and no-motion removes
-the confirmed row immediately.
+The full-motion finish now captures the real notification card rather than
+placing generic decoration over it. A bounded `html-to-image` canvas snapshot
+includes the rendered surface, avatar, text, and controls; Canvas 2D pixel data
+then supplies thousands of deterministic, original-color grains. A noisy
+left-to-right erosion front removes the captured card while those grains blow
+left and disperse. The list reflows only after the read is server-confirmed and
+the sand animation completes. Reduced motion uses a short fade, no-motion
+removes the confirmed row immediately, and the former CSS fracture remains a
+failure fallback when safe raster capture is unavailable.
 
 The same rollout establishes a one-time production baseline at midnight on
 July 18, 2026 America/New_York. Unread notification-ledger rows older than that

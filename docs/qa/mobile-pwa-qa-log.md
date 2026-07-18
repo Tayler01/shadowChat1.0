@@ -23,11 +23,17 @@ Last updated: 2026-07-18
   or Live source state. It is intentionally not a recurring daily clear.
 - A failed local retry outside the first 30 rows is retained until an exact
   canonical unread lookup says it is no longer pending.
-- Full Comfort motion now erodes the actual message surface through six
-  same-vertex polygon keyframes, with a synchronized fracture front and 28
-  wave-delayed fragments. The remaining list slides up only after the complete
-  confirmed-read sequence. Reduced/no-motion modes retain the same persistence
-  contract without decorative particles.
+- Swipe geometry compensates only near the phone's left edge so a gesture that
+  begins partway across the card can still travel the complete card width.
+  Reversing the finger reverses the card continuously instead of hitting a
+  three-quarter stop.
+- Full Comfort motion now rasterizes the actual rendered notification and
+  turns its own background, PFP, text, and controls into thousands of
+  original-color Canvas 2D grains. A noisy left-to-right erosion front and
+  leftward wind field produce the visible sand-away sequence. The remaining
+  list slides up only after the complete confirmed-read animation.
+  Reduced/no-motion modes retain the same persistence contract without capture
+  or particles, and CSS fracture is retained only as a capture-failure fallback.
 - `qa:catch-up` remains the zero-mutation Pixel Chromium/iPhone WebKit gesture,
   geometry, animation, reload, and diagnostics gate.
   `qa:catch-up:persistence` is the separate guarded linked-backend proof: it

@@ -24,10 +24,16 @@ fallback and do not invent a profile target.
 Unread notification cards can be swiped left past a deliberate threshold to
 mark the exact event read without opening its source. The card now follows the
 finger across its full measured width, accepts a deliberate distance or fast
-flick, and—after the database confirms the read—erodes the actual card from
-right to left through a jagged full-surface clip-path sequence. A synchronized
-fracture front and 28 wave-delayed fragments make the complete message visibly
-disintegrate before the remaining cards use layout motion to slide upward.
+flick, and - after the database confirms the read - rasterizes the complete
+rendered notification into a temporary canvas. The real background, border,
+PFP, text, and controls then erode from left to right into thousands of
+pixel-sourced grains that retain their original colors and blow left like sand.
+The remaining cards use layout motion to slide upward only after that complete
+effect finishes.
+Drag geometry stays one-to-one at first, then smoothly adds the small amount of
+travel a finger cannot physically supply after reaching the phone's left edge.
+Moving the finger back reverses that mapping continuously, so the card has no
+three-quarter hard stop or one-way latch.
 Early diagonal finger motion stays undecided until intent is clear instead of
 cancelling the gesture. Clearly vertical intent keeps native page scrolling,
 while a claimed left swipe keeps ownership through later downward drift and
@@ -46,8 +52,10 @@ next notification-inbox fetch. This prevents a dismissed card from returning
 after a view switch, reload, or PWA restart while keeping Supabase authoritative.
 Failed retry IDs are checked directly against canonical unread state instead of
 being discarded merely because they fall outside the first 30 visible cards.
-Reduced/no-motion Comfort modes replace the decorative shatter with a brief
-fade or immediate removal after confirmation. The revealed `Read` control
+Reduced/no-motion Comfort modes skip rasterization and use a brief fade or
+immediate removal after confirmation. If a browser cannot safely capture the
+card, the older CSS fracture sequence remains a fail-safe rather than blocking
+the read. The revealed `Read` control
 provides the same action for keyboard and assistive-technology users. Opening a
 card still opens its exact source and marks that same event read. Both paths
 clear the matching system notification and request a unified app badge refresh.

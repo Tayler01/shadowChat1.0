@@ -19,6 +19,7 @@ import {
 } from '../src/features/catch-up/catchUpApi'
 import { clearAllNotificationsFromSystemTray } from '../src/features/notifications/notificationApi'
 import { getUserProfile } from '../src/lib/auth'
+import { captureNotificationSandSnapshot } from '../src/features/catch-up/notificationSand'
 
 let mockMotionPreference: 'full' | 'reduced' | 'none' = 'none'
 
@@ -69,6 +70,26 @@ jest.mock('../src/lib/auth', () => ({
   getUserProfile: jest.fn(),
 }))
 
+jest.mock('../src/features/catch-up/NotificationSandDisintegration', () => ({
+  NotificationSandDisintegration: ({ itemId }: { itemId: string }) => (
+    <div
+      data-testid={`notification-disintegration-${itemId}`}
+      data-notification-sand-effect="active"
+    >
+      <canvas
+        data-notification-sand-canvas
+        data-sand-source="captured-card-pixels"
+        data-sand-particle-count="4800"
+      />
+    </div>
+  ),
+}))
+
+jest.mock('../src/features/catch-up/notificationSand', () => ({
+  NOTIFICATION_SAND_DURATION_MS: 980,
+  captureNotificationSandSnapshot: jest.fn(),
+}))
+
 const fetchSnapshot = fetchCatchUpSnapshot as jest.MockedFunction<typeof fetchCatchUpSnapshot>
 const acknowledgeAllNotifications = acknowledgeAllNotificationInboxEvents as jest.MockedFunction<typeof acknowledgeAllNotificationInboxEvents>
 const acknowledge = acknowledgeCatchUpEvents as jest.MockedFunction<typeof acknowledgeCatchUpEvents>
@@ -80,6 +101,7 @@ const flushPendingReads = flushPendingNotificationReads as jest.MockedFunction<t
 const queuePendingRead = queuePendingNotificationRead as jest.MockedFunction<typeof queuePendingNotificationRead>
 const clearSystemTray = clearAllNotificationsFromSystemTray as jest.MockedFunction<typeof clearAllNotificationsFromSystemTray>
 const fetchProfile = getUserProfile as jest.MockedFunction<typeof getUserProfile>
+const captureSandSnapshot = captureNotificationSandSnapshot as jest.MockedFunction<typeof captureNotificationSandSnapshot>
 
 const section = (id: CatchUpSnapshot['sections'][keyof CatchUpSnapshot['sections']]['id'], title: string) => ({
   id,
@@ -226,6 +248,12 @@ beforeEach(() => {
   fetchInbox.mockResolvedValue(inboxPage([]))
   clearSystemTray.mockResolvedValue(undefined)
   fetchProfile.mockResolvedValue(null)
+  captureSandSnapshot.mockResolvedValue({
+    canvas: document.createElement('canvas'),
+    width: 320,
+    height: 120,
+    backdrop: [10, 11, 12],
+  })
   mockMotionPreference = 'none'
 })
 
@@ -593,7 +621,7 @@ test('abandons a claimed swipe for multi-touch without blocking pinch zoom', asy
   expect(acknowledgeNotification).not.toHaveBeenCalled()
 })
 
-test('uses the full shatter-to-ash effect for full motion preference', async () => {
+test('rasterizes the whole notification into a pixel-sourced sand effect for full motion preference', async () => {
   mockMotionPreference = 'full'
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
@@ -617,16 +645,14 @@ test('uses the full shatter-to-ash effect for full motion preference', async () 
 
   const effect = await screen.findByTestId('notification-disintegration-notification:event-shatter')
   expect(swipeSurface).toHaveAttribute('data-card-disintegration', 'active')
-  expect(effect.querySelectorAll('[data-disintegration-fragment]')).toHaveLength(28)
-  expect(effect.querySelectorAll('[data-disintegration-wave]')).toHaveLength(28)
-  expect(new Set(
-    Array.from(effect.querySelectorAll('[data-disintegration-wave]'))
-      .map(fragment => fragment.getAttribute('data-disintegration-wave'))
-  ).size).toBeGreaterThanOrEqual(4)
-  expect(effect.querySelector('[data-disintegration-fracture-band]')).toBeInTheDocument()
+  expect(captureSandSnapshot).toHaveBeenCalledTimes(1)
+  expect(effect).toHaveAttribute('data-notification-sand-effect', 'active')
+  const canvas = effect.querySelector('[data-notification-sand-canvas]')
+  expect(canvas).toHaveAttribute('data-sand-source', 'captured-card-pixels')
+  expect(Number(canvas?.getAttribute('data-sand-particle-count'))).toBeGreaterThan(1_000)
 })
 
-test('tracks a full-width swipe continuously instead of stopping at the action width', async () => {
+test('tracks to the full card edge and reverses smoothly with the finger', async () => {
   mockMotionPreference = 'full'
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
@@ -664,6 +690,26 @@ test('tracks a full-width swipe continuously instead of stopping at the action w
     [touchPoint(swipeSurface, 4, 130, 122)]
   )
   expect(Number(swipeSurface.getAttribute('data-swipe-offset'))).toBeLessThanOrEqual(-170)
+  dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 4, 4, 123)]
+  )
+  const nearFullOffset = Number(swipeSurface.getAttribute('data-swipe-offset'))
+  expect(nearFullOffset).toBeLessThanOrEqual(-330)
+  dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 4, 180, 122)]
+  )
+  const reversedOffset = Number(swipeSurface.getAttribute('data-swipe-offset'))
+  expect(reversedOffset).toBeGreaterThan(nearFullOffset + 150)
+  dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 4, 4, 123)]
+  )
+  expect(Number(swipeSurface.getAttribute('data-swipe-offset'))).toBeLessThanOrEqual(-330)
   expect(screen.getByTestId('notification-row-notification:event-wide-swipe')).toHaveAttribute(
     'data-dismiss-phase',
     'dragging'

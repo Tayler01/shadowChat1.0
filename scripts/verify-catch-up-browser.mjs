@@ -277,7 +277,21 @@ for (const profile of profiles) {
     must(swipeLocked === 'true', `${profile.name} did not lock vertical scrolling after claiming the notification swipe.`)
     const claimedOffset = Number(await notificationDragSurface.getAttribute('data-swipe-offset'))
     must(claimedOffset < -80, `${profile.name} did not keep tracking a claimed swipe through downward finger drift.`)
-    await dispatchTouch('touchEnd', [], [{ x: swipeEndX, y: swipeY + 44, id: 1 }])
+    const fullSwipeX = notificationBox.x + 2
+    await dispatchTouch('touchMove', [{ x: fullSwipeX, y: swipeY + 46, id: 1 }])
+    const fullSwipeOffset = Number(await notificationDragSurface.getAttribute('data-swipe-offset'))
+    must(
+      fullSwipeOffset <= -(notificationBox.width * 0.9),
+      `${profile.name} stopped the card before full-width finger travel.`
+    )
+    await dispatchTouch('touchMove', [{ x: swipeStartX - 70, y: swipeY + 30, id: 1 }])
+    const reversedOffset = Number(await notificationDragSurface.getAttribute('data-swipe-offset'))
+    must(
+      reversedOffset > fullSwipeOffset + (notificationBox.width * 0.35),
+      `${profile.name} did not reverse the card continuously when the finger moved back.`
+    )
+    await dispatchTouch('touchMove', [{ x: fullSwipeX, y: swipeY + 44, id: 1 }])
+    await dispatchTouch('touchEnd', [], [{ x: fullSwipeX, y: swipeY + 44, id: 1 }])
     const swipeReleased = await page.getByRole('region', { name: 'Catch-Up content' })
       .getAttribute('data-horizontal-swipe-locked')
     must(swipeReleased === 'false', `${profile.name} did not release the vertical scroll lock after pointer up.`)
@@ -287,11 +301,25 @@ for (const profile of profiles) {
       await notificationDragSurface.getAttribute('data-card-disintegration') === 'active',
       `${profile.name} did not erode the actual notification card during dismissal.`
     )
+    const sandCanvas = disintegration.locator('[data-notification-sand-canvas]')
+    await sandCanvas.waitFor({ timeout: 2_000 })
+    await page.waitForTimeout(100)
+    const sandSource = await sandCanvas.getAttribute('data-sand-source')
+    const sandParticleCount = Number(await sandCanvas.getAttribute('data-sand-particle-count'))
     must(
-      await disintegration.locator('[data-disintegration-fragment]').count() === 28,
-      `${profile.name} did not render the complete notification disintegration sequence.`
+      sandSource === 'captured-card-pixels',
+      `${profile.name} did not rasterize the real notification surface before disintegration (source=${sandSource || 'missing'}).`
     )
-    await page.waitForTimeout(90)
+    must(
+      sandParticleCount > 1_000,
+      `${profile.name} did not create a dense pixel-sourced sand field (particles=${sandParticleCount}).`
+    )
+    await page.waitForTimeout(360)
+    const sandProgress = Number(await sandCanvas.getAttribute('data-sand-progress'))
+    must(
+      sandProgress > 0.03 && sandProgress < 0.98,
+      `${profile.name} did not expose a visible in-progress full-card sand frame.`
+    )
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}-disintegration.png`) })
     await notificationSurface.waitFor({ state: 'detached', timeout: 10_000 })
     must(notificationReadCalls === 1, `${profile.name} expected one notification read acknowledgement, saw ${notificationReadCalls}.`)

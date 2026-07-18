@@ -34,6 +34,12 @@ import {
   type CatchUpItem,
   type CatchUpSnapshot,
 } from './catchUpModel'
+import { NotificationSandDisintegration } from './NotificationSandDisintegration'
+import {
+  captureNotificationSandSnapshot,
+  NOTIFICATION_SAND_DURATION_MS,
+  type NotificationSandSnapshot,
+} from './notificationSand'
 
 const PublicProfileDialog = lazy(() =>
   import('../../components/profile/PublicProfileDialog').then(module => ({
@@ -101,6 +107,22 @@ const resolveSwipeIntent = (
     return 'right'
   }
   return 'pending'
+}
+
+const mapSwipeFingerOffset = (
+  deltaX: number,
+  startX: number,
+  leftBoundary: number,
+  maxTravel: number
+) => {
+  if (deltaX >= 0) return 0
+  const availableFingerTravel = Math.max(64, startX - leftBoundary)
+  const rawDistance = Math.min(availableFingerTravel, -deltaX)
+  const progress = Math.min(1, rawDistance / availableFingerTravel)
+  const edgeRampProgress = Math.min(1, Math.max(0, (progress - 0.45) / 0.55))
+  const smoothEdgeProgress = edgeRampProgress * edgeRampProgress * (3 - (2 * edgeRampProgress))
+  const edgeCompensation = Math.max(0, maxTravel - availableFingerTravel) * smoothEdgeProgress
+  return -Math.min(maxTravel, rawDistance + edgeCompensation)
 }
 
 const findTouch = (touches: TouchList, identifier: number): Touch | null => {
@@ -230,11 +252,13 @@ function SwipeToReadNotification({
 }) {
   const [phase, setPhase] = useState<SwipePhase>('idle')
   const [dissolveActive, setDissolveActive] = useState(false)
+  const [sandSnapshot, setSandSnapshot] = useState<NotificationSandSnapshot | null>(null)
   const x = useMotionValue(0)
   const readActionOpacity = useTransform(x, [-SWIPE_ACTION_WIDTH_PX, -12, 0], [1, 0.2, 0])
   const readActionScale = useTransform(x, [-SWIPE_ACTION_WIDTH_PX, -12, 0], [1, 0.9, 0.82])
   const rootRef = useRef<HTMLDivElement>(null)
   const surfaceRef = useRef<HTMLDivElement>(null)
+  const sandSnapshotPromiseRef = useRef<Promise<NotificationSandSnapshot | null> | null>(null)
   const offsetRef = useRef(0)
   const maxTravelRef = useRef(344)
   const phaseRef = useRef<SwipePhase>('idle')
@@ -269,6 +293,16 @@ function SwipeToReadNotification({
   const setSwipePhase = (next: SwipePhase) => {
     phaseRef.current = next
     setPhase(next)
+  }
+
+  const primeSandSnapshot = () => {
+    if (motionPreference !== 'full') return Promise.resolve(null)
+    if (sandSnapshotPromiseRef.current) return sandSnapshotPromiseRef.current
+    const surface = surfaceRef.current
+    if (!surface) return Promise.resolve(null)
+    const snapshotPromise = captureNotificationSandSnapshot(surface).catch(() => null)
+    sandSnapshotPromiseRef.current = snapshotPromise
+    return snapshotPromise
   }
 
   const updateOffset = (next: number) => {
@@ -378,6 +412,7 @@ function SwipeToReadNotification({
     departureCompletedRef.current = false
     readConfirmedRef.current = false
     setDissolveActive(false)
+    setSandSnapshot(null)
     suppressClickRef.current = true
     setSwipePhase('settling')
     settleTo(0)
@@ -387,17 +422,32 @@ function SwipeToReadNotification({
     }, motionPreference === 'full' ? 190 : motionPreference === 'reduced' ? 90 : 0)
   }
 
-  const startDisintegration = (attempt: number) => {
+  const completeDeparture = (attempt: number) => {
+    if (attempt !== dismissalAttemptRef.current || phaseRef.current !== 'dismissing') return
+    departureCompletedRef.current = true
+    tryBeginCollapse()
+  }
+
+  const startDisintegration = async (attempt: number) => {
     if (attempt !== dismissalAttemptRef.current || dismissCompletedRef.current) return
     if (motionPreference === 'none') {
-      departureCompletedRef.current = true
-      tryBeginCollapse()
+      completeDeparture(attempt)
       return
     }
 
+    const capturedSnapshot = motionPreference === 'full'
+      ? await primeSandSnapshot()
+      : null
+    if (attempt !== dismissalAttemptRef.current || dismissCompletedRef.current) return
+
+    setSandSnapshot(capturedSnapshot)
     setDissolveActive(true)
     settleAnimationRef.current?.stop()
-    const duration = motionPreference === 'full' ? 0.64 : 0.08
+    const duration = motionPreference === 'full'
+      ? capturedSnapshot
+        ? NOTIFICATION_SAND_DURATION_MS / 1_000
+        : 0.64
+      : 0.08
     const target = motionPreference === 'full' ? 0 : offsetRef.current
     settleAnimationRef.current = animate(x, target, {
       duration,
@@ -409,10 +459,8 @@ function SwipeToReadNotification({
     })
     clearPhaseTimer()
     phaseTimerRef.current = globalThis.setTimeout(() => {
-      if (attempt !== dismissalAttemptRef.current || phaseRef.current !== 'dismissing') return
-      departureCompletedRef.current = true
-      tryBeginCollapse()
-    }, Math.round(duration * 1_000) + (motionPreference === 'full' ? 40 : 16))
+      completeDeparture(attempt)
+    }, Math.round(duration * 1_000) + (capturedSnapshot ? 240 : motionPreference === 'full' ? 40 : 16))
   }
 
   const beginDismissal = () => {
@@ -430,11 +478,12 @@ function SwipeToReadNotification({
     readConfirmedRef.current = false
     const attempt = dismissalAttemptRef.current + 1
     dismissalAttemptRef.current = attempt
+    void primeSandSnapshot()
     void onReadStart().then(confirmed => {
       if (!confirmed) throw new Error('Notification read acknowledgement was not confirmed.')
       if (attempt !== dismissalAttemptRef.current || dismissCompletedRef.current) return
       readConfirmedRef.current = true
-      startDisintegration(attempt)
+      void startDisintegration(attempt)
     }).catch(() => restoreAfterReadFailure(attempt))
     settleAnimationRef.current?.stop()
     if (motionPreference !== 'none') {
@@ -522,6 +571,7 @@ function SwipeToReadNotification({
         suppressClickRef.current = true
         setSwipePhase('dragging')
         setHorizontalSwipeLock(true)
+        void primeSandSnapshot()
       }
 
       const now = globalThis.performance?.now?.() ?? Date.now()
@@ -531,7 +581,13 @@ function SwipeToReadNotification({
       gesture.lastX = touch.clientX
       gesture.lastAt = now
       if (event.cancelable) event.preventDefault()
-      updateOffset(deltaX)
+      const leftBoundary = rootRef.current?.getBoundingClientRect().left ?? 0
+      updateOffset(mapSwipeFingerOffset(
+        deltaX,
+        gesture.startX,
+        leftBoundary,
+        maxTravelRef.current
+      ))
     },
     end: event => {
       const gesture = gestureRef.current
@@ -574,6 +630,7 @@ function SwipeToReadNotification({
       : { type: 'spring' as const, stiffness: 500, damping: 42, mass: 0.55 }
   const isDeparting = phase === 'dismissing' || phase === 'collapsing'
   const showDust = dissolveActive && phase === 'dismissing' && motionPreference === 'full'
+  const showSand = showDust && sandSnapshot !== null
 
   return (
     <motion.div
@@ -647,10 +704,12 @@ function SwipeToReadNotification({
           }}
           animate={dissolveActive
             ? motionPreference === 'full'
-              ? {
-                  clipPath: [...CARD_DISSOLVE_CLIP_PATHS],
-                  opacity: [1, 1, 0.98, 0.86, 0.45, 0],
-                }
+              ? sandSnapshot
+                ? { clipPath: FULL_CARD_CLIP_PATH, opacity: 0 }
+                : {
+                    clipPath: [...CARD_DISSOLVE_CLIP_PATHS],
+                    opacity: [1, 1, 0.98, 0.86, 0.45, 0],
+                  }
               : { clipPath: FULL_CARD_CLIP_PATH, opacity: motionPreference === 'none' ? 0 : 0.06 }
             : { clipPath: FULL_CARD_CLIP_PATH, opacity: 1 }}
           transition={{
@@ -660,7 +719,13 @@ function SwipeToReadNotification({
               ease: [0.22, 0.72, 0.24, 1],
             },
             opacity: {
-              duration: motionPreference === 'full' ? 0.64 : motionPreference === 'reduced' ? 0.08 : 0,
+              duration: sandSnapshot
+                ? 0
+                : motionPreference === 'full'
+                  ? 0.64
+                  : motionPreference === 'reduced'
+                    ? 0.08
+                    : 0,
               times: motionPreference === 'full' ? [0, 0.14, 0.34, 0.56, 0.78, 1] : undefined,
               ease: [0.22, 0.72, 0.24, 1],
             },
@@ -720,6 +785,7 @@ function SwipeToReadNotification({
               suppressClickRef.current = true
               setSwipePhase('dragging')
               setHorizontalSwipeLock(true)
+              void primeSandSnapshot()
               event.currentTarget.setPointerCapture?.(event.pointerId)
             }
 
@@ -730,7 +796,13 @@ function SwipeToReadNotification({
             gesture.lastX = event.clientX
             gesture.lastAt = now
             event.preventDefault()
-            updateOffset(deltaX)
+            const leftBoundary = rootRef.current?.getBoundingClientRect().left ?? 0
+            updateOffset(mapSwipeFingerOffset(
+              deltaX,
+              gesture.startX,
+              leftBoundary,
+              maxTravelRef.current
+            ))
           }}
           onPointerUp={event => {
             if (event.pointerType === 'touch') return
@@ -759,7 +831,13 @@ function SwipeToReadNotification({
         </motion.div>
       </div>
 
-      {showDust && (
+      {showSand && sandSnapshot ? (
+        <NotificationSandDisintegration
+          itemId={item.id}
+          snapshot={sandSnapshot}
+          onComplete={() => completeDeparture(dismissalAttemptRef.current)}
+        />
+      ) : showDust ? (
         <div
           data-testid={`notification-disintegration-${item.id}`}
           className="pointer-events-none absolute inset-0 z-[2] overflow-visible"
@@ -809,7 +887,7 @@ function SwipeToReadNotification({
             />
           ))}
         </div>
-      )}
+      ) : null}
     </motion.div>
   )
 }
