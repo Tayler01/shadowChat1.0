@@ -16,10 +16,11 @@ Unread notification cards can be swiped left past a deliberate threshold to
 mark the exact event read without opening its source. The card now follows the
 finger across its full measured width, accepts a deliberate distance or fast
 flick, and completes with a gold fracture-and-ash dissolve before the remaining
-cards reflow upward. Direction is decided once after a short intent threshold:
-vertical intent keeps native page scrolling, while a claimed left swipe
-temporarily locks the Catch-Up scroller until pointer up, cancellation, or lost
-capture. Cancelled and short gestures settle smoothly.
+cards reflow upward. Early diagonal finger motion stays undecided until intent
+is clear instead of cancelling the gesture. Clearly vertical intent keeps native
+page scrolling, while a claimed left swipe keeps ownership through later
+downward drift and temporarily locks the Catch-Up scroller until pointer up,
+cancellation, or lost capture. Cancelled and short gestures settle smoothly.
 
 Dismissal is server-confirmed. The app writes the event ID to a small,
 user-scoped device retry ledger before calling

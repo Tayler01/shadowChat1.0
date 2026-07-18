@@ -15,9 +15,10 @@ Last updated: 2026-07-17
   the card, restores the card on failure, and replays interrupted reads before
   the next inbox fetch. This closes the view-switch, reload, and PWA-restart
   return path.
-- Gesture arbitration now commits once after a short threshold. A claimed left
-  swipe locks vertical movement only inside the Catch-Up scroller until release
-  or cancellation; vertical-first movement stays native.
+- Gesture arbitration uses a small neutral zone instead of cancelling on the
+  first imperfect phone sample. Clear left intent claims the card and locks
+  vertical movement only inside the Catch-Up scroller; later downward finger
+  drift cannot steal it, while clear vertical-first movement stays native.
 - Full motion now uses a deterministic 28-piece fracture-and-ash sequence plus
   a brighter fracture band before the remaining cards slide up. Reduced motion
   uses a short fade and no-motion removes immediately, both only after server

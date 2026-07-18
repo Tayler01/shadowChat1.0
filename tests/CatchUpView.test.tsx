@@ -357,20 +357,39 @@ test('locks vertical scrolling only after a left swipe is claimed', async () => 
   fireEvent.pointerMove(swipeSurface, {
     pointerId: 17,
     pointerType: 'touch',
-    clientX: 228,
-    clientY: 121,
+    clientX: 234,
+    clientY: 128,
   })
 
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+
+  fireEvent.pointerMove(swipeSurface, {
+    pointerId: 17,
+    pointerType: 'touch',
+    clientX: 222,
+    clientY: 134,
+  })
   expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'true')
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '-18')
   const lockedMove = new Event('touchmove', { bubbles: true, cancelable: true })
   scroller.dispatchEvent(lockedMove)
   expect(lockedMove.defaultPrevented).toBe(true)
 
-  fireEvent.pointerUp(swipeSurface, {
+  fireEvent.pointerMove(swipeSurface, {
     pointerId: 17,
     pointerType: 'touch',
-    clientX: 228,
-    clientY: 121,
+    clientX: 180,
+    clientY: 173,
+  })
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'true')
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '-60')
+
+  fireEvent.pointerCancel(swipeSurface, {
+    pointerId: 17,
+    pointerType: 'touch',
+    clientX: 180,
+    clientY: 173,
   })
   expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
   const releasedMove = new Event('touchmove', { bubbles: true, cancelable: true })
@@ -387,9 +406,26 @@ test('locks vertical scrolling only after a left swipe is claimed', async () => 
     pointerId: 18,
     pointerType: 'touch',
     clientX: 236,
-    clientY: 142,
+    clientY: 130,
   })
   expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+  fireEvent.pointerMove(swipeSurface, {
+    pointerId: 18,
+    pointerType: 'touch',
+    clientX: 234,
+    clientY: 144,
+  })
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
+
+  fireEvent.pointerMove(swipeSurface, {
+    pointerId: 18,
+    pointerType: 'touch',
+    clientX: 160,
+    clientY: 148,
+  })
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
 })
 
 test('uses the full shatter-to-ash effect for full motion preference', async () => {

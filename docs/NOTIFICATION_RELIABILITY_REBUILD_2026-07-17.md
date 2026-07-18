@@ -27,9 +27,10 @@ Swipe dismissal now uses the same durable read contract rather than removing a
 card on animation alone. The event ID is queued in user-scoped device storage
 before the read RPC, confirmed reads clear the queue and card, failures restore
 the card, and pending IDs replay before the next inbox fetch. A claimed
-horizontal gesture also locks only the Catch-Up scroller until release, so
-vertical page motion cannot steal a swipe while normal vertical intent remains
-native. Full Comfort motion uses a stronger deterministic fracture-and-ash
+horizontal gesture also locks only the Catch-Up scroller until release. Early
+diagonal finger jitter remains undecided, clear vertical intent stays native,
+and a claimed left swipe keeps ownership even if the finger later drifts down.
+Full Comfort motion uses a stronger deterministic fracture-and-ash
 finish; reduced and none keep the same confirmed-read behavior without the
 decorative particles.
 

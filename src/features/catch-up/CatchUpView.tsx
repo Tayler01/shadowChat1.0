@@ -48,8 +48,11 @@ const SWIPE_DISMISS_MAX_PX = 120
 const SWIPE_DISMISS_RATIO = 0.28
 const SWIPE_FLICK_MIN_DISTANCE_PX = 28
 const SWIPE_FLICK_VELOCITY_PX_MS = -0.65
-const SWIPE_DIRECTION_THRESHOLD_PX = 8
-const SWIPE_HORIZONTAL_LOCK_RATIO = 1.08
+const SWIPE_HORIZONTAL_CLAIM_PX = 10
+const SWIPE_VERTICAL_RELEASE_PX = 18
+const SWIPE_LEFT_DIAGONAL_RATIO = 0.75
+const SWIPE_VERTICAL_DOMINANCE_RATIO = 1.4
+const SWIPE_RIGHT_RELEASE_PX = 14
 const SWIPE_EXIT_OVERSHOOT_PX = 24
 
 type SwipePhase = 'idle' | 'dragging' | 'settling' | 'dismissing' | 'collapsing'
@@ -466,11 +469,26 @@ function SwipeToReadNotification({
             const deltaX = event.clientX - gesture.startX
             const deltaY = event.clientY - gesture.startY
             if (!gesture.dragging) {
-              if (Math.hypot(deltaX, deltaY) < SWIPE_DIRECTION_THRESHOLD_PX) return
-              if (
-                deltaX >= 0
-                || Math.abs(deltaX) < Math.abs(deltaY) * SWIPE_HORIZONTAL_LOCK_RATIO
-              ) {
+              const leftwardDistance = Math.max(0, -deltaX)
+              const rightwardDistance = Math.max(0, deltaX)
+              const verticalDistance = Math.abs(deltaY)
+              const shouldClaimHorizontal = (
+                leftwardDistance >= SWIPE_HORIZONTAL_CLAIM_PX
+                && leftwardDistance >= verticalDistance * SWIPE_LEFT_DIAGONAL_RATIO
+              )
+              const shouldReleaseToVertical = (
+                verticalDistance >= SWIPE_VERTICAL_RELEASE_PX
+                && verticalDistance >= leftwardDistance * SWIPE_VERTICAL_DOMINANCE_RATIO
+              )
+              const shouldReleaseToRight = (
+                rightwardDistance >= SWIPE_RIGHT_RELEASE_PX
+                && rightwardDistance >= verticalDistance
+              )
+
+              if (!shouldClaimHorizontal && !shouldReleaseToVertical && !shouldReleaseToRight) {
+                return
+              }
+              if (shouldReleaseToVertical || shouldReleaseToRight) {
                 gesture.cancelled = true
                 updateOffset(0)
                 return
