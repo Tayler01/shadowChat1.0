@@ -6,7 +6,34 @@ Older artifact paths remain historical evidence. The July 10 web Release A is
 deployed, but its mobile/PWA-sensitive behavior still needs a fresh harness
 artifact and physical-device pass.
 
-Last updated: 2026-07-17
+Last updated: 2026-07-18
+
+## July 18 Catch-Up Persistence And Full-Card Dissolve Checkpoint
+
+- Production inspection proved exact read state was durable: recently cleared
+  rows were absent from the unread window and their dedupe keys had not
+  reappeared. The misleading repeated `30` came from a much larger historical
+  unread backlog continuously refilling the capped working page.
+- Catch-Up now reports the full unread total, keeps its visible page bounded,
+  and provides an authenticated `Mark all read` transaction for the entire
+  notification ledger. Individual opens and swipes invalidate the cached
+  Catch-Up snapshot only after Supabase confirms the read.
+- A one-time July 18 America/New_York baseline marks pre-today notification
+  ledger rows read for all users without changing canonical message, Pin, game,
+  or Live source state. It is intentionally not a recurring daily clear.
+- A failed local retry outside the first 30 rows is retained until an exact
+  canonical unread lookup says it is no longer pending.
+- Full Comfort motion now erodes the actual message surface through six
+  same-vertex polygon keyframes, with a synchronized fracture front and 28
+  wave-delayed fragments. The remaining list slides up only after the complete
+  confirmed-read sequence. Reduced/no-motion modes retain the same persistence
+  contract without decorative particles.
+- `qa:catch-up` remains the zero-mutation Pixel Chromium/iPhone WebKit gesture,
+  geometry, animation, reload, and diagnostics gate.
+  `qa:catch-up:persistence` is the separate guarded linked-backend proof: it
+  creates one exact controlled event, reads it through the authenticated RPC,
+  verifies a fresh unread query cannot see it, and deletes and verifies the
+  fixture.
 
 ## July 17 Durable Notification Swipe Checkpoint
 

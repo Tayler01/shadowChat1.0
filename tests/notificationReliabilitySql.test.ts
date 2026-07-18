@@ -8,6 +8,14 @@ const sql = read(
   'supabase/migrations/20260717193835_notification_reliability_rebuild.sql'
 )
 const compact = sql.replace(/\s+/g, ' ').toLowerCase()
+const catchUpPersistenceSql = read(
+  'supabase/migrations/20260718134454_catch_up_notification_persistence.sql'
+)
+const catchUpPersistenceCompact = catchUpPersistenceSql.replace(/\s+/g, ' ').toLowerCase()
+const backlogBaselineSql = read(
+  'supabase/migrations/20260718135109_notification_backlog_baseline.sql'
+)
+const backlogBaselineCompact = backlogBaselineSql.replace(/\s+/g, ' ').toLowerCase()
 const allowlist = JSON.parse(read('supabase/security-definer-allowlist.json')) as {
   expected_total_security_definers: number
   private_security_definers: string[]
@@ -97,7 +105,7 @@ describe('notification reliability database contract', () => {
 
   test('publishes reviewed RPC and definer surfaces', () => {
     const publicSignatures = allowlist.domains.flatMap(domain => domain.signatures)
-    expect(allowlist.expected_total_security_definers).toBe(131)
+    expect(allowlist.expected_total_security_definers).toBe(132)
     expect(allowlist.private_security_definers).toEqual(expect.arrayContaining([
       'private.create_shadow_checkers_turn_notification()',
       'private.mirror_shado_live_notification()',
@@ -109,6 +117,7 @@ describe('notification reliability database contract', () => {
     expect(publicSignatures).toEqual(expect.arrayContaining([
       'claim_my_notification_event(uuid)',
       'get_app_badge_state_v2(uuid)',
+      'mark_all_my_notification_events_read()',
       'mark_my_checkers_turn_read(uuid)',
       'mark_my_notification_event_read(uuid)',
       'mark_my_shadow_pin_notifications_read(uuid,uuid)',
@@ -120,5 +129,34 @@ describe('notification reliability database contract', () => {
       'service_role:notification_delivery_attempts:INSERT',
       'service_role:notification_delivery_jobs:UPDATE',
     ]))
+  })
+
+  test('clears the complete caller-owned notification backlog without deleting source content', () => {
+    expect(catchUpPersistenceCompact).toContain(
+      'create or replace function public.mark_all_my_notification_events_read()'
+    )
+    expect(catchUpPersistenceCompact).toContain('current_user_id uuid := auth.uid()')
+    expect(catchUpPersistenceCompact).toContain('where events.user_id = current_user_id')
+    expect(catchUpPersistenceCompact).toContain('and events.read_at is null')
+    expect(catchUpPersistenceCompact).toContain('and events.resolved_at is null')
+    expect(catchUpPersistenceCompact).toContain(
+      'grant execute on function public.mark_all_my_notification_events_read() to authenticated'
+    )
+    expect(catchUpPersistenceCompact).not.toMatch(/\bdelete\s+from\b/)
+  })
+
+  test('sets one deterministic pre-rebuild notification baseline without changing source rows', () => {
+    expect(backlogBaselineCompact).toContain(
+      "events.created_at < timestamptz '2026-07-18 00:00:00 america/new_york'"
+    )
+    expect(backlogBaselineCompact).toContain('update public.notification_events events')
+    expect(backlogBaselineCompact).toContain('update public.activity_events events')
+    expect(backlogBaselineCompact).toContain(
+      'returning events.user_id, events.type, events.entity_id'
+    )
+    expect(backlogBaselineCompact).not.toMatch(/\bdelete\s+from\b/)
+    expect(backlogBaselineCompact).not.toMatch(
+      /update public\.(messages|dm_messages|shadow_pin_images|shadow_checkers_matches|live_rooms)/
+    )
   })
 })

@@ -5,6 +5,15 @@
 Catch-Up is the production, lazy, source-linked, non-AI notification center at
 `?view=catchup`.
 
+As of July 18, 2026, the inbox exposes the exact total unread count separately
+from its bounded 30-card working page. Removing one card no longer creates the
+false impression that Supabase restored it when an older unread card fills the
+vacated slot. `Mark all read` calls one caller-owned database transaction that
+marks the complete canonical notification backlog and matching Activity
+projections read without deleting any message, Pin, game, or Live source. The
+system tray, unified app badge, and deterministic Catch-Up cache are refreshed
+only after that transaction succeeds.
+
 As of July 17, 2026, notification-inbox cards join their `actor_id` to the
 current API-safe public profile projection. Every notification with a user
 actor therefore uses the member's current PFP, name, fallback color, and
@@ -15,12 +24,15 @@ fallback and do not invent a profile target.
 Unread notification cards can be swiped left past a deliberate threshold to
 mark the exact event read without opening its source. The card now follows the
 finger across its full measured width, accepts a deliberate distance or fast
-flick, and completes with a gold fracture-and-ash dissolve before the remaining
-cards reflow upward. Early diagonal finger motion stays undecided until intent
-is clear instead of cancelling the gesture. Clearly vertical intent keeps native
-page scrolling, while a claimed left swipe keeps ownership through later
-downward drift and temporarily locks the Catch-Up scroller until the input ends
-or cancels. Cancelled and short gestures settle smoothly.
+flick, and—after the database confirms the read—erodes the actual card from
+right to left through a jagged full-surface clip-path sequence. A synchronized
+fracture front and 28 wave-delayed fragments make the complete message visibly
+disintegrate before the remaining cards use layout motion to slide upward.
+Early diagonal finger motion stays undecided until intent is clear instead of
+cancelling the gesture. Clearly vertical intent keeps native page scrolling,
+while a claimed left swipe keeps ownership through later downward drift and
+temporarily locks the Catch-Up scroller until the input ends or cancels.
+Cancelled and short gestures settle smoothly.
 Finger input is arbitrated by a native non-passive touch path, so the exact
 touch event that claims a left swipe also prevents native vertical scrolling.
 Mouse and pen keep the pointer-event fallback, while multi-touch is released
@@ -32,6 +44,8 @@ user-scoped device retry ledger before calling
 `true`, restores on failure, and retries unfinished acknowledgements before the
 next notification-inbox fetch. This prevents a dismissed card from returning
 after a view switch, reload, or PWA restart while keeping Supabase authoritative.
+Failed retry IDs are checked directly against canonical unread state instead of
+being discarded merely because they fall outside the first 30 visible cards.
 Reduced/no-motion Comfort modes replace the decorative shatter with a brief
 fade or immediate removal after confirmation. The revealed `Read` control
 provides the same action for keyboard and assistive-technology users. Opening a
@@ -108,8 +122,12 @@ the source surface remains authoritative.
 
 ## Privacy And Security
 
-- Both RPCs require authentication, use `SECURITY INVOKER`, and have locked
-  search paths and explicit grants.
+- The deterministic snapshot and Activity acknowledgement RPCs require
+  authentication, use `SECURITY INVOKER`, and have locked search paths and
+  explicit grants.
+- Exact notification reads and `mark_all_my_notification_events_read()` are
+  reviewed `SECURITY DEFINER` functions with an empty search path, explicit
+  authenticated-only grants, and an `auth.uid()` recipient guard.
 - Source RLS and reciprocal personal blocking remain authoritative.
 - Actor data uses `user_public_profile_json`; raw `users`, email, private
   identity fields, block direction, and private circle data are never returned.
@@ -170,7 +188,7 @@ an immediate update.
   diagnostics, and zero test residue;
 - full lint, TypeScript, build/budgets, Jest, linked migration parity, database
   lint/security, and unchanged-production compatibility smoke; and
-- deploy only to `https://shadowchat-2-0-wave-one.netlify.app`.
+- deploy through the production `main` release workflow after all gates pass.
 
 ## Private AI Trial - Not Started
 

@@ -23,6 +23,11 @@ type PendingNotificationRead = {
   queuedAt: number
 }
 
+export type NotificationInboxPage = {
+  items: CatchUpItem[]
+  totalCount: number
+}
+
 const PENDING_NOTIFICATION_READ_STORAGE_PREFIX = 'shadowchat:pending-notification-reads:v1:'
 const PENDING_NOTIFICATION_READ_TTL_MS = 7 * 24 * 60 * 60 * 1_000
 const PENDING_NOTIFICATION_READ_LIMIT = 50
@@ -199,8 +204,8 @@ export async function acknowledgeCatchUpEvents(eventIds: string[]) {
   return typeof data === 'number' ? data : Number(data ?? 0)
 }
 
-export async function fetchNotificationInbox(): Promise<CatchUpItem[]> {
-  const { data, error } = await supabase
+export async function fetchNotificationInbox(): Promise<NotificationInboxPage> {
+  const { data, error, count } = await supabase
     .from('notification_events')
     .select(`
       id,
@@ -211,16 +216,20 @@ export async function fetchNotificationInbox(): Promise<CatchUpItem[]> {
       payload,
       created_at,
       ${embedPublicProfile('actor', 'users!notification_events_actor_id_fkey')}
-    `)
+    `, { count: 'exact' })
     .is('read_at', null)
     .is('resolved_at', null)
     .order('created_at', { ascending: false })
     .limit(30)
 
   if (error) throw error
-  return ((data ?? []) as unknown as RawNotificationEvent[])
+  const items = ((data ?? []) as unknown as RawNotificationEvent[])
     .map(normalizeNotificationInboxItem)
     .filter((item): item is CatchUpItem => Boolean(item))
+  return {
+    items,
+    totalCount: Math.max(items.length, count ?? items.length),
+  }
 }
 
 export async function acknowledgeNotificationInboxEvent(eventId: string) {
@@ -232,6 +241,33 @@ export async function acknowledgeNotificationInboxEvent(eventId: string) {
     throw new Error('Notification read acknowledgement was not confirmed.')
   }
   return true
+}
+
+export async function acknowledgeAllNotificationInboxEvents() {
+  const { data, error } = await supabase.rpc('mark_all_my_notification_events_read')
+  if (error) throw error
+  const count = typeof data === 'number' ? data : Number(data ?? Number.NaN)
+  if (!Number.isFinite(count) || count < 0) {
+    throw new Error('Notification inbox acknowledgement returned an invalid count.')
+  }
+  return count
+}
+
+export async function findUnreadNotificationEventIds(eventIds: string[]): Promise<string[]> {
+  const uniqueEventIds = [...new Set(eventIds.filter(Boolean))].slice(0, PENDING_NOTIFICATION_READ_LIMIT)
+  if (uniqueEventIds.length === 0) return [] as string[]
+
+  const { data, error } = await supabase
+    .from('notification_events')
+    .select('id')
+    .in('id', uniqueEventIds)
+    .is('read_at', null)
+    .is('resolved_at', null)
+
+  if (error) throw error
+  return ((data ?? []) as Array<{ id?: unknown }>)
+    .map(row => asText(row.id))
+    .filter((eventId): eventId is string => Boolean(eventId))
 }
 
 export async function flushPendingNotificationReads(userId: string) {

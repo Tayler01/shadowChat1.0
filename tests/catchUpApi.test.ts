@@ -1,9 +1,11 @@
 import { supabase } from '../src/lib/supabase'
 import {
+  acknowledgeAllNotificationInboxEvents,
   acknowledgeCatchUpEvents,
   acknowledgeNotificationInboxEvent,
   fetchCatchUpSnapshot,
   fetchNotificationInbox,
+  findUnreadNotificationEventIds,
   flushPendingNotificationReads,
   getPendingNotificationReadEventIds,
   queuePendingNotificationRead,
@@ -106,36 +108,41 @@ test('hydrates notification actors from the current safe public profile relation
       },
     }],
     error: null,
+    count: 413,
   })
   const order = jest.fn(() => ({ limit }))
   const resolvedIs = jest.fn(() => ({ order }))
   const readIs = jest.fn(() => ({ is: resolvedIs }))
-  const select = jest.fn((_query: string) => ({ is: readIs }))
+  const select = jest.fn((_query: string, _options: { count: 'exact' }) => ({ is: readIs }))
   from.mockReturnValue({ select })
 
-  await expect(fetchNotificationInbox()).resolves.toEqual([
-    expect.objectContaining({
-      id: 'notification:event-1',
-      actor: {
-        id: 'actor-1',
-        display_name: 'Mills',
-        username: 'mills',
-        avatar_url: 'https://example.com/mills-full.jpg',
-        avatar_thumbnail_url: 'https://example.com/mills-thumb.jpg',
-        color: '#d7aa46',
-      },
-      target: {
-        kind: 'app_route',
-        route: '/?view=pins&pin=pin-1&panel=comments&comment=comment-1',
-      },
-    }),
-  ])
+  await expect(fetchNotificationInbox()).resolves.toEqual({
+    items: [
+      expect.objectContaining({
+        id: 'notification:event-1',
+        actor: {
+          id: 'actor-1',
+          display_name: 'Mills',
+          username: 'mills',
+          avatar_url: 'https://example.com/mills-full.jpg',
+          avatar_thumbnail_url: 'https://example.com/mills-thumb.jpg',
+          color: '#d7aa46',
+        },
+        target: {
+          kind: 'app_route',
+          route: '/?view=pins&pin=pin-1&panel=comments&comment=comment-1',
+        },
+      }),
+    ],
+    totalCount: 413,
+  })
   expect(from).toHaveBeenCalledWith('notification_events')
   expect(select.mock.calls[0][0]).toContain(
     'actor:users!notification_events_actor_id_fkey('
   )
   expect(readIs).toHaveBeenCalledWith('read_at', null)
   expect(resolvedIs).toHaveBeenCalledWith('resolved_at', null)
+  expect(select.mock.calls[0][1]).toEqual({ count: 'exact' })
 })
 
 test('rejects an unconfirmed notification read acknowledgement', async () => {
@@ -144,6 +151,33 @@ test('rejects an unconfirmed notification read acknowledgement', async () => {
   await expect(acknowledgeNotificationInboxEvent('event-unconfirmed')).rejects.toThrow(
     'Notification read acknowledgement was not confirmed.'
   )
+})
+
+test('confirms a complete caller-owned notification inbox acknowledgement', async () => {
+  rpc.mockResolvedValue({ data: 413, error: null })
+
+  await expect(acknowledgeAllNotificationInboxEvents()).resolves.toBe(413)
+  expect(rpc).toHaveBeenCalledWith('mark_all_my_notification_events_read')
+})
+
+test('checks failed retry ids against their canonical unread state instead of the visible page', async () => {
+  const resolvedIs = jest.fn().mockResolvedValue({
+    data: [{ id: 'event-page-31' }],
+    error: null,
+  })
+  const readIs = jest.fn(() => ({ is: resolvedIs }))
+  const inFilter = jest.fn(() => ({ is: readIs }))
+  const select = jest.fn(() => ({ in: inFilter }))
+  from.mockReturnValue({ select })
+
+  await expect(findUnreadNotificationEventIds([
+    'event-page-31',
+    'event-page-31',
+    '',
+  ])).resolves.toEqual(['event-page-31'])
+  expect(inFilter).toHaveBeenCalledWith('id', ['event-page-31'])
+  expect(readIs).toHaveBeenCalledWith('read_at', null)
+  expect(resolvedIs).toHaveBeenCalledWith('resolved_at', null)
 })
 
 test('persists pending notification reads and clears them only after server confirmation', async () => {

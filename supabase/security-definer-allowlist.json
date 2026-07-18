@@ -1,6 +1,6 @@
 {
-  "reviewed_on": "2026-07-16",
-  "expected_total_security_definers": 131,
+  "reviewed_on": "2026-07-18",
+  "expected_total_security_definers": 132,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
     "private.can_operator_read_moderation_evidence(uuid,uuid)",
@@ -298,6 +298,7 @@
         "mark_dm_messages_read(uuid)",
         "mark_dm_messages_read_through(uuid,uuid)",
         "mark_general_notification_events_read_through(uuid,uuid)",
+        "mark_all_my_notification_events_read()",
         "mark_my_notification_event_read(uuid)",
         "mark_my_shadow_pin_notifications_read(uuid,uuid)",
         "search_users(text)",

@@ -284,6 +284,10 @@ for (const profile of profiles) {
     const disintegration = page.getByTestId('notification-disintegration-notification:00000000-0000-4000-8000-000000000123')
     await disintegration.waitFor({ timeout: 2_000 })
     must(
+      await notificationDragSurface.getAttribute('data-card-disintegration') === 'active',
+      `${profile.name} did not erode the actual notification card during dismissal.`
+    )
+    must(
       await disintegration.locator('[data-disintegration-fragment]').count() === 28,
       `${profile.name} did not render the complete notification disintegration sequence.`
     )
@@ -326,7 +330,7 @@ const summary = {
   baseUrl,
   supabaseProjectRef: projectRef,
   passed: results.every(result => result.passed),
-  residue: 'The swipe/read proof intercepts notification reads in-browser; no fixtures, acknowledgements, uploads, messages, or user-state mutations are created.',
+  residue: 'This visual swipe proof intercepts notification reads and creates no user-state mutations. Run qa:catch-up:persistence separately for a real linked write-read-reload-cleanup proof.',
   results,
 }
 await writeFile(path.join(artifactDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8')

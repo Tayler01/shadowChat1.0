@@ -56,6 +56,7 @@
     "qa:shado-live:real": "node scripts/verify-shado-live-real-browser.mjs",
     "qa:shado-live:provider": "node scripts/verify-shado-live-provider-browser.mjs",
     "qa:catch-up": "node scripts/verify-catch-up-browser.mjs",
+    "qa:catch-up:persistence": "node scripts/verify-catch-up-read-persistence.mjs --linked",
     "qa:comfort": "node scripts/comfort-visual-qa.mjs",
     "qa:themes": "node scripts/theme-visual-qa.mjs",
     "automation:submit-daily-scan": "node scripts/submit-daily-scan-approval-packets.mjs",

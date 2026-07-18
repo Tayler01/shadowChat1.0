@@ -108,6 +108,20 @@ export const clearNotificationEventFromSystemTray = async (message: {
   }
 }
 
+export const clearAllNotificationsFromSystemTray = async () => {
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+
+  const payload = { type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR' }
+  navigator.serviceWorker.controller?.postMessage(payload)
+
+  try {
+    const registration = await navigator.serviceWorker.getRegistration?.()
+    registration?.active?.postMessage(payload)
+  } catch {
+    // Clearing system notifications is best-effort and must not block inbox state.
+  }
+}
+
 export const markNotificationDestinationRead = async (
   eventIds: string[],
   trayContext: {

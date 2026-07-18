@@ -10,18 +10,24 @@ import { getUserProfile } from '../../lib/auth'
 import { requestAppBadgeRefresh } from '../../lib/appBadge'
 import type { User } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
-import { clearNotificationEventFromSystemTray } from '../notifications/notificationApi'
+import {
+  clearAllNotificationsFromSystemTray,
+  clearNotificationEventFromSystemTray,
+} from '../notifications/notificationApi'
 import {
   acknowledgeCatchUpEvents,
+  acknowledgeAllNotificationInboxEvents,
   acknowledgeNotificationInboxEvent,
   clearPendingNotificationRead,
   fetchCatchUpSnapshot,
   fetchNotificationInbox,
+  findUnreadNotificationEventIds,
   flushPendingNotificationReads,
   queuePendingNotificationRead,
 } from './catchUpApi'
 import {
   CATCH_UP_SECTION_ORDER,
+  clearCatchUpCache,
   formatCatchUpTime,
   readCatchUpCache,
   writeCatchUpCache,
@@ -55,6 +61,15 @@ const SWIPE_LEFT_DIAGONAL_RATIO = 0.75
 const SWIPE_VERTICAL_DOMINANCE_RATIO = 1.4
 const SWIPE_RIGHT_RELEASE_PX = 14
 const SWIPE_EXIT_OVERSHOOT_PX = 24
+const FULL_CARD_CLIP_PATH = 'polygon(0% 0%, 100% 0%, 100% 9%, 100% 18%, 100% 27%, 100% 36%, 100% 45%, 100% 55%, 100% 64%, 100% 73%, 100% 82%, 100% 91%, 100% 100%, 0% 100%)'
+const CARD_DISSOLVE_CLIP_PATHS = [
+  FULL_CARD_CLIP_PATH,
+  'polygon(0% 0%, 93% 0%, 98% 9%, 88% 18%, 96% 27%, 86% 36%, 94% 45%, 84% 55%, 97% 64%, 87% 73%, 95% 82%, 83% 91%, 91% 100%, 0% 100%)',
+  'polygon(0% 0%, 70% 0%, 80% 9%, 61% 18%, 75% 27%, 57% 36%, 72% 45%, 59% 55%, 78% 64%, 62% 73%, 73% 82%, 55% 91%, 67% 100%, 0% 100%)',
+  'polygon(0% 0%, 39% 0%, 51% 9%, 29% 18%, 46% 27%, 23% 36%, 41% 45%, 27% 55%, 53% 64%, 31% 73%, 44% 82%, 20% 91%, 35% 100%, 0% 100%)',
+  'polygon(0% 0%, 12% 0%, 23% 9%, 5% 18%, 19% 27%, 2% 36%, 15% 45%, 4% 55%, 25% 64%, 7% 73%, 18% 82%, 1% 91%, 10% 100%, 0% 100%)',
+  'polygon(0% 0%, 0% 0%, 0% 9%, 0% 18%, 0% 27%, 0% 36%, 0% 45%, 0% 55%, 0% 64%, 0% 73%, 0% 82%, 0% 91%, 0% 100%, 0% 100%)',
+] as const
 
 type SwipePhase = 'idle' | 'dragging' | 'settling' | 'dismissing' | 'collapsing'
 type SwipeIntent = 'pending' | 'horizontal' | 'vertical' | 'right'
@@ -108,7 +123,7 @@ const DISINTEGRATION_FRAGMENTS = Array.from({ length: 28 }, (_, index) => {
     x: -42 - ((index * 29) % 112),
     y: -44 + ((index * 31) % 89),
     rotate: -95 + ((index * 47) % 190),
-    delay: (wave * 0.018) + ((index % 3) * 0.007),
+    delay: (wave * 0.05) + ((index % 3) * 0.006),
     wave,
     tone: index % 3 === 0
       ? 'var(--theme-accent-readable)'
@@ -214,6 +229,7 @@ function SwipeToReadNotification({
   children: React.ReactNode
 }) {
   const [phase, setPhase] = useState<SwipePhase>('idle')
+  const [dissolveActive, setDissolveActive] = useState(false)
   const x = useMotionValue(0)
   const readActionOpacity = useTransform(x, [-SWIPE_ACTION_WIDTH_PX, -12, 0], [1, 0.2, 0])
   const readActionScale = useTransform(x, [-SWIPE_ACTION_WIDTH_PX, -12, 0], [1, 0.9, 0.82])
@@ -361,6 +377,7 @@ function SwipeToReadNotification({
     dismissStartedRef.current = false
     departureCompletedRef.current = false
     readConfirmedRef.current = false
+    setDissolveActive(false)
     suppressClickRef.current = true
     setSwipePhase('settling')
     settleTo(0)
@@ -368,6 +385,34 @@ function SwipeToReadNotification({
       if (phaseRef.current === 'settling') setSwipePhase('idle')
       suppressClickRef.current = false
     }, motionPreference === 'full' ? 190 : motionPreference === 'reduced' ? 90 : 0)
+  }
+
+  const startDisintegration = (attempt: number) => {
+    if (attempt !== dismissalAttemptRef.current || dismissCompletedRef.current) return
+    if (motionPreference === 'none') {
+      departureCompletedRef.current = true
+      tryBeginCollapse()
+      return
+    }
+
+    setDissolveActive(true)
+    settleAnimationRef.current?.stop()
+    const duration = motionPreference === 'full' ? 0.64 : 0.08
+    const target = motionPreference === 'full' ? 0 : offsetRef.current
+    settleAnimationRef.current = animate(x, target, {
+      duration,
+      ease: [0.22, 0.72, 0.24, 1],
+      onUpdate: latest => {
+        offsetRef.current = latest
+        surfaceRef.current?.setAttribute('data-swipe-offset', String(Math.round(latest)))
+      },
+    })
+    clearPhaseTimer()
+    phaseTimerRef.current = globalThis.setTimeout(() => {
+      if (attempt !== dismissalAttemptRef.current || phaseRef.current !== 'dismissing') return
+      departureCompletedRef.current = true
+      tryBeginCollapse()
+    }, Math.round(duration * 1_000) + (motionPreference === 'full' ? 40 : 16))
   }
 
   const beginDismissal = () => {
@@ -380,6 +425,7 @@ function SwipeToReadNotification({
     if (gesture?.input === 'pointer') releasePointerCapture(gesture.pointerId)
     setHorizontalSwipeLock(false)
     setSwipePhase('dismissing')
+    setDissolveActive(false)
     departureCompletedRef.current = false
     readConfirmedRef.current = false
     const attempt = dismissalAttemptRef.current + 1
@@ -388,25 +434,20 @@ function SwipeToReadNotification({
       if (!confirmed) throw new Error('Notification read acknowledgement was not confirmed.')
       if (attempt !== dismissalAttemptRef.current || dismissCompletedRef.current) return
       readConfirmedRef.current = true
-      tryBeginCollapse()
+      startDisintegration(attempt)
     }).catch(() => restoreAfterReadFailure(attempt))
     settleAnimationRef.current?.stop()
-
-    const departureDuration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 0.08 : 0.44
-    settleAnimationRef.current = animate(x, -maxTravelRef.current, {
-      duration: departureDuration,
-      ease: [0.22, 0.72, 0.24, 1],
-      onUpdate: latest => {
-        offsetRef.current = latest
-        surfaceRef.current?.setAttribute('data-swipe-offset', String(Math.round(latest)))
-      },
-    })
-    clearPhaseTimer()
-    phaseTimerRef.current = globalThis.setTimeout(() => {
-      if (attempt !== dismissalAttemptRef.current || phaseRef.current !== 'dismissing') return
-      departureCompletedRef.current = true
-      tryBeginCollapse()
-    }, Math.round(departureDuration * 1_000) + (motionPreference === 'full' ? 40 : 16))
+    if (motionPreference !== 'none') {
+      const savingOffset = Math.max(offsetRef.current, -Math.round(SWIPE_ACTION_WIDTH_PX * 0.42))
+      settleAnimationRef.current = animate(x, savingOffset, {
+        duration: motionPreference === 'full' ? 0.18 : 0.08,
+        ease: [0.22, 0.72, 0.24, 1],
+        onUpdate: latest => {
+          offsetRef.current = latest
+          surfaceRef.current?.setAttribute('data-swipe-offset', String(Math.round(latest)))
+        },
+      })
+    }
   }
 
   const finishGesture = (pointerId: number) => {
@@ -532,7 +573,7 @@ function SwipeToReadNotification({
       ? { duration: 0.08 }
       : { type: 'spring' as const, stiffness: 500, damping: 42, mass: 0.55 }
   const isDeparting = phase === 'dismissing' || phase === 'collapsing'
-  const showDust = phase === 'dismissing' && motionPreference === 'full'
+  const showDust = dissolveActive && phase === 'dismissing' && motionPreference === 'full'
 
   return (
     <motion.div
@@ -557,34 +598,40 @@ function SwipeToReadNotification({
       className="relative overflow-visible rounded-[var(--radius-lg)]"
     >
       <div className="relative overflow-hidden rounded-[var(--radius-lg)]">
-        <motion.button
-          type="button"
-          onClick={beginDismissal}
-          onFocus={() => {
-            if (dismissStartedRef.current) return
-            setSwipePhase('settling')
-            settleTo(-SWIPE_ACTION_WIDTH_PX)
-          }}
-          onBlur={() => {
-            if (!dismissStartedRef.current) resetGesture()
-          }}
-          disabled={isDeparting}
-          style={{ opacity: readActionOpacity }}
-          className="absolute inset-0 flex items-center justify-end bg-[linear-gradient(90deg,rgba(201,154,58,0.06),var(--theme-accent-soft))] pr-5 text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-focus-ring)] disabled:pointer-events-none"
-          aria-label={`Mark ${item.title} as read`}
+        <motion.div
+          animate={{ opacity: dissolveActive ? 0 : 1 }}
+          transition={{ duration: dissolveActive && motionPreference === 'full' ? 0.09 : 0 }}
+          className="absolute inset-0"
         >
-          <motion.span
-            style={{ scale: readActionScale }}
-            className="flex flex-col items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.1em]"
+          <motion.button
+            type="button"
+            onClick={beginDismissal}
+            onFocus={() => {
+              if (dismissStartedRef.current) return
+              setSwipePhase('settling')
+              settleTo(-SWIPE_ACTION_WIDTH_PX)
+            }}
+            onBlur={() => {
+              if (!dismissStartedRef.current) resetGesture()
+            }}
+            disabled={isDeparting}
+            style={{ opacity: readActionOpacity }}
+            className="flex h-full w-full items-center justify-end bg-[linear-gradient(90deg,rgba(201,154,58,0.06),var(--theme-accent-soft))] pr-5 text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-focus-ring)] disabled:pointer-events-none"
+            aria-label={`Mark ${item.title} as read`}
           >
-            {isDeparting ? (
-              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-            ) : (
-              <Check className="h-5 w-5" aria-hidden="true" />
-            )}
-            {isDeparting ? 'Saving' : 'Read'}
-          </motion.span>
-        </motion.button>
+            <motion.span
+              style={{ scale: readActionScale }}
+              className="flex flex-col items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.1em]"
+            >
+              {isDeparting ? (
+                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+              ) : (
+                <Check className="h-5 w-5" aria-hidden="true" />
+              )}
+              {isDeparting ? 'Saving' : 'Read'}
+            </motion.span>
+          </motion.button>
+        </motion.div>
         <motion.div
           ref={surfaceRef}
           data-testid={`notification-swipe-${item.id}`}
@@ -593,8 +640,32 @@ function SwipeToReadNotification({
             x,
             touchAction: 'pan-y pinch-zoom',
             userSelect: phase === 'dragging' ? 'none' : undefined,
-            willChange: phase === 'dragging' || isDeparting ? 'transform' : 'auto',
+            pointerEvents: isDeparting ? 'none' : undefined,
+            willChange: phase === 'dragging' || dissolveActive
+              ? 'transform, clip-path, opacity'
+              : 'auto',
           }}
+          animate={dissolveActive
+            ? motionPreference === 'full'
+              ? {
+                  clipPath: [...CARD_DISSOLVE_CLIP_PATHS],
+                  opacity: [1, 1, 0.98, 0.86, 0.45, 0],
+                }
+              : { clipPath: FULL_CARD_CLIP_PATH, opacity: motionPreference === 'none' ? 0 : 0.06 }
+            : { clipPath: FULL_CARD_CLIP_PATH, opacity: 1 }}
+          transition={{
+            clipPath: {
+              duration: motionPreference === 'full' ? 0.64 : 0,
+              times: [0, 0.14, 0.34, 0.56, 0.78, 1],
+              ease: [0.22, 0.72, 0.24, 1],
+            },
+            opacity: {
+              duration: motionPreference === 'full' ? 0.64 : motionPreference === 'reduced' ? 0.08 : 0,
+              times: motionPreference === 'full' ? [0, 0.14, 0.34, 0.56, 0.78, 1] : undefined,
+              ease: [0.22, 0.72, 0.24, 1],
+            },
+          }}
+          data-card-disintegration={dissolveActive && motionPreference === 'full' ? 'active' : 'inactive'}
           data-native-touch-swipe="true"
           className="relative z-[1] bg-[var(--bg-app)]"
           onClickCapture={event => {
@@ -684,19 +755,7 @@ function SwipeToReadNotification({
             resetGesture()
           }}
         >
-          <motion.div
-            animate={isDeparting
-              ? motionPreference === 'full'
-                ? { opacity: [1, 0.9, 0.5, 0.04], scale: [1, 0.99, 0.97, 0.945] }
-                : { opacity: motionPreference === 'none' ? 0 : 0.08, scale: 1 }
-              : { opacity: 1, scale: 1 }}
-            transition={{
-              duration: motionPreference === 'full' ? 0.42 : motionPreference === 'reduced' ? 0.08 : 0,
-              ease: [0.22, 0.72, 0.24, 1],
-            }}
-          >
-            {children}
-          </motion.div>
+          {children}
         </motion.div>
       </div>
 
@@ -708,14 +767,14 @@ function SwipeToReadNotification({
         >
           <motion.span
             data-disintegration-fracture-band
-            initial={{ opacity: 0, x: 18, scaleX: 0.2 }}
+            initial={{ opacity: 0, x: '0%', scaleX: 0.4 }}
             animate={{
-              opacity: [0, 0.92, 0.5, 0],
-              x: [18, 0, -18, -42],
-              scaleX: [0.2, 1.15, 0.88, 0.55],
+              opacity: [0, 1, 0.72, 0.34, 0],
+              x: ['0%', '-120%', '-285%', '-430%', '-560%'],
+              scaleX: [0.4, 1.2, 0.94, 0.7, 0.35],
             }}
-            transition={{ duration: 0.31, times: [0, 0.2, 0.66, 1], ease: [0.22, 0.72, 0.24, 1] }}
-            className="absolute right-0 top-[6%] h-[88%] w-[44%] origin-right bg-[linear-gradient(90deg,transparent,rgba(215,170,70,0.12),rgba(215,170,70,0.5),transparent)]"
+            transition={{ duration: 0.58, times: [0, 0.12, 0.42, 0.74, 1], ease: [0.22, 0.72, 0.24, 1] }}
+            className="absolute right-0 top-[2%] h-[96%] w-[18%] origin-right bg-[linear-gradient(90deg,transparent,rgba(215,170,70,0.18),rgba(245,218,143,0.74),rgba(215,170,70,0.2),transparent)]"
           />
           {DISINTEGRATION_FRAGMENTS.map(fragment => (
             <motion.span
@@ -743,7 +802,7 @@ function SwipeToReadNotification({
                 width: fragment.width,
                 height: fragment.height,
                 backgroundColor: fragment.tone,
-                boxShadow: fragment.tone === 'var(--theme-accent-readable)'
+                boxShadow: fragment.wave === 0 && fragment.tone === 'var(--theme-accent-readable)'
                   ? '0 0 9px rgba(215,170,70,0.4)'
                   : undefined,
               }}
@@ -762,8 +821,10 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   const [cached] = useState(() => readCatchUpCache(userId))
   const [snapshot, setSnapshot] = useState<CatchUpSnapshot | null>(cached.snapshot)
   const [notificationInbox, setNotificationInbox] = useState<CatchUpItem[]>([])
+  const [notificationInboxTotal, setNotificationInboxTotal] = useState(0)
   const [notificationInboxLoading, setNotificationInboxLoading] = useState(true)
   const [notificationInboxError, setNotificationInboxError] = useState<string | null>(null)
+  const [clearingNotificationInbox, setClearingNotificationInbox] = useState(false)
   const [loading, setLoading] = useState(!cached.snapshot)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -817,13 +878,18 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     setNotificationInboxError(null)
     try {
       const retry = await flushPendingNotificationReads(userId)
-      const items = await fetchNotificationInbox()
+      const page = await fetchNotificationInbox()
+      const unreadRetryIds = retry.failed.length > 0
+        ? await findUnreadNotificationEventIds(retry.failed)
+        : []
       if (mountedRef.current) {
-        setNotificationInbox(items)
-        const visibleEventIds = new Set(items.flatMap(item => item.notificationEventIds ?? []))
-        const visibleRetryFailures = retry.failed.filter(eventId => visibleEventIds.has(eventId))
+        setNotificationInbox(page.items)
+        setNotificationInboxTotal(page.totalCount)
+        const unreadRetryIdSet = new Set(unreadRetryIds)
+        const visibleEventIds = new Set(page.items.flatMap(item => item.notificationEventIds ?? []))
+        const visibleRetryFailures = unreadRetryIds.filter(eventId => visibleEventIds.has(eventId))
         retry.failed
-          .filter(eventId => !visibleEventIds.has(eventId))
+          .filter(eventId => !unreadRetryIdSet.has(eventId))
           .forEach(eventId => clearPendingNotificationRead(userId, eventId))
         if (visibleRetryFailures.length > 0) {
           setNotificationInboxError('A previously dismissed notification is still syncing. Swipe it again or refresh to retry.')
@@ -957,6 +1023,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     const request = acknowledgeNotificationInboxEvent(eventId)
       .then(() => {
         clearPendingNotificationRead(userId, eventId)
+        clearCatchUpCache()
         void clearNotificationEventFromSystemTray({
           notificationType: item.kind,
           eventId,
@@ -982,10 +1049,20 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     return request
   }
 
-  const openNotificationItem = (item: CatchUpItem) => {
-    void acknowledgeNotificationItem(item, true).catch(() => undefined)
-    onOpenSource(item)
-    setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
+  const openNotificationItem = async (item: CatchUpItem) => {
+    setAnnouncement(`Opening and clearing ${item.title}.`)
+    try {
+      await acknowledgeNotificationItem(item, true)
+      if (mountedRef.current) {
+        setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
+        setNotificationInboxTotal(current => Math.max(0, current - 1))
+        setAnnouncement(`${item.title} marked as read.`)
+      }
+    } catch {
+      // Opening the exact source remains available even if acknowledgement must retry later.
+    } finally {
+      onOpenSource(item)
+    }
   }
 
   const beginNotificationDismissal = (item: CatchUpItem): Promise<boolean> => {
@@ -1001,6 +1078,39 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
 
   const finishNotificationDismissal = (item: CatchUpItem) => {
     setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
+    setNotificationInboxTotal(current => Math.max(0, current - 1))
+  }
+
+  const clearNotificationInbox = async () => {
+    if (clearingNotificationInbox || notificationInboxTotal <= 0) return
+    const confirmed = window.confirm(
+      `Mark all ${notificationInboxTotal.toLocaleString()} notifications as read? This will not delete messages, Pins, games, or Live rooms.`
+    )
+    if (!confirmed) return
+
+    setClearingNotificationInbox(true)
+    setNotificationInboxError(null)
+    setAnnouncement('Marking every notification as read.')
+    try {
+      const cleared = await acknowledgeAllNotificationInboxEvents()
+      clearCatchUpCache()
+      await clearAllNotificationsFromSystemTray()
+      requestAppBadgeRefresh()
+      if (!mountedRef.current) return
+      setNotificationInbox([])
+      setNotificationInboxTotal(0)
+      await load(true)
+      if (mountedRef.current) {
+        setAnnouncement(`${cleared.toLocaleString()} notifications marked as read.`)
+      }
+    } catch {
+      if (mountedRef.current) {
+        setNotificationInboxError('The notification inbox could not be cleared. Nothing was hidden; refresh and try again.')
+        setAnnouncement('Notification inbox could not be cleared.')
+      }
+    } finally {
+      if (mountedRef.current) setClearingNotificationInbox(false)
+    }
   }
 
   const refreshAll = () => {
@@ -1059,14 +1169,29 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
               {hasNotificationInboxItems && (
                 <section aria-labelledby="catch-up-notification-inbox">
                   <div className="mb-3 flex items-end justify-between gap-3 px-1">
-                    <div>
+                    <div className="min-w-0">
                       <h2 id="catch-up-notification-inbox" className="flex items-center gap-2 text-lg font-bold text-[var(--text-primary)]">
                         <Inbox className="h-5 w-5 text-[var(--theme-accent-readable)]" />
                         Notification inbox
                       </h2>
-                      <p className="mt-1 text-xs text-[var(--text-muted)]">Every unread app-icon count has a source you can open and clear here.</p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        Showing {notificationInbox.length.toLocaleString()} of {notificationInboxTotal.toLocaleString()} unread notifications. Open or swipe one to clear it permanently.
+                      </p>
                     </div>
-                    <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)]">{notificationInbox.length}</span>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <span className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--text-secondary)]">
+                        {notificationInboxTotal > 999 ? '999+' : notificationInboxTotal}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => void clearNotificationInbox()}
+                        disabled={clearingNotificationInbox}
+                        aria-label={`Mark all ${notificationInboxTotal.toLocaleString()} notifications as read`}
+                        className="min-h-9 rounded-full border border-[var(--border-glow)] bg-[var(--theme-accent-soft)] px-3 text-[0.68rem] font-bold uppercase tracking-[0.1em] text-[var(--theme-accent-readable)] transition-colors hover:bg-[var(--theme-accent-soft-strong)] disabled:cursor-wait disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-focus-ring)]"
+                      >
+                        {clearingNotificationInbox ? 'Clearing...' : 'Mark all read'}
+                      </button>
+                    </div>
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {notificationInbox.map(item => (
@@ -1080,7 +1205,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
                       >
                         <CatchUpCard
                           item={item}
-                          onOpen={() => openNotificationItem(item)}
+                          onOpen={() => void openNotificationItem(item)}
                           onOpenProfile={profileId => void openProfile(profileId)}
                           profileLoading={loadingProfileId === item.actor?.id}
                         />

@@ -38,6 +38,30 @@ Full Comfort motion uses a stronger deterministic fracture-and-ash
 finish; reduced and none keep the same confirmed-read behavior without the
 decorative particles.
 
+The July 18 persistence follow-up distinguishes the bounded 30-card page from
+the complete unread ledger. Production evidence showed that exact reads
+remained read and did not recreate their dedupe keys; a large historical
+backlog was simply refilling the fixed page. Catch-Up now displays `showing X of
+Y`, offers a caller-scoped `Mark all read` transaction, invalidates its
+deterministic cache after confirmed reads, and checks interrupted retry IDs by
+exact canonical unread state even when they are beyond the first page.
+
+The full-motion finish now affects the real notification card rather than only
+an overlay: a six-keyframe jagged polygon erodes the complete surface from
+right to left while a full-height fracture front and wave-delayed fragments
+track the boundary. The list reflows only after the read is server-confirmed and
+the dissolve completes. Reduced motion uses a short fade, and no-motion removes
+the confirmed row immediately.
+
+The same rollout establishes a one-time production baseline at midnight on
+July 18, 2026 America/New_York. Unread notification-ledger rows older than that
+cutoff are marked read for all users, with matching Activity projections
+acknowledged. The migration does not delete or mark read any canonical DM,
+General Chat message, Pin, Checkers match, or Live room. Before application,
+the reviewed scope was 10,784 notification rows across 25 users, dominated by
+historical General Chat delivery events. This is a one-time baseline, not a
+daily auto-clear policy.
+
 The destination follow-up in
 `20260717233421_notification_destination_badges.sql` makes every nonzero Pins
 or Play badge traceable in the UI. Play shows unread counts on the owning

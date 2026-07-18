@@ -7,26 +7,36 @@ import {
   type CatchUpSnapshot,
 } from '../src/features/catch-up/catchUpModel'
 import {
+  acknowledgeAllNotificationInboxEvents,
   acknowledgeCatchUpEvents,
   acknowledgeNotificationInboxEvent,
   clearPendingNotificationRead,
   fetchCatchUpSnapshot,
   fetchNotificationInbox,
+  findUnreadNotificationEventIds,
   flushPendingNotificationReads,
   queuePendingNotificationRead,
 } from '../src/features/catch-up/catchUpApi'
+import { clearAllNotificationsFromSystemTray } from '../src/features/notifications/notificationApi'
 import { getUserProfile } from '../src/lib/auth'
 
 let mockMotionPreference: 'full' | 'reduced' | 'none' = 'none'
 
 jest.mock('../src/features/catch-up/catchUpApi', () => ({
+  acknowledgeAllNotificationInboxEvents: jest.fn(),
   acknowledgeCatchUpEvents: jest.fn(),
   acknowledgeNotificationInboxEvent: jest.fn(),
   clearPendingNotificationRead: jest.fn(),
   fetchCatchUpSnapshot: jest.fn(),
   fetchNotificationInbox: jest.fn(),
+  findUnreadNotificationEventIds: jest.fn(),
   flushPendingNotificationReads: jest.fn(),
   queuePendingNotificationRead: jest.fn(),
+}))
+
+jest.mock('../src/features/notifications/notificationApi', () => ({
+  clearAllNotificationsFromSystemTray: jest.fn(),
+  clearNotificationEventFromSystemTray: jest.fn(),
 }))
 
 jest.mock('../src/components/layout/MobileAppHeader', () => ({
@@ -60,12 +70,15 @@ jest.mock('../src/lib/auth', () => ({
 }))
 
 const fetchSnapshot = fetchCatchUpSnapshot as jest.MockedFunction<typeof fetchCatchUpSnapshot>
+const acknowledgeAllNotifications = acknowledgeAllNotificationInboxEvents as jest.MockedFunction<typeof acknowledgeAllNotificationInboxEvents>
 const acknowledge = acknowledgeCatchUpEvents as jest.MockedFunction<typeof acknowledgeCatchUpEvents>
 const acknowledgeNotification = acknowledgeNotificationInboxEvent as jest.MockedFunction<typeof acknowledgeNotificationInboxEvent>
 const clearPendingRead = clearPendingNotificationRead as jest.MockedFunction<typeof clearPendingNotificationRead>
 const fetchInbox = fetchNotificationInbox as jest.MockedFunction<typeof fetchNotificationInbox>
+const findUnreadNotificationIds = findUnreadNotificationEventIds as jest.MockedFunction<typeof findUnreadNotificationEventIds>
 const flushPendingReads = flushPendingNotificationReads as jest.MockedFunction<typeof flushPendingNotificationReads>
 const queuePendingRead = queuePendingNotificationRead as jest.MockedFunction<typeof queuePendingNotificationRead>
+const clearSystemTray = clearAllNotificationsFromSystemTray as jest.MockedFunction<typeof clearAllNotificationsFromSystemTray>
 const fetchProfile = getUserProfile as jest.MockedFunction<typeof getUserProfile>
 
 const section = (id: CatchUpSnapshot['sections'][keyof CatchUpSnapshot['sections']]['id'], title: string) => ({
@@ -141,6 +154,11 @@ const notificationItem = (
   ...overrides,
 })
 
+const inboxPage = (items: CatchUpItem[], totalCount = items.length) => ({
+  items,
+  totalCount,
+})
+
 const swipeLeft = (
   surface: HTMLElement,
   touchId = 1,
@@ -201,9 +219,12 @@ beforeEach(() => {
   jest.clearAllMocks()
   clearCatchUpCache()
   acknowledge.mockResolvedValue(1)
+  acknowledgeAllNotifications.mockResolvedValue(0)
   acknowledgeNotification.mockResolvedValue(true)
   flushPendingReads.mockResolvedValue({ confirmed: [], failed: [] })
-  fetchInbox.mockResolvedValue([])
+  findUnreadNotificationIds.mockResolvedValue([])
+  fetchInbox.mockResolvedValue(inboxPage([]))
+  clearSystemTray.mockResolvedValue(undefined)
   fetchProfile.mockResolvedValue(null)
   mockMotionPreference = 'none'
 })
@@ -212,7 +233,7 @@ test('shows canonical unread notifications and clears the exact event after open
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([{
+  fetchInbox.mockResolvedValue(inboxPage([{
     id: 'notification:event-9',
     kind: 'shadow_checkers_turn',
     occurredAt: '2026-07-14T01:50:00Z',
@@ -224,7 +245,7 @@ test('shows canonical unread notifications and clears the exact event after open
     target: { kind: 'app_route', route: '/?view=games&experience=shadow-checkers&item=match-1' },
     activityEventIds: [],
     notificationEventIds: ['event-9'],
-  }])
+  }], 413))
   const onOpenSource = jest.fn()
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={onOpenSource} />)
@@ -232,18 +253,40 @@ test('shows canonical unread notifications and clears the exact event after open
   expect(await screen.findByRole('heading', { name: 'Notification inbox' })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Your turn in Shadow Checkers' }))
 
+  await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledWith('event-9'))
   expect(onOpenSource).toHaveBeenCalledWith(expect.objectContaining({
     target: { kind: 'app_route', route: '/?view=games&experience=shadow-checkers&item=match-1' },
   }))
-  await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledWith('event-9'))
+  await waitFor(() => {
+    expect(screen.queryByRole('heading', { name: 'Notification inbox' })).not.toBeInTheDocument()
+  })
+})
+
+test('shows the canonical unread total and marks the complete backlog read', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue(inboxPage([notificationItem('event-visible')], 413))
+  acknowledgeAllNotifications.mockResolvedValue(413)
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true)
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+
+  expect(await screen.findByText('Showing 1 of 413 unread notifications. Open or swipe one to clear it permanently.')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Mark all 413 notifications as read' }))
+
+  await waitFor(() => expect(acknowledgeAllNotifications).toHaveBeenCalledTimes(1))
+  expect(clearSystemTray).toHaveBeenCalledTimes(1)
+  expect(await screen.findByText('413 notifications marked as read.')).toBeInTheDocument()
   expect(screen.queryByRole('heading', { name: 'Notification inbox' })).not.toBeInTheDocument()
+  confirm.mockRestore()
 })
 
 test('swipes a notification left to mark it read without opening its source', async () => {
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([{
+  fetchInbox.mockResolvedValue(inboxPage([{
     id: 'notification:event-10',
     kind: 'shadow_pin_comment',
     occurredAt: '2026-07-17T12:00:00Z',
@@ -262,7 +305,7 @@ test('swipes a notification left to mark it read without opening its source', as
     target: { kind: 'app_route', route: '/?view=shadowpin&item=pin-1' },
     activityEventIds: [],
     notificationEventIds: ['event-10'],
-  }])
+  }]))
   const onOpenSource = jest.fn()
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={onOpenSource} />)
@@ -287,7 +330,7 @@ test('keeps a swiped notification visible until the server confirms it as read',
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([notificationItem('event-confirmation')])
+  fetchInbox.mockResolvedValue(inboxPage([notificationItem('event-confirmation')]))
   let confirmRead: ((value: boolean) => void) | undefined
   acknowledgeNotification.mockReturnValue(new Promise<boolean>(resolve => {
     confirmRead = resolve
@@ -317,7 +360,7 @@ test('restores a swiped notification when the server acknowledgement fails', asy
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([notificationItem('event-failed')])
+  fetchInbox.mockResolvedValue(inboxPage([notificationItem('event-failed')]))
   acknowledgeNotification.mockRejectedValue(new Error('Network unavailable'))
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
@@ -340,22 +383,40 @@ test('drops a stale retry entry when the notification is no longer unread', asyn
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([])
+  fetchInbox.mockResolvedValue(inboxPage([]))
   flushPendingReads.mockResolvedValue({ confirmed: [], failed: ['event-already-gone'] })
+  findUnreadNotificationIds.mockResolvedValue([])
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
 
   await waitFor(() => {
     expect(clearPendingRead).toHaveBeenCalledWith('user-1', 'event-already-gone')
   })
+  expect(findUnreadNotificationIds).toHaveBeenCalledWith(['event-already-gone'])
   expect(screen.queryByText(/previously dismissed notification is still syncing/i)).not.toBeInTheDocument()
+})
+
+test('keeps a failed retry queued when it is unread outside the visible 30-card page', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue(inboxPage([], 413))
+  flushPendingReads.mockResolvedValue({ confirmed: [], failed: ['event-page-31'] })
+  findUnreadNotificationIds.mockResolvedValue(['event-page-31'])
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+
+  await waitFor(() => {
+    expect(findUnreadNotificationIds).toHaveBeenCalledWith(['event-page-31'])
+  })
+  expect(clearPendingRead).not.toHaveBeenCalledWith('user-1', 'event-page-31')
 })
 
 test('locks vertical scrolling only after a left swipe is claimed', async () => {
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([notificationItem('event-scroll-lock')])
+  fetchInbox.mockResolvedValue(inboxPage([notificationItem('event-scroll-lock')]))
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
   const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-scroll-lock')
@@ -443,7 +504,7 @@ test('uses native touch once and ignores compatibility touch pointer events', as
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([notificationItem('event-native-touch')])
+  fetchInbox.mockResolvedValue(inboxPage([notificationItem('event-native-touch')]))
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
   const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-native-touch')
@@ -496,7 +557,7 @@ test('abandons a claimed swipe for multi-touch without blocking pinch zoom', asy
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([notificationItem('event-multitouch')])
+  fetchInbox.mockResolvedValue(inboxPage([notificationItem('event-multitouch')]))
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
   const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-multitouch')
@@ -537,15 +598,25 @@ test('uses the full shatter-to-ash effect for full motion preference', async () 
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([notificationItem('event-shatter')])
-  acknowledgeNotification.mockReturnValue(new Promise<boolean>(() => undefined))
+  fetchInbox.mockResolvedValue(inboxPage([notificationItem('event-shatter')]))
+  let confirmRead: ((value: boolean) => void) | undefined
+  acknowledgeNotification.mockReturnValue(new Promise<boolean>(resolve => {
+    confirmRead = resolve
+  }))
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
   const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-shatter')
 
   swipeLeft(swipeSurface)
 
-  const effect = screen.getByTestId('notification-disintegration-notification:event-shatter')
+  expect(screen.queryByTestId('notification-disintegration-notification:event-shatter')).not.toBeInTheDocument()
+  await act(async () => {
+    confirmRead?.(true)
+    await Promise.resolve()
+  })
+
+  const effect = await screen.findByTestId('notification-disintegration-notification:event-shatter')
+  expect(swipeSurface).toHaveAttribute('data-card-disintegration', 'active')
   expect(effect.querySelectorAll('[data-disintegration-fragment]')).toHaveLength(28)
   expect(effect.querySelectorAll('[data-disintegration-wave]')).toHaveLength(28)
   expect(new Set(
@@ -560,7 +631,7 @@ test('tracks a full-width swipe continuously instead of stopping at the action w
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
   fetchSnapshot.mockResolvedValue(emptySnapshot)
-  fetchInbox.mockResolvedValue([{
+  fetchInbox.mockResolvedValue(inboxPage([{
     id: 'notification:event-wide-swipe',
     kind: 'shadow_pin_post',
     occurredAt: '2026-07-17T12:00:00Z',
@@ -572,7 +643,7 @@ test('tracks a full-width swipe continuously instead of stopping at the action w
     target: { kind: 'app_route', route: '/?view=pins&pin=pin-1' },
     activityEventIds: [],
     notificationEventIds: ['event-wide-swipe'],
-  }])
+  }]))
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
   const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-wide-swipe')
