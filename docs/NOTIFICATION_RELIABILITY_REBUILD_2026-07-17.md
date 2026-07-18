@@ -30,6 +30,10 @@ the card, and pending IDs replay before the next inbox fetch. A claimed
 horizontal gesture also locks only the Catch-Up scroller until release. Early
 diagonal finger jitter remains undecided, clear vertical intent stays native,
 and a claimed left swipe keeps ownership even if the finger later drifts down.
+Touch input uses a native non-passive listener on the active gesture so mobile
+Safari and Chrome cannot cancel the swipe before the React pointer layer sees
+it; touch-generated pointer compatibility events are ignored to prevent double
+handling, and multi-touch remains available for pinch zoom.
 Full Comfort motion uses a stronger deterministic fracture-and-ash
 finish; reduced and none keep the same confirmed-read behavior without the
 decorative particles.

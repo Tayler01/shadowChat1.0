@@ -49,6 +49,7 @@ const SWIPE_DISMISS_RATIO = 0.28
 const SWIPE_FLICK_MIN_DISTANCE_PX = 28
 const SWIPE_FLICK_VELOCITY_PX_MS = -0.65
 const SWIPE_HORIZONTAL_CLAIM_PX = 10
+const SWIPE_TOUCH_HORIZONTAL_CLAIM_PX = 6
 const SWIPE_VERTICAL_RELEASE_PX = 18
 const SWIPE_LEFT_DIAGONAL_RATIO = 0.75
 const SWIPE_VERTICAL_DOMINANCE_RATIO = 1.4
@@ -56,6 +57,44 @@ const SWIPE_RIGHT_RELEASE_PX = 14
 const SWIPE_EXIT_OVERSHOOT_PX = 24
 
 type SwipePhase = 'idle' | 'dragging' | 'settling' | 'dismissing' | 'collapsing'
+type SwipeIntent = 'pending' | 'horizontal' | 'vertical' | 'right'
+
+const resolveSwipeIntent = (
+  deltaX: number,
+  deltaY: number,
+  horizontalClaimPx: number
+): SwipeIntent => {
+  const leftwardDistance = Math.max(0, -deltaX)
+  const rightwardDistance = Math.max(0, deltaX)
+  const verticalDistance = Math.abs(deltaY)
+  if (
+    leftwardDistance >= horizontalClaimPx
+    && leftwardDistance >= verticalDistance * SWIPE_LEFT_DIAGONAL_RATIO
+  ) {
+    return 'horizontal'
+  }
+  if (
+    verticalDistance >= SWIPE_VERTICAL_RELEASE_PX
+    && verticalDistance >= leftwardDistance * SWIPE_VERTICAL_DOMINANCE_RATIO
+  ) {
+    return 'vertical'
+  }
+  if (
+    rightwardDistance >= SWIPE_RIGHT_RELEASE_PX
+    && rightwardDistance >= verticalDistance
+  ) {
+    return 'right'
+  }
+  return 'pending'
+}
+
+const findTouch = (touches: TouchList, identifier: number): Touch | null => {
+  for (let index = 0; index < touches.length; index += 1) {
+    const touch = touches[index]
+    if (touch?.identifier === identifier) return touch
+  }
+  return null
+}
 
 const DISINTEGRATION_FRAGMENTS = Array.from({ length: 28 }, (_, index) => {
   const left = 98 - ((index * 17) % 90)
@@ -193,6 +232,7 @@ function SwipeToReadNotification({
   const horizontalLockRef = useRef(false)
   const gestureRef = useRef<{
     pointerId: number
+    input: 'pointer' | 'touch'
     startX: number
     startY: number
     lastX: number
@@ -201,6 +241,13 @@ function SwipeToReadNotification({
     dragging: boolean
     cancelled: boolean
   } | null>(null)
+  const nativeTouchHandlersRef = useRef<{
+    start: (event: TouchEvent) => void
+    move: (event: TouchEvent) => void
+    end: (event: TouchEvent) => void
+    cancel: (event: TouchEvent) => void
+  } | null>(null)
+  const nativeTouchCleanupRef = useRef<(() => void) | null>(null)
   const suppressClickRef = useRef(false)
 
   const setSwipePhase = (next: SwipePhase) => {
@@ -219,6 +266,26 @@ function SwipeToReadNotification({
     if (phaseTimerRef.current === null) return
     globalThis.clearTimeout(phaseTimerRef.current)
     phaseTimerRef.current = null
+  }
+
+  const stopNativeTouchTracking = () => {
+    nativeTouchCleanupRef.current?.()
+    nativeTouchCleanupRef.current = null
+  }
+
+  const startNativeTouchTracking = () => {
+    stopNativeTouchTracking()
+    const move = (event: TouchEvent) => nativeTouchHandlersRef.current?.move(event)
+    const end = (event: TouchEvent) => nativeTouchHandlersRef.current?.end(event)
+    const cancel = (event: TouchEvent) => nativeTouchHandlersRef.current?.cancel(event)
+    document.addEventListener('touchmove', move, { capture: true, passive: false })
+    document.addEventListener('touchend', end, { capture: true, passive: true })
+    document.addEventListener('touchcancel', cancel, { capture: true, passive: true })
+    nativeTouchCleanupRef.current = () => {
+      document.removeEventListener('touchmove', move, true)
+      document.removeEventListener('touchend', end, true)
+      document.removeEventListener('touchcancel', cancel, true)
+    }
   }
 
   const setHorizontalSwipeLock = useCallback((locked: boolean) => {
@@ -247,9 +314,10 @@ function SwipeToReadNotification({
   }
 
   const resetGesture = (animated = true) => {
-    const pointerId = gestureRef.current?.pointerId
+    const gesture = gestureRef.current
     gestureRef.current = null
-    if (pointerId !== undefined) releasePointerCapture(pointerId)
+    stopNativeTouchTracking()
+    if (gesture?.input === 'pointer') releasePointerCapture(gesture.pointerId)
     setHorizontalSwipeLock(false)
     setSwipePhase(animated ? 'settling' : 'idle')
     if (animated) settleTo(0)
@@ -306,9 +374,10 @@ function SwipeToReadNotification({
     if (dismissStartedRef.current) return
     dismissStartedRef.current = true
     suppressClickRef.current = true
-    const pointerId = gestureRef.current?.pointerId
+    const gesture = gestureRef.current
     gestureRef.current = null
-    if (pointerId !== undefined) releasePointerCapture(pointerId)
+    stopNativeTouchTracking()
+    if (gesture?.input === 'pointer') releasePointerCapture(gesture.pointerId)
     setHorizontalSwipeLock(false)
     setSwipePhase('dismissing')
     departureCompletedRef.current = false
@@ -353,7 +422,7 @@ function SwipeToReadNotification({
       && offsetRef.current <= -SWIPE_FLICK_MIN_DISTANCE_PX
       && gesture.velocityX <= SWIPE_FLICK_VELOCITY_PX_MS
     gestureRef.current = null
-    releasePointerCapture(pointerId)
+    if (gesture.input === 'pointer') releasePointerCapture(pointerId)
     setHorizontalSwipeLock(false)
     if (distanceCommitted || flickCommitted) {
       beginDismissal()
@@ -362,9 +431,97 @@ function SwipeToReadNotification({
     resetGesture()
   }
 
+  nativeTouchHandlersRef.current = {
+    start: event => {
+      if (phaseRef.current === 'dismissing' || phaseRef.current === 'collapsing') return
+      if (event.touches.length !== 1) {
+        if (gestureRef.current?.input === 'touch') resetGesture(false)
+        return
+      }
+      const touch = event.touches[0]
+      if (!touch) return
+      settleAnimationRef.current?.stop()
+      clearPhaseTimer()
+      const measuredWidth = surfaceRef.current?.getBoundingClientRect().width || 320
+      maxTravelRef.current = Math.max(240, measuredWidth + SWIPE_EXIT_OVERSHOOT_PX)
+      const now = globalThis.performance?.now?.() ?? Date.now()
+      gestureRef.current = {
+        pointerId: touch.identifier,
+        input: 'touch',
+        startX: touch.clientX,
+        startY: touch.clientY,
+        lastX: touch.clientX,
+        lastAt: now,
+        velocityX: 0,
+        dragging: false,
+        cancelled: false,
+      }
+      startNativeTouchTracking()
+    },
+    move: event => {
+      const gesture = gestureRef.current
+      if (!gesture || gesture.input !== 'touch' || gesture.cancelled) return
+      if (event.touches.length !== 1) {
+        resetGesture(false)
+        return
+      }
+      const touch = findTouch(event.touches, gesture.pointerId)
+      if (!touch) return
+      const deltaX = touch.clientX - gesture.startX
+      const deltaY = touch.clientY - gesture.startY
+      if (!gesture.dragging) {
+        const intent = resolveSwipeIntent(deltaX, deltaY, SWIPE_TOUCH_HORIZONTAL_CLAIM_PX)
+        if (intent === 'pending') return
+        if (intent === 'vertical' || intent === 'right') {
+          gesture.cancelled = true
+          updateOffset(0)
+          return
+        }
+        gesture.dragging = true
+        suppressClickRef.current = true
+        setSwipePhase('dragging')
+        setHorizontalSwipeLock(true)
+      }
+
+      const now = globalThis.performance?.now?.() ?? Date.now()
+      const elapsed = Math.max(1, now - gesture.lastAt)
+      const instantaneousVelocity = (touch.clientX - gesture.lastX) / elapsed
+      gesture.velocityX = (gesture.velocityX * 0.35) + (instantaneousVelocity * 0.65)
+      gesture.lastX = touch.clientX
+      gesture.lastAt = now
+      if (event.cancelable) event.preventDefault()
+      updateOffset(deltaX)
+    },
+    end: event => {
+      const gesture = gestureRef.current
+      if (!gesture || gesture.input !== 'touch') return
+      if (findTouch(event.touches, gesture.pointerId)) return
+      stopNativeTouchTracking()
+      finishGesture(gesture.pointerId)
+    },
+    cancel: () => {
+      const gesture = gestureRef.current
+      if (!gesture || gesture.input !== 'touch') return
+      gesture.cancelled = true
+      resetGesture()
+    },
+  }
+
+  useEffect(() => {
+    const surface = surfaceRef.current
+    if (!surface) return
+    const start = (event: TouchEvent) => nativeTouchHandlersRef.current?.start(event)
+    surface.addEventListener('touchstart', start, { passive: true })
+    return () => {
+      surface.removeEventListener('touchstart', start)
+      stopNativeTouchTracking()
+    }
+  }, [])
+
   useEffect(() => () => {
     settleAnimationRef.current?.stop()
     clearPhaseTimer()
+    stopNativeTouchTracking()
     setHorizontalSwipeLock(false)
   }, [setHorizontalSwipeLock])
 
@@ -434,10 +591,11 @@ function SwipeToReadNotification({
           data-swipe-offset="0"
           style={{
             x,
-            touchAction: 'pan-y',
+            touchAction: 'pan-y pinch-zoom',
             userSelect: phase === 'dragging' ? 'none' : undefined,
             willChange: phase === 'dragging' || isDeparting ? 'transform' : 'auto',
           }}
+          data-native-touch-swipe="true"
           className="relative z-[1] bg-[var(--bg-app)]"
           onClickCapture={event => {
             if (!suppressClickRef.current) return
@@ -446,7 +604,11 @@ function SwipeToReadNotification({
             if (!isDeparting) suppressClickRef.current = false
           }}
           onPointerDown={event => {
-            if (isDeparting || (event.pointerType === 'mouse' && event.button !== 0)) return
+            if (
+              event.pointerType === 'touch'
+              || isDeparting
+              || (event.pointerType === 'mouse' && event.button !== 0)
+            ) return
             settleAnimationRef.current?.stop()
             clearPhaseTimer()
             const measuredWidth = surfaceRef.current?.getBoundingClientRect().width || 320
@@ -454,6 +616,7 @@ function SwipeToReadNotification({
             const now = globalThis.performance?.now?.() ?? Date.now()
             gestureRef.current = {
               pointerId: event.pointerId,
+              input: 'pointer',
               startX: event.clientX,
               startY: event.clientY,
               lastX: event.clientX,
@@ -464,31 +627,20 @@ function SwipeToReadNotification({
             }
           }}
           onPointerMove={event => {
+            if (event.pointerType === 'touch') return
             const gesture = gestureRef.current
-            if (!gesture || gesture.pointerId !== event.pointerId || gesture.cancelled) return
+            if (
+              !gesture
+              || gesture.input !== 'pointer'
+              || gesture.pointerId !== event.pointerId
+              || gesture.cancelled
+            ) return
             const deltaX = event.clientX - gesture.startX
             const deltaY = event.clientY - gesture.startY
             if (!gesture.dragging) {
-              const leftwardDistance = Math.max(0, -deltaX)
-              const rightwardDistance = Math.max(0, deltaX)
-              const verticalDistance = Math.abs(deltaY)
-              const shouldClaimHorizontal = (
-                leftwardDistance >= SWIPE_HORIZONTAL_CLAIM_PX
-                && leftwardDistance >= verticalDistance * SWIPE_LEFT_DIAGONAL_RATIO
-              )
-              const shouldReleaseToVertical = (
-                verticalDistance >= SWIPE_VERTICAL_RELEASE_PX
-                && verticalDistance >= leftwardDistance * SWIPE_VERTICAL_DOMINANCE_RATIO
-              )
-              const shouldReleaseToRight = (
-                rightwardDistance >= SWIPE_RIGHT_RELEASE_PX
-                && rightwardDistance >= verticalDistance
-              )
-
-              if (!shouldClaimHorizontal && !shouldReleaseToVertical && !shouldReleaseToRight) {
-                return
-              }
-              if (shouldReleaseToVertical || shouldReleaseToRight) {
+              const intent = resolveSwipeIntent(deltaX, deltaY, SWIPE_HORIZONTAL_CLAIM_PX)
+              if (intent === 'pending') return
+              if (intent === 'vertical' || intent === 'right') {
                 gesture.cancelled = true
                 updateOffset(0)
                 return
@@ -509,16 +661,26 @@ function SwipeToReadNotification({
             event.preventDefault()
             updateOffset(deltaX)
           }}
-          onPointerUp={event => finishGesture(event.pointerId)}
+          onPointerUp={event => {
+            if (event.pointerType === 'touch') return
+            finishGesture(event.pointerId)
+          }}
           onPointerCancel={event => {
+            if (event.pointerType === 'touch') return
             const gesture = gestureRef.current
-            if (!gesture || gesture.pointerId !== event.pointerId) return
+            if (!gesture || gesture.input !== 'pointer' || gesture.pointerId !== event.pointerId) return
             gesture.cancelled = true
             resetGesture()
           }}
           onLostPointerCapture={event => {
+            if (event.pointerType === 'touch') return
             const gesture = gestureRef.current
-            if (!gesture || gesture.pointerId !== event.pointerId || !gesture.dragging) return
+            if (
+              !gesture
+              || gesture.input !== 'pointer'
+              || gesture.pointerId !== event.pointerId
+              || !gesture.dragging
+            ) return
             resetGesture()
           }}
         >

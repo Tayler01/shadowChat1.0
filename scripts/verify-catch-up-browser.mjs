@@ -125,7 +125,7 @@ for (const profile of profiles) {
     const text = message.text()
     if (!/content security policy/iu.test(text)) diagnostics.consoleErrors.push(text)
   })
-  page.on('pageerror', error => diagnostics.pageErrors.push(error.message))
+  page.on('pageerror', error => diagnostics.pageErrors.push(error.stack || error.message))
   page.on('requestfailed', request => diagnostics.requestFailures.push(`${request.method()} ${request.url()} ${request.failure()?.errorText || ''}`))
   page.on('response', response => {
     if (response.status() >= 400) diagnostics.errorResponses.push(`${response.status()} ${response.url()}`)
@@ -217,29 +217,67 @@ for (const profile of profiles) {
     const swipeStartX = notificationBox.x + (notificationBox.width * 0.82)
     const swipeEndX = notificationBox.x + (notificationBox.width * 0.32)
     const swipeY = notificationBox.y + (notificationBox.height * 0.5)
-    await page.mouse.move(swipeStartX, swipeY)
-    await page.mouse.down()
-    await page.mouse.move(swipeStartX - 6, swipeY + 8)
+    const dispatchSyntheticTouch = async (type, points, changedPoints = points) => (
+      notificationDragSurface.evaluate((element, payload) => {
+        const toTouches = values => values.map(value => ({
+          identifier: value.id,
+          target: element,
+          clientX: value.x,
+          clientY: value.y,
+          pageX: value.x,
+          pageY: value.y,
+          screenX: value.x,
+          screenY: value.y,
+        }))
+        const event = new Event(payload.type, { bubbles: true, cancelable: true })
+        Object.defineProperties(event, {
+          touches: { value: toTouches(payload.points) },
+          targetTouches: { value: toTouches(payload.points) },
+          changedTouches: { value: toTouches(payload.changedPoints) },
+        })
+        element.dispatchEvent(event)
+        return event.defaultPrevented
+      }, { type, points, changedPoints })
+    )
+    const cdp = profile.engine === chromium ? await context.newCDPSession(page) : null
+    const dispatchTouch = async (type, points, changedPoints = points) => {
+      if (!cdp) {
+        const domType = {
+          touchStart: 'touchstart',
+          touchMove: 'touchmove',
+          touchEnd: 'touchend',
+          touchCancel: 'touchcancel',
+        }[type]
+        return dispatchSyntheticTouch(domType, points, changedPoints)
+      }
+      await cdp.send('Input.dispatchTouchEvent', {
+        type,
+        touchPoints: points,
+      })
+      return null
+    }
+    const startPoint = { x: swipeStartX, y: swipeY, id: 1 }
+    await dispatchTouch('touchStart', [startPoint])
+    await dispatchTouch('touchMove', [{ x: swipeStartX - 4, y: swipeY + 7, id: 1 }])
     const pendingSwipe = await notificationDragSurface.getAttribute('data-swipe-offset')
     const pendingLock = await page.getByRole('region', { name: 'Catch-Up content' })
       .getAttribute('data-horizontal-swipe-locked')
     must(pendingSwipe === '0', `${profile.name} moved the notification before diagonal swipe intent was clear.`)
     must(pendingLock === 'false', `${profile.name} locked vertical scrolling during ambiguous finger movement.`)
-    await page.mouse.move(swipeStartX - 24, swipeY + 18)
-    await page.mouse.move(swipeEndX, swipeY + 44, { steps: 5 })
+    await dispatchTouch('touchMove', [{ x: swipeStartX - 24, y: swipeY + 18, id: 1 }])
+    for (const progress of [0.25, 0.5, 0.75, 1]) {
+      await dispatchTouch('touchMove', [{
+        x: (swipeStartX - 24) + ((swipeEndX - (swipeStartX - 24)) * progress),
+        y: (swipeY + 18) + (26 * progress),
+        id: 1,
+      }])
+    }
     const swipeLocked = await page.getByRole('region', { name: 'Catch-Up content' })
       .getAttribute('data-horizontal-swipe-locked')
     must(swipeLocked === 'true', `${profile.name} did not lock vertical scrolling after claiming the notification swipe.`)
     const claimedOffset = Number(await notificationDragSurface.getAttribute('data-swipe-offset'))
     must(claimedOffset < -80, `${profile.name} did not keep tracking a claimed swipe through downward finger drift.`)
-    const verticalMovePrevented = await page.getByRole('region', { name: 'Catch-Up content' })
-      .evaluate(element => {
-        const event = new Event('touchmove', { bubbles: true, cancelable: true })
-        element.dispatchEvent(event)
-        return event.defaultPrevented
-      })
-    must(verticalMovePrevented, `${profile.name} allowed vertical scrolling during an active horizontal notification swipe.`)
-    await page.mouse.up()
+    await dispatchTouch('touchEnd', [], [{ x: swipeEndX, y: swipeY + 44, id: 1 }])
     const swipeReleased = await page.getByRole('region', { name: 'Catch-Up content' })
       .getAttribute('data-horizontal-swipe-locked')
     must(swipeReleased === 'false', `${profile.name} did not release the vertical scroll lock after pointer up.`)

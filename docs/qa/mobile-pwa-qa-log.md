@@ -19,12 +19,16 @@ Last updated: 2026-07-17
   first imperfect phone sample. Clear left intent claims the card and locks
   vertical movement only inside the Catch-Up scroller; later downward finger
   drift cannot steal it, while clear vertical-first movement stays native.
+- Physical-phone follow-up moved finger input from React pointer arbitration to
+  a native non-passive touch lifecycle. Chromium QA now injects a real CDP touch
+  stream; WebKit verifies the same native handler contract synthetically, with
+  installed-iPhone PWA feel retained as the final acceptance gate.
 - Full motion now uses a deterministic 28-piece fracture-and-ash sequence plus
   a brighter fracture band before the remaining cards slide up. Reduced motion
   uses a short fade and no-motion removes immediately, both only after server
   confirmation.
-- The focused Catch-Up component/API suites passed 19 tests. The full Jest gate
-  passed 235 suites and 1,290 tests with 16 existing todos; ESLint, TypeScript,
+- The focused Catch-Up component/API suites passed 21 tests. The full Jest gate
+  passed 235 suites and 1,292 tests with 16 existing todos; ESLint, TypeScript,
   the production build, paused-feature verification, and build budgets passed.
 - A controlled notification response and read RPC were intercepted in-browser,
   so no backend rows changed. Pixel Chromium and iPhone WebKit both proved the

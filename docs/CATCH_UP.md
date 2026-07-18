@@ -19,8 +19,12 @@ flick, and completes with a gold fracture-and-ash dissolve before the remaining
 cards reflow upward. Early diagonal finger motion stays undecided until intent
 is clear instead of cancelling the gesture. Clearly vertical intent keeps native
 page scrolling, while a claimed left swipe keeps ownership through later
-downward drift and temporarily locks the Catch-Up scroller until pointer up,
-cancellation, or lost capture. Cancelled and short gestures settle smoothly.
+downward drift and temporarily locks the Catch-Up scroller until the input ends
+or cancels. Cancelled and short gestures settle smoothly.
+Finger input is arbitrated by a native non-passive touch path, so the exact
+touch event that claims a left swipe also prevents native vertical scrolling.
+Mouse and pen keep the pointer-event fallback, while multi-touch is released
+for browser pinch zoom.
 
 Dismissal is server-confirmed. The app writes the event ID to a small,
 user-scoped device retry ledger before calling

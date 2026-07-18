@@ -143,28 +143,58 @@ const notificationItem = (
 
 const swipeLeft = (
   surface: HTMLElement,
-  pointerId = 1,
+  touchId = 1,
   from = { x: 240, y: 120 },
   to = { x: 140, y: 122 }
 ) => {
-  fireEvent.pointerDown(surface, {
-    pointerId,
-    pointerType: 'touch',
-    clientX: from.x,
-    clientY: from.y,
+  dispatchTouch(surface, 'touchstart', [touchPoint(surface, touchId, from.x, from.y)])
+  dispatchTouch(surface, 'touchmove', [touchPoint(surface, touchId, to.x, to.y)])
+  dispatchTouch(surface, 'touchend', [], [touchPoint(surface, touchId, to.x, to.y)])
+}
+
+type TestTouch = {
+  identifier: number
+  target: EventTarget
+  clientX: number
+  clientY: number
+  pageX: number
+  pageY: number
+  screenX: number
+  screenY: number
+}
+
+const touchPoint = (
+  target: EventTarget,
+  identifier: number,
+  clientX: number,
+  clientY: number
+): TestTouch => ({
+  identifier,
+  target,
+  clientX,
+  clientY,
+  pageX: clientX,
+  pageY: clientY,
+  screenX: clientX,
+  screenY: clientY,
+})
+
+const dispatchTouch = (
+  target: HTMLElement,
+  type: 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel',
+  touches: TestTouch[],
+  changedTouches: TestTouch[] = touches
+) => {
+  const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.defineProperties(event, {
+    touches: { value: touches },
+    targetTouches: { value: touches },
+    changedTouches: { value: changedTouches },
   })
-  fireEvent.pointerMove(surface, {
-    pointerId,
-    pointerType: 'touch',
-    clientX: to.x,
-    clientY: to.y,
+  act(() => {
+    target.dispatchEvent(event)
   })
-  fireEvent.pointerUp(surface, {
-    pointerId,
-    pointerType: 'touch',
-    clientX: to.x,
-    clientY: to.y,
-  })
+  return event
 }
 
 beforeEach(() => {
@@ -243,24 +273,7 @@ test('swipes a notification left to mark it read without opening its source', as
     'https://example.com/mills-thumb.jpg'
   )
   const swipeSurface = screen.getByTestId('notification-swipe-notification:event-10')
-  fireEvent.pointerDown(swipeSurface, {
-    pointerId: 1,
-    pointerType: 'touch',
-    clientX: 240,
-    clientY: 120,
-  })
-  fireEvent.pointerMove(swipeSurface, {
-    pointerId: 1,
-    pointerType: 'touch',
-    clientX: 150,
-    clientY: 122,
-  })
-  fireEvent.pointerUp(swipeSurface, {
-    pointerId: 1,
-    pointerType: 'touch',
-    clientX: 150,
-    clientY: 122,
-  })
+  swipeLeft(swipeSurface, 1, { x: 240, y: 120 }, { x: 150, y: 122 })
 
   await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledWith('event-10'))
   expect(onOpenSource).not.toHaveBeenCalled()
@@ -348,84 +361,175 @@ test('locks vertical scrolling only after a left swipe is claimed', async () => 
   const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-scroll-lock')
   const scroller = screen.getByRole('region', { name: 'Catch-Up content' })
 
-  fireEvent.pointerDown(swipeSurface, {
-    pointerId: 17,
-    pointerType: 'touch',
-    clientX: 240,
-    clientY: 120,
-  })
-  fireEvent.pointerMove(swipeSurface, {
-    pointerId: 17,
-    pointerType: 'touch',
-    clientX: 234,
-    clientY: 128,
-  })
+  const start17 = touchPoint(swipeSurface, 17, 240, 120)
+  dispatchTouch(swipeSurface, 'touchstart', [start17])
+  const ambiguousMove = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 17, 236, 127)]
+  )
 
+  expect(ambiguousMove.defaultPrevented).toBe(false)
   expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
   expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
 
-  fireEvent.pointerMove(swipeSurface, {
-    pointerId: 17,
-    pointerType: 'touch',
-    clientX: 222,
-    clientY: 134,
-  })
+  const claimedMove = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 17, 222, 134)]
+  )
+  expect(claimedMove.defaultPrevented).toBe(true)
   expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'true')
   expect(swipeSurface).toHaveAttribute('data-swipe-offset', '-18')
-  const lockedMove = new Event('touchmove', { bubbles: true, cancelable: true })
-  scroller.dispatchEvent(lockedMove)
-  expect(lockedMove.defaultPrevented).toBe(true)
 
-  fireEvent.pointerMove(swipeSurface, {
-    pointerId: 17,
-    pointerType: 'touch',
-    clientX: 180,
-    clientY: 173,
-  })
+  const driftMove = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 17, 180, 173)]
+  )
+  expect(driftMove.defaultPrevented).toBe(true)
   expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'true')
   expect(swipeSurface).toHaveAttribute('data-swipe-offset', '-60')
 
-  fireEvent.pointerCancel(swipeSurface, {
-    pointerId: 17,
-    pointerType: 'touch',
-    clientX: 180,
-    clientY: 173,
-  })
+  dispatchTouch(
+    swipeSurface,
+    'touchcancel',
+    [],
+    [touchPoint(swipeSurface, 17, 180, 173)]
+  )
   expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
   const releasedMove = new Event('touchmove', { bubbles: true, cancelable: true })
   scroller.dispatchEvent(releasedMove)
   expect(releasedMove.defaultPrevented).toBe(false)
 
+  dispatchTouch(
+    swipeSurface,
+    'touchstart',
+    [touchPoint(swipeSurface, 18, 240, 120)]
+  )
+  const verticalPending = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 18, 236, 130)]
+  )
+  expect(verticalPending.defaultPrevented).toBe(false)
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+  const verticalRelease = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 18, 234, 144)]
+  )
+  expect(verticalRelease.defaultPrevented).toBe(false)
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
+
+  const lateHorizontalMove = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 18, 160, 148)]
+  )
+  expect(lateHorizontalMove.defaultPrevented).toBe(false)
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
+  dispatchTouch(
+    swipeSurface,
+    'touchend',
+    [],
+    [touchPoint(swipeSurface, 18, 160, 148)]
+  )
+})
+
+test('uses native touch once and ignores compatibility touch pointer events', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([notificationItem('event-native-touch')])
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+  const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-native-touch')
+
+  dispatchTouch(
+    swipeSurface,
+    'touchstart',
+    [touchPoint(swipeSurface, 31, 240, 120)]
+  )
   fireEvent.pointerDown(swipeSurface, {
-    pointerId: 18,
+    pointerId: 31,
     pointerType: 'touch',
     clientX: 240,
     clientY: 120,
   })
   fireEvent.pointerMove(swipeSurface, {
-    pointerId: 18,
+    pointerId: 31,
     pointerType: 'touch',
-    clientX: 236,
-    clientY: 130,
+    clientX: 140,
+    clientY: 122,
   })
-  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
-  fireEvent.pointerMove(swipeSurface, {
-    pointerId: 18,
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
+
+  const nativeMove = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 31, 140, 122)]
+  )
+  expect(nativeMove.defaultPrevented).toBe(true)
+  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '-100')
+
+  fireEvent.pointerUp(swipeSurface, {
+    pointerId: 31,
     pointerType: 'touch',
-    clientX: 234,
-    clientY: 144,
+    clientX: 140,
+    clientY: 122,
   })
+  dispatchTouch(
+    swipeSurface,
+    'touchend',
+    [],
+    [touchPoint(swipeSurface, 31, 140, 122)]
+  )
+
+  await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledTimes(1))
+  expect(acknowledgeNotification).toHaveBeenCalledWith('event-native-touch')
+})
+
+test('abandons a claimed swipe for multi-touch without blocking pinch zoom', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([notificationItem('event-multitouch')])
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+  const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-multitouch')
+  const scroller = screen.getByRole('region', { name: 'Catch-Up content' })
+
+  const firstTouch = touchPoint(swipeSurface, 41, 240, 120)
+  dispatchTouch(swipeSurface, 'touchstart', [firstTouch])
+  const claimedMove = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 41, 200, 122)]
+  )
+  expect(claimedMove.defaultPrevented).toBe(true)
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'true')
+
+  const secondTouch = touchPoint(swipeSurface, 42, 280, 160)
+  const secondStart = dispatchTouch(
+    swipeSurface,
+    'touchstart',
+    [touchPoint(swipeSurface, 41, 200, 122), secondTouch],
+    [secondTouch]
+  )
+  expect(secondStart.defaultPrevented).toBe(false)
   expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
   expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
 
-  fireEvent.pointerMove(swipeSurface, {
-    pointerId: 18,
-    pointerType: 'touch',
-    clientX: 160,
-    clientY: 148,
-  })
-  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
-  expect(swipeSurface).toHaveAttribute('data-swipe-offset', '0')
+  const pinchMove = dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 41, 190, 112), touchPoint(swipeSurface, 42, 292, 172)]
+  )
+  expect(pinchMove.defaultPrevented).toBe(false)
+  expect(acknowledgeNotification).not.toHaveBeenCalled()
 })
 
 test('uses the full shatter-to-ash effect for full motion preference', async () => {
@@ -472,25 +576,22 @@ test('tracks a full-width swipe continuously instead of stopping at the action w
 
   render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
   const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-wide-swipe')
-  fireEvent.pointerDown(swipeSurface, {
-    pointerId: 4,
-    pointerType: 'touch',
-    clientX: 300,
-    clientY: 120,
-  })
-  fireEvent.pointerMove(swipeSurface, {
-    pointerId: 4,
-    pointerType: 'touch',
-    clientX: 250,
-    clientY: 121,
-  })
+  dispatchTouch(
+    swipeSurface,
+    'touchstart',
+    [touchPoint(swipeSurface, 4, 300, 120)]
+  )
+  dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 4, 250, 121)]
+  )
   expect(Number(swipeSurface.getAttribute('data-swipe-offset'))).toBeLessThanOrEqual(-50)
-  fireEvent.pointerMove(swipeSurface, {
-    pointerId: 4,
-    pointerType: 'touch',
-    clientX: 130,
-    clientY: 122,
-  })
+  dispatchTouch(
+    swipeSurface,
+    'touchmove',
+    [touchPoint(swipeSurface, 4, 130, 122)]
+  )
   expect(Number(swipeSurface.getAttribute('data-swipe-offset'))).toBeLessThanOrEqual(-170)
   expect(screen.getByTestId('notification-row-notification:event-wide-swipe')).toHaveAttribute(
     'data-dismiss-phase',
