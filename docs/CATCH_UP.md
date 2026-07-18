@@ -15,14 +15,23 @@ fallback and do not invent a profile target.
 Unread notification cards can be swiped left past a deliberate threshold to
 mark the exact event read without opening its source. The card now follows the
 finger across its full measured width, accepts a deliberate distance or fast
-flick, and completes with a restrained gold-particle dissolve before the
-remaining cards reflow upward. Vertical intent keeps native page scrolling,
-cancelled/short gestures settle smoothly, and reduced/no-motion Comfort modes
-replace the decorative dissolve with a brief or immediate removal. The
-revealed `Read` control provides the same action for keyboard and
-assistive-technology users. Opening a card still opens its exact source and
-marks that same event read. Both paths clear the matching system notification
-and request a unified app badge refresh.
+flick, and completes with a gold fracture-and-ash dissolve before the remaining
+cards reflow upward. Direction is decided once after a short intent threshold:
+vertical intent keeps native page scrolling, while a claimed left swipe
+temporarily locks the Catch-Up scroller until pointer up, cancellation, or lost
+capture. Cancelled and short gestures settle smoothly.
+
+Dismissal is server-confirmed. The app writes the event ID to a small,
+user-scoped device retry ledger before calling
+`mark_my_notification_event_read`; the card stays mounted until the RPC returns
+`true`, restores on failure, and retries unfinished acknowledgements before the
+next notification-inbox fetch. This prevents a dismissed card from returning
+after a view switch, reload, or PWA restart while keeping Supabase authoritative.
+Reduced/no-motion Comfort modes replace the decorative shatter with a brief
+fade or immediate removal after confirmation. The revealed `Read` control
+provides the same action for keyboard and assistive-technology users. Opening a
+card still opens its exact source and marks that same event read. Both paths
+clear the matching system notification and request a unified app badge refresh.
 
 ## Product Contract
 

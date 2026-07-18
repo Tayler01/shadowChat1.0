@@ -1,8 +1,12 @@
 import { supabase } from '../src/lib/supabase'
 import {
   acknowledgeCatchUpEvents,
+  acknowledgeNotificationInboxEvent,
   fetchCatchUpSnapshot,
   fetchNotificationInbox,
+  flushPendingNotificationReads,
+  getPendingNotificationReadEventIds,
+  queuePendingNotificationRead,
 } from '../src/features/catch-up/catchUpApi'
 
 jest.mock('../src/lib/supabase', () => ({
@@ -22,7 +26,10 @@ const emptySection = (id: string, title: string) => ({
   items: [],
 })
 
-beforeEach(() => jest.clearAllMocks())
+beforeEach(() => {
+  jest.clearAllMocks()
+  localStorage.clear()
+})
 
 test('fetches the bounded seven-day deterministic snapshot contract', async () => {
   rpc.mockResolvedValue({
@@ -129,4 +136,38 @@ test('hydrates notification actors from the current safe public profile relation
   )
   expect(readIs).toHaveBeenCalledWith('read_at', null)
   expect(resolvedIs).toHaveBeenCalledWith('resolved_at', null)
+})
+
+test('rejects an unconfirmed notification read acknowledgement', async () => {
+  rpc.mockResolvedValue({ data: false, error: null })
+
+  await expect(acknowledgeNotificationInboxEvent('event-unconfirmed')).rejects.toThrow(
+    'Notification read acknowledgement was not confirmed.'
+  )
+})
+
+test('persists pending notification reads and clears them only after server confirmation', async () => {
+  queuePendingNotificationRead('user-1', 'event-pending')
+  expect(getPendingNotificationReadEventIds('user-1')).toEqual(['event-pending'])
+
+  rpc.mockResolvedValue({ data: true, error: null })
+  await expect(flushPendingNotificationReads('user-1')).resolves.toEqual({
+    confirmed: ['event-pending'],
+    failed: [],
+  })
+  expect(getPendingNotificationReadEventIds('user-1')).toEqual([])
+  expect(rpc).toHaveBeenCalledWith('mark_my_notification_event_read', {
+    target_event_id: 'event-pending',
+  })
+})
+
+test('retains pending notification reads when the retry cannot be confirmed', async () => {
+  queuePendingNotificationRead('user-1', 'event-retry')
+  rpc.mockResolvedValue({ data: false, error: null })
+
+  await expect(flushPendingNotificationReads('user-1')).resolves.toEqual({
+    confirmed: [],
+    failed: ['event-retry'],
+  })
+  expect(getPendingNotificationReadEventIds('user-1')).toEqual(['event-retry'])
 })

@@ -14,8 +14,11 @@ import { clearNotificationEventFromSystemTray } from '../notifications/notificat
 import {
   acknowledgeCatchUpEvents,
   acknowledgeNotificationInboxEvent,
+  clearPendingNotificationRead,
   fetchCatchUpSnapshot,
   fetchNotificationInbox,
+  flushPendingNotificationReads,
+  queuePendingNotificationRead,
 } from './catchUpApi'
 import {
   CATCH_UP_SECTION_ORDER,
@@ -45,24 +48,33 @@ const SWIPE_DISMISS_MAX_PX = 120
 const SWIPE_DISMISS_RATIO = 0.28
 const SWIPE_FLICK_MIN_DISTANCE_PX = 28
 const SWIPE_FLICK_VELOCITY_PX_MS = -0.65
-const SWIPE_VERTICAL_LOCK_PX = 10
-const SWIPE_HORIZONTAL_LOCK_RATIO = 1.2
+const SWIPE_DIRECTION_THRESHOLD_PX = 8
+const SWIPE_HORIZONTAL_LOCK_RATIO = 1.08
 const SWIPE_EXIT_OVERSHOOT_PX = 24
 
 type SwipePhase = 'idle' | 'dragging' | 'settling' | 'dismissing' | 'collapsing'
 
-const DISINTEGRATION_FRAGMENTS = [
-  { left: 38, top: 18, size: 2, x: -18, y: -8, rotate: -24, delay: 0 },
-  { left: 52, top: 72, size: 3, x: -28, y: 10, rotate: 34, delay: 0.015 },
-  { left: 63, top: 35, size: 2, x: -36, y: -13, rotate: -42, delay: 0.03 },
-  { left: 72, top: 84, size: 2, x: -24, y: 8, rotate: 28, delay: 0.045 },
-  { left: 79, top: 14, size: 3, x: -44, y: -7, rotate: -36, delay: 0.06 },
-  { left: 84, top: 58, size: 2, x: -32, y: 13, rotate: 46, delay: 0.075 },
-  { left: 89, top: 30, size: 2, x: -52, y: -11, rotate: -52, delay: 0.09 },
-  { left: 92, top: 76, size: 3, x: -38, y: 9, rotate: 38, delay: 0.105 },
-  { left: 95, top: 46, size: 2, x: -58, y: -4, rotate: -60, delay: 0.12 },
-  { left: 97, top: 22, size: 2, x: -46, y: -14, rotate: 54, delay: 0.135 },
-] as const
+const DISINTEGRATION_FRAGMENTS = Array.from({ length: 28 }, (_, index) => {
+  const left = 98 - ((index * 17) % 90)
+  const shard = index % 4 === 0
+  const wave = Math.min(4, Math.floor((100 - left) / 20))
+  return {
+    left,
+    top: 5 + ((index * 37) % 91),
+    width: shard ? 3 + (index % 3) : 2 + (index % 3),
+    height: shard ? 9 + ((index * 5) % 8) : 2 + ((index * 7) % 3),
+    x: -42 - ((index * 29) % 112),
+    y: -44 + ((index * 31) % 89),
+    rotate: -95 + ((index * 47) % 190),
+    delay: (wave * 0.018) + ((index % 3) * 0.007),
+    wave,
+    tone: index % 3 === 0
+      ? 'var(--theme-accent-readable)'
+      : index % 3 === 1
+        ? 'var(--text-secondary)'
+        : 'var(--theme-accent)',
+  }
+})
 
 const getInitials = (item: CatchUpItem) => {
   const label = item.actor?.display_name || item.actor?.username || item.title
@@ -149,12 +161,14 @@ function SwipeToReadNotification({
   motionPreference,
   onReadStart,
   onDismissComplete,
+  onHorizontalSwipeLockChange,
   children,
 }: {
   item: CatchUpItem
   motionPreference: 'full' | 'reduced' | 'none'
-  onReadStart: () => void
+  onReadStart: () => Promise<boolean>
   onDismissComplete: () => void
+  onHorizontalSwipeLockChange: (itemId: string, locked: boolean) => void
   children: React.ReactNode
 }) {
   const [phase, setPhase] = useState<SwipePhase>('idle')
@@ -170,6 +184,10 @@ function SwipeToReadNotification({
   const phaseTimerRef = useRef<ReturnType<typeof globalThis.setTimeout> | null>(null)
   const dismissStartedRef = useRef(false)
   const dismissCompletedRef = useRef(false)
+  const departureCompletedRef = useRef(false)
+  const readConfirmedRef = useRef(false)
+  const dismissalAttemptRef = useRef(0)
+  const horizontalLockRef = useRef(false)
   const gestureRef = useRef<{
     pointerId: number
     startX: number
@@ -200,6 +218,18 @@ function SwipeToReadNotification({
     phaseTimerRef.current = null
   }
 
+  const setHorizontalSwipeLock = useCallback((locked: boolean) => {
+    if (horizontalLockRef.current === locked) return
+    horizontalLockRef.current = locked
+    onHorizontalSwipeLockChange(item.id, locked)
+  }, [item.id, onHorizontalSwipeLockChange])
+
+  const releasePointerCapture = (pointerId: number) => {
+    const surface = surfaceRef.current
+    if (!surface?.hasPointerCapture?.(pointerId)) return
+    surface.releasePointerCapture?.(pointerId)
+  }
+
   const settleTo = (target: number) => {
     settleAnimationRef.current?.stop()
     const duration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 0.08 : 0.18
@@ -214,7 +244,10 @@ function SwipeToReadNotification({
   }
 
   const resetGesture = (animated = true) => {
+    const pointerId = gestureRef.current?.pointerId
     gestureRef.current = null
+    if (pointerId !== undefined) releasePointerCapture(pointerId)
+    setHorizontalSwipeLock(false)
     setSwipePhase(animated ? 'settling' : 'idle')
     if (animated) settleTo(0)
     else updateOffset(0)
@@ -239,16 +272,55 @@ function SwipeToReadNotification({
     phaseTimerRef.current = globalThis.setTimeout(finishDismissal, collapseDuration + 40)
   }
 
+  const tryBeginCollapse = () => {
+    if (!departureCompletedRef.current || !readConfirmedRef.current) return
+    if (phaseRef.current !== 'dismissing') return
+    if (motionPreference === 'none') {
+      setSwipePhase('collapsing')
+      finishDismissal()
+      return
+    }
+    beginCollapse()
+  }
+
+  const restoreAfterReadFailure = (attempt: number) => {
+    if (attempt !== dismissalAttemptRef.current || dismissCompletedRef.current) return
+    clearPhaseTimer()
+    settleAnimationRef.current?.stop()
+    dismissStartedRef.current = false
+    departureCompletedRef.current = false
+    readConfirmedRef.current = false
+    suppressClickRef.current = true
+    setSwipePhase('settling')
+    settleTo(0)
+    phaseTimerRef.current = globalThis.setTimeout(() => {
+      if (phaseRef.current === 'settling') setSwipePhase('idle')
+      suppressClickRef.current = false
+    }, motionPreference === 'full' ? 190 : motionPreference === 'reduced' ? 90 : 0)
+  }
+
   const beginDismissal = () => {
     if (dismissStartedRef.current) return
     dismissStartedRef.current = true
     suppressClickRef.current = true
+    const pointerId = gestureRef.current?.pointerId
     gestureRef.current = null
+    if (pointerId !== undefined) releasePointerCapture(pointerId)
+    setHorizontalSwipeLock(false)
     setSwipePhase('dismissing')
-    onReadStart()
+    departureCompletedRef.current = false
+    readConfirmedRef.current = false
+    const attempt = dismissalAttemptRef.current + 1
+    dismissalAttemptRef.current = attempt
+    void onReadStart().then(confirmed => {
+      if (!confirmed) throw new Error('Notification read acknowledgement was not confirmed.')
+      if (attempt !== dismissalAttemptRef.current || dismissCompletedRef.current) return
+      readConfirmedRef.current = true
+      tryBeginCollapse()
+    }).catch(() => restoreAfterReadFailure(attempt))
     settleAnimationRef.current?.stop()
 
-    const departureDuration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 0.08 : 0.24
+    const departureDuration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 0.08 : 0.44
     settleAnimationRef.current = animate(x, -maxTravelRef.current, {
       duration: departureDuration,
       ease: [0.22, 0.72, 0.24, 1],
@@ -258,10 +330,11 @@ function SwipeToReadNotification({
       },
     })
     clearPhaseTimer()
-    phaseTimerRef.current = globalThis.setTimeout(
-      beginCollapse,
-      Math.round(departureDuration * 1_000) + 16
-    )
+    phaseTimerRef.current = globalThis.setTimeout(() => {
+      if (attempt !== dismissalAttemptRef.current || phaseRef.current !== 'dismissing') return
+      departureCompletedRef.current = true
+      tryBeginCollapse()
+    }, Math.round(departureDuration * 1_000) + (motionPreference === 'full' ? 40 : 16))
   }
 
   const finishGesture = (pointerId: number) => {
@@ -277,6 +350,8 @@ function SwipeToReadNotification({
       && offsetRef.current <= -SWIPE_FLICK_MIN_DISTANCE_PX
       && gesture.velocityX <= SWIPE_FLICK_VELOCITY_PX_MS
     gestureRef.current = null
+    releasePointerCapture(pointerId)
+    setHorizontalSwipeLock(false)
     if (distanceCommitted || flickCommitted) {
       beginDismissal()
       return
@@ -287,7 +362,8 @@ function SwipeToReadNotification({
   useEffect(() => () => {
     settleAnimationRef.current?.stop()
     clearPhaseTimer()
-  }, [])
+    setHorizontalSwipeLock(false)
+  }, [setHorizontalSwipeLock])
 
   const collapseDuration = motionPreference === 'none' ? 0 : motionPreference === 'reduced' ? 0.09 : 0.19
   const layoutTransition = motionPreference === 'none'
@@ -318,7 +394,7 @@ function SwipeToReadNotification({
       onAnimationComplete={() => {
         if (phaseRef.current === 'collapsing') finishDismissal()
       }}
-      className={`relative rounded-[var(--radius-lg)] ${phase === 'collapsing' ? 'overflow-hidden' : 'overflow-visible'}`}
+      className="relative overflow-visible rounded-[var(--radius-lg)]"
     >
       <div className="relative overflow-hidden rounded-[var(--radius-lg)]">
         <motion.button
@@ -341,8 +417,12 @@ function SwipeToReadNotification({
             style={{ scale: readActionScale }}
             className="flex flex-col items-center gap-1 text-[0.65rem] font-bold uppercase tracking-[0.1em]"
           >
-            <Check className="h-5 w-5" aria-hidden="true" />
-            Read
+            {isDeparting ? (
+              <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+            ) : (
+              <Check className="h-5 w-5" aria-hidden="true" />
+            )}
+            {isDeparting ? 'Saving' : 'Read'}
           </motion.span>
         </motion.button>
         <motion.div
@@ -352,6 +432,7 @@ function SwipeToReadNotification({
           style={{
             x,
             touchAction: 'pan-y',
+            userSelect: phase === 'dragging' ? 'none' : undefined,
             willChange: phase === 'dragging' || isDeparting ? 'transform' : 'auto',
           }}
           className="relative z-[1] bg-[var(--bg-app)]"
@@ -385,21 +466,19 @@ function SwipeToReadNotification({
             const deltaX = event.clientX - gesture.startX
             const deltaY = event.clientY - gesture.startY
             if (!gesture.dragging) {
+              if (Math.hypot(deltaX, deltaY) < SWIPE_DIRECTION_THRESHOLD_PX) return
               if (
-                Math.abs(deltaY) > SWIPE_VERTICAL_LOCK_PX
-                && Math.abs(deltaY) > Math.abs(deltaX) * SWIPE_HORIZONTAL_LOCK_RATIO
+                deltaX >= 0
+                || Math.abs(deltaX) < Math.abs(deltaY) * SWIPE_HORIZONTAL_LOCK_RATIO
               ) {
                 gesture.cancelled = true
                 updateOffset(0)
                 return
               }
-              if (
-                deltaX >= -8
-                || Math.abs(deltaX) <= Math.abs(deltaY) * SWIPE_HORIZONTAL_LOCK_RATIO
-              ) return
               gesture.dragging = true
               suppressClickRef.current = true
               setSwipePhase('dragging')
+              setHorizontalSwipeLock(true)
               event.currentTarget.setPointerCapture?.(event.pointerId)
             }
 
@@ -419,13 +498,20 @@ function SwipeToReadNotification({
             gesture.cancelled = true
             resetGesture()
           }}
+          onLostPointerCapture={event => {
+            const gesture = gestureRef.current
+            if (!gesture || gesture.pointerId !== event.pointerId || !gesture.dragging) return
+            resetGesture()
+          }}
         >
           <motion.div
             animate={isDeparting
-              ? { opacity: motionPreference === 'none' ? 0 : 0.12, scale: motionPreference === 'full' ? 0.975 : 1 }
+              ? motionPreference === 'full'
+                ? { opacity: [1, 0.9, 0.5, 0.04], scale: [1, 0.99, 0.97, 0.945] }
+                : { opacity: motionPreference === 'none' ? 0 : 0.08, scale: 1 }
               : { opacity: 1, scale: 1 }}
             transition={{
-              duration: motionPreference === 'full' ? 0.22 : motionPreference === 'reduced' ? 0.08 : 0,
+              duration: motionPreference === 'full' ? 0.42 : motionPreference === 'reduced' ? 0.08 : 0,
               ease: [0.22, 0.72, 0.24, 1],
             }}
           >
@@ -440,29 +526,46 @@ function SwipeToReadNotification({
           className="pointer-events-none absolute inset-0 z-[2] overflow-visible"
           aria-hidden="true"
         >
+          <motion.span
+            data-disintegration-fracture-band
+            initial={{ opacity: 0, x: 18, scaleX: 0.2 }}
+            animate={{
+              opacity: [0, 0.92, 0.5, 0],
+              x: [18, 0, -18, -42],
+              scaleX: [0.2, 1.15, 0.88, 0.55],
+            }}
+            transition={{ duration: 0.31, times: [0, 0.2, 0.66, 1], ease: [0.22, 0.72, 0.24, 1] }}
+            className="absolute right-0 top-[6%] h-[88%] w-[44%] origin-right bg-[linear-gradient(90deg,transparent,rgba(215,170,70,0.12),rgba(215,170,70,0.5),transparent)]"
+          />
           {DISINTEGRATION_FRAGMENTS.map(fragment => (
             <motion.span
               key={`${fragment.left}-${fragment.top}`}
-              initial={{ opacity: 0, x: 0, y: 0, rotate: 0, scale: 0.7 }}
+              data-disintegration-fragment
+              data-disintegration-wave={fragment.wave}
+              initial={{ opacity: 0, x: 0, y: 0, rotate: 0, scale: 0.45 }}
               animate={{
-                opacity: [0, 0.9, 0],
-                x: fragment.x,
-                y: fragment.y,
+                opacity: [0, 1, 0.7, 0],
+                x: [0, fragment.x * 0.25, fragment.x],
+                y: [0, fragment.y * 0.35, fragment.y],
                 rotate: fragment.rotate,
-                scale: [0.7, 1, 0.15],
+                scale: [0.45, 1.15, 0.7, 0],
               }}
               transition={{
-                duration: 0.28,
+                duration: 0.38,
                 delay: fragment.delay,
-                times: [0, 0.28, 1],
+                times: [0, 0.2, 0.72, 1],
                 ease: [0.22, 0.72, 0.24, 1],
               }}
-              className="absolute rounded-[1px] bg-[var(--theme-accent-readable)] shadow-[0_0_8px_rgba(215,170,70,0.35)]"
+              className="absolute rounded-[1px]"
               style={{
                 left: `${fragment.left}%`,
                 top: `${fragment.top}%`,
-                width: fragment.size,
-                height: fragment.size,
+                width: fragment.width,
+                height: fragment.height,
+                backgroundColor: fragment.tone,
+                boxShadow: fragment.tone === 'var(--theme-accent-readable)'
+                  ? '0 0 9px rgba(215,170,70,0.4)'
+                  : undefined,
               }}
             />
           ))}
@@ -494,7 +597,8 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   const mountedRef = useRef(true)
   const profileCacheRef = useRef(new Map<string, User>())
   const profileRequestRef = useRef(0)
-  const notificationAcknowledgeRef = useRef(new Set<string>())
+  const notificationAcknowledgeRef = useRef(new Map<string, Promise<boolean>>())
+  const activeHorizontalSwipeRef = useRef<string | null>(null)
 
   useEffect(() => {
     snapshotRef.current = snapshot
@@ -532,13 +636,33 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     setNotificationInboxLoading(true)
     setNotificationInboxError(null)
     try {
+      const retry = await flushPendingNotificationReads(userId)
       const items = await fetchNotificationInbox()
-      if (mountedRef.current) setNotificationInbox(items)
+      if (mountedRef.current) {
+        setNotificationInbox(items)
+        const visibleEventIds = new Set(items.flatMap(item => item.notificationEventIds ?? []))
+        const visibleRetryFailures = retry.failed.filter(eventId => visibleEventIds.has(eventId))
+        retry.failed
+          .filter(eventId => !visibleEventIds.has(eventId))
+          .forEach(eventId => clearPendingNotificationRead(userId, eventId))
+        if (visibleRetryFailures.length > 0) {
+          setNotificationInboxError('A previously dismissed notification is still syncing. Swipe it again or refresh to retry.')
+        }
+      }
     } catch {
       if (mountedRef.current) setNotificationInboxError('Notification inbox could not refresh.')
     } finally {
       if (mountedRef.current) setNotificationInboxLoading(false)
     }
+  }, [userId])
+
+  const setHorizontalSwipeLock = useCallback((itemId: string, locked: boolean) => {
+    if (locked) activeHorizontalSwipeRef.current = itemId
+    else if (activeHorizontalSwipeRef.current === itemId) activeHorizontalSwipeRef.current = null
+    scrollRef.current?.setAttribute(
+      'data-horizontal-swipe-locked',
+      activeHorizontalSwipeRef.current ? 'true' : 'false'
+    )
   }, [])
 
   useEffect(() => {
@@ -559,9 +683,17 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
   useEffect(() => {
     mountedRef.current = true
     const scrollElement = scrollRef.current
+    const preventVerticalScrollDuringSwipe = (event: TouchEvent) => {
+      if (!activeHorizontalSwipeRef.current || !event.cancelable) return
+      event.preventDefault()
+    }
+    scrollElement?.addEventListener('touchmove', preventVerticalScrollDuringSwipe, { passive: false })
     return () => {
       mountedRef.current = false
+      activeHorizontalSwipeRef.current = null
+      scrollElement?.removeEventListener('touchmove', preventVerticalScrollDuringSwipe)
       if (scrollElement) {
+        scrollElement.setAttribute('data-horizontal-swipe-locked', 'false')
         writeCatchUpCache(userId, snapshotRef.current, {
           scrollTop: scrollElement.scrollTop,
           fetchedAt: fetchedAtRef.current,
@@ -632,37 +764,59 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     onOpenSource(item)
   }
 
-  const acknowledgeNotificationItem = (item: CatchUpItem, openSource: boolean) => {
+  const acknowledgeNotificationItem = (item: CatchUpItem, openSource: boolean): Promise<boolean> => {
     const eventId = item.notificationEventIds?.[0]
-    if (!eventId || notificationAcknowledgeRef.current.has(eventId)) return
-    notificationAcknowledgeRef.current.add(eventId)
-    void acknowledgeNotificationInboxEvent(eventId).then(() => {
-      void clearNotificationEventFromSystemTray({
-        notificationType: item.kind,
-        eventId,
+    if (!eventId || !userId) {
+      return Promise.reject(new Error('This notification does not have a readable event.'))
+    }
+
+    const currentRequest = notificationAcknowledgeRef.current.get(eventId)
+    if (currentRequest) return currentRequest
+
+    queuePendingNotificationRead(userId, eventId)
+    const request = acknowledgeNotificationInboxEvent(eventId)
+      .then(() => {
+        clearPendingNotificationRead(userId, eventId)
+        void clearNotificationEventFromSystemTray({
+          notificationType: item.kind,
+          eventId,
+        })
+        requestAppBadgeRefresh()
+        return true
       })
-      requestAppBadgeRefresh()
-    }).catch(() => {
-      notificationAcknowledgeRef.current.delete(eventId)
-      if (!mountedRef.current) return
-      setNotificationInboxError(
-        openSource
-          ? 'The source opened, but this notification could not be cleared. Refresh to try again.'
-          : 'This notification could not be marked as read. Refresh to try again.'
-      )
-      void loadNotificationInbox()
-    })
+      .catch(caught => {
+        if (mountedRef.current) {
+          setNotificationInboxError(
+            openSource
+              ? 'The source opened, but this notification could not be cleared. It will retry automatically.'
+              : 'This notification could not be marked as read. It stayed in your inbox and will retry automatically.'
+          )
+        }
+        throw caught
+      })
+      .finally(() => {
+        notificationAcknowledgeRef.current.delete(eventId)
+      })
+
+    notificationAcknowledgeRef.current.set(eventId, request)
+    return request
   }
 
   const openNotificationItem = (item: CatchUpItem) => {
+    void acknowledgeNotificationItem(item, true).catch(() => undefined)
     onOpenSource(item)
     setNotificationInbox(current => current.filter(candidate => candidate.id !== item.id))
-    acknowledgeNotificationItem(item, true)
   }
 
-  const beginNotificationDismissal = (item: CatchUpItem) => {
-    setAnnouncement(`${item.title} marked as read.`)
-    acknowledgeNotificationItem(item, false)
+  const beginNotificationDismissal = (item: CatchUpItem): Promise<boolean> => {
+    setAnnouncement(`Marking ${item.title} as read.`)
+    return acknowledgeNotificationItem(item, false).then(() => {
+      if (mountedRef.current) setAnnouncement(`${item.title} marked as read.`)
+      return true
+    }).catch(caught => {
+      if (mountedRef.current) setAnnouncement(`${item.title} could not be marked as read and was restored.`)
+      throw caught
+    })
   }
 
   const finishNotificationDismissal = (item: CatchUpItem) => {
@@ -677,7 +831,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
     <div className="theme-app-surface flex h-full min-h-0 flex-col pb-[calc(env(safe-area-inset-bottom)+4.2rem)] text-sm md:pb-0" data-testid="catch-up-view">
       <MobileAppHeader currentView={currentView} onViewChange={onViewChange} title="Catch-Up" logo className="hidden md:flex" />
 
-      <div ref={scrollRef} role="region" aria-label="Catch-Up content" className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 md:pt-6">
+      <div ref={scrollRef} role="region" aria-label="Catch-Up content" data-horizontal-swipe-locked="false" className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-[calc(env(safe-area-inset-top)+1rem)] sm:px-6 md:pt-6">
         <div className="mx-auto w-full max-w-4xl">
           <header className="border-b border-[var(--border-subtle)] px-1 pb-4" data-testid="catch-up-compact-header">
             <div className="flex items-start justify-between gap-4">
@@ -742,6 +896,7 @@ export function CatchUpView({ currentView, onViewChange, onOpenSource }: CatchUp
                         motionPreference={effectivePreferences.motion}
                         onReadStart={() => beginNotificationDismissal(item)}
                         onDismissComplete={() => finishNotificationDismissal(item)}
+                        onHorizontalSwipeLockChange={setHorizontalSwipeLock}
                       >
                         <CatchUpCard
                           item={item}

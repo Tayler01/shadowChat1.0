@@ -1,11 +1,19 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { CatchUpView } from '../src/features/catch-up/CatchUpView'
-import { clearCatchUpCache, writeCatchUpCache, type CatchUpSnapshot } from '../src/features/catch-up/catchUpModel'
+import {
+  clearCatchUpCache,
+  writeCatchUpCache,
+  type CatchUpItem,
+  type CatchUpSnapshot,
+} from '../src/features/catch-up/catchUpModel'
 import {
   acknowledgeCatchUpEvents,
   acknowledgeNotificationInboxEvent,
+  clearPendingNotificationRead,
   fetchCatchUpSnapshot,
   fetchNotificationInbox,
+  flushPendingNotificationReads,
+  queuePendingNotificationRead,
 } from '../src/features/catch-up/catchUpApi'
 import { getUserProfile } from '../src/lib/auth'
 
@@ -14,8 +22,11 @@ let mockMotionPreference: 'full' | 'reduced' | 'none' = 'none'
 jest.mock('../src/features/catch-up/catchUpApi', () => ({
   acknowledgeCatchUpEvents: jest.fn(),
   acknowledgeNotificationInboxEvent: jest.fn(),
+  clearPendingNotificationRead: jest.fn(),
   fetchCatchUpSnapshot: jest.fn(),
   fetchNotificationInbox: jest.fn(),
+  flushPendingNotificationReads: jest.fn(),
+  queuePendingNotificationRead: jest.fn(),
 }))
 
 jest.mock('../src/components/layout/MobileAppHeader', () => ({
@@ -51,7 +62,10 @@ jest.mock('../src/lib/auth', () => ({
 const fetchSnapshot = fetchCatchUpSnapshot as jest.MockedFunction<typeof fetchCatchUpSnapshot>
 const acknowledge = acknowledgeCatchUpEvents as jest.MockedFunction<typeof acknowledgeCatchUpEvents>
 const acknowledgeNotification = acknowledgeNotificationInboxEvent as jest.MockedFunction<typeof acknowledgeNotificationInboxEvent>
+const clearPendingRead = clearPendingNotificationRead as jest.MockedFunction<typeof clearPendingNotificationRead>
 const fetchInbox = fetchNotificationInbox as jest.MockedFunction<typeof fetchNotificationInbox>
+const flushPendingReads = flushPendingNotificationReads as jest.MockedFunction<typeof flushPendingNotificationReads>
+const queuePendingRead = queuePendingNotificationRead as jest.MockedFunction<typeof queuePendingNotificationRead>
 const fetchProfile = getUserProfile as jest.MockedFunction<typeof getUserProfile>
 
 const section = (id: CatchUpSnapshot['sections'][keyof CatchUpSnapshot['sections']]['id'], title: string) => ({
@@ -102,11 +116,63 @@ const snapshot = (): CatchUpSnapshot => ({
   },
 })
 
+const notificationItem = (
+  eventId: string,
+  overrides: Partial<CatchUpItem> = {}
+): CatchUpItem => ({
+  id: `notification:${eventId}`,
+  kind: 'shadow_pin_comment',
+  occurredAt: '2026-07-17T12:00:00Z',
+  actor: {
+    id: 'actor-1',
+    display_name: 'Mills',
+    username: 'mills',
+    avatar_url: 'https://example.com/mills-full.jpg',
+    avatar_thumbnail_url: 'https://example.com/mills-thumb.jpg',
+    color: '#d7aa46',
+  },
+  title: 'New comment on your Pin',
+  preview: 'Mills left a comment.',
+  unreadCount: 1,
+  manuallyUnread: false,
+  target: { kind: 'app_route', route: '/?view=shadowpin&item=pin-1' },
+  activityEventIds: [],
+  notificationEventIds: [eventId],
+  ...overrides,
+})
+
+const swipeLeft = (
+  surface: HTMLElement,
+  pointerId = 1,
+  from = { x: 240, y: 120 },
+  to = { x: 140, y: 122 }
+) => {
+  fireEvent.pointerDown(surface, {
+    pointerId,
+    pointerType: 'touch',
+    clientX: from.x,
+    clientY: from.y,
+  })
+  fireEvent.pointerMove(surface, {
+    pointerId,
+    pointerType: 'touch',
+    clientX: to.x,
+    clientY: to.y,
+  })
+  fireEvent.pointerUp(surface, {
+    pointerId,
+    pointerType: 'touch',
+    clientX: to.x,
+    clientY: to.y,
+  })
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   clearCatchUpCache()
   acknowledge.mockResolvedValue(1)
   acknowledgeNotification.mockResolvedValue(true)
+  flushPendingReads.mockResolvedValue({ confirmed: [], failed: [] })
   fetchInbox.mockResolvedValue([])
   fetchProfile.mockResolvedValue(null)
   mockMotionPreference = 'none'
@@ -202,6 +268,151 @@ test('swipes a notification left to mark it read without opening its source', as
     expect(screen.queryByRole('heading', { name: 'Notification inbox' })).not.toBeInTheDocument()
   })
   expect(screen.getByText('New comment on your Pin marked as read.')).toBeInTheDocument()
+})
+
+test('keeps a swiped notification visible until the server confirms it as read', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([notificationItem('event-confirmation')])
+  let confirmRead: ((value: boolean) => void) | undefined
+  acknowledgeNotification.mockReturnValue(new Promise<boolean>(resolve => {
+    confirmRead = resolve
+  }))
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+  const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-confirmation')
+
+  swipeLeft(swipeSurface)
+
+  expect(queuePendingRead).toHaveBeenCalledWith('user-1', 'event-confirmation')
+  expect(screen.getByTestId('notification-row-notification:event-confirmation')).toBeInTheDocument()
+  expect(screen.getByText('Marking New comment on your Pin as read.')).toBeInTheDocument()
+
+  await act(async () => {
+    confirmRead?.(true)
+    await Promise.resolve()
+  })
+
+  await waitFor(() => {
+    expect(screen.queryByTestId('notification-row-notification:event-confirmation')).not.toBeInTheDocument()
+  })
+  expect(clearPendingRead).toHaveBeenCalledWith('user-1', 'event-confirmation')
+})
+
+test('restores a swiped notification when the server acknowledgement fails', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([notificationItem('event-failed')])
+  acknowledgeNotification.mockRejectedValue(new Error('Network unavailable'))
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+  const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-failed')
+
+  swipeLeft(swipeSurface)
+
+  await waitFor(() => {
+    expect(screen.getByTestId('notification-row-notification:event-failed')).toHaveAttribute(
+      'data-dismiss-phase',
+      'idle'
+    )
+  })
+  expect(screen.getByText(/stayed in your inbox and will retry automatically/i)).toBeInTheDocument()
+  expect(queuePendingRead).toHaveBeenCalledWith('user-1', 'event-failed')
+  expect(clearPendingRead).not.toHaveBeenCalled()
+})
+
+test('drops a stale retry entry when the notification is no longer unread', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([])
+  flushPendingReads.mockResolvedValue({ confirmed: [], failed: ['event-already-gone'] })
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+
+  await waitFor(() => {
+    expect(clearPendingRead).toHaveBeenCalledWith('user-1', 'event-already-gone')
+  })
+  expect(screen.queryByText(/previously dismissed notification is still syncing/i)).not.toBeInTheDocument()
+})
+
+test('locks vertical scrolling only after a left swipe is claimed', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([notificationItem('event-scroll-lock')])
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+  const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-scroll-lock')
+  const scroller = screen.getByRole('region', { name: 'Catch-Up content' })
+
+  fireEvent.pointerDown(swipeSurface, {
+    pointerId: 17,
+    pointerType: 'touch',
+    clientX: 240,
+    clientY: 120,
+  })
+  fireEvent.pointerMove(swipeSurface, {
+    pointerId: 17,
+    pointerType: 'touch',
+    clientX: 228,
+    clientY: 121,
+  })
+
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'true')
+  const lockedMove = new Event('touchmove', { bubbles: true, cancelable: true })
+  scroller.dispatchEvent(lockedMove)
+  expect(lockedMove.defaultPrevented).toBe(true)
+
+  fireEvent.pointerUp(swipeSurface, {
+    pointerId: 17,
+    pointerType: 'touch',
+    clientX: 228,
+    clientY: 121,
+  })
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+  const releasedMove = new Event('touchmove', { bubbles: true, cancelable: true })
+  scroller.dispatchEvent(releasedMove)
+  expect(releasedMove.defaultPrevented).toBe(false)
+
+  fireEvent.pointerDown(swipeSurface, {
+    pointerId: 18,
+    pointerType: 'touch',
+    clientX: 240,
+    clientY: 120,
+  })
+  fireEvent.pointerMove(swipeSurface, {
+    pointerId: 18,
+    pointerType: 'touch',
+    clientX: 236,
+    clientY: 142,
+  })
+  expect(scroller).toHaveAttribute('data-horizontal-swipe-locked', 'false')
+})
+
+test('uses the full shatter-to-ash effect for full motion preference', async () => {
+  mockMotionPreference = 'full'
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue([notificationItem('event-shatter')])
+  acknowledgeNotification.mockReturnValue(new Promise<boolean>(() => undefined))
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={jest.fn()} />)
+  const swipeSurface = await screen.findByTestId('notification-swipe-notification:event-shatter')
+
+  swipeLeft(swipeSurface)
+
+  const effect = screen.getByTestId('notification-disintegration-notification:event-shatter')
+  expect(effect.querySelectorAll('[data-disintegration-fragment]')).toHaveLength(28)
+  expect(effect.querySelectorAll('[data-disintegration-wave]')).toHaveLength(28)
+  expect(new Set(
+    Array.from(effect.querySelectorAll('[data-disintegration-wave]'))
+      .map(fragment => fragment.getAttribute('data-disintegration-wave'))
+  ).size).toBeGreaterThanOrEqual(4)
+  expect(effect.querySelector('[data-disintegration-fracture-band]')).toBeInTheDocument()
 })
 
 test('tracks a full-width swipe continuously instead of stopping at the action width', async () => {

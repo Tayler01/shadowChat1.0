@@ -18,6 +18,15 @@ type RawNotificationEvent = {
   actor: unknown
 }
 
+type PendingNotificationRead = {
+  eventId: string
+  queuedAt: number
+}
+
+const PENDING_NOTIFICATION_READ_STORAGE_PREFIX = 'shadowchat:pending-notification-reads:v1:'
+const PENDING_NOTIFICATION_READ_TTL_MS = 7 * 24 * 60 * 60 * 1_000
+const PENDING_NOTIFICATION_READ_LIMIT = 50
+
 const asRecord = (value: unknown): Record<string, unknown> | null => (
   value && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown>
@@ -27,6 +36,77 @@ const asRecord = (value: unknown): Record<string, unknown> | null => (
 const asText = (value: unknown) => typeof value === 'string' && value.trim()
   ? value.trim()
   : null
+
+const getPendingNotificationReadStorageKey = (userId: string) => (
+  `${PENDING_NOTIFICATION_READ_STORAGE_PREFIX}${userId}`
+)
+
+const parsePendingNotificationReads = (value: unknown): PendingNotificationRead[] => {
+  if (!Array.isArray(value)) return []
+  const oldestAllowed = Date.now() - PENDING_NOTIFICATION_READ_TTL_MS
+  const seen = new Set<string>()
+  return value.flatMap(candidate => {
+    const record = asRecord(candidate)
+    const eventId = asText(record?.eventId)
+    const queuedAt = typeof record?.queuedAt === 'number' && Number.isFinite(record.queuedAt)
+      ? record.queuedAt
+      : 0
+    if (!eventId || queuedAt < oldestAllowed || seen.has(eventId)) return []
+    seen.add(eventId)
+    return [{ eventId, queuedAt }]
+  }).slice(-PENDING_NOTIFICATION_READ_LIMIT)
+}
+
+const readPendingNotificationReads = (userId: string): PendingNotificationRead[] => {
+  if (!userId || typeof localStorage === 'undefined') return []
+  try {
+    return parsePendingNotificationReads(
+      JSON.parse(localStorage.getItem(getPendingNotificationReadStorageKey(userId)) || '[]')
+    )
+  } catch {
+    return []
+  }
+}
+
+const writePendingNotificationReads = (
+  userId: string,
+  entries: PendingNotificationRead[]
+) => {
+  if (!userId || typeof localStorage === 'undefined') return
+  const key = getPendingNotificationReadStorageKey(userId)
+  try {
+    if (entries.length === 0) {
+      localStorage.removeItem(key)
+      return
+    }
+    localStorage.setItem(key, JSON.stringify(entries.slice(-PENDING_NOTIFICATION_READ_LIMIT)))
+  } catch {
+    // Persistence is a reliability enhancement. The live RPC remains canonical.
+  }
+}
+
+export const getPendingNotificationReadEventIds = (userId: string) => (
+  readPendingNotificationReads(userId).map(entry => entry.eventId)
+)
+
+export const queuePendingNotificationRead = (userId: string, eventId: string) => {
+  const normalizedEventId = eventId.trim()
+  if (!userId || !normalizedEventId) return
+  const current = readPendingNotificationReads(userId)
+    .filter(entry => entry.eventId !== normalizedEventId)
+  writePendingNotificationReads(userId, [
+    ...current,
+    { eventId: normalizedEventId, queuedAt: Date.now() },
+  ])
+}
+
+export const clearPendingNotificationRead = (userId: string, eventId: string) => {
+  if (!userId || !eventId) return
+  writePendingNotificationReads(
+    userId,
+    readPendingNotificationReads(userId).filter(entry => entry.eventId !== eventId)
+  )
+}
 
 const notificationActor = (
   payload: Record<string, unknown>,
@@ -148,5 +228,28 @@ export async function acknowledgeNotificationInboxEvent(eventId: string) {
     target_event_id: eventId,
   })
   if (error) throw error
-  return data === true
+  if (data !== true) {
+    throw new Error('Notification read acknowledgement was not confirmed.')
+  }
+  return true
+}
+
+export async function flushPendingNotificationReads(userId: string) {
+  const eventIds = getPendingNotificationReadEventIds(userId)
+  if (eventIds.length === 0) return { confirmed: [] as string[], failed: [] as string[] }
+
+  const results = await Promise.all(eventIds.map(async eventId => {
+    try {
+      await acknowledgeNotificationInboxEvent(eventId)
+      clearPendingNotificationRead(userId, eventId)
+      return { eventId, confirmed: true }
+    } catch {
+      return { eventId, confirmed: false }
+    }
+  }))
+
+  return {
+    confirmed: results.filter(result => result.confirmed).map(result => result.eventId),
+    failed: results.filter(result => !result.confirmed).map(result => result.eventId),
+  }
 }

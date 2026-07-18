@@ -8,6 +8,30 @@ artifact and physical-device pass.
 
 Last updated: 2026-07-17
 
+## July 17 Durable Notification Swipe Checkpoint
+
+- Notification swipe-to-read now queues the exact event ID locally before the
+  server call, waits for a confirmed Supabase acknowledgement before removing
+  the card, restores the card on failure, and replays interrupted reads before
+  the next inbox fetch. This closes the view-switch, reload, and PWA-restart
+  return path.
+- Gesture arbitration now commits once after a short threshold. A claimed left
+  swipe locks vertical movement only inside the Catch-Up scroller until release
+  or cancellation; vertical-first movement stays native.
+- Full motion now uses a deterministic 28-piece fracture-and-ash sequence plus
+  a brighter fracture band before the remaining cards slide up. Reduced motion
+  uses a short fade and no-motion removes immediately, both only after server
+  confirmation.
+- The focused Catch-Up component/API suites passed 19 tests. The full Jest gate
+  passed 235 suites and 1,290 tests with 16 existing todos; ESLint, TypeScript,
+  the production build, paused-feature verification, and build budgets passed.
+- A controlled notification response and read RPC were intercepted in-browser,
+  so no backend rows changed. Pixel Chromium and iPhone WebKit both proved the
+  lock/release cycle, all 28 fragments, one confirmed acknowledgement, empty
+  retry ledger after success, no return after reload, zero horizontal overflow,
+  and clean runtime diagnostics. Evidence:
+  `output/playwright/catch-up/summary.json`.
+
 ## July 17 Destination Badges, Catch-Up Motion, And Discover Page Checkpoint
 
 - Catch-Up notification cards now track the finger across the measured card

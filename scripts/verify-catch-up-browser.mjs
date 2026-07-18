@@ -114,6 +114,8 @@ for (const profile of profiles) {
   const diagnostics = { consoleErrors: [], pageErrors: [], requestFailures: [], errorResponses: [] }
   let snapshotCalls = 0
   let acknowledgementCalls = 0
+  let notificationReadCalls = 0
+  let syntheticNotificationRead = false
   page.on('request', request => {
     if (/\/rest\/v1\/rpc\/get_my_catch_up_v1(?:\?|$)/u.test(request.url())) snapshotCalls += 1
     if (/\/rest\/v1\/rpc\/acknowledge_my_catch_up_events(?:\?|$)/u.test(request.url())) acknowledgementCalls += 1
@@ -136,6 +138,37 @@ for (const profile of profiles) {
       timeout: 20_000,
     })
     must(snapshotCalls === 0, `${profile.name} fetched Catch-Up before the surface was opened.`)
+
+    await page.route('**/rest/v1/notification_events*', async route => {
+      if (route.request().method() !== 'GET') {
+        await route.continue()
+        return
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'content-range': syntheticNotificationRead ? '*/0' : '0-0/1' },
+        body: JSON.stringify(syntheticNotificationRead ? [] : [{
+          id: '00000000-0000-4000-8000-000000000123',
+          type: 'shadow_pin_comment',
+          category: 'shadow_pin',
+          actor_id: null,
+          route: '/?view=pins&pin=browser-proof-pin',
+          payload: {
+            title: 'Browser proof notification',
+            body: 'Swipe this controlled notification to verify durable dismissal.',
+            image_id: 'browser-proof-pin',
+          },
+          created_at: '2026-07-17T12:00:00.000Z',
+          actor: null,
+        }]),
+      })
+    })
+    await page.route('**/rest/v1/rpc/mark_my_notification_event_read*', async route => {
+      notificationReadCalls += 1
+      syntheticNotificationRead = true
+      await route.fulfill({ status: 200, contentType: 'application/json', body: 'true' })
+    })
 
     await page.goto(`${baseUrl}/?view=catchup`, { waitUntil: 'domcontentloaded' })
     await dismissTransientUi(page)
@@ -175,16 +208,64 @@ for (const profile of profiles) {
     }))
     must(geometry.scrollWidth <= geometry.viewportWidth + 1, `${profile.name} Catch-Up has horizontal overflow.`)
     must(geometry.refreshVisible, `${profile.name} refresh control is outside the viewport.`)
+
+    const notificationSurface = page.locator('[data-notification-swipe-id="notification:00000000-0000-4000-8000-000000000123"]')
+    await notificationSurface.waitFor()
+    const notificationBox = await notificationSurface.boundingBox()
+    must(notificationBox, `${profile.name} notification surface did not have measurable geometry.`)
+    const swipeStartX = notificationBox.x + (notificationBox.width * 0.82)
+    const swipeEndX = notificationBox.x + (notificationBox.width * 0.32)
+    const swipeY = notificationBox.y + (notificationBox.height * 0.5)
+    await page.mouse.move(swipeStartX, swipeY)
+    await page.mouse.down()
+    await page.mouse.move(swipeEndX, swipeY + 2, { steps: 5 })
+    const swipeLocked = await page.getByRole('region', { name: 'Catch-Up content' })
+      .getAttribute('data-horizontal-swipe-locked')
+    must(swipeLocked === 'true', `${profile.name} did not lock vertical scrolling after claiming the notification swipe.`)
+    const verticalMovePrevented = await page.getByRole('region', { name: 'Catch-Up content' })
+      .evaluate(element => {
+        const event = new Event('touchmove', { bubbles: true, cancelable: true })
+        element.dispatchEvent(event)
+        return event.defaultPrevented
+      })
+    must(verticalMovePrevented, `${profile.name} allowed vertical scrolling during an active horizontal notification swipe.`)
+    await page.mouse.up()
+    const swipeReleased = await page.getByRole('region', { name: 'Catch-Up content' })
+      .getAttribute('data-horizontal-swipe-locked')
+    must(swipeReleased === 'false', `${profile.name} did not release the vertical scroll lock after pointer up.`)
+    const disintegration = page.getByTestId('notification-disintegration-notification:00000000-0000-4000-8000-000000000123')
+    await disintegration.waitFor({ timeout: 2_000 })
+    must(
+      await disintegration.locator('[data-disintegration-fragment]').count() === 28,
+      `${profile.name} did not render the complete notification disintegration sequence.`
+    )
+    await page.waitForTimeout(90)
+    await page.screenshot({ path: path.join(artifactDir, `${profile.name}-disintegration.png`) })
+    await notificationSurface.waitFor({ state: 'detached', timeout: 10_000 })
+    must(notificationReadCalls === 1, `${profile.name} expected one notification read acknowledgement, saw ${notificationReadCalls}.`)
+    const pendingReadIds = await page.evaluate(userId => {
+      const key = `shadowchat:pending-notification-reads:v1:${userId}`
+      return JSON.parse(localStorage.getItem(key) || '[]')
+    }, auth.data.session.user.id)
+    must(Array.isArray(pendingReadIds) && pendingReadIds.length === 0, `${profile.name} retained a confirmed notification read in its retry ledger.`)
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await dismissTransientUi(page)
+    await page.getByRole('heading', { name: 'Your Catch-Up', level: 1 }).waitFor({ timeout: 20_000 })
+    must(
+      await page.locator('[data-notification-swipe-id="notification:00000000-0000-4000-8000-000000000123"]').count() === 0,
+      `${profile.name} restored a notification after reload even though its read acknowledgement was confirmed.`
+    )
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}.png`), fullPage: true })
 
     must(diagnostics.consoleErrors.length === 0, `${profile.name} console errors: ${JSON.stringify(diagnostics.consoleErrors)}`)
     must(diagnostics.pageErrors.length === 0, `${profile.name} page errors: ${JSON.stringify(diagnostics.pageErrors)}`)
     must(diagnostics.requestFailures.length === 0, `${profile.name} request failures: ${JSON.stringify(diagnostics.requestFailures)}`)
     must(diagnostics.errorResponses.length === 0, `${profile.name} error responses: ${JSON.stringify(diagnostics.errorResponses)}`)
-    results.push({ profile: profile.name, passed: true, snapshotCalls, acknowledgementCalls, geometry, diagnostics })
+    results.push({ profile: profile.name, passed: true, snapshotCalls, acknowledgementCalls, notificationReadCalls, geometry, diagnostics })
   } catch (error) {
     await page.screenshot({ path: path.join(artifactDir, `${profile.name}-failure.png`), fullPage: true }).catch(() => undefined)
-    results.push({ profile: profile.name, passed: false, error: error instanceof Error ? error.message : String(error), snapshotCalls, acknowledgementCalls, diagnostics })
+    results.push({ profile: profile.name, passed: false, error: error instanceof Error ? error.message : String(error), snapshotCalls, acknowledgementCalls, notificationReadCalls, diagnostics })
   } finally {
     await context.close()
     await browser.close()
@@ -197,7 +278,7 @@ const summary = {
   baseUrl,
   supabaseProjectRef: projectRef,
   passed: results.every(result => result.passed),
-  residue: 'Read-only UI/RPC proof; no fixtures, acknowledgements, uploads, messages, or user-state mutations created.',
+  residue: 'The swipe/read proof intercepts notification reads in-browser; no fixtures, acknowledgements, uploads, messages, or user-state mutations are created.',
   results,
 }
 await writeFile(path.join(artifactDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8')

@@ -23,6 +23,16 @@ also support swipe-left mark-as-read without source navigation, with an
 equivalent revealed Read button. Both open-and-read and swipe-and-read paths
 clear the matching system notification and refresh unified badges.
 
+Swipe dismissal now uses the same durable read contract rather than removing a
+card on animation alone. The event ID is queued in user-scoped device storage
+before the read RPC, confirmed reads clear the queue and card, failures restore
+the card, and pending IDs replay before the next inbox fetch. A claimed
+horizontal gesture also locks only the Catch-Up scroller until release, so
+vertical page motion cannot steal a swipe while normal vertical intent remains
+native. Full Comfort motion uses a stronger deterministic fracture-and-ash
+finish; reduced and none keep the same confirmed-read behavior without the
+decorative particles.
+
 The destination follow-up in
 `20260717233421_notification_destination_badges.sql` makes every nonzero Pins
 or Play badge traceable in the UI. Play shows unread counts on the owning
