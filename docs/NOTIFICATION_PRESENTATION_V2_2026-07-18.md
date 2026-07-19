@@ -367,6 +367,15 @@ native detection and atomic auth-plus-enable handoff, register the first
 production iOS token, and pass foreground, background, and terminated tests
 before activation.
 
+Production commit `ae2d04e` contains that repair. The replacement artifacts are
+iOS build `7` (`a6e8d7d1-7c77-4c40-b54c-a6ca206fa15e`) and Android version-code
+`4` (`b443cfe8-5cba-40ec-be54-5410384b162a`). They were created from the same
+verified source state. iOS build `7` finished, was submitted and processed by
+Apple, received build-specific test instructions, and is attached to
+`ShadoChat Internal Beta`. Android version-code `4` finished as an internal APK.
+Native delivery remains deliberately inactive until the physical-device
+acceptance pass registers a real native installation.
+
 ## Local Verification - July 18, 2026
 
 - full local Supabase reset from migration zero: pass

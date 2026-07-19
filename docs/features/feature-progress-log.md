@@ -81,8 +81,17 @@ Canonical detail and release gates live in:
   makes `?nativeApp=1` authoritative, re-sends the current web auth session
   before enable for backward compatibility, and makes the replacement binary
   await that same session in the enable command.
-- The Android version-code `3` replacement build is running as EAS build
-  `267873cc-2489-455f-9326-67a76d6433c9`.
+- Android version-code `3` finished as EAS build
+  `267873cc-2489-455f-9326-67a76d6433c9`; it is retained as the safe-area
+  artifact and superseded for auth/permission acceptance by version-code `4`.
+- Commit `ae2d04e` is deployed to the production web app with the complete
+  native detection/auth synchronization repair. Replacement iOS build `7`
+  (`a6e8d7d1-7c77-4c40-b54c-a6ca206fa15e`) and Android version-code `4`
+  (`b443cfe8-5cba-40ec-be54-5410384b162a`) carry that source state. Both builds
+  finished; iOS build `7` is processed and attached to
+  `ShadoChat Internal Beta`, while Android `4` is available as an internal APK.
+  Native delivery remains in DM-only shadow mode pending physical-device
+  registration and foreground/background/terminated acceptance.
 
 ## Current Goal
 
