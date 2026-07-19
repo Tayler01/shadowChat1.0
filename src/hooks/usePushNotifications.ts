@@ -15,6 +15,13 @@ import {
   type PushSupportStatus,
   upsertNotificationPreferences,
 } from '../lib/push'
+import {
+  isNativeAppWebView,
+  requestNativeNotificationDisable,
+  requestNativeNotificationEnable,
+  requestNativeNotificationState,
+  subscribeToNativeNotificationState,
+} from '../lib/nativeAppBridge'
 
 type UsePushNotificationsOptions = {
   enabled?: boolean
@@ -29,6 +36,11 @@ type PushNotificationState = {
 
 const cachedPushStateByUserId = new Map<string, PushNotificationState>()
 const pushStateRequestByUserId = new Map<string, Promise<PushNotificationState>>()
+const NATIVE_PUSH_SUPPORT: PushSupportStatus = {
+  supported: true,
+  canPrompt: true,
+  reason: null,
+}
 
 const loadPushState = async (userId: string, force = false) => {
   const cached = cachedPushStateByUserId.get(userId)
@@ -72,10 +84,15 @@ const updateCachedPushState = (userId: string, partial: Partial<PushNotification
 
 export function usePushNotifications(options: UsePushNotificationsOptions = {}) {
   const enabled = options.enabled ?? true
+  const nativeApp = isNativeAppWebView()
   const { user } = useAuth()
   const cachedState = user ? cachedPushStateByUserId.get(user.id) : undefined
-  const [support, setSupport] = useState<PushSupportStatus>(() => cachedState?.support ?? getPushSupportStatus())
-  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(() => cachedState?.permission ?? getNotificationPermission())
+  const [support, setSupport] = useState<PushSupportStatus>(
+    () => nativeApp ? NATIVE_PUSH_SUPPORT : cachedState?.support ?? getPushSupportStatus()
+  )
+  const [permission, setPermission] = useState<NotificationPermission | 'unsupported'>(
+    () => nativeApp ? 'default' : cachedState?.permission ?? getNotificationPermission()
+  )
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(() => cachedState?.preferences ?? null)
   const [subscribed, setSubscribed] = useState(() => cachedState?.subscribed ?? false)
   const [loading, setLoading] = useState(false)
@@ -83,9 +100,35 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (nativeApp) {
+      setSupport(NATIVE_PUSH_SUPPORT)
+      const unsubscribe = subscribeToNativeNotificationState(state => {
+        setSubscribed(state.enabled)
+        setPermission(
+          state.permission === 'undetermined' || state.permission === 'unknown'
+            ? 'default'
+            : state.permission
+        )
+        setSaving(state.busy)
+        setError(state.error)
+        if (user) {
+          updateCachedPushState(user.id, {
+            subscribed: state.enabled,
+            permission:
+              state.permission === 'undetermined' || state.permission === 'unknown'
+                ? 'default'
+                : state.permission,
+            support: NATIVE_PUSH_SUPPORT,
+          })
+        }
+      })
+      requestNativeNotificationState()
+      return unsubscribe
+    }
+
     setSupport(getPushSupportStatus())
     setPermission(getNotificationPermission())
-  }, [])
+  }, [nativeApp, user])
 
   const refreshState = useCallback(async (force = false) => {
     if (!user) {
@@ -111,6 +154,18 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     setError(null)
 
     try {
+      if (nativeApp) {
+        const prefs = await fetchNotificationPreferences(user.id)
+        setPreferences(prefs)
+        setSupport(NATIVE_PUSH_SUPPORT)
+        updateCachedPushState(user.id, {
+          preferences: prefs,
+          support: NATIVE_PUSH_SUPPORT,
+        })
+        requestNativeNotificationState()
+        return
+      }
+
       const nextState = await loadPushState(user.id, force)
       setPreferences(nextState.preferences)
       setSubscribed(nextState.subscribed)
@@ -130,7 +185,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     } finally {
       setLoading(false)
     }
-  }, [enabled, user])
+  }, [enabled, nativeApp, user])
 
   useEffect(() => {
     refreshState()
@@ -189,6 +244,35 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     setError(null)
 
     try {
+      if (nativeApp) {
+        const state = await requestNativeNotificationEnable()
+        setSubscribed(state.enabled)
+        setPermission(
+          state.permission === 'undetermined' || state.permission === 'unknown'
+            ? 'default'
+            : state.permission
+        )
+        const next = await fetchNotificationPreferences(user.id)
+        setPreferences(next)
+        updateCachedPushState(user.id, {
+          preferences: next,
+          subscribed: state.enabled,
+          permission:
+            state.permission === 'undetermined' || state.permission === 'unknown'
+              ? 'default'
+              : state.permission,
+          support: NATIVE_PUSH_SUPPORT,
+        })
+        if (!state.enabled) {
+          throw new Error(
+            state.permission === 'denied'
+              ? 'Notifications are disabled in your phone settings.'
+              : 'Notifications were not enabled on this device.'
+          )
+        }
+        return
+      }
+
       await enablePushForCurrentDevice(user.id)
       setSubscribed(true)
       setPermission(getNotificationPermission())
@@ -208,7 +292,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     } finally {
       setSaving(false)
     }
-  }, [user])
+  }, [nativeApp, user])
 
   const disablePush = useCallback(async () => {
     if (!user) return
@@ -216,6 +300,28 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     setError(null)
 
     try {
+      if (nativeApp) {
+        const state = await requestNativeNotificationDisable()
+        setSubscribed(false)
+        setPermission(
+          state.permission === 'undetermined' || state.permission === 'unknown'
+            ? 'default'
+            : state.permission
+        )
+        const next = await fetchNotificationPreferences(user.id)
+        setPreferences(next)
+        updateCachedPushState(user.id, {
+          preferences: next,
+          subscribed: false,
+          permission:
+            state.permission === 'undetermined' || state.permission === 'unknown'
+              ? 'default'
+              : state.permission,
+          support: NATIVE_PUSH_SUPPORT,
+        })
+        return
+      }
+
       await disablePushForCurrentDevice(user.id)
       setSubscribed(false)
       const next = await fetchNotificationPreferences(user.id)
@@ -233,7 +339,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     } finally {
       setSaving(false)
     }
-  }, [user])
+  }, [nativeApp, user])
 
   return {
     supported: support.supported,

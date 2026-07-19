@@ -7,18 +7,34 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      "channel": "development"
+      "channel": "development",
+      "env": {
+        "EXPO_PUBLIC_NOTIFICATION_ENVIRONMENT": "development"
+      }
     },
     "preview": {
+      "autoIncrement": true,
       "distribution": "internal",
-      "channel": "preview"
+      "channel": "preview",
+      "env": {
+        "EXPO_PUBLIC_NOTIFICATION_ENVIRONMENT": "preview"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "channel": "production"
+      "channel": "production",
+      "env": {
+        "EXPO_PUBLIC_NOTIFICATION_ENVIRONMENT": "production"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "ascAppId": "6792533179",
+        "appleTeamId": "89M6KGXTBS",
+        "bundleIdentifier": "com.shadowchat.mobile"
+      }
+    }
   }
 }

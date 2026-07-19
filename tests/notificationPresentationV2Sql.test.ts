@@ -9,6 +9,14 @@ const sql = readFileSync(
   'utf8',
 )
 const compact = sql.replace(/\s+/g, ' ').toLowerCase()
+const hardeningSql = readFileSync(
+  path.resolve(
+    process.cwd(),
+    'supabase/migrations/20260718233000_notification_v2_rollout_hardening.sql',
+  ),
+  'utf8',
+)
+const hardeningCompact = hardeningSql.replace(/\s+/g, ' ').toLowerCase()
 
 describe('notification presentation v2 database contract', () => {
   test('ships dormant with a forward-only activation watermark', () => {
@@ -81,6 +89,59 @@ describe('notification presentation v2 database contract', () => {
     expect(compact).toContain('outbox.attempt_count < outbox.max_attempts')
     expect(compact).toContain(
       "new.type not in ('shadow_war_turn', 'weather_alert', 'security_alert')",
+    )
+  })
+
+  test('hard-stops disabled and out-of-canary delivery before provider work', () => {
+    expect(hardeningCompact).toContain(
+      'add column if not exists enabled_categories text[] not null',
+    )
+    expect(hardeningCompact).toContain(
+      'add column if not exists canary_user_ids uuid[] not null',
+    )
+    expect(hardeningCompact).toContain(
+      'or not runtime.worker_invocation_enabled then return',
+    )
+    expect(hardeningCompact).toContain(
+      'not (envelopes.category_key = any(runtime.enabled_categories))',
+    )
+    expect(hardeningCompact).toContain(
+      'not (outbox.user_id = any(runtime.canary_user_ids))',
+    )
+    expect(hardeningCompact).toContain(
+      'create trigger guard_notification_outbox_v2_insert',
+    )
+  })
+
+  test('invokes the worker through Vault, pg_net, and disabled-safe cron recovery', () => {
+    expect(hardeningCompact).toContain(
+      "where secrets.name = 'shadowchat_notification_v2_worker_secret'",
+    )
+    expect(hardeningCompact).toContain("'x-shadowchat-worker-secret'")
+    expect(hardeningCompact).toContain('select net.http_post(')
+    expect(hardeningCompact).toContain(
+      "'shadowchat-notification-v2-delivery-recovery'",
+    )
+    expect(hardeningCompact).toContain(
+      "'shadowchat-notification-v2-receipts'",
+    )
+    expect(hardeningCompact).toContain(
+      "and runtime.delivery_mode = 'active' and runtime.worker_invocation_enabled",
+    )
+  })
+
+  test('runtime mutation is service-role RPC only and validates its Vault dependency', () => {
+    expect(hardeningCompact).toContain(
+      'revoke insert, update, delete on table public.notification_v2_runtime_config from service_role',
+    )
+    expect(hardeningCompact).toContain(
+      'create or replace function public.configure_notification_v2_runtime(',
+    )
+    expect(hardeningCompact).toContain(
+      "raise exception 'the notification v2 worker secret is not configured in vault'",
+    )
+    expect(hardeningCompact).toContain(
+      'grant execute on function public.configure_notification_v2_runtime(',
     )
   })
 })

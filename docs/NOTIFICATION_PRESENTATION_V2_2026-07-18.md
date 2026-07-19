@@ -296,24 +296,47 @@ delivery owner until gate 4 is explicitly completed. The dormant Expo worker
 does not deliver to web installations. This prevents two transports from
 delivering the same event during the foundation release.
 
-## External Native Release Prerequisites
+## Native Release Status - July 19, 2026
 
-The implementation is locally complete but native remote delivery cannot be
-accepted or activated from this Windows checkout alone:
+The external signing and beta-distribution prerequisites are now in place:
 
-- Expo Application Services is not authenticated on this workstation.
-- `apps/mobile` therefore has no verified EAS project id, native signing
-  credentials, or development-build push token.
-- iOS rich lock-screen images require a Notification Service Extension in the
-  signed iOS build. Android rich images are already represented through the
-  Expo `richContent` payload.
-- production enablement also requires an optional Expo Push access token if
-  enhanced push security is enabled in the Expo project.
+- Expo Application Services is authenticated as `shadowchat111`, and
+  `apps/mobile` is linked to EAS project
+  `1deb0022-9ec4-4e90-8fc8-8b71c3737ff2`.
+- iOS build `3` exposed an obsolete General Chat-only proof shell and could not
+  synchronize the production web session into native notification
+  registration. It was removed from `ShadoChat Internal Beta` and is not an
+  acceptance artifact.
+- replacement iOS production build `5`
+  (`1635236c-c9ce-4810-8fe2-bfaf8c5e202c`) contains the complete production
+  ShadoChat app in a strict same-origin native container, secure web/native
+  session synchronization, native notification setup, exact notification
+  routing, and the rich notification service extension. Apple reports it
+  `VALID` and `IN_BETA_TESTING` in `ShadoChat Internal Beta`; auto-notify is
+  enabled and only build `5` is attached to that group.
+- the account holder at `taylerthekid1407@icloud.com` is invited as the first
+  internal tester.
+- the signed iOS configuration includes the
+  `ShadowChatNotificationService` extension for rich lock-screen media.
+- Android package `com.shadowchat.mobile` has its Firebase project file and an
+  active FCM V1 service-account credential in Expo. The former proof-shell APK
+  is superseded; version-code `2` replacement build
+  `ef382e37-f474-4ada-9909-4efb8b36ece1` is compiling from the same full-app
+  source.
+- the linked Supabase runtime is in `shadow` mode for the `dm` category and the
+  single Tayler Kid canary account. Worker invocation and receipt
+  reconciliation remain disabled.
+- the worker health probe returns HTTP 200, but the linked backend currently
+  has zero active native tokens. Existing PWA delivery therefore remains the
+  only production delivery owner.
 
-Do not enable `notification_presentation_v2` or deploy the delivery worker as a
-production owner until EAS authentication, development builds, real Expo push
-tokens, iPhone and Android delivery receipts, and route/sound/privacy checks
-all pass.
+Do not change the DM canary from `shadow` to `active` until TestFlight build `5`
+is installed, the complete app is visually confirmed, notification permission
+is granted, a production Expo token is visible in the linked backend, and a
+fresh worker health probe succeeds. After that gate, activate only the
+single-account DM canary and verify foreground, background, terminated, route,
+sound, image, action, badge, read-clearing, and duplicate-suppression behavior
+before expanding categories or users.
 
 ## Local Verification - July 18, 2026
 
@@ -337,11 +360,30 @@ all pass.
   gate: pass with zero unexpected runtime issues; see
   `output/playwright/notification-presentation-v2-hardened-r4/summary.json`
 
-The physical native-device gate remains pending for the external prerequisites
-above. The V2 runtime flags remain disabled. Applying the additive migration,
-deploying the guarded worker, or shipping the web presentation code does not
-activate native delivery; no native binary is released by this repository
-deployment.
+## Rollout Verification - July 19, 2026
+
+- linked migrations `20260718210000`, `20260718233000`, and `20260719110500`:
+  applied
+- linked `deliver-notifications-v2` Edge Function: active, version 3
+- worker authentication secret and delivery-environment secret: present
+- worker health probe: HTTP 200
+- focused Node notification contracts: 6/6 passing
+- focused notification SQL Jest contracts: 3 suites / 21 tests passing
+- delivery worker Deno tests: 8/8 passing
+- replacement iOS EAS production build
+  `1635236c-c9ce-4810-8fe2-bfaf8c5e202c`: finished
+- App Store Connect build `5`: valid and in internal beta testing; build `3`
+  removed from the internal group after its obsolete proof shell was identified
+- replacement Android EAS preview build
+  `ef382e37-f474-4ada-9909-4efb8b36ece1`: in progress
+- Expo Android FCM V1 credential:
+  `firebase-adminsdk-fbsvc@shadowchat-99822.iam.gserviceaccount.com`, active
+- linked rollout state: DM-only, one-account `shadow` canary; zero active native
+  tokens; worker delivery disabled
+
+The remaining gate is physical native-device proof. Shadow mode materializes
+and measures the candidate path without sending native pushes. It does not
+compete with the current PWA transport.
 
 ## Required Acceptance
 

@@ -5663,6 +5663,7 @@
         "npm:@types/react-dom@^18.3.0",
         "npm:@types/react@^18.3.5",
         "npm:@vitejs/plugin-react@^5.1.4",
+        "npm:ajv@6.15.0",
         "npm:autoprefixer@^10.4.18",
         "npm:clsx@2",
         "npm:emoji-picker-react@^4.7.15",

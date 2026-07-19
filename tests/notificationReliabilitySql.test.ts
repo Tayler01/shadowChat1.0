@@ -105,7 +105,7 @@ describe('notification reliability database contract', () => {
 
   test('publishes reviewed RPC and definer surfaces', () => {
     const publicSignatures = allowlist.domains.flatMap(domain => domain.signatures)
-    expect(allowlist.expected_total_security_definers).toBe(139)
+    expect(allowlist.expected_total_security_definers).toBe(142)
     expect(allowlist.private_security_definers).toEqual(expect.arrayContaining([
       'private.create_shadow_checkers_turn_notification()',
       'private.materialize_notification_envelope_v2()',

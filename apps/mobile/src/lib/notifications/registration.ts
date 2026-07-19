@@ -1,28 +1,35 @@
 import * as Application from 'expo-application';
 import Constants from 'expo-constants';
+import * as Crypto from 'expo-crypto';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import { getSupabase } from '@/lib/supabase';
+import { registerNativeNotificationBackgroundTask } from './background';
 import { NOTIFICATION_CHANNEL_SCHEMA_VERSION } from './config';
 
 const INSTALLATION_KEY = 'shadowchat-native-notification-installation-v2';
-
-const createUuid = () =>
-  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
-    const value = Math.floor(Math.random() * 16);
-    const nibble = character === 'x' ? value : (value & 0x3) | 0x8;
-    return nibble.toString(16);
-  });
+const DEVICE_OPT_OUT_KEY = 'shadowchat-native-notification-device-opt-out-v2';
 
 export const getNativeNotificationInstallationKey = async () => {
   const stored = await SecureStore.getItemAsync(INSTALLATION_KEY);
   if (stored) return stored;
-  const created = createUuid();
+  const created = Crypto.randomUUID();
   await SecureStore.setItemAsync(INSTALLATION_KEY, created);
   return created;
+};
+
+export const getNativeNotificationDeviceOptOut = async () =>
+  (await SecureStore.getItemAsync(DEVICE_OPT_OUT_KEY)) === 'true';
+
+export const setNativeNotificationDeviceOptOut = async (optedOut: boolean) => {
+  if (optedOut) {
+    await SecureStore.setItemAsync(DEVICE_OPT_OUT_KEY, 'true');
+  } else {
+    await SecureStore.deleteItemAsync(DEVICE_OPT_OUT_KEY);
+  }
 };
 
 const getEasProjectId = () => {
@@ -36,9 +43,47 @@ const getEasProjectId = () => {
 
 const getEnvironment = () => {
   if (__DEV__) return 'development';
-  return Constants.expoConfig?.extra?.notificationEnvironment === 'preview'
-    ? 'preview'
-    : 'production';
+  const configured = process.env.EXPO_PUBLIC_NOTIFICATION_ENVIRONMENT;
+  if (
+    configured === 'development' ||
+    configured === 'preview' ||
+    configured === 'production'
+  ) {
+    return configured;
+  }
+  throw new Error('This build is missing its notification environment.');
+};
+
+const persistExpoPushToken = async (
+  devicePushToken?: Notifications.DevicePushToken
+) => {
+  const projectId = getEasProjectId();
+  if (!projectId) {
+    throw new Error('This build is missing its EAS project ID.');
+  }
+  const installationKey = await getNativeNotificationInstallationKey();
+  const environment = getEnvironment();
+  const token = await Notifications.getExpoPushTokenAsync({
+    projectId,
+    ...(devicePushToken ? { devicePushToken } : {}),
+  });
+  const { error } = await getSupabase().rpc(
+    'register_my_native_notification_token_v2',
+    {
+      target_installation_key: installationKey,
+      target_provider: 'expo',
+      target_environment: environment,
+      target_token: token.data,
+    }
+  );
+  if (error) throw error;
+};
+
+export const refreshNativeNotificationToken = async (
+  devicePushToken: Notifications.DevicePushToken
+) => {
+  if (await getNativeNotificationDeviceOptOut()) return;
+  await persistExpoPushToken(devicePushToken);
 };
 
 export const registerNativeNotificationInstallation = async ({
@@ -48,6 +93,10 @@ export const registerNativeNotificationInstallation = async ({
 }) => {
   if (!Device.isDevice) {
     throw new Error('Remote notifications require a physical iPhone or Android device.');
+  }
+  if (await getNativeNotificationDeviceOptOut()) {
+    const currentPermissions = await Notifications.getPermissionsAsync();
+    return { enabled: false, permission: currentPermissions.status };
   }
 
   const projectId = getEasProjectId();
@@ -64,6 +113,7 @@ export const registerNativeNotificationInstallation = async ({
   if (permissions.status !== 'granted') {
     return { enabled: false, permission: permissions.status };
   }
+  await registerNativeNotificationBackgroundTask();
 
   const installationKey = await getNativeNotificationInstallationKey();
   const client = getSupabase();
@@ -86,17 +136,7 @@ export const registerNativeNotificationInstallation = async ({
   );
   if (installationError) throw installationError;
 
-  const token = await Notifications.getExpoPushTokenAsync({ projectId });
-  const { error: tokenError } = await client.rpc(
-    'register_my_native_notification_token_v2',
-    {
-      target_installation_key: installationKey,
-      target_provider: 'expo',
-      target_environment: environment,
-      target_token: token.data,
-    }
-  );
-  if (tokenError) throw tokenError;
+  await persistExpoPushToken();
 
   return { enabled: true, permission: permissions.status };
 };

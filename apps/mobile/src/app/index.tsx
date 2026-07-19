@@ -1,483 +1,491 @@
 import type { Session } from '@supabase/supabase-js';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Linking from 'expo-linking';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   ActivityIndicator,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
+  BackHandler,
   Pressable,
-  RefreshControl,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
 import {
-  fetchCurrentProfile,
-  fetchGeneralMessages,
-  getDisplayName,
-  sendGeneralTextMessage,
-  subscribeToGeneralMessages,
-  upsertGeneralMessage,
-} from '@/lib/shadow-chat-api';
-import { getSupabase, isSupabaseConfigured, removeRealtimeChannel } from '@/lib/supabase';
-import type { GeneralChatMessage, ShadowUser } from '@/types/shadow-chat';
+  WebView,
+  type WebViewMessageEvent,
+  type WebViewNavigation,
+} from 'react-native-webview';
+
 import { useNativeNotifications } from '@/hooks/useNativeNotifications';
+import {
+  parseNativeWebMessage,
+  publishNativeNotificationState,
+  subscribeToNativeNotificationRoutes,
+} from '@/lib/nativeAppBridge';
+import { getNotificationWebUrl } from '@/lib/notifications/routes';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 
-const colors = {
-  background: '#050505',
-  panel: '#101112',
-  panelStrong: '#171717',
-  panelSoft: '#0B0C0D',
-  border: 'rgba(233, 199, 102, 0.18)',
-  borderStrong: 'rgba(233, 199, 102, 0.38)',
-  gold: '#E9C766',
-  goldStrong: '#F7E7B2',
-  text: '#F7F0DE',
-  textMuted: '#A69B82',
-  textDim: '#756B58',
-  danger: '#F3A19D',
-};
+const APP_ORIGIN = 'https://shadochat.online';
+const APP_URL = getNotificationWebUrl('/?nativeApp=1');
+const NATIVE_BOOTSTRAP_SCRIPT = `
+  (function () {
+    window.__SHADOWCHAT_NATIVE_APP__ = true;
+    if (document.documentElement) {
+      document.documentElement.dataset.shadowchatNativeApp = 'true';
+    }
 
-const formatMessageTime = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+    var storageKey = 'sb-shsqqouecvdoifzufkqm-auth-token';
+    var lastSessionFingerprint = null;
 
-  return date.toLocaleTimeString([], {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
-};
+    function postToNative(message) {
+      if (
+        window.ReactNativeWebView &&
+        typeof window.ReactNativeWebView.postMessage === 'function'
+      ) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(message));
+      }
+    }
 
-const getMessageBody = (message: GeneralChatMessage) => {
-  if (message.message_type === 'text' || message.message_type === 'command') {
-    return message.content;
+    function readWebSession() {
+      try {
+        var raw = window.localStorage.getItem(storageKey);
+        if (!raw) return null;
+        var stored = JSON.parse(raw);
+        var session = stored && (
+          stored.currentSession ||
+          stored.session ||
+          stored
+        );
+        if (
+          !session ||
+          typeof session.access_token !== 'string' ||
+          typeof session.refresh_token !== 'string' ||
+          !session.user ||
+          typeof session.user.id !== 'string'
+        ) {
+          return null;
+        }
+        return {
+          accessToken: session.access_token,
+          refreshToken: session.refresh_token,
+          expiresAt: typeof session.expires_at === 'number'
+            ? session.expires_at
+            : null,
+          userId: session.user.id
+        };
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function publishWebSession() {
+      var session = readWebSession();
+      var fingerprint = session
+        ? session.userId + ':' + session.accessToken.slice(-16)
+        : 'signed-out';
+      if (fingerprint === lastSessionFingerprint) return;
+      lastSessionFingerprint = fingerprint;
+      postToNative({
+        version: 1,
+        type: 'auth_session',
+        session: session
+      });
+    }
+
+    postToNative({ version: 1, type: 'bridge_ready' });
+    publishWebSession();
+    window.addEventListener('storage', publishWebSession);
+    window.setInterval(publishWebSession, 1200);
+  })();
+  true;
+`;
+
+const isAllowedAppUrl = (value: string) => {
+  if (value === 'about:blank') return true;
+  try {
+    return new URL(value).origin === APP_ORIGIN;
+  } catch {
+    return false;
   }
-
-  return `[${message.message_type}] ${message.content || message.file_url || ''}`.trim();
 };
+
+const sameSession = (
+  current: Session | null,
+  next: { accessToken: string; refreshToken: string; userId: string }
+) =>
+  current?.access_token === next.accessToken &&
+  current.refresh_token === next.refreshToken &&
+  current.user.id === next.userId;
 
 function ConfigurationNotice() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.centeredPanel}>
-        <Text style={styles.brand}>ShadowChat</Text>
+        <Text style={styles.brand}>ShadoChat</Text>
         <Text selectable style={styles.errorText}>
-          Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to
-          apps/mobile/.env before starting the native app.
+          This build is missing its public Supabase configuration.
         </Text>
       </View>
     </SafeAreaView>
   );
 }
 
-function SignInScreen({
-  busy,
-  error,
-  onSubmit,
-}: {
-  busy: boolean;
-  error: string | null;
-  onSubmit: (email: string, password: string) => Promise<void>;
-}) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-
-  const canSubmit = email.trim().length > 0 && password.length > 0 && !busy;
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.authShell}
-      >
-        <View style={styles.authCard}>
-          <Text style={styles.brand}>ShadowChat</Text>
-          <Text style={styles.authSubtitle}>Sign in with your existing web account.</Text>
-
-          <View style={styles.form}>
-            <TextInput
-              autoCapitalize="none"
-              autoComplete="email"
-              autoCorrect={false}
-              editable={!busy}
-              inputMode="email"
-              keyboardAppearance="dark"
-              onChangeText={setEmail}
-              placeholder="Email"
-              placeholderTextColor={colors.textDim}
-              style={styles.input}
-              textContentType="emailAddress"
-              value={email}
-            />
-            <TextInput
-              autoCapitalize="none"
-              editable={!busy}
-              keyboardAppearance="dark"
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={colors.textDim}
-              secureTextEntry
-              style={styles.input}
-              textContentType="password"
-              value={password}
-            />
-
-            {error && <Text selectable style={styles.errorText}>{error}</Text>}
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={!canSubmit}
-              onPress={() => {
-                void onSubmit(email, password);
-              }}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                !canSubmit && styles.disabledButton,
-                pressed && canSubmit && styles.pressed,
-              ]}
-            >
-              {busy ? (
-                <ActivityIndicator color={colors.background} />
-              ) : (
-                <Text style={styles.primaryButtonText}>Sign In</Text>
-              )}
-            </Pressable>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
-}
-
-function MessageRow({
-  currentUserId,
-  message,
-}: {
-  currentUserId: string | null;
-  message: GeneralChatMessage;
-}) {
-  const mine = message.user_id === currentUserId;
-  const author = getDisplayName(message.user);
-
-  return (
-    <View style={[styles.messageRow, mine ? styles.messageRowMine : styles.messageRowTheirs]}>
-      <View style={[styles.messageBubble, mine ? styles.messageBubbleMine : styles.messageBubbleTheirs]}>
-        <View style={styles.messageMeta}>
-          <Text style={[styles.messageAuthor, mine && styles.messageAuthorMine]}>{author}</Text>
-          <Text style={styles.messageTime}>{formatMessageTime(message.created_at)}</Text>
-        </View>
-        <Text selectable style={styles.messageText}>
-          {getMessageBody(message)}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-export default function GeneralChatScreen() {
+export default function ShadowChatAppScreen() {
+  const webViewRef = useRef<WebView>(null);
+  const authSyncRef = useRef<Promise<void> | null>(null);
   const nativeNotifications = useNativeNotifications();
-  const listRef = useRef<FlatList<GeneralChatMessage>>(null);
-  const [initialized, setInitialized] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<ShadowUser | null>(null);
-  const [messages, setMessages] = useState<GeneralChatMessage[]>([]);
-  const [draft, setDraft] = useState('');
-  const [authBusy, setAuthBusy] = useState(false);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [webReady, setWebReady] = useState(false);
+  const [canGoBack, setCanGoBack] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [bridgeError, setBridgeError] = useState<string | null>(null);
+  const [nativeUserId, setNativeUserId] = useState<string | null>(null);
+  const [notificationPromptDismissed, setNotificationPromptDismissed] =
+    useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const currentUserId = session?.user.id ?? null;
-  const signedInName = useMemo(() => getDisplayName(profile), [profile]);
+  const notificationState = useMemo(() => ({
+    enabled: nativeNotifications.enabled,
+    permission: nativeNotifications.permission,
+    busy: nativeNotifications.busy,
+    error: nativeNotifications.error,
+  }), [
+    nativeNotifications.busy,
+    nativeNotifications.enabled,
+    nativeNotifications.error,
+    nativeNotifications.permission,
+  ]);
 
-  const applySession = useCallback(async (nextSession: Session | null) => {
-    setSession(nextSession);
-    setError(null);
+  const publishNotificationState = useCallback(() => {
+    publishNativeNotificationState(webViewRef.current, notificationState);
+  }, [notificationState]);
 
-    if (!nextSession?.user) {
-      setProfile(null);
-      setMessages([]);
-      return;
-    }
+  useEffect(() => {
+    if (!webReady) return;
+    publishNotificationState();
+  }, [publishNotificationState, webReady]);
 
-    try {
-      const nextProfile = await fetchCurrentProfile(nextSession.user.id);
-      setProfile(nextProfile);
-    } catch (err) {
-      setProfile(null);
-      setError(err instanceof Error ? err.message : 'Failed to load profile.');
-    }
+  const navigateInsideApp = useCallback((url: string) => {
+    if (!isAllowedAppUrl(url)) return;
+    const serializedUrl = JSON.stringify(url);
+    webViewRef.current?.injectJavaScript(`
+      window.location.assign(${serializedUrl});
+      true;
+    `);
   }, []);
 
-  const loadMessages = useCallback(async (showSpinner = true) => {
-    if (!currentUserId) return;
-
-    if (showSpinner) {
-      setMessagesLoading(true);
-    } else {
-      setRefreshing(true);
-    }
-
-    try {
-      const nextMessages = await fetchGeneralMessages();
-      setMessages(nextMessages);
-      setError(null);
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load General Chat.');
-    } finally {
-      setMessagesLoading(false);
-      setRefreshing(false);
-    }
-  }, [currentUserId]);
+  useEffect(
+    () => subscribeToNativeNotificationRoutes(navigateInsideApp),
+    [navigateInsideApp]
+  );
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
-      setInitialized(true);
-      return;
-    }
-
-    const client = getSupabase();
-    let mounted = true;
-
-    void client.auth.getSession().then(({ data, error: sessionError }) => {
-      if (!mounted) return;
-      if (sessionError) {
-        setError(sessionError.message);
-      }
-      void applySession(data.session).finally(() => {
-        if (mounted) setInitialized(true);
-      });
-    });
-
-    const {
-      data: { subscription },
-    } = client.auth.onAuthStateChange((_event, nextSession) => {
-      void applySession(nextSession);
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, [applySession]);
-
-  useEffect(() => {
-    if (currentUserId) {
-      void loadMessages(true);
-    }
-  }, [currentUserId, loadMessages]);
-
-  useEffect(() => {
-    if (!currentUserId) return;
-
-    const channel = subscribeToGeneralMessages(
-      message => {
-        setMessages(previous => upsertGeneralMessage(previous, message));
-        requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-      },
-      nextError => {
-        setError(nextError.message);
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        if (!canGoBack) return false;
+        webViewRef.current?.goBack();
+        return true;
       }
     );
+    return () => subscription.remove();
+  }, [canGoBack]);
 
-    return () => removeRealtimeChannel(channel);
-  }, [currentUserId]);
+  const syncNativeSession = useCallback(async (
+    nextSession: {
+      accessToken: string;
+      refreshToken: string;
+      userId: string;
+    } | null
+  ) => {
+    const prior = authSyncRef.current;
+    if (prior) await prior.catch(() => undefined);
 
-  const handleSignIn = useCallback(async (email: string, password: string) => {
-    setAuthBusy(true);
-    setError(null);
+    const sync = (async () => {
+      const client = getSupabase();
+      const { data } = await client.auth.getSession();
+      const current = data.session;
+
+      if (!nextSession) {
+        if (current) {
+          const { error } = await client.auth.signOut({ scope: 'local' });
+          if (error) throw error;
+        }
+        setNativeUserId(null);
+        return;
+      }
+
+      if (!sameSession(current, nextSession)) {
+        const { data: sessionData, error } = await client.auth.setSession({
+          access_token: nextSession.accessToken,
+          refresh_token: nextSession.refreshToken,
+        });
+        if (error) throw error;
+        if (sessionData.session?.user.id !== nextSession.userId) {
+          throw new Error('The native session did not match the signed-in account.');
+        }
+      }
+
+      setNativeUserId(nextSession.userId);
+      setBridgeError(null);
+    })();
+
+    authSyncRef.current = sync;
     try {
-      const { error: signInError } = await getSupabase().auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (signInError) throw signInError;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed.');
+      await sync;
     } finally {
-      setAuthBusy(false);
+      if (authSyncRef.current === sync) authSyncRef.current = null;
     }
   }, []);
 
-  const handleSignOut = useCallback(async () => {
-    setError(null);
-    await nativeNotifications.disableThisDevice().catch(() => undefined);
-    const { error: signOutError } = await getSupabase().auth.signOut();
-    if (signOutError) {
-      setError(signOutError.message);
-    }
-  }, [nativeNotifications]);
+  const handleMessage = useCallback(async (event: WebViewMessageEvent) => {
+    const message = parseNativeWebMessage(event.nativeEvent.data);
+    if (!message) return;
 
-  const handleSend = useCallback(async () => {
-    const content = draft.trim();
-    if (!content || !currentUserId || sending) return;
-
-    setSending(true);
-    setDraft('');
     try {
-      const sent = await sendGeneralTextMessage(currentUserId, content);
-      setMessages(previous => upsertGeneralMessage(previous, sent));
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-      setError(null);
-    } catch (err) {
-      setDraft(content);
-      setError(err instanceof Error ? err.message : 'Failed to send message.');
-    } finally {
-      setSending(false);
+      if (message.type === 'auth_session') {
+        await syncNativeSession(message.session);
+        return;
+      }
+      if (message.type === 'notifications_enable') {
+        await nativeNotifications.enable();
+        return;
+      }
+      if (message.type === 'notifications_disable') {
+        await nativeNotifications.disableThisDevice();
+        return;
+      }
+      if (
+        message.type === 'bridge_ready' ||
+        message.type === 'native_state_request'
+      ) {
+        publishNotificationState();
+      }
+    } catch (caught) {
+      const messageText = caught instanceof Error
+        ? caught.message
+        : 'Native app synchronization failed.';
+      setBridgeError(messageText);
+      publishNativeNotificationState(webViewRef.current, {
+        ...notificationState,
+        busy: false,
+        error: messageText,
+      });
     }
-  }, [currentUserId, draft, sending]);
+  }, [
+    nativeNotifications,
+    notificationState,
+    publishNotificationState,
+    syncNativeSession,
+  ]);
+
+  const handleNavigationChange = useCallback((navigation: WebViewNavigation) => {
+    setCanGoBack(navigation.canGoBack);
+  }, []);
+
+  const handleNavigationRequest = useCallback((request: { url: string }) => {
+    if (isAllowedAppUrl(request.url)) return true;
+    if (
+      request.url.startsWith('mailto:') ||
+      request.url.startsWith('tel:') ||
+      request.url.startsWith('sms:') ||
+      request.url.startsWith('https://')
+    ) {
+      void Linking.openURL(request.url);
+    }
+    return false;
+  }, []);
+
+  const showNotificationPrompt =
+    Boolean(nativeUserId) &&
+    !nativeNotifications.enabled &&
+    !notificationPromptDismissed;
 
   if (!isSupabaseConfigured) {
     return <ConfigurationNotice />;
   }
 
-  if (!initialized) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centeredPanel}>
-          <ActivityIndicator color={colors.gold} />
-          <Text style={styles.loadingText}>Opening ShadowChat</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!session) {
-    return <SignInScreen busy={authBusy} error={error} onSubmit={handleSignIn} />;
-  }
-
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={88}
-        style={styles.chatShell}
-      >
-        <View style={styles.chatHeader}>
-          <View>
-            <Text style={styles.headerEyebrow}>General Chat</Text>
-            <Text style={styles.headerTitle}>{signedInName}</Text>
+    <View style={styles.safeArea}>
+      <WebView
+        key={reloadKey}
+        ref={webViewRef}
+        allowsBackForwardNavigationGestures
+        allowsInlineMediaPlayback
+        applicationNameForUserAgent="ShadoChatNative/1.0"
+        automaticallyAdjustContentInsets={false}
+        bounces={false}
+        contentInsetAdjustmentBehavior="never"
+        decelerationRate="normal"
+        injectedJavaScriptBeforeContentLoaded={NATIVE_BOOTSTRAP_SCRIPT}
+        javaScriptCanOpenWindowsAutomatically={false}
+        javaScriptEnabled
+        mediaPlaybackRequiresUserAction={false}
+        onContentProcessDidTerminate={() => setReloadKey(value => value + 1)}
+        onError={(event) => {
+          setLoadError(
+            event.nativeEvent.description || 'Could not load ShadoChat.'
+          );
+        }}
+        onHttpError={(event) => {
+          if (event.nativeEvent.statusCode >= 500) {
+            setLoadError(`ShadoChat returned ${event.nativeEvent.statusCode}.`);
+          }
+        }}
+        onLoadEnd={() => {
+          setWebReady(true);
+          setLoadError(null);
+          publishNotificationState();
+        }}
+        onLoadStart={() => setWebReady(false)}
+        onMessage={(event) => {
+          void handleMessage(event);
+        }}
+        onNavigationStateChange={handleNavigationChange}
+        onShouldStartLoadWithRequest={handleNavigationRequest}
+        originWhitelist={['https://*', 'about:blank']}
+        pullToRefreshEnabled
+        setSupportMultipleWindows={false}
+        sharedCookiesEnabled
+        source={{ uri: APP_URL }}
+        startInLoadingState
+        style={styles.webView}
+        thirdPartyCookiesEnabled
+        renderLoading={() => (
+          <View style={styles.loadingLayer}>
+            <ActivityIndicator color="#E9C766" size="large" />
+            <Text style={styles.loadingText}>Opening ShadoChat</Text>
           </View>
-          <View style={styles.headerActions}>
+        )}
+      />
+
+      {loadError ? (
+        <SafeAreaView pointerEvents="box-none" style={styles.blockingLayer}>
+          <View style={styles.errorCard}>
+            <Text style={styles.cardEyebrow}>Connection interrupted</Text>
+            <Text style={styles.cardTitle}>ShadoChat could not load</Text>
+            <Text selectable style={styles.cardBody}>{loadError}</Text>
             <Pressable
-              accessibilityLabel={nativeNotifications.enabled ? 'Disable notifications on this device' : 'Enable notifications on this device'}
               accessibilityRole="button"
-              disabled={nativeNotifications.busy}
               onPress={() => {
-                if (nativeNotifications.enabled) {
-                  void nativeNotifications.disableThisDevice();
-                } else {
-                  void nativeNotifications.enable();
-                }
+                setLoadError(null);
+                setReloadKey(value => value + 1);
               }}
               style={({ pressed }) => [
-                styles.secondaryButton,
-                nativeNotifications.enabled && styles.notificationButtonEnabled,
-                nativeNotifications.busy && styles.disabledButton,
+                styles.primaryButton,
                 pressed && styles.pressed,
               ]}
             >
-              <Text style={styles.secondaryButtonText}>
-                {nativeNotifications.busy ? 'Alerts…' : nativeNotifications.enabled ? 'Alerts On' : 'Alerts'}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                void handleSignOut();
-              }}
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-            >
-              <Text style={styles.secondaryButtonText}>Sign Out</Text>
+              <Text style={styles.primaryButtonText}>Try Again</Text>
             </Pressable>
           </View>
-        </View>
+        </SafeAreaView>
+      ) : null}
 
-        {(error || nativeNotifications.error) && (
-          <Text selectable style={styles.inlineError}>
-            {error || nativeNotifications.error}
-          </Text>
-        )}
-
-        <FlatList
-          ref={listRef}
-          contentContainerStyle={styles.messageList}
-          contentInsetAdjustmentBehavior="automatic"
-          data={messages}
-          keyExtractor={item => item.id}
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              {messagesLoading ? (
-                <ActivityIndicator color={colors.gold} />
-              ) : (
-                <Text style={styles.emptyText}>No General Chat messages loaded yet.</Text>
-              )}
+      {showNotificationPrompt ? (
+        <SafeAreaView pointerEvents="box-none" style={styles.promptLayer}>
+          <View style={styles.promptCard}>
+            <View style={styles.promptCopy}>
+              <Text style={styles.cardEyebrow}>Native alerts</Text>
+              <Text style={styles.promptTitle}>
+                {nativeNotifications.permission === 'denied'
+                  ? 'Notifications are off in iPhone Settings'
+                  : 'Turn on the full ShadoChat experience'}
+              </Text>
+              <Text style={styles.promptBody}>
+                Get rich messages, ShadowPin previews, game turns, custom
+                sounds, badges, and exact tap-through destinations.
+              </Text>
+              {bridgeError || nativeNotifications.error ? (
+                <Text selectable style={styles.inlineError}>
+                  {bridgeError || nativeNotifications.error}
+                </Text>
+              ) : null}
             </View>
-          }
-          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              tintColor={colors.gold}
-              onRefresh={() => {
-                void loadMessages(false);
-              }}
-            />
-          }
-          renderItem={({ item }) => <MessageRow currentUserId={currentUserId} message={item} />}
-        />
+            <View style={styles.promptActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={nativeNotifications.busy}
+                onPress={() => {
+                  if (nativeNotifications.permission === 'denied') {
+                    void Linking.openSettings();
+                  } else {
+                    void nativeNotifications.enable();
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.primaryButton,
+                  nativeNotifications.busy && styles.disabled,
+                  pressed && styles.pressed,
+                ]}
+              >
+                {nativeNotifications.busy ? (
+                  <ActivityIndicator color="#050505" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>
+                    {nativeNotifications.permission === 'denied'
+                      ? 'Open Settings'
+                      : 'Enable Notifications'}
+                  </Text>
+                )}
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setNotificationPromptDismissed(true)}
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.secondaryButtonText}>Not Now</Text>
+              </Pressable>
+            </View>
+          </View>
+        </SafeAreaView>
+      ) : null}
 
-        <View style={styles.composer}>
-          <TextInput
-            editable={!sending}
-            keyboardAppearance="dark"
-            multiline
-            onChangeText={setDraft}
-            onSubmitEditing={() => {
-              void handleSend();
-            }}
-            placeholder="Message General Chat"
-            placeholderTextColor={colors.textDim}
-            returnKeyType="send"
-            style={styles.composerInput}
-            value={draft}
-          />
+      {!showNotificationPrompt && bridgeError ? (
+        <SafeAreaView pointerEvents="box-none" style={styles.noticeLayer}>
           <Pressable
             accessibilityRole="button"
-            disabled={draft.trim().length === 0 || sending}
-            onPress={() => {
-              void handleSend();
-            }}
-            style={({ pressed }) => [
-              styles.sendButton,
-              (draft.trim().length === 0 || sending) && styles.disabledButton,
-              pressed && draft.trim().length > 0 && !sending && styles.pressed,
-            ]}
+            onPress={() => setBridgeError(null)}
+            style={styles.notice}
           >
-            {sending ? (
-              <ActivityIndicator color={colors.background} />
-            ) : (
-              <Text style={styles.sendButtonText}>Send</Text>
-            )}
+            <Text numberOfLines={2} style={styles.noticeText}>{bridgeError}</Text>
+            <Text style={styles.noticeDismiss}>×</Text>
           </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        </SafeAreaView>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#050505',
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: '#050505',
+  },
+  loadingLayer: {
+    position: 'absolute',
+    inset: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+    backgroundColor: '#050505',
+  },
+  loadingText: {
+    color: '#A69B82',
+    fontSize: 14,
+    fontWeight: '600',
   },
   centeredPanel: {
     flex: 1,
@@ -487,224 +495,150 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   brand: {
-    color: colors.goldStrong,
+    color: '#F7E7B2',
     fontSize: 34,
     fontWeight: '800',
-    letterSpacing: 0,
   },
-  authShell: {
-    flex: 1,
+  errorText: {
+    color: '#F3A19D',
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  blockingLayer: {
+    position: 'absolute',
+    inset: 0,
+    alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(5, 5, 5, 0.92)',
     padding: 20,
   },
-  authCard: {
-    gap: 22,
+  errorCard: {
+    width: '100%',
+    maxWidth: 460,
+    gap: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.panel,
+    borderColor: 'rgba(233, 199, 102, 0.28)',
     borderRadius: 24,
+    backgroundColor: '#101112',
     padding: 22,
-    boxShadow: '0 20px 50px rgba(0, 0, 0, 0.42)',
   },
-  authSubtitle: {
-    color: colors.textMuted,
+  cardEyebrow: {
+    color: '#E9C766',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
+  },
+  cardTitle: {
+    color: '#F7F0DE',
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  cardBody: {
+    color: '#A69B82',
     fontSize: 15,
     lineHeight: 22,
   },
-  form: {
-    gap: 12,
+  promptLayer: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 14,
   },
-  input: {
-    minHeight: 50,
-    borderRadius: 16,
+  promptCard: {
+    gap: 14,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.panelSoft,
-    color: colors.text,
-    fontSize: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderColor: 'rgba(233, 199, 102, 0.38)',
+    borderRadius: 24,
+    backgroundColor: 'rgba(13, 14, 15, 0.98)',
+    padding: 18,
+    boxShadow: '0 18px 46px rgba(0, 0, 0, 0.58)',
   },
-  primaryButton: {
-    minHeight: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-    backgroundColor: colors.gold,
+  promptCopy: {
+    gap: 5,
   },
-  primaryButtonText: {
-    color: colors.background,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  secondaryButton: {
-    minHeight: 40,
-    justifyContent: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.borderStrong,
-    paddingHorizontal: 14,
-  },
-  secondaryButtonText: {
-    color: colors.goldStrong,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  notificationButtonEnabled: {
-    backgroundColor: 'rgba(233, 199, 102, 0.12)',
-  },
-  disabledButton: {
-    opacity: 0.46,
-  },
-  pressed: {
-    opacity: 0.72,
-  },
-  errorText: {
-    color: colors.danger,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  loadingText: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-  chatShell: {
-    flex: 1,
-  },
-  chatHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  headerEyebrow: {
-    color: colors.gold,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0,
-    textTransform: 'uppercase',
-  },
-  headerTitle: {
-    color: colors.text,
+  promptTitle: {
+    color: '#F7F0DE',
     fontSize: 18,
     fontWeight: '800',
   },
-  inlineError: {
-    marginHorizontal: 16,
-    marginTop: 10,
-    color: colors.danger,
+  promptBody: {
+    color: '#A69B82',
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
   },
-  messageList: {
-    flexGrow: 1,
-    gap: 10,
-    padding: 16,
-  },
-  messageRow: {
-    flexDirection: 'row',
-  },
-  messageRowMine: {
-    justifyContent: 'flex-end',
-  },
-  messageRowTheirs: {
-    justifyContent: 'flex-start',
-  },
-  messageBubble: {
-    maxWidth: '84%',
-    gap: 6,
-    borderRadius: 18,
-    borderWidth: 1,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-  },
-  messageBubbleMine: {
-    borderColor: colors.borderStrong,
-    backgroundColor: '#2A2312',
-  },
-  messageBubbleTheirs: {
-    borderColor: colors.border,
-    backgroundColor: colors.panelStrong,
-  },
-  messageMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  messageAuthor: {
-    flexShrink: 1,
-    color: colors.gold,
+  inlineError: {
+    marginTop: 5,
+    color: '#F3A19D',
     fontSize: 12,
-    fontWeight: '800',
+    lineHeight: 17,
   },
-  messageAuthorMine: {
-    color: colors.goldStrong,
-  },
-  messageTime: {
-    color: colors.textDim,
-    fontSize: 11,
-    fontVariant: ['tabular-nums'],
-  },
-  messageText: {
-    color: colors.text,
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  emptyState: {
-    flexGrow: 1,
-    minHeight: 240,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-  composer: {
+  promptActions: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
     gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    backgroundColor: colors.panel,
-    paddingHorizontal: 12,
-    paddingBottom: 10,
-    paddingTop: 10,
   },
-  composerInput: {
-    maxHeight: 120,
-    minHeight: 46,
+  primaryButton: {
+    minHeight: 48,
     flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.panelSoft,
-    color: colors.text,
-    fontSize: 16,
-    lineHeight: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  sendButton: {
-    minHeight: 46,
-    minWidth: 72,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 16,
-    backgroundColor: colors.gold,
+    backgroundColor: '#E9C766',
     paddingHorizontal: 16,
   },
-  sendButtonText: {
-    color: colors.background,
-    fontSize: 15,
+  primaryButtonText: {
+    color: '#050505',
+    fontSize: 14,
     fontWeight: '900',
+  },
+  secondaryButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(233, 199, 102, 0.28)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+  },
+  secondaryButtonText: {
+    color: '#F7E7B2',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  noticeLayer: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    top: 8,
+  },
+  notice: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(243, 161, 157, 0.38)',
+    borderRadius: 16,
+    backgroundColor: 'rgba(35, 18, 18, 0.97)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  noticeText: {
+    flex: 1,
+    color: '#F3C4C0',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  noticeDismiss: {
+    color: '#F3C4C0',
+    fontSize: 24,
+    fontWeight: '300',
+  },
+  disabled: {
+    opacity: 0.5,
+  },
+  pressed: {
+    opacity: 0.72,
   },
 });

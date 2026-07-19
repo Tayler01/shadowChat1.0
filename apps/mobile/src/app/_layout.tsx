@@ -14,18 +14,10 @@ export default function RootLayout() {
       <Stack
           screenOptions={{
             contentStyle: { backgroundColor: '#050505' },
-            headerLargeTitle: true,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: '#050505' },
-            headerTintColor: '#E9C766',
-            headerTitleStyle: { color: '#F7E7B2', fontWeight: '700' },
+            headerShown: false,
           }}
         >
-          <Stack.Screen name="index" options={{ title: 'ShadowChat' }} />
-          <Stack.Screen
-            name="notification-target"
-            options={{ title: 'ShadowChat Update', headerLargeTitle: false }}
-          />
+          <Stack.Screen name="index" />
         </Stack>
         <StatusBar style="light" />
     </NativeNotificationsProvider>

@@ -46,6 +46,28 @@ Canonical detail and release gates live in:
   contract, clean local/linked database lint, and authenticated Pixel
   Chromium/iPhone WebKit Discover and Catch-Up gates with zero data residue.
 
+## July 19 Native Notification Beta Rollout
+
+- EAS is authenticated and linked to the ShadowChat Expo project. Signed iOS
+  build `3` was rejected as an obsolete General Chat-only proof shell and
+  removed from the internal TestFlight group.
+- replacement production build `5`
+  (`1635236c-c9ce-4810-8fe2-bfaf8c5e202c`) contains the complete production
+  ShadoChat UI, secure web/native session synchronization, native notification
+  setup, exact routing, and the rich notification extension. It is valid and
+  `IN_BETA_TESTING` in `ShadoChat Internal Beta`; the account holder is
+  auto-notified.
+- Android Firebase/FCM V1 credentials are configured in Expo and signed preview
+  replacement build `ef382e37-f474-4ada-9909-4efb8b36ece1` is compiling from
+  the same full-app source.
+- Linked notification-v2 migrations, worker version 3, secrets, and the worker
+  health probe are verified. The backend is deliberately limited to a DM-only,
+  one-account `shadow` canary with worker delivery disabled.
+- Native activation remains gated on the first production Expo token from
+  TestFlight build `5`, followed by iPhone and Android foreground/background/
+  terminated delivery, route, sound, media, action, badge, clearing, and
+  duplicate-suppression proof.
+
 ## Current Goal
 
 ### ShadowChat 2.0 Wave Three

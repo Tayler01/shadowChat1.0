@@ -70,7 +70,7 @@ type ExpoTicketDecision = {
 
 type ExpoTransport = {
   send: (messages: Record<string, unknown>[], signal: AbortSignal) => Promise<Response>
-  getReceipts: (ids: string[]) => Promise<Response>
+  getReceipts: (ids: string[], signal?: AbortSignal) => Promise<Response>
 }
 
 const notificationEnvironments = new Set(['development', 'preview', 'production'])
@@ -83,9 +83,11 @@ const permanentlyRejectedExpoErrors = new Set([
 
 export const getNotificationDeliveryEnvironment = (
   configured = Deno.env.get('NOTIFICATION_DELIVERY_ENVIRONMENT') ||
-    Deno.env.get('APP_ENVIRONMENT') ||
-    'production',
+    Deno.env.get('APP_ENVIRONMENT'),
 ) => {
+  if (!configured?.trim()) {
+    throw new Error('Notification delivery environment is not configured')
+  }
   const environment = configured.trim().toLowerCase()
   if (!notificationEnvironments.has(environment)) {
     throw new Error('Invalid notification delivery environment')
@@ -127,9 +129,8 @@ export const decideExpoOutboxCompletion = (
 ) => {
   const pending = statuses.filter(status => status === 'pending').length
   const failed = statuses.filter(status => status === 'failed' || status === 'cancelled').length
-  const accepted = statuses.filter(status => (
-    status === 'accepted' || status === 'delivered'
-  )).length
+  const accepted = statuses.filter(status => status === 'accepted').length
+  const delivered = statuses.filter(status => status === 'delivered').length
   const invalid = statuses.filter(status => status === 'invalid').length
 
   if (pending > 0 && canRetry) {
@@ -140,20 +141,32 @@ export const decideExpoOutboxCompletion = (
       error: `${pending} native notification target${pending === 1 ? '' : 's'} await retry`,
     }
   }
-  if (pending > 0 || failed > 0) {
+  if (pending > 0) {
     return {
       status: 'failed' as const,
       delivered: false,
       retryable: false,
-      error: `${pending + failed} native notification target${pending + failed === 1 ? '' : 's'} failed`,
+      error: `${pending} native notification target${pending === 1 ? '' : 's'} failed`,
     }
   }
   if (accepted > 0) {
     return {
+      status: 'accepted' as const,
+      delivered: false,
+      retryable: false,
+      error: failed > 0
+        ? `${failed} sibling native notification target${failed === 1 ? '' : 's'} failed`
+        : null,
+    }
+  }
+  if (delivered > 0) {
+    return {
       status: 'delivered' as const,
       delivered: true,
       retryable: false,
-      error: null,
+      error: failed > 0
+        ? `${failed} sibling native notification target${failed === 1 ? '' : 's'} failed`
+        : null,
     }
   }
   return {
@@ -183,10 +196,11 @@ export const createExpoTransport = (
       body: JSON.stringify(messages),
       signal,
     }),
-    getReceipts: ids => fetchImpl('https://exp.host/--/api/v2/push/getReceipts', {
+    getReceipts: (ids, signal) => fetchImpl('https://exp.host/--/api/v2/push/getReceipts', {
       method: 'POST',
       headers,
       body: JSON.stringify({ ids }),
+      signal,
     }),
   }
 }
@@ -206,18 +220,31 @@ const getAdminClient = () => {
   })
 }
 
-const requireServiceRole = (request: Request) => {
-  const expected = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  const authorization = request.headers.get('authorization') ?? ''
-  if (!expected || authorization !== `Bearer ${expected}`) {
-    throw new Error('Service role required')
+const constantTimeEqual = async (left: string, right: string) => {
+  const encoder = new TextEncoder()
+  const [leftDigest, rightDigest] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(left)),
+    crypto.subtle.digest('SHA-256', encoder.encode(right)),
+  ])
+  const leftBytes = new Uint8Array(leftDigest)
+  const rightBytes = new Uint8Array(rightDigest)
+  let difference = leftBytes.length ^ rightBytes.length
+  for (let index = 0; index < leftBytes.length; index += 1) {
+    difference |= leftBytes[index] ^ rightBytes[index]
   }
+  return difference === 0
 }
 
-const isForeground = (installation: InstallationRow) => {
-  if (!installation.foreground_until) return false
-  const expires = Date.parse(installation.foreground_until)
-  return Number.isFinite(expires) && expires > Date.now()
+const requireWorkerSecret = async (request: Request) => {
+  const expected = Deno.env.get('NOTIFICATION_V2_WORKER_SECRET')?.trim()
+  const provided = request.headers.get('x-shadowchat-worker-secret')?.trim()
+  if (
+    !expected ||
+    !provided ||
+    !(await constantTimeEqual(provided, expected))
+  ) {
+    throw new Error('Notification worker authorization required')
+  }
 }
 
 const categoryEnabled = (
@@ -300,7 +327,7 @@ const getBadgeCount = async (
   return Number.isFinite(value) ? Math.max(0, Math.min(99, Math.floor(value))) : 0
 }
 
-const toExpoMessage = (
+export const toExpoMessage = (
   token: NativeTokenRow,
   installation: InstallationRow,
   envelope: ReturnType<typeof buildNotificationDeliveryEnvelopeV2>,
@@ -308,9 +335,6 @@ const toExpoMessage = (
   entityId: string,
   badge: number,
 ) => {
-  const channelId = installation.channel_schema_version >= 2
-    ? `shadowchat_sound_${envelope.soundId}_v2`
-    : `shadowchat_${envelope.androidChannelKey}`
   const sound = envelope.soundId === 'silent'
     ? null
     : envelope.soundId === 'system_default'
@@ -334,7 +358,19 @@ const toExpoMessage = (
     type: eventType,
     entityId,
   }
-  const message: Record<string, unknown> = {
+  const message: Record<string, unknown> = installation.platform === 'android'
+    ? {
+      to: token.token,
+      data: {
+        envelopeV2: deliveryEnvelope,
+        badgeCount: badge,
+      },
+      priority: 'high',
+      ttl: Math.max(1, Math.min(90, Math.floor(
+        (Date.parse(envelope.expiresAt) - Date.now()) / 1000,
+      ))),
+    }
+    : {
     to: token.token,
     title: envelope.content.title,
     subtitle: envelope.content.eyebrow,
@@ -355,20 +391,25 @@ const toExpoMessage = (
     ttl: Math.max(1, Math.min(90, Math.floor(
       (Date.parse(envelope.expiresAt) - Date.now()) / 1000,
     ))),
-    channelId: installation.platform === 'android' ? channelId : undefined,
     categoryId,
-    collapseId: envelope.groupKey.slice(0, 64),
-    tag: envelope.groupKey.slice(0, 128),
-    mutableContent: Boolean(envelope.media),
-    richContent: envelope.media
-      ? { image: envelope.media.thumbnailUrl }
-      : undefined,
+    threadId: envelope.groupKey.slice(0, 64),
+    collapseId: envelope.eventId.slice(0, 64),
+    mutableContent: Boolean(
+      envelope.media ||
+      (
+        envelope.actor &&
+        (
+          envelope.category === 'dm' ||
+          envelope.category === 'general_chat' ||
+          envelope.category === 'mentions_replies'
+        )
+      ),
+    ),
   }
 
   const payloadBytes = () =>
     new TextEncoder().encode(JSON.stringify(message)).byteLength
   if (payloadBytes() > 3_800) {
-    delete message.richContent
     deliveryEnvelope.media = null
     if (deliveryEnvelope.actor) {
       deliveryEnvelope.actor = {
@@ -378,11 +419,28 @@ const toExpoMessage = (
     }
   }
   if (payloadBytes() > 3_800) {
-    message.body = undefined
+    if (installation.platform === 'ios') message.body = undefined
     deliveryEnvelope.content = {
       ...deliveryEnvelope.content,
       body: null,
     }
+  }
+  if (payloadBytes() > 3_800) {
+    deliveryEnvelope.actor = null
+    deliveryEnvelope.actions = ['open']
+  }
+  if (payloadBytes() > 3_800) {
+    deliveryEnvelope.eventIds = [deliveryEnvelope.eventId]
+    deliveryEnvelope.content = {
+      eyebrow: deliveryEnvelope.content.eyebrow.slice(0, 60),
+      title: deliveryEnvelope.content.title.slice(0, 120),
+      body: null,
+      privateTitle: deliveryEnvelope.content.privateTitle.slice(0, 120),
+      privateBody: null,
+    }
+  }
+  if (payloadBytes() > 3_800) {
+    throw new Error('Notification envelope exceeds the provider payload limit')
   }
   return message
 }
@@ -390,7 +448,7 @@ const toExpoMessage = (
 const completeOutbox = async (
   supabase: ReturnType<typeof getAdminClient>,
   claim: OutboxClaim,
-  status: 'pending' | 'delivered' | 'cancelled' | 'failed',
+  status: 'pending' | 'accepted' | 'delivered' | 'cancelled' | 'failed',
   error: string | null = null,
   retryAfterSeconds: number | null = null,
 ) => {
@@ -429,7 +487,7 @@ const processClaim = async (
       .maybeSingle(),
     supabase
       .from('notification_events')
-      .select('id, type, entity_id, actor_id, read_at, resolved_at')
+      .select('id, type, entity_id, actor_id, conversation_id, read_at, resolved_at')
       .eq('id', claim.event_id)
       .eq('user_id', claim.user_id)
       .maybeSingle(),
@@ -498,13 +556,32 @@ const processClaim = async (
       return { delivered: false, cancelled: true }
     }
   }
+  if (event.type === 'dm_message' && event.conversation_id) {
+    const { data: conversationMute, error: conversationMuteError } = await supabase
+      .from('notification_conversation_mutes')
+      .select('muted_until')
+      .eq('user_id', claim.user_id)
+      .eq('conversation_id', event.conversation_id)
+      .maybeSingle()
+    if (conversationMuteError) throw conversationMuteError
+    if (
+      conversationMute &&
+      (
+        conversationMute.muted_until === null ||
+        Date.parse(conversationMute.muted_until) > Date.now()
+      )
+    ) {
+      await completeOutbox(supabase, claim, 'cancelled', 'DM conversation is muted')
+      return { delivered: false, cancelled: true }
+    }
+  }
 
   const installations = (installationsResult.data ?? []) as InstallationRow[]
   const eligibleInstallations = installations.filter(installation => (
-    installation.platform !== 'web' && !isForeground(installation)
+    installation.platform !== 'web'
   ))
   if (eligibleInstallations.length === 0) {
-    await completeOutbox(supabase, claim, 'cancelled', 'No background native installation')
+    await completeOutbox(supabase, claim, 'cancelled', 'No native installation')
     return { delivered: false, cancelled: true }
   }
 
@@ -695,6 +772,27 @@ const processClaim = async (
     target.attempt_count += 1
   }
 
+  if (Date.parse(claim.expires_at) <= Date.now()) {
+    await completeOutbox(
+      supabase,
+      claim,
+      'cancelled',
+      'Notification presentation expired before provider delivery',
+    )
+    return { delivered: false, cancelled: true }
+  }
+  const { data: validLease, error: validLeaseError } = await supabase.rpc(
+    'validate_notification_outbox_v2_lease',
+    {
+      target_outbox_id: claim.outbox_id,
+      target_lease_token: claim.lease_token,
+    },
+  )
+  if (validLeaseError) throw validLeaseError
+  if (validLease !== true) {
+    return { delivered: false, cancelled: true }
+  }
+
   const messages = attemptTokens.map(token => {
     const installation = installationById.get(token.installation_id)!
     return toExpoMessage(
@@ -806,6 +904,10 @@ const processClaim = async (
         next_receipt_check_at: decision.providerMessageId
           ? new Date(Date.now() + 15 * 60_000).toISOString()
           : null,
+        receipt_attempt_count: 0,
+        receipt_expires_at: decision.providerMessageId
+          ? new Date(Date.now() + 6 * 60 * 60_000).toISOString()
+          : null,
         last_status_code: response.status,
         last_error: decision.error,
         completed_at: decision.status === 'accepted' || decision.status === 'pending'
@@ -843,75 +945,178 @@ const checkExpoReceipts = async (
   deliveryEnvironment: string,
 ) => {
   const now = new Date().toISOString()
+  const affectedOutboxIds = new Set<string>()
+  const { data: expiredTargetRows, error: expiredTargetsQueryError } = await supabase
+    .from('notification_delivery_targets_v2')
+    .select(
+      'id, outbox_id, notification_installations!inner(environment)',
+    )
+    .eq('transport', 'expo')
+    .eq('status', 'accepted')
+    .eq('notification_installations.environment', deliveryEnvironment)
+    .lte('receipt_expires_at', now)
+    .limit(500)
+  if (expiredTargetsQueryError) throw expiredTargetsQueryError
+  const expiredTargetIds = (expiredTargetRows ?? []).map(target => target.id)
+  if (expiredTargetIds.length > 0) {
+    const { error: expiredTargetsError } = await supabase
+      .from('notification_delivery_targets_v2')
+      .update({
+        status: 'failed',
+        last_error: 'Expo delivery receipt window expired',
+        completed_at: now,
+        next_receipt_check_at: null,
+        updated_at: now,
+      })
+      .in('id', expiredTargetIds)
+      .eq('status', 'accepted')
+    if (expiredTargetsError) throw expiredTargetsError
+  }
+  for (const target of expiredTargetRows ?? []) {
+    if (target.outbox_id) affectedOutboxIds.add(target.outbox_id)
+  }
+
   const { data, error } = await supabase
     .from('notification_delivery_targets_v2')
     .select(
-      'id, installation_id, provider_message_id, notification_installations!inner(environment)',
+      'id, outbox_id, installation_id, provider_message_id, receipt_attempt_count, receipt_expires_at, created_at, notification_installations!inner(environment)',
     )
     .eq('transport', 'expo')
     .eq('status', 'accepted')
     .eq('notification_installations.environment', deliveryEnvironment)
     .not('provider_message_id', 'is', null)
     .lte('next_receipt_check_at', now)
+    .gt('receipt_expires_at', now)
+    .lt('receipt_attempt_count', 8)
+    .order('next_receipt_check_at', { ascending: true })
+    .order('created_at', { ascending: true })
     .limit(100)
   if (error) throw error
-  if (!data?.length) return { checked: 0, delivered: 0, invalid: 0 }
-
-  const ids = data.map(item => item.provider_message_id)
-  const response = await expoTransport.getReceipts(ids)
-  if (!response.ok) throw new Error(`Expo receipt lookup failed (${response.status})`)
-  const payload = await response.json()
-  const receipts = payload.data as Record<string, ExpoTicket> | undefined
   let delivered = 0
   let invalid = 0
+  let failed = expiredTargetRows?.length ?? 0
 
-  for (const target of data) {
-    const receipt = receipts?.[target.provider_message_id]
-    if (!receipt) {
-      await supabase
+  if (data?.length) {
+    const ids = data.map(item => item.provider_message_id)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 8_000)
+    let response: Response
+    try {
+      response = await expoTransport.getReceipts(ids, controller.signal)
+    } finally {
+      clearTimeout(timeout)
+    }
+    if (!response.ok) throw new Error(`Expo receipt lookup failed (${response.status})`)
+    const payload = await response.json()
+    const receipts = payload.data as Record<string, ExpoTicket> | undefined
+
+    for (const target of data) {
+      affectedOutboxIds.add(target.outbox_id)
+      const receipt = receipts?.[target.provider_message_id]
+      const nextAttemptCount = Number(target.receipt_attempt_count ?? 0) + 1
+      if (!receipt) {
+        const exhausted = (
+          nextAttemptCount >= 8 ||
+          Date.parse(target.receipt_expires_at) <= Date.now()
+        )
+        const { error: missingReceiptError } = await supabase
+          .from('notification_delivery_targets_v2')
+          .update({
+            status: exhausted ? 'failed' : 'accepted',
+            receipt_attempt_count: nextAttemptCount,
+            next_receipt_check_at: exhausted
+              ? null
+              : new Date(
+                Date.now() + Math.min(60, 15 * nextAttemptCount) * 60_000,
+              ).toISOString(),
+            last_error: exhausted
+              ? 'Expo delivery receipt was not returned before the retry limit'
+              : 'Expo delivery receipt is not available yet',
+            completed_at: exhausted ? now : null,
+            updated_at: now,
+          })
+          .eq('id', target.id)
+          .eq('status', 'accepted')
+        if (missingReceiptError) throw missingReceiptError
+        if (exhausted) failed += 1
+        continue
+      }
+      const deviceInvalid = receipt.status === 'error' &&
+        receipt.details?.error === 'DeviceNotRegistered'
+      const status = receipt.status === 'ok'
+        ? 'delivered'
+        : deviceInvalid
+          ? 'invalid'
+          : 'failed'
+      const { error: targetUpdateError } = await supabase
         .from('notification_delivery_targets_v2')
         .update({
-          next_receipt_check_at: new Date(Date.now() + 15 * 60_000).toISOString(),
+          status,
+          receipt_attempt_count: nextAttemptCount,
+          last_error: receipt.message?.slice(0, 500) ?? null,
+          completed_at: now,
+          next_receipt_check_at: null,
           updated_at: now,
         })
         .eq('id', target.id)
-      continue
-    }
-    const deviceInvalid = receipt.status === 'error' &&
-      receipt.details?.error === 'DeviceNotRegistered'
-    const status = receipt.status === 'ok'
-      ? 'delivered'
-      : deviceInvalid
-        ? 'invalid'
-        : 'failed'
-    if (status === 'delivered') delivered += 1
-    if (status === 'invalid') invalid += 1
-    await supabase
-      .from('notification_delivery_targets_v2')
-      .update({
-        status,
-        last_error: receipt.message?.slice(0, 500) ?? null,
-        completed_at: now,
-        next_receipt_check_at: null,
-        updated_at: now,
-      })
-      .eq('id', target.id)
-    if (deviceInvalid) {
-      await supabase
-        .schema('private')
-        .from('notification_native_tokens')
-        .update({
-          enabled: false,
-          disabled_at: now,
-          disabled_reason: 'DeviceNotRegistered',
-          updated_at: now,
-        })
-        .eq('installation_id', target.installation_id)
-        .eq('provider', 'expo')
-        .eq('environment', deliveryEnvironment)
+        .eq('status', 'accepted')
+      if (targetUpdateError) throw targetUpdateError
+
+      if (deviceInvalid) {
+        const { error: disableError } = await supabase
+          .schema('private')
+          .from('notification_native_tokens')
+          .update({
+            enabled: false,
+            disabled_at: now,
+            disabled_reason: 'DeviceNotRegistered',
+            updated_at: now,
+          })
+          .eq('installation_id', target.installation_id)
+          .eq('provider', 'expo')
+          .eq('environment', deliveryEnvironment)
+        if (disableError) throw disableError
+      }
+      if (status === 'delivered') delivered += 1
+      if (status === 'invalid') invalid += 1
+      if (status === 'failed') failed += 1
     }
   }
-  return { checked: data.length, delivered, invalid }
+
+  for (const outboxId of affectedOutboxIds) {
+    const { data: targets, error: targetsError } = await supabase
+      .from('notification_delivery_targets_v2')
+      .select('status')
+      .eq('outbox_id', outboxId)
+    if (targetsError) throw targetsError
+    const statuses = (targets ?? []).map(target => target.status)
+    if (statuses.some(status => status === 'accepted' || status === 'pending')) {
+      continue
+    }
+    const finalStatus = statuses.some(status => status === 'delivered')
+      ? 'delivered'
+      : 'failed'
+    const { error: outboxError } = await supabase
+      .from('notification_outbox_v2')
+      .update({
+        status: finalStatus,
+        completed_at: now,
+        last_error: finalStatus === 'failed'
+          ? 'No native notification target produced a delivery receipt'
+          : null,
+        updated_at: now,
+      })
+      .eq('id', outboxId)
+      .eq('status', 'accepted')
+    if (outboxError) throw outboxError
+  }
+
+  return {
+    checked: data?.length ?? 0,
+    delivered,
+    invalid,
+    failed,
+  }
 }
 
 export const handleNotificationDeliveryRequest = async (request: Request) => {
@@ -919,10 +1124,20 @@ export const handleNotificationDeliveryRequest = async (request: Request) => {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   try {
-    requireServiceRole(request)
+    await requireWorkerSecret(request)
     const body = await request.json().catch(() => ({}))
-    const supabase = getAdminClient()
     const deliveryEnvironment = getNotificationDeliveryEnvironment()
+    if (body.action === 'health') {
+      return json({
+        ok: true,
+        environment: deliveryEnvironment,
+        worker: 'deliver-notifications-v2',
+      })
+    }
+    if (body.action !== 'deliver' && body.action !== 'receipts') {
+      return json({ error: 'Unsupported notification worker action' }, 400)
+    }
+    const supabase = getAdminClient()
     const expoTransport = createExpoTransport()
     if (body.action === 'receipts') {
       return json(await checkExpoReceipts(
@@ -932,34 +1147,50 @@ export const handleNotificationDeliveryRequest = async (request: Request) => {
       ))
     }
 
-    const { data, error } = await supabase.rpc('claim_notification_outbox_v2', {
-      batch_size: 20,
-      lease_seconds: 45,
-    })
-    if (error) throw error
-    const claims = (data ?? []) as OutboxClaim[]
-    const results = []
-    for (const claim of claims) {
-      try {
-        results.push(await processClaim(
-          supabase,
-          claim,
-          expoTransport,
-          deliveryEnvironment,
-        ))
-      } catch (caught) {
-        await completeOutbox(
-          supabase,
-          claim,
-          'pending',
-          caught instanceof Error ? caught.message : 'Native delivery failed',
-          20,
-        ).catch(() => undefined)
-        results.push({ delivered: false, retryable: true })
-      }
+    const startedAt = Date.now()
+    const maxRuntimeMs = 24_000
+    const batchSize = 12
+    const maxRounds = 4
+    let claimed = 0
+    let rounds = 0
+    const results: Array<Record<string, unknown>> = []
+    while (rounds < maxRounds && Date.now() - startedAt < maxRuntimeMs) {
+      const { data, error } = await supabase.rpc('claim_notification_outbox_v2', {
+        batch_size: batchSize,
+        lease_seconds: 120,
+      })
+      if (error) throw error
+      const claims = (data ?? []) as OutboxClaim[]
+      if (claims.length === 0) break
+      claimed += claims.length
+      rounds += 1
+      results.push(...await Promise.all(claims.map(async claim => {
+        try {
+          return await processClaim(
+            supabase,
+            claim,
+            expoTransport,
+            deliveryEnvironment,
+          )
+        } catch (caught) {
+          await completeOutbox(
+            supabase,
+            claim,
+            'pending',
+            caught instanceof Error ? caught.message : 'Native delivery failed',
+            20,
+          ).catch(() => undefined)
+          return { delivered: false, retryable: true }
+        }
+      })))
+      if (claims.length < batchSize) break
     }
     return json({
-      claimed: claims.length,
+      claimed,
+      rounds,
+      accepted: results.reduce((sum, result) => (
+        sum + (typeof result.accepted === 'number' ? result.accepted : 0)
+      ), 0),
       delivered: results.filter(result => result.delivered).length,
       retryable: results.filter(result => (
         'retryable' in result && result.retryable
@@ -967,7 +1198,10 @@ export const handleNotificationDeliveryRequest = async (request: Request) => {
     })
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : 'Notification delivery failed'
-    return json({ error: message }, message === 'Service role required' ? 401 : 500)
+    return json(
+      { error: message },
+      message === 'Notification worker authorization required' ? 401 : 500,
+    )
   }
 }
 

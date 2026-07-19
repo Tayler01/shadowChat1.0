@@ -103,9 +103,9 @@ verify_jwt = false
 [functions.send-push]
 verify_jwt = false
 
-# Notification Presentation V2 is a service-role-only outbox worker. The
-# gateway is bypassed so the function can compare the exact service credential
-# before it reads private device tokens or claims delivery work.
+# Notification Presentation V2 is a private outbox worker. The gateway is
+# bypassed so the function can validate its dedicated Vault-mirrored worker
+# secret before it reads private device tokens or claims delivery work.
 [functions.deliver-notifications-v2]
 verify_jwt = false
 

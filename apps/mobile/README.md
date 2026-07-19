@@ -1,20 +1,31 @@
 # ShadowChat Mobile
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 19, 2026
 
-The native workspace is a local development candidate, not a shipped client.
-It is aligned to Expo `~57.0.4`, React Native `0.86.0`, React `19.2.3`, and
-TypeScript `~6.0.3`. The web/PWA remains the production client.
+The native workspace is the signed iPhone/Android notification companion for
+the production ShadoChat web client. It is aligned to Expo `~57.0.4`, React
+Native `0.86.0`, React `19.2.3`, and TypeScript `~6.0.3`.
 
-Expo iOS-first native client for ShadowChat. The current web/PWA app remains the
-production client while this app proves native parity.
+Expo iOS-first native client for ShadoChat. The complete product UI continues
+to come from `https://shadochat.online` inside a strict same-origin WebView, so
+the signed app and installed PWA do not drift into separate feature shells.
+Native code owns push permissions, secure session persistence, token
+registration, foreground arbitration, rich presentation, actions, badges,
+custom sounds, and exact notification routing.
 
-## First Milestone
+## Native Client Contract
 
-- Sign in with the same Supabase Auth account used by the web app.
-- Load the same API-safe `public.users` presentation profile.
-- Read and send General Chat messages through the same `public.messages` table.
-- Receive web-sent General Chat messages through Supabase Realtime.
+- Present the complete production ShadoChat app rather than a native imitation.
+- Allow only the canonical `https://shadochat.online` origin in the app
+  container; external links open in the operating system.
+- Synchronize the signed-in web session into native secure storage without
+  exposing service-role credentials or provider secrets.
+- Register one native notification installation per signed-in account/device.
+- Keep PWA and native foreground leases separate so only one presentation
+  surface wins.
+- Route notification taps and actions to their exact production destination.
+- Revoke the native installation and clear native notification state on
+  sign-out or device opt-out.
 
 ## Setup
 
@@ -55,8 +66,10 @@ Release B still requires Release A production proof and a fresh Expo gate.
 npm run start
 ```
 
-Open the project in Expo Go first. Use a custom development build only after a
-native-only capability requires it.
+Rich notification capabilities require a development or signed native build;
+Expo Go is not an acceptance surface for APNs/FCM, the iOS notification service
+extension, Notifee presentation, communication intents, custom sounds, or
+production routing.
 
 ## Verification
 
@@ -66,10 +79,9 @@ npm audit --audit-level=low
 npm run lint
 npx tsc --noEmit
 npm run doctor
-npx expo export --platform web --output-dir output/expo57-web
+npx expo export --platform ios --output-dir output/expo57-ios
 ```
 
-The July 10 Expo 57 upgrade passed these checks locally, including Expo Doctor
-`20/20` and a static web export. Remove generated export output after inspection.
-These checks establish toolchain health; they are not App Store/TestFlight,
-native-device, installed-PWA, or production-deployment proof.
+Remove generated export output after inspection. These checks establish
+toolchain and bundle health; App Store/TestFlight processing and physical-device
+APNs/FCM delivery remain separate release gates.

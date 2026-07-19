@@ -20,6 +20,48 @@ const nativeNotificationHookSource = readFileSync(
   join(mobileRoot, 'src', 'hooks', 'useNativeNotifications.tsx'),
   'utf8',
 )
+const nativeEntrySource = readFileSync(join(mobileRoot, 'index.js'), 'utf8')
+const nativeAppSource = readFileSync(
+  join(mobileRoot, 'src', 'app', 'index.tsx'),
+  'utf8',
+)
+const nativeBridgeSource = readFileSync(
+  join(mobileRoot, 'src', 'lib', 'nativeAppBridge.ts'),
+  'utf8',
+)
+const webNativeBridgeSource = readFileSync(
+  join(repoRoot, 'src', 'components', 'native', 'NativeAppBridge.tsx'),
+  'utf8',
+)
+const webBridgeTransportSource = readFileSync(
+  join(repoRoot, 'src', 'lib', 'nativeAppBridge.ts'),
+  'utf8',
+)
+const webMainSource = readFileSync(join(repoRoot, 'src', 'main.tsx'), 'utf8')
+const mobilePackage = JSON.parse(
+  readFileSync(join(mobileRoot, 'package.json'), 'utf8'),
+)
+const androidBackgroundSource = readFileSync(
+  join(mobileRoot, 'src', 'lib', 'notifications', 'background.ts'),
+  'utf8',
+)
+const androidPresenterSource = readFileSync(
+  join(mobileRoot, 'src', 'lib', 'notifications', 'androidPresenter.ts'),
+  'utf8',
+)
+const iosExtensionPluginSource = readFileSync(
+  join(mobileRoot, 'plugins', 'with-shadowchat-notification-service-extension.js'),
+  'utf8',
+)
+const iosExtensionSource = readFileSync(
+  join(
+    mobileRoot,
+    'plugins',
+    'notification-service-extension',
+    'NotificationService.swift',
+  ),
+  'utf8',
+)
 
 test('all original ShadowChat notification sounds exist and ship through Expo', () => {
   assert.equal(manifest.version, 1)
@@ -57,20 +99,97 @@ test('native notification channels are versioned, private, and foreground-suppre
   )
 })
 
-test('delivery worker enforces service-only delivery and Expo reliability controls', () => {
-  assert.match(deliveryWorkerSource, /Service role required/)
+test('delivery worker uses a dedicated secret and platform-specific rich payloads', () => {
+  assert.match(deliveryWorkerSource, /NOTIFICATION_V2_WORKER_SECRET/)
+  assert.match(deliveryWorkerSource, /x-shadowchat-worker-secret/)
   assert.match(deliveryWorkerSource, /EXPO_PUSH_ACCESS_TOKEN/)
   assert.match(deliveryWorkerSource, /DeviceNotRegistered/)
   assert.match(deliveryWorkerSource, /push\/getReceipts/)
   assert.match(deliveryWorkerSource, /payloadBytes\(\) > 3_800/)
-  assert.match(deliveryWorkerSource, /richContent/)
+  assert.match(deliveryWorkerSource, /installation\.platform === 'android'/)
+  assert.match(deliveryWorkerSource, /badgeCount: badge/)
+  assert.doesNotMatch(deliveryWorkerSource, /_contentAvailable: true/)
+  assert.doesNotMatch(deliveryWorkerSource, /richContent/)
   assert.match(deliveryWorkerSource, /mutableContent/)
 })
 
-test('native auth loss revokes the installation and invalidates local push state', () => {
+test('Android registers its headless task before Expo Router and presents rich groups', () => {
+  assert.match(nativeEntrySource, /notifications\/background/)
+  assert.match(nativeEntrySource, /expo-router\/entry/)
+  assert.ok(
+    nativeEntrySource.indexOf('notifications/background') <
+      nativeEntrySource.indexOf('expo-router/entry'),
+  )
+  assert.match(androidBackgroundSource, /TaskManager\.defineTask/)
+  assert.match(androidBackgroundSource, /AppState\.currentState === 'active'/)
+  assert.match(androidBackgroundSource, /data\.dataString/)
+  assert.doesNotMatch(androidBackgroundSource, /notifee\.onBackgroundEvent/)
+  assert.match(androidPresenterSource, /AndroidStyle\.MESSAGING/)
+  assert.match(androidPresenterSource, /AndroidStyle\.BIGPICTURE/)
+  assert.match(androidPresenterSource, /notifee\.setBadgeCount/)
+  assert.match(androidPresenterSource, /groupSummary: true/)
+})
+
+test('iOS ships a communication-aware notification service extension', () => {
+  assert.equal(
+    appConfig.expo.extra.eas.build.experimental.ios.appExtensions.length,
+    1,
+  )
+  assert.equal(
+    appConfig.expo.extra.eas.build.experimental.ios.appExtensions[0].bundleIdentifier,
+    'com.shadowchat.mobile.notification-service',
+  )
+  assert.equal(
+    appConfig.expo.ios.entitlements[
+      'com.apple.developer.usernotifications.communication'
+    ],
+    true,
+  )
+  assert.match(iosExtensionPluginSource, /ShadowChatNotificationService/)
+  assert.match(iosExtensionSource, /UNNotificationServiceExtension/)
+  assert.match(iosExtensionSource, /INSendMessageIntent/)
+  assert.match(iosExtensionSource, /downloadedAvatar\.flatMap/)
+  assert.match(iosExtensionSource, /INInteractionDirection\.incoming/)
+  assert.match(iosExtensionSource, /interaction\.donate \{ _ in \}/)
+  assert.match(iosExtensionSource, /serviceExtensionTimeWillExpire/)
+})
+
+test('native auth loss, opt-out, read state, and badges are durable', () => {
   assert.match(nativeNotificationHookSource, /revokeInstallationWithSession\(priorSession\)/)
   assert.match(nativeNotificationHookSource, /unregisterForNotificationsAsync\(\)/)
   assert.match(nativeNotificationHookSource, /dismissAllNotificationsAsync\(\)/)
   assert.match(nativeNotificationHookSource, /setBadgeCountAsync\(0\)/)
   assert.match(nativeNotificationHookSource, /registrationInFlightRef/)
+  assert.match(nativeNotificationHookSource, /setNativeNotificationDeviceOptOut\(true\)/)
+  assert.match(nativeNotificationHookSource, /get_app_badge_state_v2/)
+  assert.match(nativeNotificationHookSource, /mark_my_notification_event_read/)
+})
+
+test('signed mobile client contains the full production app and a secure native session bridge', () => {
+  assert.equal(typeof mobilePackage.dependencies['react-native-webview'], 'string')
+  assert.match(nativeAppSource, /from 'react-native-webview'/)
+  assert.match(nativeAppSource, /https:\/\/shadochat\.online/)
+  assert.match(nativeAppSource, /new URL\(value\)\.origin === APP_ORIGIN/)
+  assert.match(nativeAppSource, /sb-shsqqouecvdoifzufkqm-auth-token/)
+  assert.match(nativeAppSource, /window\.setInterval\(publishWebSession, 1200\)/)
+  assert.match(nativeAppSource, /client\.auth\.setSession/)
+  assert.match(nativeAppSource, /Enable Notifications/)
+  assert.match(nativeAppSource, /subscribeToNativeNotificationRoutes/)
+  assert.doesNotMatch(nativeAppSource, /fetchGeneralMessages/)
+  assert.doesNotMatch(nativeAppSource, /sendGeneralTextMessage/)
+  assert.equal(
+    existsSync(join(mobileRoot, 'src', 'app', 'notification-target.tsx')),
+    false,
+  )
+
+  assert.match(webMainSource, /<NativeAppBridge \/>/)
+  assert.match(webBridgeTransportSource, /ReactNativeWebView/)
+  assert.match(webNativeBridgeSource, /accessToken: session\.access_token/)
+  assert.match(webNativeBridgeSource, /refreshToken: session\.refresh_token/)
+  assert.match(nativeBridgeSource, /parseNativeWebMessage/)
+  assert.match(nativeBridgeSource, /publishNativeNotificationRoute/)
+  assert.match(
+    nativeNotificationHookSource,
+    /publishNativeNotificationRoute\(normalizeNotificationRoute\(envelope\.route\)\)/,
+  )
 })

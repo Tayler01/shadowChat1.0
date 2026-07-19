@@ -6,6 +6,7 @@ import {
   syncCurrentDeviceSubscription,
   updateCurrentDeviceForegroundLease,
 } from '../../lib/push'
+import { isNativeAppWebView } from '../../lib/nativeAppBridge'
 
 const PUSH_SUBSCRIPTION_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000
 const PUSH_SUBSCRIPTION_SYNC_RETRY_MS = 60 * 1000
@@ -46,6 +47,7 @@ export function PushSubscriptionSync() {
     if (!user || typeof window === 'undefined') {
       return
     }
+    if (isNativeAppWebView()) return
 
     if (document.visibilityState === 'hidden') {
       return
@@ -106,6 +108,7 @@ export function PushSubscriptionSync() {
 
   useEffect(() => {
     if (!user) return
+    if (isNativeAppWebView()) return
 
     const updateLease = () => {
       const foreground = document.visibilityState === 'visible'

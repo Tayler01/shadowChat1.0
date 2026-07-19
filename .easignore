@@ -1,0 +1,74 @@
+# EAS archives from the repository root even though the Expo project lives in
+# apps/mobile. Exclude every unrelated root surface explicitly so only the
+# standalone mobile application is uploaded to the cloud builder.
+/.agents/
+/.codex/
+/.git/
+/.github/
+/.playwright-cli/
+/contracts/
+/dist/
+/docs/
+/firmware/
+/netlify/
+/output/
+/public/
+/release-notes/
+/scripts/
+/services/
+/source-assets/
+/src/
+/supabase/
+/tests/
+/tools/
+
+/.env
+/.env.*
+/.gitattributes
+/.gitignore
+/.gitleaksignore
+/AGENT.md
+/AGENTS.md
+/deno.lock
+/design-qa.md
+/eslint.config.js
+/index.html
+/jest.config.js
+/LICENSE
+/netlify.toml
+/package-lock.json
+/package.json
+/PLAN.md
+/postcss.config.js
+/README.md
+/render.yaml
+/setup.sh
+/skills-lock.json
+/STATUS.md
+/tailwind.config.js
+/TASK.md
+/tsconfig.app.json
+/tsconfig.json
+/tsconfig.node.json
+/tsconfig.test.json
+/vite.config.ts
+
+/apps/mobile/.env
+/apps/mobile/.env.*
+/apps/mobile/.expo/
+/apps/mobile/android/
+/apps/mobile/ios/
+/apps/mobile/node_modules/
+/apps/mobile/output/
+/apps/mobile/npm-debug.log*
+/apps/mobile/yarn-debug.log*
+/apps/mobile/yarn-error.log*
+
+# EAS may treat apps/mobile as the archive root even when it discovers this
+# repository-root ignore file. Keep unanchored fallbacks so generated native
+# trees and the 12 GB local dependency cache never enter a future upload.
+node_modules/
+android/
+ios/
+output/
+.expo/

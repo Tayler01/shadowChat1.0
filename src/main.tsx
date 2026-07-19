@@ -11,6 +11,8 @@ import { initializeTelemetry } from './lib/telemetry';
 import { BlockedUsersProvider } from './hooks/useBlockedUsers';
 import { ComfortPreferencesProvider } from './hooks/useComfortPreferences';
 import { MEMBER_REPORTING_FEATURE_ENABLED, SHADO_LIVE_REAL_ENABLED } from './config/featureFlags';
+import { NativeAppBridge } from './components/native/NativeAppBridge';
+import { isNativeAppWebView } from './lib/nativeAppBridge';
 
 const REPORTING_RUNTIME_ENABLED = MEMBER_REPORTING_FEATURE_ENABLED || SHADO_LIVE_REAL_ENABLED;
 
@@ -25,6 +27,7 @@ initializeTelemetry();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
+      <NativeAppBridge />
       <BlockedUsersProvider>
         <PresenceRoot>
           <ComfortPreferencesProvider>
@@ -52,6 +55,7 @@ createRoot(document.getElementById('root')!).render(
 
 if (typeof window !== 'undefined') {
   window.addEventListener('load', () => {
+    if (isNativeAppWebView()) return;
     registerPushServiceWorker().catch((error) => {
       if (import.meta.env.DEV) {
         console.warn('Push service worker registration skipped:', error);

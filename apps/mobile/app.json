@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "ShadowChat",
-    "slug": "shadowchat-mobile",
+    "name": "ShadoChat",
+    "slug": "shadowchat",
+    "owner": "shadowchat111s-team",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,9 +10,22 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.shadowchat.mobile"
+      "bundleIdentifier": "com.shadowchat.mobile",
+      "entitlements": {
+        "com.apple.developer.usernotifications.communication": true,
+        "com.apple.developer.usernotifications.time-sensitive": true
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSUserActivityTypes": [
+          "$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route",
+          "INSendMessageIntent"
+        ]
+      },
+      "buildNumber": "5"
     },
     "android": {
+      "googleServicesFile": "./google-services.json",
       "package": "com.shadowchat.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#050505",
@@ -19,7 +33,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "versionCode": 2
     },
     "web": {
       "output": "static",
@@ -43,12 +58,14 @@
       ],
       "expo-secure-store",
       "expo-status-bar",
+      "./plugins/with-shadowchat-notification-service-extension",
       [
         "expo-notifications",
         {
           "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#E9C766",
           "defaultChannel": "shadowchat_sound_shadow_whisper_v2",
+          "mode": "production",
           "sounds": [
             "./assets/sounds/shadow_whisper.wav",
             "./assets/sounds/low_glass.wav",
@@ -67,7 +84,23 @@
       ]
     ],
     "extra": {
-      "webAppUrl": "https://shadochat.online"
+      "webAppUrl": "https://shadochat.online",
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ShadowChatNotificationService",
+                  "bundleIdentifier": "com.shadowchat.mobile.notification-service"
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "1deb0022-9ec4-4e90-8fc8-8b71c3737ff2"
+      },
+      "router": {}
     },
     "experiments": {
       "typedRoutes": true,
