@@ -14,6 +14,7 @@ export type NativeWebMessage =
   | { version: 1; type: 'auth_session'; session: NativeWebSession | null }
   | { version: 1; type: 'notifications_enable' }
   | { version: 1; type: 'notifications_disable' }
+  | { version: 1; type: 'notifications_open_settings' }
   | { version: 1; type: 'native_state_request' };
 
 export type NativeNotificationBridgeState = {
@@ -69,6 +70,7 @@ export const parseNativeWebMessage = (raw: string): NativeWebMessage | null => {
     value.type === 'bridge_ready' ||
     value.type === 'notifications_enable' ||
     value.type === 'notifications_disable' ||
+    value.type === 'notifications_open_settings' ||
     value.type === 'native_state_request'
   ) {
     return { version: 1, type: value.type };

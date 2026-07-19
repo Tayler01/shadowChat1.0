@@ -27,6 +27,7 @@ type NativeAppOutboundMessage =
     }
   | { version: 1; type: 'notifications_enable' }
   | { version: 1; type: 'notifications_disable' }
+  | { version: 1; type: 'notifications_open_settings' }
   | { version: 1; type: 'native_state_request' }
 
 declare global {
@@ -88,8 +89,7 @@ export const requestNativeNotificationEnable = () =>
     { version: 1, type: 'notifications_enable' },
     state => !state.busy && (
       state.enabled ||
-      state.permission === 'denied' ||
-      state.permission === 'undetermined'
+      state.permission === 'denied'
     )
   )
 
@@ -98,6 +98,9 @@ export const requestNativeNotificationDisable = () =>
     { version: 1, type: 'notifications_disable' },
     state => !state.busy && !state.enabled
   )
+
+export const openNativeNotificationSettings = () =>
+  postNativeAppMessage({ version: 1, type: 'notifications_open_settings' })
 
 export const requestNativeNotificationState = () =>
   postNativeAppMessage({ version: 1, type: 'native_state_request' })

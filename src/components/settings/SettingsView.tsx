@@ -431,8 +431,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     loading: pushLoading,
     saving: pushSaving,
     error: pushError,
+    nativeApp,
     enablePush,
     disablePush,
+    openDeviceNotificationSettings,
     updatePreference,
     updatePreferences,
   } = usePushNotifications({ enabled: shouldLoadPushSettings })
@@ -741,6 +743,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (devicePushEnabled) {
         await disablePush()
         toast.success('Push notifications disabled on this device')
+        return
+      }
+
+      if (nativeApp) {
+        if (permission === 'denied') {
+          if (!openDeviceNotificationSettings()) {
+            throw new Error('Could not open this device notification settings.')
+          }
+          toast('Allow notifications for ShadoChat, then return to the app.')
+          return
+        }
+        await enablePush()
+        toast.success('Push notifications enabled on this device')
         return
       }
 

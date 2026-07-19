@@ -17,6 +17,7 @@ import {
 } from '../lib/push'
 import {
   isNativeAppWebView,
+  openNativeNotificationSettings,
   requestNativeNotificationDisable,
   requestNativeNotificationEnable,
   requestNativeNotificationState,
@@ -341,7 +342,13 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     }
   }, [nativeApp, user])
 
+  const openDeviceNotificationSettings = useCallback(() => {
+    if (!nativeApp) return false
+    return openNativeNotificationSettings()
+  }, [nativeApp])
+
   return {
+    nativeApp,
     supported: support.supported,
     canPrompt: support.canPrompt,
     supportReason: support.reason,
@@ -355,6 +362,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     error,
     enablePush,
     disablePush,
+    openDeviceNotificationSettings,
     updatePreference,
     updatePreferences,
     refreshState,

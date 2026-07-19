@@ -174,6 +174,8 @@ test('signed mobile client contains the full production app and a secure native 
   assert.match(nativeAppSource, /window\.setInterval\(publishWebSession, 1200\)/)
   assert.match(nativeAppSource, /client\.auth\.setSession/)
   assert.match(nativeAppSource, /Enable Notifications/)
+  assert.match(nativeAppSource, /<SafeAreaView edges=\{\['top', 'bottom'\]\}/)
+  assert.match(nativeAppSource, /message\.type === 'notifications_open_settings'/)
   assert.match(nativeAppSource, /subscribeToNativeNotificationRoutes/)
   assert.doesNotMatch(nativeAppSource, /fetchGeneralMessages/)
   assert.doesNotMatch(nativeAppSource, /sendGeneralTextMessage/)
@@ -184,6 +186,11 @@ test('signed mobile client contains the full production app and a secure native 
 
   assert.match(webMainSource, /<NativeAppBridge \/>/)
   assert.match(webBridgeTransportSource, /ReactNativeWebView/)
+  assert.match(webBridgeTransportSource, /openNativeNotificationSettings/)
+  assert.doesNotMatch(
+    webBridgeTransportSource,
+    /state\.permission === 'undetermined'\s*\n\s*\)/,
+  )
   assert.match(webNativeBridgeSource, /accessToken: session\.access_token/)
   assert.match(webNativeBridgeSource, /refreshToken: session\.refresh_token/)
   assert.match(nativeBridgeSource, /parseNativeWebMessage/)

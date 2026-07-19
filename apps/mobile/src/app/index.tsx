@@ -260,6 +260,10 @@ export default function ShadowChatAppScreen() {
         await nativeNotifications.disableThisDevice();
         return;
       }
+      if (message.type === 'notifications_open_settings') {
+        await Linking.openSettings();
+        return;
+      }
       if (
         message.type === 'bridge_ready' ||
         message.type === 'native_state_request'
@@ -311,7 +315,7 @@ export default function ShadowChatAppScreen() {
   }
 
   return (
-    <View style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
       <WebView
         key={reloadKey}
         ref={webViewRef}
@@ -461,7 +465,7 @@ export default function ShadowChatAppScreen() {
           </Pressable>
         </SafeAreaView>
       ) : null}
-    </View>
+    </SafeAreaView>
   );
 }
 
