@@ -12,7 +12,11 @@ export type NativeWebSession = {
 export type NativeWebMessage =
   | { version: 1; type: 'bridge_ready' }
   | { version: 1; type: 'auth_session'; session: NativeWebSession | null }
-  | { version: 1; type: 'notifications_enable' }
+  | {
+      version: 1;
+      type: 'notifications_enable';
+      session: NativeWebSession | null;
+    }
   | { version: 1; type: 'notifications_disable' }
   | { version: 1; type: 'notifications_open_settings' }
   | { version: 1; type: 'native_state_request' };
@@ -68,7 +72,6 @@ export const parseNativeWebMessage = (raw: string): NativeWebMessage | null => {
 
   if (
     value.type === 'bridge_ready' ||
-    value.type === 'notifications_enable' ||
     value.type === 'notifications_disable' ||
     value.type === 'notifications_open_settings' ||
     value.type === 'native_state_request'
@@ -80,6 +83,12 @@ export const parseNativeWebMessage = (raw: string): NativeWebMessage | null => {
     const session = parseSession(value.session);
     if (session === undefined) return null;
     return { version: 1, type: 'auth_session', session };
+  }
+
+  if (value.type === 'notifications_enable') {
+    const session = parseSession(value.session);
+    if (session === undefined) return null;
+    return { version: 1, type: 'notifications_enable', session };
   }
 
   return null;

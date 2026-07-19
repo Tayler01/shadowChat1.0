@@ -23,6 +23,7 @@ import {
   requestNativeNotificationState,
   subscribeToNativeNotificationState,
 } from '../lib/nativeAppBridge'
+import { supabase } from '../lib/supabase'
 
 type UsePushNotificationsOptions = {
   enabled?: boolean
@@ -246,7 +247,21 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
 
     try {
       if (nativeApp) {
-        const state = await requestNativeNotificationEnable()
+        const { data, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) throw sessionError
+        const webSession = data.session
+        const state = await requestNativeNotificationEnable(
+          webSession?.access_token &&
+          webSession.refresh_token &&
+          webSession.user?.id
+            ? {
+                accessToken: webSession.access_token,
+                refreshToken: webSession.refresh_token,
+                expiresAt: webSession.expires_at ?? null,
+                userId: webSession.user.id,
+              }
+            : null
+        )
         setSubscribed(state.enabled)
         setPermission(
           state.permission === 'undetermined' || state.permission === 'unknown'

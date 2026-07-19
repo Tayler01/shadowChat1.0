@@ -338,6 +338,35 @@ single-account DM canary and verify foreground, background, terminated, route,
 sound, image, action, badge, read-clearing, and duplicate-suppression behavior
 before expanding categories or users.
 
+### Build 6 native hotfix
+
+Physical build `5` exposed two native-container defects even though its signed
+APNs entitlements were correct:
+
+- the production WebView extended into the iPhone status-bar area instead of
+  owning the native top and bottom safe areas;
+- the web Settings switch still opened browser-oriented setup before sending
+  the native permission request, and the bridge could incorrectly accept an
+  initial `undetermined` permission state as a completed request.
+
+Production commit `c7c4ee7` makes the Settings switch request native permission
+directly, adds an exact native route to the phone notification settings for
+denied permission, waits for a terminal permission result, and wraps the full
+app in the iOS/Android safe-area container. iOS EAS build `6`
+(`c96adbff-dc49-47c6-896b-483681643b8d`) is signed, processed by Apple, attached
+to `ShadoChat Internal Beta`, and has build-specific test instructions. Build
+`6` confirmed the safe-area repair, then exposed one more bridge problem:
+native-mode detection was frozen before the WebView JavaScript bridge appeared,
+and a stale native session read could overwrite the signed-in session supplied
+by the web app. The visible symptoms were `Permission: Unsupported` and the
+incorrect `Sign in to ShadoChat` error for an already signed-in user.
+
+Native delivery remains in the existing DM-only `shadow` canary with worker
+invocation disabled. The next replacement build must contain the query-backed
+native detection and atomic auth-plus-enable handoff, register the first
+production iOS token, and pass foreground, background, and terminated tests
+before activation.
+
 ## Local Verification - July 18, 2026
 
 - full local Supabase reset from migration zero: pass

@@ -253,6 +253,7 @@ export default function ShadowChatAppScreen() {
         return;
       }
       if (message.type === 'notifications_enable') {
+        await syncNativeSession(message.session);
         await nativeNotifications.enable();
         return;
       }

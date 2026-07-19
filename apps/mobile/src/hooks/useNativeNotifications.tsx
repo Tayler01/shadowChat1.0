@@ -294,7 +294,17 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   }, [markEnvelopeRead, openEnvelope]);
 
   const register = useCallback(async (requestPermission: boolean) => {
-    if (!session?.user) {
+    let activeSession = sessionRef.current;
+    if (!activeSession?.user) {
+      const { data, error: sessionError } = await getSupabase().auth.getSession();
+      if (sessionError) throw sessionError;
+      activeSession = data.session;
+      if (activeSession?.user) {
+        sessionRef.current = activeSession;
+        setSession(activeSession);
+      }
+    }
+    if (!activeSession?.user) {
       throw new Error('Sign in to ShadoChat before enabling notifications.');
     }
     const pending = registrationInFlightRef.current;
@@ -310,12 +320,12 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     registrationInFlightRef.current = registration;
     try {
       const result = await registration;
-      if (sessionRef.current?.user.id === session.user.id) {
+      if (sessionRef.current?.user.id === activeSession.user.id) {
         setEnabled(result.enabled);
         setPermission(result.permission);
       }
     } catch (caught) {
-      if (sessionRef.current?.user.id === session.user.id) {
+      if (sessionRef.current?.user.id === activeSession.user.id) {
         setEnabled(false);
         setError(caught instanceof Error ? caught.message : 'Notification setup failed.');
       }
@@ -326,7 +336,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       }
       setBusy(false);
     }
-  }, [session]);
+  }, []);
 
   const enable = useCallback(async () => {
     await setNativeNotificationDeviceOptOut(false);
@@ -355,6 +365,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     if (!isSupabaseConfigured) return;
     const client = getSupabase();
     let active = true;
+    let authEventVersion = 0;
     void configureNativeNotifications()
       .then(() => Notifications.getPermissionsAsync())
       .then(async nextPermissions => {
@@ -391,9 +402,10 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     };
 
     void client.auth.getSession().then(({ data }) => {
-      if (active) applySession(data.session);
+      if (active && authEventVersion === 0) applySession(data.session);
     });
     const { data: authListener } = client.auth.onAuthStateChange((_event, nextSession) => {
+      authEventVersion += 1;
       if (active) applySession(nextSession);
     });
     return () => {

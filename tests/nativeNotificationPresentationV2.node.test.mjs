@@ -160,6 +160,8 @@ test('native auth loss, opt-out, read state, and badges are durable', () => {
   assert.match(nativeNotificationHookSource, /dismissAllNotificationsAsync\(\)/)
   assert.match(nativeNotificationHookSource, /setBadgeCountAsync\(0\)/)
   assert.match(nativeNotificationHookSource, /registrationInFlightRef/)
+  assert.match(nativeNotificationHookSource, /authEventVersion === 0/)
+  assert.match(nativeNotificationHookSource, /getSupabase\(\)\.auth\.getSession\(\)/)
   assert.match(nativeNotificationHookSource, /setNativeNotificationDeviceOptOut\(true\)/)
   assert.match(nativeNotificationHookSource, /get_app_badge_state_v2/)
   assert.match(nativeNotificationHookSource, /mark_my_notification_event_read/)
@@ -186,7 +188,10 @@ test('signed mobile client contains the full production app and a secure native 
 
   assert.match(webMainSource, /<NativeAppBridge \/>/)
   assert.match(webBridgeTransportSource, /ReactNativeWebView/)
+  assert.match(webBridgeTransportSource, /get\('nativeApp'\) === '1'/)
   assert.match(webBridgeTransportSource, /openNativeNotificationSettings/)
+  assert.match(webBridgeTransportSource, /type: 'notifications_enable', session/)
+  assert.match(webBridgeTransportSource, /type: 'auth_session'/)
   assert.doesNotMatch(
     webBridgeTransportSource,
     /state\.permission === 'undetermined'\s*\n\s*\)/,

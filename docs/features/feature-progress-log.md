@@ -67,6 +67,22 @@ Canonical detail and release gates live in:
   TestFlight build `5`, followed by iPhone and Android foreground/background/
   terminated delivery, route, sound, media, action, badge, clearing, and
   duplicate-suppression proof.
+- Physical testing of build `5` found a native safe-area regression and a
+  permission-bridge completion race. Commit `c7c4ee7` fixes both without
+  changing the PWA layout: the full native WebView now owns top/bottom safe
+  areas, Settings requests iOS/Android permission directly, denied permission
+  can open the app's phone settings, and `undetermined` is no longer accepted
+  as a completed enable request.
+- iOS production build `6`
+  (`c96adbff-dc49-47c6-896b-483681643b8d`) is processed, attached to
+  `ShadoChat Internal Beta`, and carries the focused safe-area/permission test
+  plan. It confirmed the safe-area repair, then exposed an early native-mode
+  detection freeze and a stale native-session overwrite. The web/native repair
+  makes `?nativeApp=1` authoritative, re-sends the current web auth session
+  before enable for backward compatibility, and makes the replacement binary
+  await that same session in the enable command.
+- The Android version-code `3` replacement build is running as EAS build
+  `267873cc-2489-455f-9326-67a76d6433c9`.
 
 ## Current Goal
 

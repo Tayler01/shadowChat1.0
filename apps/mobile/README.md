@@ -85,3 +85,15 @@ npx expo export --platform ios --output-dir output/expo57-ios
 Remove generated export output after inspection. These checks establish
 toolchain and bundle health; App Store/TestFlight processing and physical-device
 APNs/FCM delivery remain separate release gates.
+
+## EAS Build Hygiene
+
+Run signed builds from the clean `main` checkout after confirming it matches
+`origin/main`. On Windows, starting EAS from a linked Git worktree can cause the
+CLI to archive the shared Git object store; the July 19 incident inflated a
+normal 1.4 MB mobile upload to 240 MB. Prefer the primary checkout so EAS keeps
+normal Git commit metadata and excludes repository history.
+
+For an emergency build from a linked worktree, first prove the worktree is
+clean, record its exact commit SHA, inspect the archive, and use
+`EAS_NO_VCS=1` only for that invocation. Do not make no-VCS mode the default.

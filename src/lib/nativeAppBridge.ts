@@ -25,7 +25,16 @@ type NativeAppOutboundMessage =
         userId: string
       }
     }
-  | { version: 1; type: 'notifications_enable' }
+  | {
+      version: 1
+      type: 'notifications_enable'
+      session: null | {
+        accessToken: string
+        refreshToken: string
+        expiresAt: number | null
+        userId: string
+      }
+    }
   | { version: 1; type: 'notifications_disable' }
   | { version: 1; type: 'notifications_open_settings' }
   | { version: 1; type: 'native_state_request' }
@@ -43,6 +52,7 @@ export const isNativeAppWebView = () =>
   typeof window !== 'undefined' &&
   (
     window.__SHADOWCHAT_NATIVE_APP__ === true ||
+    new URLSearchParams(window.location.search).get('nativeApp') === '1' ||
     typeof window.ReactNativeWebView?.postMessage === 'function'
   )
 
@@ -84,14 +94,29 @@ const waitForNativeNotificationState = (
   }
 })
 
-export const requestNativeNotificationEnable = () =>
-  waitForNativeNotificationState(
-    { version: 1, type: 'notifications_enable' },
+export const requestNativeNotificationEnable = async (
+  session: Extract<
+    NativeAppOutboundMessage,
+    { type: 'notifications_enable' }
+  >['session']
+) => {
+  if (session) {
+    postNativeAppMessage({
+      version: 1,
+      type: 'auth_session',
+      session,
+    })
+    await new Promise(resolve => window.setTimeout(resolve, 1_000))
+  }
+
+  return waitForNativeNotificationState(
+    { version: 1, type: 'notifications_enable', session },
     state => !state.busy && (
       state.enabled ||
       state.permission === 'denied'
     )
   )
+}
 
 export const requestNativeNotificationDisable = () =>
   waitForNativeNotificationState(
