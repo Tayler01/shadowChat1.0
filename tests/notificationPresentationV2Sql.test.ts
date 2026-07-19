@@ -69,8 +69,8 @@ describe('notification presentation v2 database contract', () => {
     ]) {
       expect(compact).toContain(`alter table public.${table} enable row level security`)
     }
-    expect(compact).toContain('using (auth.uid() = user_id)')
-    expect(compact).toContain('with check (auth.uid() = user_id)')
+    expect(compact).toContain('using ((select auth.uid()) = user_id)')
+    expect(compact).toContain('with check ((select auth.uid()) = user_id)')
   })
 
   test('isolates the service worker and disables unowned future producers', () => {
