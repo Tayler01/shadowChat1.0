@@ -111,8 +111,8 @@ create policy "Users manage their notification presentation preferences"
   on public.notification_category_presentation_preferences
   for all
   to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
 
 drop trigger if exists update_notification_category_presentation_preferences_updated_at
   on public.notification_category_presentation_preferences;
@@ -251,7 +251,7 @@ create policy "Users can read their notification envelopes"
   on public.notification_envelopes_v2
   for select
   to authenticated
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id);
 
 create table if not exists public.notification_installations (
   id uuid primary key default gen_random_uuid(),
@@ -301,7 +301,7 @@ create policy "Users can read their notification installations"
   on public.notification_installations
   for select
   to authenticated
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id);
 
 alter table public.push_subscriptions
   add column if not exists installation_id uuid
@@ -382,7 +382,7 @@ create policy "Users can read their notification presentation receipts"
   on public.notification_presentation_receipts_v2
   for select
   to authenticated
-  using (auth.uid() = user_id);
+  using ((select auth.uid()) = user_id);
 
 create table if not exists public.notification_outbox_v2 (
   id uuid primary key default gen_random_uuid(),
