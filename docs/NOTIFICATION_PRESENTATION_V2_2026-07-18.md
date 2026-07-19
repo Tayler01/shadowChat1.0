@@ -321,8 +321,8 @@ The external signing and beta-distribution prerequisites are now in place:
 - Android package `com.shadowchat.mobile` has its Firebase project file and an
   active FCM V1 service-account credential in Expo. The former proof-shell APK
   is superseded; version-code `2` replacement build
-  `ef382e37-f474-4ada-9909-4efb8b36ece1` is compiling from the same full-app
-  source.
+  `ef382e37-f474-4ada-9909-4efb8b36ece1` finished successfully from the same
+  full-app source and is ready for physical-device validation.
 - the linked Supabase runtime is in `shadow` mode for the `dm` category and the
   single Tayler Kid canary account. Worker invocation and receipt
   reconciliation remain disabled.
@@ -375,7 +375,7 @@ before expanding categories or users.
 - App Store Connect build `5`: valid and in internal beta testing; build `3`
   removed from the internal group after its obsolete proof shell was identified
 - replacement Android EAS preview build
-  `ef382e37-f474-4ada-9909-4efb8b36ece1`: in progress
+  `ef382e37-f474-4ada-9909-4efb8b36ece1`: finished
 - Expo Android FCM V1 credential:
   `firebase-adminsdk-fbsvc@shadowchat-99822.iam.gserviceaccount.com`, active
 - linked rollout state: DM-only, one-account `shadow` canary; zero active native

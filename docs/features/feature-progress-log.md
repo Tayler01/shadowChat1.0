@@ -58,8 +58,8 @@ Canonical detail and release gates live in:
   `IN_BETA_TESTING` in `ShadoChat Internal Beta`; the account holder is
   auto-notified.
 - Android Firebase/FCM V1 credentials are configured in Expo and signed preview
-  replacement build `ef382e37-f474-4ada-9909-4efb8b36ece1` is compiling from
-  the same full-app source.
+  replacement build `ef382e37-f474-4ada-9909-4efb8b36ece1` finished from the
+  same full-app source and is ready for phone testing.
 - Linked notification-v2 migrations, worker version 3, secrets, and the worker
   health probe are verified. The backend is deliberately limited to a DM-only,
   one-account `shadow` canary with worker delivery disabled.
