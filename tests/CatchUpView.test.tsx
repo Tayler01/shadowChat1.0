@@ -290,6 +290,38 @@ test('shows canonical unread notifications and clears the exact event after open
   })
 })
 
+test('renders shared-envelope category and media while keeping the existing source action', async () => {
+  const emptySnapshot = snapshot()
+  emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')
+  fetchSnapshot.mockResolvedValue(emptySnapshot)
+  fetchInbox.mockResolvedValue(inboxPage([notificationItem('event-rich', {
+    notificationPresentation: {
+      schemaVersion: 2,
+      category: 'shadow_pin',
+      privacy: 'full',
+      media: {
+        kind: 'image',
+        thumbnailUrl: 'https://media.b-cdn.net/pin-preview.jpg',
+        alt: 'Pin preview',
+      },
+    },
+  })]))
+  const onOpenSource = jest.fn()
+
+  render(<CatchUpView currentView="catchup" onViewChange={jest.fn()} onOpenSource={onOpenSource} />)
+
+  expect(await screen.findByText('ShadowPin')).toBeInTheDocument()
+  expect(screen.getByTestId('catch-up-notification-media-notification:event-rich')).toHaveAttribute(
+    'src',
+    'https://media.b-cdn.net/pin-preview.jpg'
+  )
+  fireEvent.click(screen.getByRole('button', { name: 'New comment on your Pin' }))
+  await waitFor(() => expect(acknowledgeNotification).toHaveBeenCalledWith('event-rich'))
+  expect(onOpenSource).toHaveBeenCalledWith(expect.objectContaining({
+    notificationEventIds: ['event-rich'],
+  }))
+})
+
 test('shows the canonical unread total and marks the complete backlog read', async () => {
   const emptySnapshot = snapshot()
   emptySnapshot.sections.needs_you = section('needs_you', 'Needs you')

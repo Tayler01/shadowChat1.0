@@ -46,6 +46,85 @@ const getPayloadBadgeCount = (payload) => {
   return normalizeBadgeCount(count)
 }
 
+const asObject = (value) => (
+  value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+)
+
+const asBoundedString = (value, maxLength) => (
+  typeof value === 'string' && value.trim()
+    ? value.trim().slice(0, maxLength)
+    : null
+)
+
+const normalizeSameOriginRoute = (value) => {
+  const candidate = asBoundedString(value, 1024)
+  if (!candidate) return '/'
+  try {
+    const parsed = new URL(candidate, self.location.origin)
+    if (
+      parsed.origin !== self.location.origin ||
+      !parsed.pathname.startsWith('/') ||
+      parsed.pathname.startsWith('//')
+    ) {
+      return '/'
+    }
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`
+  } catch {
+    return '/'
+  }
+}
+
+const normalizeEnvelopeV2 = (payload) => {
+  const data = asObject(payload.data)
+  const candidate = asObject(
+    payload.envelopeV2 ??
+    data.envelopeV2 ??
+    data.notificationEnvelopeV2
+  )
+  if (
+    candidate.schemaVersion !== 2 ||
+    typeof candidate.eventId !== 'string' ||
+    typeof candidate.type !== 'string' ||
+    typeof candidate.groupKey !== 'string'
+  ) {
+    return null
+  }
+
+  const expiresAt = Date.parse(candidate.expiresAt)
+  if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
+    return { expired: true }
+  }
+
+  const content = asObject(candidate.content)
+  const actor = asObject(candidate.actor)
+  const media = asObject(candidate.media)
+  const eventIds = Array.isArray(candidate.eventIds)
+    ? candidate.eventIds.filter(value => typeof value === 'string').slice(0, 32)
+    : [candidate.eventId]
+  const actionKeys = Array.isArray(candidate.actions)
+    ? candidate.actions.filter(value => value === 'open' || value === 'mark_read')
+    : []
+
+  return {
+    expired: false,
+    eventId: candidate.eventId,
+    eventIds: eventIds.length ? eventIds : [candidate.eventId],
+    type: candidate.type,
+    category: asBoundedString(candidate.category, 64) || 'system',
+    entityId: asBoundedString(candidate.entityId, 128),
+    route: normalizeSameOriginRoute(candidate.route),
+    groupKey: asBoundedString(candidate.groupKey, 160) || `notification:${candidate.eventId}`,
+    priority: asBoundedString(candidate.priority, 16) || 'normal',
+    title: asBoundedString(content.title, 120) || 'ShadowChat',
+    body: asBoundedString(content.body, 240) || '',
+    icon: asBoundedString(actor.avatarUrl, 2048),
+    image: asBoundedString(media.thumbnailUrl, 2048),
+    actions: actionKeys,
+    soundId: asBoundedString(candidate.soundId, 64) || 'system_default',
+    createdAt: asBoundedString(candidate.createdAt, 64),
+  }
+}
+
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 let badgeUpdateVersion = 0
@@ -191,6 +270,8 @@ self.addEventListener('push', (event) => {
 
   event.waitUntil((async () => {
     const data = payload.data || payload
+    const envelopeV2 = normalizeEnvelopeV2(payload)
+    if (envelopeV2?.expired) return
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
     const visibleAppClients = clients.filter((client) => {
       try {
@@ -211,13 +292,35 @@ self.addEventListener('push', (event) => {
       return
     }
 
-    const title = payload.title || 'Shadow Chat'
+    const title = envelopeV2?.title || payload.title || 'Shadow Chat'
+    const notificationData = envelopeV2
+      ? {
+          ...data,
+          type: envelopeV2.type,
+          eventId: envelopeV2.eventId,
+          eventIds: envelopeV2.eventIds,
+          entityId: envelopeV2.entityId,
+          route: envelopeV2.route,
+          url: envelopeV2.route,
+          category: envelopeV2.category,
+          envelopeV2,
+        }
+      : data
     const options = {
-      body: payload.body || '',
-      icon: payload.icon || '/icons/app-icon-192.png',
+      body: envelopeV2?.body || payload.body || '',
+      icon: envelopeV2?.icon || payload.icon || '/icons/app-icon-192.png',
       badge: payload.badge || '/icons/badge.svg',
-      tag: payload.tag || undefined,
-      data,
+      image: envelopeV2?.image || payload.image || undefined,
+      tag: envelopeV2?.groupKey || payload.tag || undefined,
+      timestamp: envelopeV2?.createdAt
+        ? Date.parse(envelopeV2.createdAt)
+        : undefined,
+      renotify: envelopeV2?.priority === 'urgent',
+      silent: envelopeV2?.soundId === 'silent',
+      actions: envelopeV2?.actions.includes('mark_read')
+        ? [{ action: 'mark_read', title: 'Mark read' }]
+        : undefined,
+      data: notificationData,
     }
 
     const tasks = [self.registration.showNotification(title, options)]
@@ -233,30 +336,36 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
   const data = event.notification.data || {}
-  let targetUrl = data.url || data.route || '/'
-  if (data.type === 'dm_message' && data.conversationId && data.messageId) {
+  const envelopeV2 = data.envelopeV2 && data.envelopeV2.schemaVersion === 2
+    ? data.envelopeV2
+    : null
+  const action = event.action === 'mark_read' ? 'mark_read' : 'open'
+  let targetUrl = envelopeV2
+    ? normalizeSameOriginRoute(envelopeV2.route)
+    : data.url || data.route || '/'
+  if (!envelopeV2 && data.type === 'dm_message' && data.conversationId && data.messageId) {
     targetUrl = `/?view=dms&conversation=${encodeURIComponent(data.conversationId)}&message=${encodeURIComponent(data.messageId)}`
-  } else if (
+  } else if (!envelopeV2 && (
     (data.type === 'group_message' || data.type === 'mention' || data.type === 'reply') &&
     data.messageId
-  ) {
+  )) {
     targetUrl = `/?view=chat&message=${encodeURIComponent(data.messageId)}`
-  } else if (data.type === 'reaction' && data.messageId) {
+  } else if (!envelopeV2 && data.type === 'reaction' && data.messageId) {
     targetUrl = data.isDm && data.conversationId
       ? `/?view=dms&conversation=${encodeURIComponent(data.conversationId)}&message=${encodeURIComponent(data.messageId)}`
       : `/?view=chat&message=${encodeURIComponent(data.messageId)}`
-  } else if (data.type === 'hype_event') {
+  } else if (!envelopeV2 && data.type === 'hype_event') {
     targetUrl = data.messageId
       ? `/?view=chat&message=${encodeURIComponent(data.messageId)}`
       : '/?view=chat'
-  } else if (data.type === 'presence_active') {
+  } else if (!envelopeV2 && data.type === 'presence_active') {
     targetUrl = '/?view=active-users'
-  } else if (
+  } else if (!envelopeV2 && (
     (data.type === 'shadow_pin_post' ||
       data.type === 'shadow_pin_comment' ||
       data.type === 'shadow_pin_reply') &&
     data.imageId
-  ) {
+  )) {
     targetUrl = `/?view=pins&pin=${encodeURIComponent(data.imageId)}`
     if (data.type !== 'shadow_pin_post') {
       targetUrl += '&panel=comments'
@@ -264,8 +373,19 @@ self.addEventListener('notificationclick', (event) => {
         targetUrl += `&comment=${encodeURIComponent(data.commentId)}`
       }
     }
-  } else if (data.type === 'shadow_checkers_turn' && data.matchId) {
+  } else if (!envelopeV2 && data.type === 'shadow_checkers_turn' && data.matchId) {
     targetUrl = `/?view=games&experience=shadow-checkers&item=${encodeURIComponent(data.matchId)}`
+  }
+  targetUrl = normalizeSameOriginRoute(targetUrl)
+  if (action === 'mark_read') {
+    const actionUrl = new URL(targetUrl, self.location.origin)
+    actionUrl.searchParams.set('notificationAction', 'mark_read')
+    const actionEventIds = envelopeV2?.eventIds || data.eventIds || [data.eventId]
+    actionUrl.searchParams.set(
+      'notificationEvents',
+      actionEventIds.filter(value => typeof value === 'string').slice(0, 32).join(',')
+    )
+    targetUrl = `${actionUrl.pathname}${actionUrl.search}${actionUrl.hash}`
   }
   const targetHref = new URL(targetUrl, self.location.origin).href
 
@@ -279,6 +399,9 @@ self.addEventListener('notificationclick', (event) => {
       targetUrl,
       targetHref,
       data,
+      action,
+      eventId: envelopeV2?.eventId || data.eventId,
+      eventIds: envelopeV2?.eventIds || data.eventIds,
     })
   }
 

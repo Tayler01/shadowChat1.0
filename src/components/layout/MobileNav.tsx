@@ -42,12 +42,13 @@ export function MobileNav({
   const badgeState = useAppBadgeState()
   const activity = useOptionalActivity()
   const { status: resetStatus } = useOptionalClientReset()
-  const [page, setPage] = useState<0 | 1>(() => currentView === 'active-users' || currentView === 'weather' || currentView === 'discover' ? 1 : 0)
-  const [toolsMounted, setToolsMounted] = useState(() => currentView === 'active-users' || currentView === 'weather' || currentView === 'discover')
+  const [page, setPage] = useState<0 | 1>(() => currentView === 'games' || currentView === 'weather' || currentView === 'discover' ? 1 : 0)
+  const [toolsMounted, setToolsMounted] = useState(() => currentView === 'games' || currentView === 'weather' || currentView === 'discover')
   const primaryPageRef = useRef<HTMLUListElement>(null)
   const toolsPageRef = useRef<HTMLUListElement>(null)
   const totalUnread = conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)
   const catchUpUnread = badgeState.interactions + badgeState.connections
+  const moreUnread = badgeState.games
 
   const primaryItems = useMemo(() => [
     { id: 'chat' as const, icon: MessageSquare, label: 'Chat', badge: badgeState.group || null },
@@ -56,11 +57,10 @@ export function MobileNav({
     ...(ACTIVITY_FEATURE_ENABLED ? [{ id: 'activity' as const, icon: Bell, label: 'Activity', badge: activity?.unreadCount || null }] : []),
     ...(boardsEnabled ? [{ id: 'boards' as const, icon: Newspaper, label: 'Boards', badge: boardsBadgeCount || null }] : []),
     { id: 'pins' as const, icon: Images, label: 'Pins', badge: badgeState.shadow_pin || null },
-    { id: 'games' as const, icon: Gamepad2, label: 'Play', badge: badgeState.games || null },
+    { id: 'active-users' as const, icon: Users, label: 'Active', badge: null },
   ], [
     activity?.unreadCount,
     badgeState.dm,
-    badgeState.games,
     badgeState.group,
     badgeState.shadow_pin,
     boardsBadgeCount,
@@ -83,7 +83,7 @@ export function MobileNav({
   }, [])
 
   useEffect(() => {
-    if (currentView !== 'active-users' && currentView !== 'weather' && currentView !== 'discover') return
+    if (currentView !== 'games' && currentView !== 'weather' && currentView !== 'discover') return
     setToolsMounted(true)
     setPage(1)
   }, [currentView])
@@ -98,7 +98,7 @@ export function MobileNav({
     onViewChange(view)
   }
 
-  const showTools = () => {
+  const showMore = () => {
     setToolsMounted(true)
     setPage(1)
     window.requestAnimationFrame(() => {
@@ -114,9 +114,14 @@ export function MobileNav({
   }
 
   const openActiveUsers = () => {
+    setPage(0)
+    onViewChange('active-users')
+  }
+
+  const openGames = () => {
     setToolsMounted(true)
     setPage(1)
-    onViewChange('active-users')
+    onViewChange('games')
   }
 
   const openWeather = () => {
@@ -155,29 +160,52 @@ export function MobileNav({
         >
           {primaryItems.map(item => (
             <li key={item.id} className="relative min-w-0">
-              <button
-                type="button"
-                onClick={() => changeView(item.id)}
-                aria-label={`${item.label}${item.badge ? `, ${item.badge} unread` : ''}`}
-                aria-current={currentView === item.id ? 'page' : undefined}
-                className={`${pageButtonClass} ${currentView === item.id ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]' : ''}`}
-              >
-                <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
-                  <item.icon className="h-[1.15rem] w-[1.15rem]" />
-                  {item.badge ? (
-                    <span aria-hidden="true" className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[0.625rem] leading-none">
-                      {formatBadge(item.badge)}
-                    </span>
-                  ) : null}
-                </span>
-                <span>{item.label}</span>
-              </button>
+              {item.id === 'active-users' ? (
+                <Suspense fallback={<span className="block h-full w-full" aria-hidden="true" />}>
+                  <LazyActiveUsersButton
+                    resetStatus={resetStatus}
+                    variant="nav"
+                    onOpen={openActiveUsers}
+                    active={currentView === 'active-users'}
+                  />
+                </Suspense>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => changeView(item.id)}
+                  aria-label={`${item.label}${item.badge ? `, ${item.badge} unread` : ''}`}
+                  aria-current={currentView === item.id ? 'page' : undefined}
+                  className={`${pageButtonClass} ${currentView === item.id ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]' : ''}`}
+                >
+                  <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
+                    <item.icon className="h-[1.15rem] w-[1.15rem]" />
+                    {item.badge ? (
+                      <span aria-hidden="true" className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[0.625rem] leading-none">
+                        {formatBadge(item.badge)}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span>{item.label}</span>
+                </button>
+              )}
             </li>
           ))}
           <li className="min-w-0">
-            <button type="button" onClick={showTools} className={pageButtonClass} aria-label="Show app tools">
-              <span className="mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]"><ChevronRight className="h-[1.15rem] w-[1.15rem]" /></span>
-              <span>Tools</span>
+            <button
+              type="button"
+              onClick={showMore}
+              className={pageButtonClass}
+              aria-label={`Show more navigation${moreUnread ? `, ${moreUnread} unread` : ''}`}
+            >
+              <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
+                <ChevronRight className="h-[1.15rem] w-[1.15rem]" />
+                {moreUnread ? (
+                  <span aria-hidden="true" className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[0.625rem] leading-none">
+                    {formatBadge(moreUnread)}
+                  </span>
+                ) : null}
+              </span>
+              <span>More</span>
             </button>
           </li>
         </ul>
@@ -185,7 +213,7 @@ export function MobileNav({
         <ul
           ref={toolsPageRef}
           className="grid h-[var(--shadowchat-mobile-nav-row-height)] w-1/2 shrink-0 grid-cols-5 px-1"
-          aria-label="App tools"
+          aria-label="More navigation"
           aria-hidden={page === 0}
         >
           <li className="min-w-0">
@@ -200,16 +228,17 @@ export function MobileNav({
             ) : null}
           </li>
           <li className="min-w-0">
-            {toolsMounted ? (
-              <Suspense fallback={<span className="block h-full w-full" aria-hidden="true" />}>
-                <LazyActiveUsersButton
-                  resetStatus={resetStatus}
-                  variant="nav"
-                  onOpen={openActiveUsers}
-                  active={currentView === 'active-users'}
-                />
-              </Suspense>
-            ) : null}
+            <button type="button" onClick={openGames} className={`${pageButtonClass} ${currentView === 'games' ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]' : ''}`} aria-label={`Open Play${badgeState.games ? `, ${badgeState.games} unread` : ''}`} aria-current={currentView === 'games' ? 'page' : undefined}>
+              <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
+                <Gamepad2 className="h-[1.15rem] w-[1.15rem]" />
+                {badgeState.games ? (
+                  <span aria-hidden="true" className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[0.625rem] leading-none">
+                    {formatBadge(badgeState.games)}
+                  </span>
+                ) : null}
+              </span>
+              <span>Play</span>
+            </button>
           </li>
           <li className="min-w-0">
             {toolsMounted ? (

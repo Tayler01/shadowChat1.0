@@ -160,6 +160,22 @@ const getInitials = (item: CatchUpItem) => {
   return label.split(/\s+/u).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'S'
 }
 
+const getNotificationCategoryLabel = (category: string) => {
+  if (category === 'dm') return 'Direct message'
+  if (category === 'general_chat') return 'General Chat'
+  if (category === 'mentions_replies') return 'Mentions and replies'
+  if (category === 'reactions_hype') return 'Reactions and Hype'
+  if (category === 'shadow_pin') return 'ShadowPin'
+  if (category === 'connections') return 'Connections'
+  if (category === 'presence') return 'Active users'
+  if (category === 'shado_live') return 'Shado Live'
+  if (category === 'shadow_checkers') return 'Shadow Checkers'
+  if (category === 'shadow_war') return 'Shadow War'
+  if (category === 'weather') return 'Weather'
+  if (category === 'security') return 'Security'
+  return 'ShadowChat'
+}
+
 const removeOpenedActivityItem = (snapshot: CatchUpSnapshot, item: CatchUpItem): CatchUpSnapshot => {
   if (item.activityEventIds.length === 0) return snapshot
   const eventIds = new Set(item.activityEventIds)
@@ -218,8 +234,13 @@ function CatchUpCard({
           {getInitials(item)}
         </span>
       )}
-      <button type="button" onClick={onOpen} data-catch-up-item-id={item.id} className="flex min-h-16 min-w-0 flex-1 items-center rounded-[var(--radius-md)] text-left focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]" aria-labelledby={titleId} aria-describedby={detailsId}>
+      <button type="button" onClick={onOpen} data-catch-up-item-id={item.id} className="flex min-h-16 min-w-0 flex-1 items-center gap-3 rounded-[var(--radius-md)] text-left focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]" aria-labelledby={titleId} aria-describedby={detailsId}>
         <span className="min-w-0 flex-1">
+          {item.notificationPresentation && (
+            <span className="mb-1 block text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-gold)]">
+              {getNotificationCategoryLabel(item.notificationPresentation.category)}
+            </span>
+          )}
           <span className="flex items-start justify-between gap-3">
             <span id={titleId} className="truncate font-semibold text-[var(--text-primary)]">{item.title}</span>
             <span className="shrink-0 text-xs text-[var(--text-muted)]">{formatCatchUpTime(item.occurredAt)}</span>
@@ -230,6 +251,15 @@ function CatchUpCard({
             <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
         </span>
+        {item.notificationPresentation?.media && (
+          <img
+            src={item.notificationPresentation.media.thumbnailUrl}
+            alt=""
+            aria-hidden="true"
+            data-testid={`catch-up-notification-media-${item.id}`}
+            className="h-14 w-14 shrink-0 rounded-[var(--radius-sm)] border border-[var(--border-subtle)] object-cover"
+          />
+        )}
       </button>
     </article>
   )

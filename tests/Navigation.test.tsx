@@ -53,17 +53,21 @@ jest.mock('../src/hooks/useAuth', () => ({
   }),
 }))
 
-test('mobile navigation exposes four primary destinations and pauses Activity and Boards', () => {
+test('mobile navigation keeps Active on the primary page and Play behind More', async () => {
   const onViewChange = jest.fn()
   render(<MobileNav currentView="chat" onViewChange={onViewChange} />)
 
   expect(screen.queryByText('Boards')).not.toBeInTheDocument()
-  expect(screen.getByText('Play')).toBeInTheDocument()
   expect(screen.queryByText('Activity')).not.toBeInTheDocument()
-  expect(screen.getByText('Tools')).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Open active users' })).toBeInTheDocument()
+  expect(screen.getByText('More')).toBeInTheDocument()
+  expect(screen.queryByText('Tools')).not.toBeInTheDocument()
   expect(screen.queryByText('Profile')).toBeNull()
 
-  fireEvent.click(screen.getByText('Play'))
+  fireEvent.click(screen.getByRole('button', { name: 'Show more navigation, 2 unread' }))
+  expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
+  const play = await screen.findByRole('button', { name: 'Open Play, 2 unread' })
+  fireEvent.click(play)
   expect(onViewChange).toHaveBeenCalledWith('games')
 })
 
@@ -75,29 +79,31 @@ test('mobile navigation exposes only the active destination as the current page'
   expect(screen.getAllByRole('button').filter(button => button.hasAttribute('aria-current'))).toHaveLength(1)
 })
 
-test('mobile navigation makes every badge category findable at its source', () => {
+test('mobile navigation makes every badge category findable at its source', async () => {
   render(<MobileNav currentView="chat" onViewChange={jest.fn()} />)
 
   expect(screen.getByRole('button', { name: 'Chat, 3 unread' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'DMs, 2 unread' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Catch-Up, 5 unread' })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Pins, 3 unread' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Play, 2 unread' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Show more navigation, 2 unread' }))
+  expect(await screen.findByRole('button', { name: 'Open Play, 2 unread' })).toBeInTheDocument()
 })
 
 test('mobile navigation slides to utility controls and back', async () => {
   const onViewChange = jest.fn()
   render(<MobileNav currentView="chat" onViewChange={onViewChange} />)
 
-  fireEvent.click(screen.getByRole('button', { name: 'Show app tools' }))
+  expect(screen.getByRole('button', { name: 'Open active users' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Show more navigation, 2 unread' }))
   expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
   expect(await screen.findByText('Weather')).toBeInTheDocument()
-  expect(await screen.findByText('Active')).toBeInTheDocument()
+  expect(await screen.findByText('Play')).toBeInTheDocument()
   expect(await screen.findByText('Search')).toBeInTheDocument()
   expect(screen.getByText('Settings')).toBeInTheDocument()
 
-  fireEvent.click(screen.getByRole('button', { name: 'Open active users' }))
-  expect(onViewChange).toHaveBeenCalledWith('active-users')
+  fireEvent.click(screen.getByRole('button', { name: 'Open Play, 2 unread' }))
+  expect(onViewChange).toHaveBeenCalledWith('games')
   expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
 
   fireEvent.click(screen.getByRole('button', { name: 'Return to main navigation' }))
@@ -107,7 +113,7 @@ test('mobile navigation slides to utility controls and back', async () => {
 test('active users route keeps its existing utility icon visible and current', async () => {
   render(<MobileNav currentView="active-users" onViewChange={jest.fn()} />)
 
-  expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('-translate-x-1/2')
+  expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('translate-x-0')
   expect(await screen.findByRole('button', { name: 'Open active users' })).toHaveAttribute('aria-current', 'page')
 })
 

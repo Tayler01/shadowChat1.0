@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sampleRate": 44100,
+  "license": "Original ShadowChat generated assets",
+  "sounds": [
+    "shadow_whisper",
+    "low_glass",
+    "gold_signal",
+    "hype_burst",
+    "pin_shutter",
+    "connection_chime",
+    "presence_pulse",
+    "live_beacon",
+    "checkers_move",
+    "war_drum",
+    "weather_glass",
+    "security_signal"
+  ]
+}

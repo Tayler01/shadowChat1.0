@@ -19,6 +19,17 @@ export type CatchUpTarget =
   | { kind: 'pin_comment'; pin_id: string; comment_id: string }
   | { kind: 'app_route'; route: string }
 
+export type CatchUpNotificationPresentation = {
+  schemaVersion: 2
+  category: string
+  privacy: 'full' | 'sender_only' | 'private'
+  media: {
+    kind: 'image' | 'video'
+    thumbnailUrl: string
+    alt: string
+  } | null
+}
+
 export type CatchUpItem = {
   id: string
   kind: string
@@ -31,6 +42,7 @@ export type CatchUpItem = {
   target: CatchUpTarget
   activityEventIds: string[]
   notificationEventIds?: string[]
+  notificationPresentation?: CatchUpNotificationPresentation
 }
 
 export type CatchUpSection = {

@@ -1,4 +1,8 @@
 import type { NotificationPreferences } from '../../lib/push'
+import type {
+  NotificationPresentationCategory,
+  NotificationSoundId,
+} from './notificationEnvelopeV2'
 
 export type NotificationCategory =
   | 'dm'
@@ -34,6 +38,9 @@ export interface NotificationEventRecord {
 export type NotificationCoordinatorPreferences = NotificationPreferences & {
   checkers_turn_enabled?: boolean
   badge_games_enabled?: boolean
+  notification_sound_map?: Partial<
+    Record<NotificationPresentationCategory, NotificationSoundId>
+  >
 }
 
 export interface NotificationPresentation {

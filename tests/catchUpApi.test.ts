@@ -145,6 +145,180 @@ test('hydrates notification actors from the current safe public profile relation
   expect(select.mock.calls[0][1]).toEqual({ count: 'exact' })
 })
 
+test('uses a v2 envelope as the Catch-Up presentation authority while preserving the exact event id', async () => {
+  const eventLimit = jest.fn().mockResolvedValue({
+    data: [{
+      id: 'event-v2',
+      type: 'shadow_pin_comment',
+      category: 'shadow_pin',
+      actor_id: 'raw-actor',
+      route: '/?view=pins&pin=raw-pin',
+      payload: {
+        title: 'Raw title',
+        body: 'Raw private content',
+        image_id: 'raw-pin',
+      },
+      created_at: '2026-07-18T12:00:00.000Z',
+      actor: {
+        id: 'raw-actor',
+        display_name: 'Raw actor',
+      },
+    }],
+    error: null,
+    count: 1,
+  })
+  const eventOrder = jest.fn(() => ({ limit: eventLimit }))
+  const eventResolvedIs = jest.fn(() => ({ order: eventOrder }))
+  const eventReadIs = jest.fn(() => ({ is: eventResolvedIs }))
+  const eventSelect = jest.fn(() => ({ is: eventReadIs }))
+
+  const envelopeIn = jest.fn().mockResolvedValue({
+    data: [{
+      event_id: 'event-v2',
+      schema_version: 2,
+      category_key: 'shadow_pin',
+      title: 'Envelope title',
+      body: 'Envelope body',
+      private_title: 'Private notification',
+      private_body: 'Open ShadowChat to view it.',
+      actor_id: 'actor-v2',
+      route: '/?view=pins&pin=pin-v2&panel=comments&comment=comment-v2',
+      privacy_level: 'full',
+      media_ref: { kind: 'shadow_pin', image_id: 'pin-v2' },
+      actor: {
+        id: 'stale-embedded-id',
+        display_name: 'JJ',
+        username: 'jj',
+        avatar_url: 'https://shadochat.online/jj.jpg',
+        avatar_thumbnail_url: null,
+        color: '#d7aa46',
+      },
+    }],
+    error: null,
+  })
+  const envelopeSelect = jest.fn(() => ({ in: envelopeIn }))
+
+  const mediaIs = jest.fn().mockResolvedValue({
+    data: [{
+      id: 'pin-v2',
+      title: 'Pin preview',
+      thumbnail_url: 'https://media.b-cdn.net/pin-v2.jpg',
+      medium_url: null,
+      image_url: null,
+      image_content_type: 'image/jpeg',
+    }],
+    error: null,
+  })
+  const mediaIn = jest.fn(() => ({ is: mediaIs }))
+  const mediaSelect = jest.fn(() => ({ in: mediaIn }))
+
+  from.mockImplementation((table: string) => {
+    if (table === 'notification_events') return { select: eventSelect }
+    if (table === 'notification_envelopes_v2') return { select: envelopeSelect }
+    if (table === 'shadow_pin_images') return { select: mediaSelect }
+    throw new Error(`Unexpected table ${table}`)
+  })
+
+  await expect(fetchNotificationInbox()).resolves.toEqual({
+    items: [expect.objectContaining({
+      id: 'notification:event-v2',
+      actor: expect.objectContaining({
+        id: 'actor-v2',
+        display_name: 'JJ',
+      }),
+      title: 'Envelope title',
+      preview: 'Envelope body',
+      target: {
+        kind: 'app_route',
+        route: '/?view=pins&pin=pin-v2&panel=comments&comment=comment-v2',
+      },
+      notificationEventIds: ['event-v2'],
+      notificationPresentation: {
+        schemaVersion: 2,
+        category: 'shadow_pin',
+        privacy: 'full',
+        media: {
+          kind: 'image',
+          thumbnailUrl: 'https://media.b-cdn.net/pin-v2.jpg',
+          alt: 'Pin preview',
+        },
+      },
+    })],
+    totalCount: 1,
+  })
+  expect(envelopeIn).toHaveBeenCalledWith('event_id', ['event-v2'])
+  expect(mediaIn).toHaveBeenCalledWith('id', ['pin-v2'])
+})
+
+test('applies private envelope copy without leaking the raw actor, body, or media', async () => {
+  const eventLimit = jest.fn().mockResolvedValue({
+    data: [{
+      id: 'event-private',
+      type: 'dm_message',
+      category: 'dm',
+      actor_id: 'raw-actor',
+      route: '/?view=dms&conversation=raw',
+      payload: { title: 'Raw sender', body: 'Secret raw message' },
+      created_at: '2026-07-18T12:00:00.000Z',
+      actor: { id: 'raw-actor', display_name: 'Raw sender' },
+    }],
+    error: null,
+    count: 1,
+  })
+  const eventSelect = jest.fn(() => ({
+    is: jest.fn(() => ({
+      is: jest.fn(() => ({
+        order: jest.fn(() => ({ limit: eventLimit })),
+      })),
+    })),
+  }))
+  const envelopeIn = jest.fn().mockResolvedValue({
+    data: [{
+      event_id: 'event-private',
+      schema_version: 2,
+      category_key: 'dm',
+      title: 'JJ',
+      body: 'Secret envelope message',
+      private_title: 'New ShadowChat notification',
+      private_body: 'Open ShadowChat to view it.',
+      actor_id: 'actor-private',
+      route: '/?view=dms&conversation=dm-v2',
+      privacy_level: 'private',
+      media_ref: { kind: 'shadow_pin', image_id: 'pin-secret' },
+      actor: { id: 'actor-private', display_name: 'JJ' },
+    }],
+    error: null,
+  })
+  const envelopeSelect = jest.fn(() => ({ in: envelopeIn }))
+  const mediaIs = jest.fn().mockResolvedValue({ data: [], error: null })
+  const mediaSelect = jest.fn(() => ({
+    in: jest.fn(() => ({ is: mediaIs })),
+  }))
+  from.mockImplementation((table: string) => {
+    if (table === 'notification_events') return { select: eventSelect }
+    if (table === 'notification_envelopes_v2') return { select: envelopeSelect }
+    if (table === 'shadow_pin_images') return { select: mediaSelect }
+    throw new Error(`Unexpected table ${table}`)
+  })
+
+  const page = await fetchNotificationInbox()
+  expect(page.items[0]).toMatchObject({
+    actor: null,
+    title: 'New ShadowChat notification',
+    preview: 'Open ShadowChat to view it.',
+    target: { kind: 'app_route', route: '/?view=dms&conversation=dm-v2' },
+    notificationEventIds: ['event-private'],
+    notificationPresentation: {
+      category: 'dm',
+      privacy: 'private',
+      media: null,
+    },
+  })
+  expect(JSON.stringify(page)).not.toContain('Secret raw message')
+  expect(JSON.stringify(page)).not.toContain('Secret envelope message')
+  expect(JSON.stringify(page)).not.toContain('Raw sender')
+})
+
 test('rejects an unconfirmed notification read acknowledgement', async () => {
   rpc.mockResolvedValue({ data: false, error: null })
 

@@ -4,7 +4,7 @@ ShadowChat 1.0 is a premium dark realtime chat app built with React, TypeScript,
 
 The project is already wired for hosted Supabase and Netlify deployment. It is designed to behave like a product app, not a demo: realtime messaging, uploads, presence, settings, DMs, and notification flows are all first-class parts of the codebase.
 
-## Documentation Status - July 11, 2026
+## Documentation Status - July 18, 2026
 
 The documentation set has been refreshed for the July 9-10 alignment program
 and deployed Release A: paused product domains, Supabase
@@ -22,6 +22,15 @@ verification then found two historical active-table grants outside the reviewed
 contract; a forward revocation and follow-up release are the remaining closeout
 step. The latest successful `main` workflow plus the public health manifest are
 the authority for the live SHA and deployment state.
+
+The Notification Presentation v2 foundation is additive and runtime-disabled.
+It adds rich foreground/PWA presentation, privacy modes,
+per-category sound selection, a 12-sound original native pack, Expo
+registration/routing, installation-scoped delivery receipts, and a guarded
+Expo delivery worker without changing the canonical unread ledger. It is not a
+native-delivery acceptance claim, and deploying the foundation does not make
+V2 a notification transport owner; follow
+[docs/NOTIFICATION_PRESENTATION_V2_2026-07-18.md](C:/repos/chat2.0/docs/NOTIFICATION_PRESENTATION_V2_2026-07-18.md:1).
 
 The isolated `codex/shadowchat-2.0` branch contains all five Wave One candidate
 implementations. The current trial revision pauses Activity HQ and member-facing

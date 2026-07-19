@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "active": [
     { "name": "delete-account", "verifyJwt": false },
+    { "name": "deliver-notifications-v2", "verifyJwt": false },
     { "name": "klipy-gifs", "verifyJwt": true },
     { "name": "link-preview", "verifyJwt": false },
     { "name": "openai-chat", "verifyJwt": false },

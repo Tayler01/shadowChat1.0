@@ -1,6 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import {
   createContext,
+  lazy,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -9,25 +11,22 @@ import {
   type ReactNode,
 } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
-import {
-  Bell,
-  Gamepad2,
-  Images,
-  MessageCircle,
-  RadioTower,
-  UserRoundPlus,
-  Users,
-  X,
-} from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
+import { useSoundEffects } from '../../hooks/useSoundEffects'
+import { getUserProfile } from '../../lib/auth'
+import { updateWebNotificationInstallationForeground } from '../../lib/notificationInstallation'
 import {
   APP_BADGE_REFRESH_EVENT,
   refreshAppBadgeState,
   requestAppBadgeRefresh,
 } from '../../lib/appBadge'
 import { createRealtimeChannelName } from '../../lib/realtimeChannelName'
-import { getRealtimeClient, getWorkingClient } from '../../lib/supabase'
+import {
+  getRealtimeClient,
+  getWorkingClient,
+  type User,
+} from '../../lib/supabase'
 import {
   clearNotificationEventFromSystemTray,
   claimNotificationEvent,
@@ -45,15 +44,32 @@ import {
   type NotificationEventRecord,
   type NotificationPresentation,
 } from './notificationModel'
+import { NotificationBannerV2 } from './NotificationBannerV2'
+import {
+  buildNotificationEnvelopeV2,
+  getNotificationTypePolicyV2,
+  type NotificationEnvelopeV2,
+} from './notificationEnvelopeV2'
 import {
   dispatchConnectionsChanged,
   getConnectionNotificationTargetUserId,
   isConnectionNotificationType,
 } from '../connections/connectionModel'
 
-const PRESENTATION_DURATION_MS = 5_000
 const PREFERENCES_REFRESH_MS = 30_000
 const MAX_QUEUED_PRESENTATIONS = 4
+const GROUP_WINDOW_MS = 4_000
+
+const PublicProfileDialog = lazy(() =>
+  import('../../components/profile/PublicProfileDialog').then(module => ({
+    default: module.PublicProfileDialog,
+  }))
+)
+
+interface QueuedNotificationPresentation {
+  presentation: NotificationPresentation
+  envelope: NotificationEnvelopeV2
+}
 
 interface NotificationCoordinatorContextValue {
   dismissAll: () => void
@@ -86,119 +102,12 @@ const openNotificationRoute = (route: string) => {
   }))
 }
 
-const getPresentationIcon = (type: string) => {
-  if (type === 'dm_message') return Users
-  if (type === 'group_message' || type === 'mention' || type === 'reply' || type === 'reaction' || type === 'hype_event') {
-    return MessageCircle
-  }
-  if (type.startsWith('shadow_pin_')) return Images
-  if (type.startsWith('connection_')) return UserRoundPlus
-  if (type === 'presence_active') return RadioTower
-  if (type.startsWith('shado_live_')) return RadioTower
-  if (type === 'shadow_checkers_turn') return Gamepad2
-  return Bell
-}
-
-function NotificationTray({
-  presentation,
-  desktop,
-  onDismiss,
-  onOpen,
-}: {
-  presentation: NotificationPresentation | null
-  desktop: boolean
-  onDismiss: (eventId: string) => void
-  onOpen: (presentation: NotificationPresentation) => void
-}) {
-  const deadlineRef = useRef(0)
-
-  useEffect(() => {
-    if (!presentation) return
-
-    const eventId = presentation.event.id
-    deadlineRef.current = Date.now() + PRESENTATION_DURATION_MS
-    const dismissIfDue = () => {
-      if (Date.now() >= deadlineRef.current) onDismiss(eventId)
-    }
-    const timerId = window.setTimeout(dismissIfDue, PRESENTATION_DURATION_MS)
-    const intervalId = window.setInterval(dismissIfDue, 500)
-    window.addEventListener('focus', dismissIfDue)
-    window.addEventListener('pageshow', dismissIfDue)
-    document.addEventListener('visibilitychange', dismissIfDue)
-
-    return () => {
-      window.clearTimeout(timerId)
-      window.clearInterval(intervalId)
-      window.removeEventListener('focus', dismissIfDue)
-      window.removeEventListener('pageshow', dismissIfDue)
-      document.removeEventListener('visibilitychange', dismissIfDue)
-    }
-  }, [onDismiss, presentation])
-
-  if (!presentation) return null
-  const Icon = getPresentationIcon(presentation.event.type)
-  const initial = (presentation.actorLabel ?? presentation.title).charAt(0).toUpperCase()
-
-  return (
-    <div
-      className={`pointer-events-none fixed z-[10050] ${
-        desktop
-          ? 'right-5 top-5 w-[22rem]'
-          : 'left-4 right-4 top-[var(--shadowchat-toast-top,calc(env(safe-area-inset-top)+4.5rem))]'
-      }`}
-      aria-live="polite"
-      aria-atomic="true"
-      data-testid="notification-coordinator-tray"
-    >
-      <div className="popup-surface pointer-events-auto mx-auto flex w-full max-w-[24rem] items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--border-panel)] p-3 text-left shadow-[var(--shadow-panel-strong)]">
-        <button
-          type="button"
-          onClick={() => onOpen(presentation)}
-          className="flex min-w-0 flex-1 items-start gap-3 text-left"
-          aria-label={`${presentation.title}. Open notification.`}
-        >
-          <span className="relative mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-soft)] text-sm font-semibold text-[var(--theme-accent-readable)]">
-            {presentation.avatarUrl ? (
-              <img
-                src={presentation.avatarUrl}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              initial
-            )}
-            <span className="absolute bottom-[-0.1rem] right-[-0.1rem] inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--bg-panel-strong)] text-[var(--theme-accent-readable)]">
-              <Icon className="h-3 w-3" aria-hidden="true" />
-            </span>
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold leading-5 text-[var(--text-primary)]">
-              {presentation.title}
-            </span>
-            {presentation.body && (
-              <span className="mt-0.5 line-clamp-2 block text-xs leading-5 text-[var(--text-secondary)]">
-                {presentation.body}
-              </span>
-            )}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => onDismiss(presentation.event.id)}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-panel-hover)] hover:text-[var(--text-primary)]"
-          aria-label="Dismiss notification"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
-  )
-}
-
 export function NotificationCoordinatorProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const isDesktop = useIsDesktop()
-  const [queue, setQueue] = useState<NotificationPresentation[]>([])
+  const { playNotificationCue } = useSoundEffects()
+  const [queue, setQueue] = useState<QueuedNotificationPresentation[]>([])
+  const [selectedProfile, setSelectedProfile] = useState<User | null>(null)
   const preferencesRef = useRef<NotificationCoordinatorPreferences | null>(null)
   const preferencesLoadedAtRef = useRef(0)
   const preferencesRequestRef = useRef<Promise<NotificationCoordinatorPreferences> | null>(null)
@@ -214,8 +123,8 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
   const dismissEvent = useCallback((eventId: string) => {
     const now = Date.now()
     setQueue(current => current
-      .filter(item => item.event.id !== eventId)
-      .filter(item => Date.parse(item.event.presentation_expires_at) > now))
+      .filter(item => !item.envelope.eventIds.includes(eventId))
+      .filter(item => Date.parse(item.envelope.expiresAt) > now))
   }, [])
 
   const refreshBadgeState = useCallback(async () => {
@@ -245,13 +154,60 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
     return preferencesRequestRef.current
   }, [user?.id])
 
-  const enqueuePresentation = useCallback((presentation: NotificationPresentation) => {
+  const enqueuePresentation = useCallback((item: QueuedNotificationPresentation) => {
     setQueue(current => {
-      if (current.some(item => item.event.id === presentation.event.id)) return current
+      if (current.some(queued => queued.envelope.eventIds.includes(item.envelope.eventId))) {
+        return current
+      }
       const unexpired = current.filter(
-        item => Date.parse(item.event.presentation_expires_at) > Date.now(),
+        queued => Date.parse(queued.envelope.expiresAt) > Date.now(),
       )
-      return [...unexpired, presentation].slice(0, MAX_QUEUED_PRESENTATIONS)
+      const groupedIndex = unexpired.findIndex(queued => (
+        queued.envelope.groupKey === item.envelope.groupKey &&
+        Math.abs(
+          Date.parse(queued.envelope.createdAt) -
+          Date.parse(item.envelope.createdAt),
+        ) <= GROUP_WINDOW_MS
+      ))
+      if (groupedIndex >= 0) {
+        const existing = unexpired[groupedIndex]
+        const eventIds = [...new Set([
+          ...existing.envelope.eventIds,
+          ...item.envelope.eventIds,
+        ])]
+        const count = eventIds.length
+        const groupedTitle = item.envelope.category === 'dm' && item.envelope.actor
+          ? `${count} new messages from ${item.envelope.actor.label}`
+          : item.envelope.category === 'shadow_pin'
+            ? `${count} new ShadowPin updates`
+            : item.envelope.category === 'general_chat'
+              ? `${count} new General Chat messages`
+              : `${count} new updates`
+        const next = [...unexpired]
+        next[groupedIndex] = {
+          presentation: item.presentation,
+          envelope: {
+            ...item.envelope,
+            eventIds,
+            content: {
+              ...item.envelope.content,
+              title: groupedTitle,
+            },
+          },
+        }
+        return next
+      }
+
+      const next = [...unexpired, item]
+      return next
+        .sort((left, right) => {
+          const rank = { urgent: 3, high: 2, normal: 1, ambient: 0 }
+          return (
+            rank[right.envelope.priority] - rank[left.envelope.priority] ||
+            Date.parse(left.envelope.createdAt) - Date.parse(right.envelope.createdAt)
+          )
+        })
+        .slice(0, MAX_QUEUED_PRESENTATIONS)
     })
   }, [])
 
@@ -285,7 +241,17 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
 
       const presentation = buildNotificationPresentation(event)
       if (isNotificationSourceActive(presentation.route, window.location.href)) return
-      enqueuePresentation(presentation)
+      const envelope = buildNotificationEnvelopeV2(event, presentation, {
+        previewMode: preferences.notification_preview_mode,
+        mediaEnabled: preferences.notification_media_enabled,
+        soundId: preferences.notification_sound_map?.[
+          getNotificationTypePolicyV2(event.type).category
+        ],
+      })
+      enqueuePresentation({ presentation, envelope })
+      if (preferences.notification_foreground_sounds_enabled !== false) {
+        playNotificationCue(envelope.soundId)
+      }
       if (presentation.autoRead) {
         await markNotificationEventRead(event.id)
         requestAppBadgeRefresh()
@@ -293,7 +259,7 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
     } catch {
       handledEventIdsRef.current.delete(event.id)
     }
-  }, [enqueuePresentation, refreshPreferences, user?.id])
+  }, [enqueuePresentation, playNotificationCue, refreshPreferences, user?.id])
 
   const recoverVisibleEvents = useCallback(async () => {
     const visibleSince = visibleSinceRef.current
@@ -306,21 +272,35 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
     }
   }, [handleEvent, user?.id])
 
-  const openPresentation = useCallback((presentation: NotificationPresentation) => {
-    dismissEvent(presentation.event.id)
-    const media = getNotificationEventMediaIds(presentation.event)
-    void Promise.allSettled([
-      markNotificationEventRead(presentation.event.id),
+  const openPresentation = useCallback((envelope: NotificationEnvelopeV2) => {
+    const queued = queue.find(item => item.envelope.eventIds.includes(envelope.eventId))
+    if (!queued) return
+    dismissEvent(envelope.eventId)
+    const media = getNotificationEventMediaIds(queued.presentation.event)
+    void Promise.allSettled(envelope.eventIds.flatMap(eventId => [
+      markNotificationEventRead(eventId),
       clearNotificationEventFromSystemTray({
-        notificationType: presentation.event.type,
-        eventId: presentation.event.id,
-        conversationId: presentation.event.conversation_id,
-        messageId: presentation.event.dm_message_id ?? presentation.event.message_id,
+        notificationType: queued.presentation.event.type,
+        eventId,
+        conversationId: queued.presentation.event.conversation_id,
+        messageId: (
+          queued.presentation.event.dm_message_id ??
+          queued.presentation.event.message_id
+        ),
         ...media,
       }),
-    ]).finally(() => requestAppBadgeRefresh())
-    openNotificationRoute(presentation.route)
-  }, [dismissEvent])
+    ])).finally(() => requestAppBadgeRefresh())
+    openNotificationRoute(envelope.route)
+  }, [dismissEvent, queue])
+
+  const openProfile = useCallback(async (profileId: string) => {
+    try {
+      const profile = await getUserProfile(profileId)
+      if (profile) setSelectedProfile(profile)
+    } catch {
+      // The notification remains usable even if the current profile is unavailable.
+    }
+  }, [])
 
   useEffect(() => {
     preferencesRef.current = null
@@ -410,6 +390,7 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
     const beginVisibleSession = () => {
       if (document.visibilityState !== 'visible') return
       if (visibleSinceRef.current === null) visibleSinceRef.current = Date.now()
+      void updateWebNotificationInstallationForeground(true).catch(() => undefined)
       void refreshPreferences(true).catch(() => undefined)
       void refreshBadgeState()
       void recoverVisibleEvents()
@@ -418,6 +399,7 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
       if (document.visibilityState === 'hidden') {
         visibleSinceRef.current = null
         dismissAll()
+        void updateWebNotificationInstallationForeground(false).catch(() => undefined)
         return
       }
       beginVisibleSession()
@@ -438,7 +420,10 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
     window.addEventListener(APP_BADGE_REFRESH_EVENT, handleBadgeRequest)
     document.addEventListener('visibilitychange', handleVisibility)
     const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'visible') void refreshBadgeState()
+      if (document.visibilityState === 'visible') {
+        void refreshBadgeState()
+        void updateWebNotificationInstallationForeground(true).catch(() => undefined)
+      }
     }, 30_000)
     return () => {
       window.clearInterval(intervalId)
@@ -462,12 +447,35 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
   return (
     <NotificationCoordinatorContext.Provider value={contextValue}>
       {children}
-      <NotificationTray
-        presentation={queue[0] ?? null}
-        desktop={isDesktop}
-        onDismiss={dismissEvent}
-        onOpen={openPresentation}
-      />
+      {queue[0] && (
+        <div
+          className={`pointer-events-none fixed z-[10050] ${
+            isDesktop
+              ? 'right-5 top-5 w-[25rem]'
+              : 'left-3 right-3 top-[var(--shadowchat-toast-top,calc(env(safe-area-inset-top)+4.5rem))]'
+          }`}
+          aria-live="off"
+          data-testid="notification-coordinator-tray"
+        >
+          <NotificationBannerV2
+            envelope={queue[0].envelope}
+            desktop={isDesktop}
+            queuedCount={Math.max(0, queue.length - 1)}
+            onDismiss={dismissEvent}
+            onOpen={openPresentation}
+            onOpenProfile={profileId => void openProfile(profileId)}
+          />
+        </div>
+      )}
+      {selectedProfile && (
+        <Suspense fallback={null}>
+          <PublicProfileDialog
+            user={selectedProfile}
+            open
+            onClose={() => setSelectedProfile(null)}
+          />
+        </Suspense>
+      )}
     </NotificationCoordinatorContext.Provider>
   )
 }

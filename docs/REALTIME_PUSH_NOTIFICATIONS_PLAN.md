@@ -1,6 +1,6 @@
 # Realtime Push Notifications Plan
 
-## Documentation Status - July 17, 2026
+## Documentation Status - July 18, 2026
 
 This file documents the notification architecture shipped in Release A rather
 than only the original plan. The deployed release includes targeted
@@ -20,6 +20,15 @@ inbox, rebuilds notification settings, mirrors Shado Live into the canonical
 ledger, and adds server-authored Shadow Checkers turn events. See
 [NOTIFICATION_RELIABILITY_REBUILD_2026-07-17.md](./NOTIFICATION_RELIABILITY_REBUILD_2026-07-17.md).
 It is locally accepted but not deployed.
+
+The additive Notification Presentation v2 candidate now adds the canonical
+presentation envelope, privacy modes, per-category sounds, original native
+sound pack, rich actor/media presentation, installation-scoped native tokens,
+per-install receipts, Expo delivery worker, and Expo client registration and
+routing. It deliberately leaves `notification_events` as the only unread/read
+and badge authority and remains runtime-disabled until physical iPhone and
+Android acceptance. See
+[NOTIFICATION_PRESENTATION_V2_2026-07-18.md](./NOTIFICATION_PRESENTATION_V2_2026-07-18.md).
 
 ## Goal
 

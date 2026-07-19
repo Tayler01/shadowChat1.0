@@ -8,7 +8,7 @@ Engineering security gates, staging parity, privacy-safe telemetry, real-device
 release validation, and production monitoring are defined in
 [ENGINEERING_SAFEGUARDS.md](C:/repos/chat2.0/docs/ENGINEERING_SAFEGUARDS.md:1).
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 18, 2026
 
 This guide reflects the current GitHub Actions, Netlify, Supabase, Render,
 app-release, invite-only signup/email-verification rollout, and production-smoke
@@ -87,6 +87,25 @@ Pop-Location
 Expo 57, React Native 0.86, and React 19.2 are the local native-client baseline.
 Those checks do not deploy the native client and do not replace installed PWA
 or production browser smoke.
+
+Notification Presentation v2 has an additional native release gate. Before its
+runtime flag or `deliver-notifications-v2` worker becomes a production delivery
+owner:
+
+1. authenticate EAS CLI and set the real Expo project id
+2. create signed iOS and Android development builds
+3. add and verify the iOS Notification Service Extension for rich images
+4. register real Expo push tokens on both platforms
+5. verify foreground suppression, background delivery, custom sounds, privacy
+   modes, actions, cold-start routes, badges, receipts, and invalid-token
+   cleanup on physical devices
+6. enable one canary category with exactly one delivery owner, then review
+   receipts before expanding
+
+The database migration and worker are additive and default-disabled. Do not
+interpret a successful web build or Expo Doctor result as native push proof.
+See
+[NOTIFICATION_PRESENTATION_V2_2026-07-18.md](C:/repos/chat2.0/docs/NOTIFICATION_PRESENTATION_V2_2026-07-18.md:1).
 
 If the change affects realtime or UI behavior, also run a headed browser smoke before shipping.
 
@@ -229,7 +248,7 @@ npx netlify deploy --prod
 
 This project already includes:
 
-- linked Netlify metadata under [`.netlify`](C:/repos/chat2.0/.netlify/state.json:1)
+- linked local Netlify metadata under `.netlify/state.json` (ignored from Git)
 - a production build command in [netlify.toml](C:/repos/chat2.0/netlify.toml:1)
 - GitHub Actions production deployment on every push to `main`
 

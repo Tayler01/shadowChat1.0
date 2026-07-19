@@ -519,6 +519,33 @@ Latest focused pass: `node scripts/mobile-pwa-visual-qa.mjs --run-name=mobile-he
   real room lifecycle runs still produce zero automatic receipts. Re-run the
   LiveKit dashboard test event after correcting the webhook entry.
 
+## July 18 Notification Presentation v2 Checkpoint
+
+- Mobile bottom navigation now keeps Active Users on the first page, moves
+  Play to the second page, and names the page-swap control More.
+- The foreground notification banner uses the shared obsidian-and-gold system,
+  48px controls, actor PFP/profile navigation, optional media, contextual
+  actions, Comfort-aware motion, pause-aware timing, and grouped event ids.
+- The native Expo client configures action categories, private lock-screen
+  visibility, 14 immutable v2 sound channels, and 12 original bundled sounds.
+- Local gates passed: app and mobile lint/typecheck, Expo Doctor 20/20,
+  production build and budgets, database reset/lint/security contract, Deno
+  check, Node contracts, and focused notification/navigation suites.
+- The hardened notification visual gate passed iPhone WebKit and Android
+  Chromium with the real service worker controlling both profiles, the real
+  coordinator banner routing to Pins, worker-message routing to Active Users,
+  48px controls, and zero unexpected console/page/network errors. Evidence:
+  `output/playwright/notification-presentation-v2-hardened-r4/summary.json`.
+- The final full gate passed 238 Jest suites (1,320 tests plus 16 documented
+  TODOs), 47 Node contract tests, and five Deno worker retry tests.
+- A transactional two-user local database proof verified truly dormant
+  disabled mode, provider-silent shadow planning, native-token ownership
+  transfer on account switch, prior-installation revocation, cross-user RLS
+  isolation, private token grants, and per-installation claim idempotency.
+- Physical installed-PWA and native-development-build notification delivery
+  remains required. EAS was not authenticated on this workstation, so no
+  native binary or real Expo push token was produced.
+
 ## Historical May Summary
 
 The automated mobile PWA visual loop passed across the core installed-home-screen simulations. Final required checks also passed: lint, typecheck, build, Jest, existing mobile smoke, full smoke, and the focused mobile PWA harness. Remaining mobile-specific risk is limited to real-device behavior that Playwright cannot fully reproduce: native keyboard animation, iOS standalone status bar behavior, home indicator safe-area behavior on physical devices, and touch comfort for dense secondary controls.

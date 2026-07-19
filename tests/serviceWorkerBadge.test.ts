@@ -167,6 +167,151 @@ describe('service worker app badge handling', () => {
     })
   })
 
+  it('renders a current v2 envelope with rich media, grouping, and mark-read action', async () => {
+    const { listeners, showNotification } = loadServiceWorker()
+    const pending: Promise<unknown>[] = []
+    const createdAt = new Date().toISOString()
+
+    listeners.push({
+      data: {
+        json: () => ({
+          envelopeV2: {
+            schemaVersion: 2,
+            eventId: 'event-rich',
+            eventIds: ['event-rich'],
+            type: 'shadow_pin_post',
+            category: 'shadow_pin',
+            entityId: 'pin-1',
+            route: '/?view=pins&pin=pin-1',
+            groupKey: 'pin:pin-1',
+            priority: 'normal',
+            actor: {
+              avatarUrl: 'https://cdn.example.com/avatar.jpg',
+            },
+            content: {
+              title: 'New pin from JJ',
+              body: 'Night flight',
+            },
+            media: {
+              thumbnailUrl: 'https://cdn.example.com/pin.jpg',
+            },
+            actions: ['open', 'mark_read'],
+            soundId: 'pin_shutter',
+            createdAt,
+            expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          },
+        }),
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+
+    expect(showNotification).toHaveBeenCalledWith(
+      'New pin from JJ',
+      expect.objectContaining({
+        body: 'Night flight',
+        icon: 'https://cdn.example.com/avatar.jpg',
+        image: 'https://cdn.example.com/pin.jpg',
+        tag: 'pin:pin-1',
+        timestamp: Date.parse(createdAt),
+        actions: [{ action: 'mark_read', title: 'Mark read' }],
+        data: expect.objectContaining({
+          eventId: 'event-rich',
+          route: '/?view=pins&pin=pin-1',
+        }),
+      }),
+    )
+  })
+
+  it('drops an expired v2 envelope instead of creating a stale tray item', async () => {
+    const { listeners, showNotification } = loadServiceWorker()
+    const pending: Promise<unknown>[] = []
+
+    listeners.push({
+      data: {
+        json: () => ({
+          envelopeV2: {
+            schemaVersion: 2,
+            eventId: 'event-expired',
+            type: 'dm_message',
+            groupKey: 'dm:one',
+            expiresAt: new Date(Date.now() - 1_000).toISOString(),
+          },
+        }),
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+    expect(showNotification).not.toHaveBeenCalled()
+  })
+
+  it('routes v2 mark-read actions with exact event ids through the existing app client', async () => {
+    const { clients, listeners } = loadServiceWorker()
+    const postMessage = jest.fn()
+    const focus = jest.fn().mockResolvedValue(undefined)
+    const navigate = jest.fn().mockResolvedValue(null)
+    clients.matchAll.mockResolvedValueOnce([{
+      url: 'https://shadowchat.test/?view=chat',
+      postMessage,
+      focus,
+      navigate,
+    }])
+    const pending: Promise<unknown>[] = []
+
+    listeners.notificationclick({
+      action: 'mark_read',
+      notification: {
+        close: jest.fn(),
+        data: {
+          envelopeV2: {
+            schemaVersion: 2,
+            eventId: 'event-a',
+            eventIds: ['event-a', 'event-b'],
+            route: '/?view=dms&conversation=conversation-a',
+          },
+        },
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+
+    expect(navigate).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'notificationAction=mark_read&notificationEvents=event-a%2Cevent-b',
+      ),
+    )
+    expect(postMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'SHADOWCHAT_NOTIFICATION_CLICK',
+      action: 'mark_read',
+      eventId: 'event-a',
+      eventIds: ['event-a', 'event-b'],
+    }))
+    expect(focus).toHaveBeenCalled()
+  })
+
+  it('confines legacy notification routes to the ShadowChat origin', async () => {
+    const { clients, listeners } = loadServiceWorker()
+    const pending: Promise<unknown>[] = []
+
+    listeners.notificationclick({
+      notification: {
+        close: jest.fn(),
+        data: {
+          type: 'system',
+          url: 'https://malicious.example/phish',
+        },
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+
+    expect(clients.openWindow).toHaveBeenCalledWith('https://shadowchat.test/')
+  })
+
   it('closes only DM notifications for the conversation that was read', async () => {
     const { listeners, notifications } = loadServiceWorker()
     const closeReadConversation = jest.fn()

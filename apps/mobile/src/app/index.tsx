@@ -24,6 +24,7 @@ import {
 } from '@/lib/shadow-chat-api';
 import { getSupabase, isSupabaseConfigured, removeRealtimeChannel } from '@/lib/supabase';
 import type { GeneralChatMessage, ShadowUser } from '@/types/shadow-chat';
+import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 
 const colors = {
   background: '#050505',
@@ -177,6 +178,7 @@ function MessageRow({
 }
 
 export default function GeneralChatScreen() {
+  const nativeNotifications = useNativeNotifications();
   const listRef = useRef<FlatList<GeneralChatMessage>>(null);
   const [initialized, setInitialized] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
@@ -305,11 +307,12 @@ export default function GeneralChatScreen() {
 
   const handleSignOut = useCallback(async () => {
     setError(null);
+    await nativeNotifications.disableThisDevice().catch(() => undefined);
     const { error: signOutError } = await getSupabase().auth.signOut();
     if (signOutError) {
       setError(signOutError.message);
     }
-  }, []);
+  }, [nativeNotifications]);
 
   const handleSend = useCallback(async () => {
     const content = draft.trim();
@@ -361,20 +364,44 @@ export default function GeneralChatScreen() {
             <Text style={styles.headerEyebrow}>General Chat</Text>
             <Text style={styles.headerTitle}>{signedInName}</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              void handleSignOut();
-            }}
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.secondaryButtonText}>Sign Out</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              accessibilityLabel={nativeNotifications.enabled ? 'Disable notifications on this device' : 'Enable notifications on this device'}
+              accessibilityRole="button"
+              disabled={nativeNotifications.busy}
+              onPress={() => {
+                if (nativeNotifications.enabled) {
+                  void nativeNotifications.disableThisDevice();
+                } else {
+                  void nativeNotifications.enable();
+                }
+              }}
+              style={({ pressed }) => [
+                styles.secondaryButton,
+                nativeNotifications.enabled && styles.notificationButtonEnabled,
+                nativeNotifications.busy && styles.disabledButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={styles.secondaryButtonText}>
+                {nativeNotifications.busy ? 'Alerts…' : nativeNotifications.enabled ? 'Alerts On' : 'Alerts'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                void handleSignOut();
+              }}
+              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            >
+              <Text style={styles.secondaryButtonText}>Sign Out</Text>
+            </Pressable>
+          </View>
         </View>
 
-        {error && (
+        {(error || nativeNotifications.error) && (
           <Text selectable style={styles.inlineError}>
-            {error}
+            {error || nativeNotifications.error}
           </Text>
         )}
 
@@ -522,6 +549,13 @@ const styles = StyleSheet.create({
     color: colors.goldStrong,
     fontSize: 13,
     fontWeight: '700',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  notificationButtonEnabled: {
+    backgroundColor: 'rgba(233, 199, 102, 0.12)',
   },
   disabledButton: {
     opacity: 0.46,

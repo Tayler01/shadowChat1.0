@@ -56,6 +56,11 @@ import type { ActivityTarget } from './features/activity/activityModel'
 import { buildCatchUpTargetUrl, type CatchUpItem } from './features/catch-up/catchUpModel'
 import { FirstRunActivationCoordinator } from './features/activation/FirstRunActivationCoordinator'
 import { NotificationCoordinatorProvider } from './features/notifications/NotificationCoordinator'
+import {
+  clearNotificationEventFromSystemTray,
+  markNotificationEventRead,
+} from './features/notifications/notificationApi'
+import { requestAppBadgeRefresh } from './lib/appBadge'
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -347,6 +352,20 @@ function App() {
         return
       }
 
+      const action = event.data.action
+      const rawEventIds = Array.isArray(event.data.eventIds)
+        ? event.data.eventIds
+        : [event.data.eventId]
+      const eventIds = rawEventIds.filter(
+        (eventId: unknown): eventId is string => typeof eventId === 'string' && eventId.length > 0,
+      )
+      if (action === 'mark_read' && eventIds.length > 0) {
+        void Promise.allSettled(eventIds.map(async (eventId: string) => {
+          await markNotificationEventRead(eventId)
+          await clearNotificationEventFromSystemTray({ eventId })
+        })).finally(() => requestAppBadgeRefresh())
+      }
+
       window.history.replaceState({}, '', nextUrl)
       applyLocationState(getLocationStateFromUrl(nextUrl))
     }
@@ -354,6 +373,24 @@ function App() {
     window.addEventListener('popstate', applyUrlState)
     window.addEventListener('pageshow', applyUrlState)
     navigator.serviceWorker?.addEventListener('message', applyServiceWorkerNotificationClick)
+
+    const currentUrl = new URL(window.location.href)
+    if (currentUrl.searchParams.get('notificationAction') === 'mark_read') {
+      const eventIds = (currentUrl.searchParams.get('notificationEvents') ?? '')
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean)
+        .slice(0, 32)
+      currentUrl.searchParams.delete('notificationAction')
+      currentUrl.searchParams.delete('notificationEvents')
+      window.history.replaceState({}, '', currentUrl)
+      if (eventIds.length > 0) {
+        void Promise.allSettled(eventIds.map(async eventId => {
+          await markNotificationEventRead(eventId)
+          await clearNotificationEventFromSystemTray({ eventId })
+        })).finally(() => requestAppBadgeRefresh())
+      }
+    }
 
     return () => {
       window.removeEventListener('popstate', applyUrlState)
@@ -908,10 +945,10 @@ function App() {
   }
 
   return (
-    <NotificationCoordinatorProvider>
-      <AuthGuard>
-        <ClientResetProvider>
-          <SoundEffectsProvider>
+    <SoundEffectsProvider>
+      <NotificationCoordinatorProvider>
+        <AuthGuard>
+          <ClientResetProvider>
             <MessagesProvider>
               <HypeProvider>
                 <DirectMessagesProvider>
@@ -919,10 +956,9 @@ function App() {
                 </DirectMessagesProvider>
               </HypeProvider>
             </MessagesProvider>
-          </SoundEffectsProvider>
-        </ClientResetProvider>
-      </AuthGuard>
-    <Toaster
+          </ClientResetProvider>
+        </AuthGuard>
+      <Toaster
       position={isDesktop ? 'top-right' : 'top-center'}
       containerStyle={
         isDesktop
@@ -975,8 +1011,9 @@ function App() {
           },
         },
       }}
-    />
-    </NotificationCoordinatorProvider>
+      />
+      </NotificationCoordinatorProvider>
+    </SoundEffectsProvider>
   )
 }
 

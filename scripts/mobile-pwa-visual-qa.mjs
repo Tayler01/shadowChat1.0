@@ -671,8 +671,8 @@ async function waitForBootSurface(page) {
 }
 
 async function waitForChatView(page) {
-  await page.getByText(/Lounge/i).first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
   await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByTestId('mobile-nav-pages').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function waitForDmView(page) {

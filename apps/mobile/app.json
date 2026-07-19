@@ -42,8 +42,33 @@
         }
       ],
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#E9C766",
+          "defaultChannel": "shadowchat_sound_shadow_whisper_v2",
+          "sounds": [
+            "./assets/sounds/shadow_whisper.wav",
+            "./assets/sounds/low_glass.wav",
+            "./assets/sounds/gold_signal.wav",
+            "./assets/sounds/hype_burst.wav",
+            "./assets/sounds/pin_shutter.wav",
+            "./assets/sounds/connection_chime.wav",
+            "./assets/sounds/presence_pulse.wav",
+            "./assets/sounds/live_beacon.wav",
+            "./assets/sounds/checkers_move.wav",
+            "./assets/sounds/war_drum.wav",
+            "./assets/sounds/weather_glass.wav",
+            "./assets/sounds/security_signal.wav"
+          ]
+        }
+      ]
     ],
+    "extra": {
+      "webAppUrl": "https://shadochat.online"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true

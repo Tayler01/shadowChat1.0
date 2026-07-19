@@ -17,7 +17,11 @@ test('bridge Auth hold query requests machine-readable Supabase output', () => {
 
 test('every local Edge Function has one explicit production disposition', () => {
   const manifest = validateFunctionManifest(loadFunctionManifest())
-  assert.equal(manifest.active.length, 12)
+  assert.equal(manifest.active.length, 13)
+  assert.equal(
+    manifest.active.find(entry => entry.name === 'deliver-notifications-v2')?.verifyJwt,
+    false,
+  )
   assert.deepEqual(
     manifest.active
       .map(entry => entry.name)

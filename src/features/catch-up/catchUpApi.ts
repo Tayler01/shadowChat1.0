@@ -4,8 +4,10 @@ import {
   normalizeCatchUpSnapshot,
   type CatchUpActor,
   type CatchUpItem,
+  type CatchUpNotificationPresentation,
   type CatchUpSnapshot,
 } from './catchUpModel'
+import { normalizeNotificationMediaUrl } from '../notifications/notificationEnvelopeV2'
 
 type RawNotificationEvent = {
   id: string
@@ -16,6 +18,30 @@ type RawNotificationEvent = {
   payload: unknown
   created_at: string
   actor: unknown
+}
+
+type RawNotificationEnvelopeV2 = {
+  event_id: string
+  schema_version: number
+  category_key: string
+  title: string
+  body: string | null
+  private_title: string
+  private_body: string | null
+  actor_id: string | null
+  route: string
+  privacy_level: string
+  media_ref: unknown
+  actor: unknown
+}
+
+type RawShadowPinMedia = {
+  id: string
+  title: string | null
+  thumbnail_url: string | null
+  medium_url: string | null
+  image_url: string | null
+  image_content_type: string | null
 }
 
 type PendingNotificationRead = {
@@ -131,6 +157,15 @@ const notificationActor = (
   }
 }
 
+const notificationEnvelopeActor = (
+  actorId: string | null,
+  currentActor: unknown,
+): CatchUpActor | null => {
+  if (!actorId) return null
+  const actor = notificationActor({}, actorId, currentActor)
+  return actor ? { ...actor, id: actorId } : null
+}
+
 const categoryTitle = (category: string | null) => {
   if (category === 'dm') return 'Direct message'
   if (category === 'group') return 'General Chat'
@@ -140,6 +175,10 @@ const categoryTitle = (category: string | null) => {
   if (category === 'games') return 'Play'
   return 'ShadowChat update'
 }
+
+const isSafeAppRoute = (value: string | null): value is string => (
+  Boolean(value?.startsWith('/') && !value.startsWith('//'))
+)
 
 const getNotificationInboxRoute = (
   raw: RawNotificationEvent,
@@ -164,23 +203,181 @@ const getNotificationInboxRoute = (
   return asText(raw.route) || asText(payload.route) || asText(payload.url)
 }
 
-const normalizeNotificationInboxItem = (raw: RawNotificationEvent): CatchUpItem | null => {
+const getEnvelopeMediaRefId = (value: unknown) => {
+  const record = asRecord(value)
+  return record?.kind === 'shadow_pin' ? asText(record.image_id) : null
+}
+
+const getDirectEnvelopeMedia = (
+  value: unknown,
+): CatchUpNotificationPresentation['media'] => {
+  const record = asRecord(value)
+  const thumbnailUrl = normalizeNotificationMediaUrl(
+    asText(record?.thumbnail_url) || asText(record?.thumbnailUrl),
+  )
+  if (!thumbnailUrl) return null
+  return {
+    kind: asText(record?.media_kind) === 'video' || asText(record?.kind) === 'video'
+      ? 'video'
+      : 'image',
+    thumbnailUrl,
+    alt: asText(record?.alt) || '',
+  }
+}
+
+const normalizeShadowPinMedia = (
+  row: RawShadowPinMedia,
+): CatchUpNotificationPresentation['media'] => {
+  const thumbnailUrl = asText(row.thumbnail_url)
+    || asText(row.medium_url)
+    || asText(row.image_url)
+  const normalizedThumbnailUrl = normalizeNotificationMediaUrl(thumbnailUrl)
+  if (!normalizedThumbnailUrl) return null
+  return {
+    kind: asText(row.image_content_type)?.startsWith('video/') ? 'video' : 'image',
+    thumbnailUrl: normalizedThumbnailUrl,
+    alt: asText(row.title) || 'ShadowPin',
+  }
+}
+
+const fetchNotificationEnvelopes = async (
+  eventIds: string[],
+): Promise<RawNotificationEnvelopeV2[]> => {
+  if (eventIds.length === 0) return []
+  try {
+    const { data, error } = await supabase
+      .from('notification_envelopes_v2')
+      .select(`
+        event_id,
+        schema_version,
+        category_key,
+        title,
+        body,
+        private_title,
+        private_body,
+        actor_id,
+        route,
+        privacy_level,
+        media_ref,
+        ${embedPublicProfile('actor', 'users!notification_envelopes_v2_actor_id_fkey')}
+      `)
+      .in('event_id', eventIds)
+    if (error) return []
+    return (data ?? []) as unknown as RawNotificationEnvelopeV2[]
+  } catch {
+    // Presentation v2 is additive and runtime-gated. Production without the
+    // projection must continue to use the canonical notification event.
+    return []
+  }
+}
+
+const fetchEnvelopeMedia = async (
+  envelopes: RawNotificationEnvelopeV2[],
+): Promise<Map<string, CatchUpNotificationPresentation['media']>> => {
+  const imageIds = [...new Set(
+    envelopes.map(envelope => getEnvelopeMediaRefId(envelope.media_ref)).filter(
+      (imageId): imageId is string => Boolean(imageId)
+    )
+  )]
+  if (imageIds.length === 0) return new Map()
+  try {
+    const { data, error } = await supabase
+      .from('shadow_pin_images')
+      .select('id, title, thumbnail_url, medium_url, image_url, image_content_type')
+      .in('id', imageIds)
+      .is('deleted_at', null)
+    if (error) return new Map()
+    return new Map(
+      ((data ?? []) as unknown as RawShadowPinMedia[])
+        .map(row => [row.id, normalizeShadowPinMedia(row)] as const)
+        .filter((entry): entry is readonly [string, NonNullable<CatchUpNotificationPresentation['media']>] => (
+          Boolean(entry[0] && entry[1])
+        ))
+    )
+  } catch {
+    return new Map()
+  }
+}
+
+const normalizeEnvelopePresentation = (
+  raw: RawNotificationEnvelopeV2,
+  mediaById: Map<string, CatchUpNotificationPresentation['media']>,
+) => {
+  const eventId = asText(raw.event_id)
+  const category = asText(raw.category_key)
+  const title = asText(raw.title)
+  const privateTitle = asText(raw.private_title)
+  const privacy = raw.privacy_level === 'sender_only' || raw.privacy_level === 'private'
+    ? raw.privacy_level
+    : raw.privacy_level === 'full'
+      ? 'full'
+      : null
+  const route = asText(raw.route)
+  if (
+    raw.schema_version !== 2
+    || !eventId
+    || !category
+    || !title
+    || !privateTitle
+    || !privacy
+    || !isSafeAppRoute(route)
+  ) return null
+
+  const actor = privacy === 'private'
+    ? null
+    : notificationEnvelopeActor(asText(raw.actor_id), raw.actor)
+  const mediaRefId = getEnvelopeMediaRefId(raw.media_ref)
+  const media = privacy === 'full'
+    ? getDirectEnvelopeMedia(raw.media_ref) || (mediaRefId ? mediaById.get(mediaRefId) ?? null : null)
+    : null
+  return {
+    eventId,
+    actor,
+    title: privacy === 'private' ? privateTitle : title,
+    preview: privacy === 'private'
+      ? asText(raw.private_body) || 'Open ShadowChat to view it.'
+      : privacy === 'sender_only'
+        ? 'Open ShadowChat to view it.'
+        : asText(raw.body) || 'Open the exact source to review this update.',
+    route,
+    presentation: {
+      schemaVersion: 2,
+      category,
+      privacy,
+      media,
+    } satisfies CatchUpNotificationPresentation,
+  }
+}
+
+const normalizeNotificationInboxItem = (
+  raw: RawNotificationEvent,
+  envelope: RawNotificationEnvelopeV2 | undefined,
+  mediaById: Map<string, CatchUpNotificationPresentation['media']>,
+): CatchUpItem | null => {
   const payload = asRecord(raw.payload) ?? {}
-  const route = getNotificationInboxRoute(raw, payload)
+  const envelopePresentation = envelope
+    ? normalizeEnvelopePresentation(envelope, mediaById)
+    : null
+  const route = envelopePresentation?.route ?? getNotificationInboxRoute(raw, payload)
   if (!raw.id || !raw.type || !route || (!route.startsWith('/') && !route.startsWith('?'))) return null
-  const actor = notificationActor(payload, raw.actor_id, raw.actor)
+  const actor = envelopePresentation
+    ? envelopePresentation.actor
+    : notificationActor(payload, raw.actor_id, raw.actor)
   return {
     id: `notification:${raw.id}`,
     kind: raw.type,
     occurredAt: raw.created_at,
     actor,
-    title: asText(payload.title) || categoryTitle(raw.category),
-    preview: asText(payload.body) || asText(payload.body_preview) || 'Open the exact source to review this update.',
+    title: envelopePresentation?.title || asText(payload.title) || categoryTitle(raw.category),
+    preview: envelopePresentation?.preview || asText(payload.body) || asText(payload.body_preview) || 'Open the exact source to review this update.',
     unreadCount: 1,
     manuallyUnread: false,
     target: { kind: 'app_route', route },
     activityEventIds: [],
     notificationEventIds: [raw.id],
+    ...(envelopePresentation
+      ? { notificationPresentation: envelopePresentation.presentation }
+      : {}),
   }
 }
 
@@ -223,8 +420,16 @@ export async function fetchNotificationInbox(): Promise<NotificationInboxPage> {
     .limit(30)
 
   if (error) throw error
-  const items = ((data ?? []) as unknown as RawNotificationEvent[])
-    .map(normalizeNotificationInboxItem)
+  const events = (data ?? []) as unknown as RawNotificationEvent[]
+  const envelopes = await fetchNotificationEnvelopes(events.map(event => event.id))
+  const mediaById = await fetchEnvelopeMedia(envelopes)
+  const envelopesByEventId = new Map(envelopes.map(envelope => [envelope.event_id, envelope]))
+  const items = events
+    .map(event => normalizeNotificationInboxItem(
+      event,
+      envelopesByEventId.get(event.id),
+      mediaById,
+    ))
     .filter((item): item is CatchUpItem => Boolean(item))
   return {
     items,

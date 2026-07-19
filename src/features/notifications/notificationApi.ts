@@ -5,6 +5,8 @@ import type {
   NotificationCoordinatorPreferences,
   NotificationEventRecord,
 } from './notificationModel'
+import { fetchNotificationCategoryPresentationPreferences } from './notificationPresentationPreferences'
+import { claimWebNotificationPresentation } from '../../lib/notificationInstallation'
 
 const EVENT_SELECT = [
   'id',
@@ -37,9 +39,12 @@ export const fetchNotificationCoordinatorPreferences = async (
     .maybeSingle()
 
   if (error) throw error
+  const notificationSoundMap =
+    await fetchNotificationCategoryPresentationPreferences(userId)
   return {
     ...getDefaultNotificationPreferences(userId),
     ...(data ?? {}),
+    notification_sound_map: notificationSoundMap,
   } as NotificationCoordinatorPreferences
 }
 
@@ -53,7 +58,6 @@ export const fetchForegroundNotificationEvents = async (
     .select(EVENT_SELECT)
     .eq('user_id', userId)
     .is('read_at', null)
-    .is('presented_at', null)
     .is('resolved_at', null)
     .gte('created_at', new Date(visibleSinceMs).toISOString())
     .gt('presentation_expires_at', new Date().toISOString())
@@ -65,6 +69,9 @@ export const fetchForegroundNotificationEvents = async (
 }
 
 export const claimNotificationEvent = async (eventId: string) => {
+  const v2Claimed = await claimWebNotificationPresentation(eventId)
+  if (v2Claimed !== null) return v2Claimed
+
   const client = await getWorkingClient()
   const { data, error } = await client.rpc('claim_my_notification_event', {
     target_event_id: eventId,

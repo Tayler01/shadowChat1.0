@@ -7,6 +7,7 @@ import React, {
   useRef,
 } from 'react'
 import { useComfortPreferences } from './useComfortPreferences'
+import type { NotificationSoundId } from '../features/notifications/notificationEnvelopeV2'
 
 interface SoundEffectsContextValue {
   enabled: boolean
@@ -17,11 +18,17 @@ interface SoundEffectsContextValue {
   playReaction: () => void
   playHypeBell: () => void
   playHypeMessage: () => void
+  playNotificationCue: (soundId: NotificationSoundId) => void
 }
 
 const SoundEffectsContext = createContext<SoundEffectsContextValue | undefined>(undefined)
 
-type ToneVariant = 'message' | 'reaction' | 'hype-bell' | 'hype-message'
+type ToneVariant =
+  | 'message'
+  | 'reaction'
+  | 'hype-bell'
+  | 'hype-message'
+  | Exclude<NotificationSoundId, 'system_default' | 'silent'>
 
 type ToneDefinition = {
   frequencies: readonly number[]
@@ -60,6 +67,90 @@ const toneDefinitions: Record<ToneVariant, ToneDefinition> = {
     oscillator: 'sine',
     peakGain: 0.16,
   },
+  shadow_whisper: {
+    frequencies: [392, 523.25],
+    interval: 0.105,
+    duration: 0.28,
+    oscillator: 'sine',
+    peakGain: 0.055,
+  },
+  low_glass: {
+    frequencies: [440, 659.25],
+    interval: 0.085,
+    duration: 0.3,
+    oscillator: 'sine',
+    peakGain: 0.06,
+  },
+  gold_signal: {
+    frequencies: [659.25, 987.77],
+    interval: 0.09,
+    duration: 0.34,
+    oscillator: 'triangle',
+    peakGain: 0.07,
+  },
+  hype_burst: {
+    frequencies: [523.25, 783.99, 1046.5],
+    interval: 0.06,
+    duration: 0.3,
+    oscillator: 'triangle',
+    peakGain: 0.075,
+  },
+  pin_shutter: {
+    frequencies: [880, 587.33, 783.99],
+    interval: 0.045,
+    duration: 0.18,
+    oscillator: 'square',
+    peakGain: 0.035,
+  },
+  connection_chime: {
+    frequencies: [493.88, 659.25, 880],
+    interval: 0.09,
+    duration: 0.38,
+    oscillator: 'sine',
+    peakGain: 0.06,
+  },
+  presence_pulse: {
+    frequencies: [349.23, 440],
+    interval: 0.13,
+    duration: 0.32,
+    oscillator: 'sine',
+    peakGain: 0.045,
+  },
+  live_beacon: {
+    frequencies: [196, 392, 783.99],
+    interval: 0.11,
+    duration: 0.42,
+    oscillator: 'sine',
+    peakGain: 0.07,
+  },
+  checkers_move: {
+    frequencies: [293.66, 440],
+    interval: 0.055,
+    duration: 0.2,
+    oscillator: 'triangle',
+    peakGain: 0.065,
+  },
+  war_drum: {
+    frequencies: [110, 146.83, 220],
+    interval: 0.09,
+    duration: 0.38,
+    oscillator: 'sine',
+    peakGain: 0.09,
+  },
+  weather_glass: {
+    frequencies: [587.33, 739.99, 880],
+    interval: 0.12,
+    duration: 0.48,
+    oscillator: 'sine',
+    peakGain: 0.055,
+  },
+  security_signal: {
+    frequencies: [440, 369.99, 440],
+    interval: 0.12,
+    duration: 0.42,
+    oscillator: 'triangle',
+    peakGain: 0.075,
+  },
 }
 
 function useProvideSoundEffects(): SoundEffectsContextValue {
@@ -68,6 +159,7 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
   const hypeEnabled = preferences.celebrationSounds
   const audioContextRef = useRef<AudioContext | null>(null)
   const soundPolicyRef = useRef({ enabled, hypeEnabled })
+  const lastNotificationCueAtRef = useRef(0)
   soundPolicyRef.current = { enabled, hypeEnabled }
 
   const ensureAudioContext = useCallback(() => {
@@ -204,6 +296,13 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
 
   const playHypeBell = useCallback(() => playHypeTone('bell'), [playHypeTone])
   const playHypeMessage = useCallback(() => playHypeTone('message'), [playHypeTone])
+  const playNotificationCue = useCallback((soundId: NotificationSoundId) => {
+    if (!enabled || soundId === 'silent') return
+    const now = Date.now()
+    if (now - lastNotificationCueAtRef.current < 700) return
+    lastNotificationCueAtRef.current = now
+    playTone(soundId === 'system_default' ? 'message' : soundId)
+  }, [enabled, playTone])
 
   return {
     enabled,
@@ -214,6 +313,7 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     playReaction,
     playHypeBell,
     playHypeMessage,
+    playNotificationCue,
   }
 }
 

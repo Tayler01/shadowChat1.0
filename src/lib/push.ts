@@ -1,6 +1,7 @@
 import { VITE_WEB_PUSH_PUBLIC_KEY } from './env'
 import { getWorkingClient } from './supabase'
 import { invokeEdgeFunctionWithRetry } from './edgeFunctionRetry'
+import { registerWebNotificationInstallation } from './notificationInstallation'
 
 export interface NotificationPreferences {
   user_id: string
@@ -26,6 +27,9 @@ export interface NotificationPreferences {
   badge_connections_enabled: boolean
   badge_shadow_pin_enabled: boolean
   badge_games_enabled: boolean
+  notification_preview_mode: 'full' | 'sender_only' | 'private'
+  notification_media_enabled: boolean
+  notification_foreground_sounds_enabled: boolean
   general_chat_muted: boolean
   quiet_hours_start: string | null
   quiet_hours_end: string | null
@@ -77,6 +81,9 @@ const DEFAULT_PREFERENCES = {
   badge_connections_enabled: true,
   badge_shadow_pin_enabled: true,
   badge_games_enabled: true,
+  notification_preview_mode: 'full' as const,
+  notification_media_enabled: true,
+  notification_foreground_sounds_enabled: true,
   general_chat_muted: false,
   quiet_hours_start: null,
   quiet_hours_end: null,
@@ -108,6 +115,9 @@ const NOTIFICATION_PREFERENCE_SELECT = [
   'badge_connections_enabled',
   'badge_shadow_pin_enabled',
   'badge_games_enabled',
+  'notification_preview_mode',
+  'notification_media_enabled',
+  'notification_foreground_sounds_enabled',
   'general_chat_muted',
   'quiet_hours_start',
   'quiet_hours_end',
@@ -546,6 +556,8 @@ export const syncPushSubscription = async (
     throw new Error('Push subscription keys are missing.')
   }
 
+  const installation = await registerWebNotificationInstallation().catch(() => null)
+
   const { error } = await workingClient
     .from('push_subscriptions')
     .upsert(
@@ -556,6 +568,7 @@ export const syncPushSubscription = async (
         auth: keys.auth,
         platform: inferPlatform(),
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        installation_id: installation?.id ?? null,
         enabled,
         last_seen_at: new Date().toISOString(),
       },

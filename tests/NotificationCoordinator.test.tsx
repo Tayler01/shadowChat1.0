@@ -17,6 +17,17 @@ import {
 
 jest.mock('../src/hooks/useAuth', () => ({ useAuth: jest.fn() }))
 jest.mock('../src/hooks/useIsDesktop', () => ({ useIsDesktop: jest.fn() }))
+jest.mock('../src/hooks/useSoundEffects', () => ({
+  useSoundEffects: () => ({ playNotificationCue: jest.fn() }),
+}))
+jest.mock('../src/hooks/useComfortPreferences', () => ({
+  useComfortPreferences: () => ({
+    effectivePreferences: { motion: 'full' },
+  }),
+}))
+jest.mock('../src/lib/notificationInstallation', () => ({
+  updateWebNotificationInstallationForeground: jest.fn().mockResolvedValue(true),
+}))
 jest.mock('../src/lib/supabase', () => ({
   getRealtimeClient: jest.fn(),
   getWorkingClient: jest.fn(),
@@ -126,7 +137,7 @@ describe('NotificationCoordinatorProvider', () => {
     })
 
     await waitFor(() => expect(claimNotificationEvent).toHaveBeenCalledWith('event-1'))
-    const alert = await screen.findByRole('button', { name: /JJ. Open notification/i })
+    const alert = await screen.findByRole('button', { name: /JJ. Open DM/i })
     fireEvent.click(alert)
 
     expect(new URL(window.location.href).searchParams.get('conversation')).toBe('conversation-1')
@@ -290,11 +301,11 @@ describe('NotificationCoordinatorProvider', () => {
       await Promise.resolve()
       await Promise.resolve()
     })
-    expect(screen.getByText('Fresh alert')).toBeInTheDocument()
+    expect(screen.getByTestId('notification-banner-v2')).toHaveTextContent('Fresh alert')
     act(() => {
-      jest.advanceTimersByTime(5_000)
+      jest.advanceTimersByTime(7_000)
     })
-    expect(screen.queryByText('Fresh alert')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('notification-banner-v2')).not.toBeInTheDocument()
     jest.useRealTimers()
   })
 })

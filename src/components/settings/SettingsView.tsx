@@ -58,6 +58,19 @@ import type { AppView } from '../../types/navigation'
 import { getBrowserTimeZone } from '../../lib/push'
 import { COMFORT_RESET_EVENT } from '../../lib/comfortPreferences'
 import { requestAppBadgeRefresh } from '../../lib/appBadge'
+import { NotificationBannerV2 } from '../../features/notifications/NotificationBannerV2'
+import {
+  NOTIFICATION_CATEGORY_PRESENTATION_OPTIONS,
+  NOTIFICATION_SOUND_OPTIONS,
+  fetchNotificationCategoryPresentationPreferences,
+  getDefaultNotificationSoundMap,
+  updateNotificationCategorySound,
+} from '../../features/notifications/notificationPresentationPreferences'
+import type {
+  NotificationEnvelopeV2,
+  NotificationPresentationCategory,
+  NotificationSoundId,
+} from '../../features/notifications/notificationEnvelopeV2'
 
 const ShadowPinActivityAdmin = React.lazy(() =>
   import('./ShadowPinActivityAdmin').then(module => ({ default: module.ShadowPinActivityAdmin }))
@@ -373,6 +386,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setEnabled: setSounds,
     hypeEnabled: hypeSounds,
     setHypeEnabled: setHypeSounds,
+    playNotificationCue,
   } = useSoundEffects()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const [activeSection, setActiveSection] = useState<SettingsSectionId | null>(() => getInitialSettingsSection())
@@ -384,6 +398,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showPhoneInstallGuide, setShowPhoneInstallGuide] = useState(false)
   const [showFeedbackSubmission, setShowFeedbackSubmission] = useState(false)
   const [adminUserSearch, setAdminUserSearch] = useState('')
+  const [notificationSoundMap, setNotificationSoundMap] = useState(
+    getDefaultNotificationSoundMap,
+  )
+  const [savingNotificationSound, setSavingNotificationSound] =
+    useState<NotificationPresentationCategory | null>(null)
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
   const { signOut, deleteAccount, user: currentUser } = useAuth()
@@ -431,6 +450,49 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const snoozedUntil = preferences?.mute_until && new Date(preferences.mute_until).getTime() > Date.now()
     ? new Date(preferences.mute_until)
     : null
+  const notificationPreviewEnvelope = useMemo<NotificationEnvelopeV2>(() => ({
+    schemaVersion: 2,
+    eventId: 'settings-preview',
+    eventIds: ['settings-preview'],
+    type: 'shadow_pin_comment',
+    category: 'shadow_pin',
+    entityId: 'settings-preview',
+    route: '/?view=pins',
+    groupKey: 'settings:preview',
+    priority: 'normal',
+    privacy: preferences?.notification_preview_mode ?? 'full',
+    actor: {
+      id: currentUser?.id ?? 'shadowchat-preview',
+      label: 'JJ',
+      avatarUrl: null,
+    },
+    content: {
+      eyebrow: 'ShadowPin conversation',
+      title: 'JJ commented on your ShadowPin',
+      body: 'This is how a rich foreground notification will look.',
+      privateTitle: 'New ShadowChat notification',
+      privateBody: 'Open ShadowChat to view it.',
+    },
+    media: preferences?.notification_media_enabled === false
+      ? null
+      : {
+          kind: 'image',
+          thumbnailUrl: '/icons/app-icon-192.png',
+          alt: 'ShadowPin preview',
+        },
+    actions: ['open', 'mark_read'],
+    soundId: notificationSoundMap.shadow_pin,
+    androidChannelKey: 'social_v1',
+    badgeCategory: 'shadow_pin',
+    autoRead: false,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 90_000).toISOString(),
+  }), [
+    currentUser?.id,
+    notificationSoundMap.shadow_pin,
+    preferences?.notification_media_enabled,
+    preferences?.notification_preview_mode,
+  ])
   const visibleSections = useMemo(
     () => sections.filter(section => section.id !== 'admin' || isAdminOperator),
     [isAdminOperator]
@@ -594,6 +656,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   }, [activeSection])
 
   useEffect(() => {
+    if (
+      activeSection !== 'notifications-audio' ||
+      !currentUser?.id
+    ) return
+
+    let active = true
+    void fetchNotificationCategoryPresentationPreferences(currentUser.id)
+      .then(next => {
+        if (active) setNotificationSoundMap(next)
+      })
+      .catch(() => {
+        if (active) setNotificationSoundMap(getDefaultNotificationSoundMap())
+      })
+    return () => {
+      active = false
+    }
+  }, [activeSection, currentUser?.id])
+
+  useEffect(() => {
     const scrollContainer = scrollContainerRef.current
     if (!scrollContainer) return
 
@@ -604,6 +685,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     scrollContainer.scrollTop = 0
   }, [activeAdminSection, activeSection])
+
+  const handleNotificationSoundChange = async (
+    category: NotificationPresentationCategory,
+    soundId: NotificationSoundId,
+  ) => {
+    if (!currentUser?.id) return
+    const previous = notificationSoundMap[category]
+    setNotificationSoundMap(current => ({ ...current, [category]: soundId }))
+    setSavingNotificationSound(category)
+    if (soundId !== 'silent') playNotificationCue(soundId)
+    try {
+      await updateNotificationCategorySound(currentUser.id, category, soundId)
+    } catch (error) {
+      setNotificationSoundMap(current => ({ ...current, [category]: previous }))
+      toast.error(error instanceof Error ? error.message : 'Failed to save notification sound')
+    } finally {
+      setSavingNotificationSound(null)
+    }
+  }
 
   const handleDeleteAccount = async () => {
     if (deleteAccountConfirmText.trim().toUpperCase() !== 'DELETE') {
@@ -821,6 +921,82 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {preferences && (
+        <section className="glass-panel rounded-[var(--radius-lg)] p-4 sm:p-5" aria-labelledby="notification-presentation-heading">
+          <div className="mb-4">
+            <h2 id="notification-presentation-heading" className="text-lg font-semibold text-[var(--text-primary)]">
+              Presentation & Privacy
+            </h2>
+            <p className="mt-1 text-sm leading-5 text-[var(--text-muted)]">
+              Control what appears in rich notifications. Your phone's lock-screen privacy, silent mode, Focus, and Do Not Disturb still have final control.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <ToggleRow
+              label="Foreground Obsidian Sounds"
+              description="Play the selected branded cue while ShadowChat is open. Background PWA sound is controlled by your phone."
+              enabled={preferences.notification_foreground_sounds_enabled}
+              disabled={pushSaving}
+              onChange={enabled => updatePreference('notification_foreground_sounds_enabled', enabled)}
+            />
+            <ToggleRow
+              label="Media Previews"
+              description="Show eligible public ShadowPin and event thumbnails in rich notifications."
+              enabled={preferences.notification_media_enabled}
+              disabled={pushSaving}
+              onChange={enabled => updatePreference('notification_media_enabled', enabled)}
+            />
+          </div>
+
+          <fieldset className="mt-4">
+            <legend className="text-sm font-semibold text-[var(--text-primary)]">Preview privacy</legend>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3">
+              {([
+                ['full', 'Full', 'Member, message, and media'],
+                ['sender_only', 'Sender only', 'Member with private content'],
+                ['private', 'Private', 'Generic lock-screen copy'],
+              ] as const).map(([value, label, description]) => {
+                const selected = preferences.notification_preview_mode === value
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    disabled={pushSaving}
+                    onClick={() => void updatePreference('notification_preview_mode', value)}
+                    className={`min-h-12 rounded-[var(--radius-sm)] border px-3 py-2 text-left transition-[background-color,border-color,color] ${
+                      selected
+                        ? 'border-[var(--border-glow)] bg-[var(--theme-accent-soft)] text-[var(--theme-accent-readable)]'
+                        : 'border-[var(--border-subtle)] bg-[rgba(0,0,0,0.18)] text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    <span className="block text-sm font-semibold">{label}</span>
+                    <span className="mt-0.5 block text-[0.6875rem] leading-4 opacity-80">{description}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </fieldset>
+
+          <div className="mt-5 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.18)] p-3">
+            <p className="mb-3 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
+              Live preview
+            </p>
+            <NotificationBannerV2
+              envelope={notificationPreviewEnvelope}
+              desktop={false}
+              queuedCount={2}
+              autoDismiss={false}
+              onDismiss={() => toast.success('Foreground dismiss keeps the source unread')}
+              onOpen={() => toast.success('The real banner opens its exact source')}
+              onOpenProfile={() => toast.success('The real PFP opens the member profile')}
+            />
+          </div>
+        </section>
+      )}
 
       <div className="space-y-4">
         <div className="px-1">
@@ -1041,6 +1217,40 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             onChange={setHypeSounds}
           />
         </div>
+
+        {preferences && (
+          <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Notification sound by category</h3>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+              These original cues play for foreground notifications and ship as bundled sounds in the native app. Installed PWA background alerts use your phone's configured notification sound.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {NOTIFICATION_CATEGORY_PRESENTATION_OPTIONS.map(option => (
+                <label
+                  key={option.category}
+                  className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.18)] p-3 text-sm text-[var(--text-secondary)]"
+                >
+                  <span className="block font-semibold text-[var(--text-primary)]">{option.label}</span>
+                  <span className="mt-0.5 block text-[0.6875rem] leading-4 text-[var(--text-muted)]">{option.description}</span>
+                  <select
+                    value={notificationSoundMap[option.category]}
+                    disabled={savingNotificationSound === option.category}
+                    onChange={event => void handleNotificationSoundChange(
+                      option.category,
+                      event.target.value as NotificationSoundId,
+                    )}
+                    className="mt-2 min-h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel-strong)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-glow)]"
+                    aria-label={`${option.label} notification sound`}
+                  >
+                    {NOTIFICATION_SOUND_OPTIONS.map(sound => (
+                      <option key={sound.id} value={sound.id}>{sound.label}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

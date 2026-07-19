@@ -105,9 +105,10 @@ describe('notification reliability database contract', () => {
 
   test('publishes reviewed RPC and definer surfaces', () => {
     const publicSignatures = allowlist.domains.flatMap(domain => domain.signatures)
-    expect(allowlist.expected_total_security_definers).toBe(132)
+    expect(allowlist.expected_total_security_definers).toBe(139)
     expect(allowlist.private_security_definers).toEqual(expect.arrayContaining([
       'private.create_shadow_checkers_turn_notification()',
+      'private.materialize_notification_envelope_v2()',
       'private.mirror_shado_live_notification()',
       'private.normalize_notification_event()',
       'private.sync_dm_notification_reads()',
@@ -121,9 +122,13 @@ describe('notification reliability database contract', () => {
       'mark_my_checkers_turn_read(uuid)',
       'mark_my_notification_event_read(uuid)',
       'mark_my_shadow_pin_notifications_read(uuid,uuid)',
+      'register_my_notification_installation_v2(uuid,text,text,text,text,text,text,text,text,integer)',
     ]))
     expect(allowlist.internal_signatures).toContain(
       'claim_notification_delivery_jobs(integer)'
+    )
+    expect(allowlist.internal_signatures).toContain(
+      'claim_notification_outbox_v2(integer,integer)'
     )
     expect(allowlist.required_active_table_privileges).toEqual(expect.arrayContaining([
       'service_role:notification_delivery_attempts:INSERT',

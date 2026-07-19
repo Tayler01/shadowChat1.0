@@ -58,6 +58,13 @@ jest.mock('../src/hooks/useSoundEffects', () => ({
     setEnabled: jest.fn(),
     hypeEnabled: true,
     setHypeEnabled: jest.fn(),
+    playNotificationCue: jest.fn(),
+  }),
+}))
+
+jest.mock('../src/hooks/useComfortPreferences', () => ({
+  useComfortPreferences: () => ({
+    effectivePreferences: { motion: 'full' },
   }),
 }))
 
@@ -106,6 +113,9 @@ jest.mock('../src/hooks/usePushNotifications', () => ({
       badge_connections_enabled: true,
       badge_shadow_pin_enabled: true,
       badge_games_enabled: true,
+      notification_preview_mode: 'full',
+      notification_media_enabled: true,
+      notification_foreground_sounds_enabled: true,
       general_chat_muted: false,
       quiet_hours_start: null,
       quiet_hours_end: null,
@@ -285,6 +295,27 @@ test('settings notification toggles save independently', () => {
 
   expect(mockUpdatePreference).toHaveBeenCalledWith('reaction_enabled', true)
   expect(mockUpdatePreference).toHaveBeenCalledWith('group_enabled', false)
+})
+
+test('settings exposes the real rich-notification preview and saves presentation privacy', () => {
+  render(<SettingsView onToggleSidebar={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: /notifications & audio/i }))
+
+  expect(screen.getByRole('heading', { name: /presentation & privacy/i })).toBeInTheDocument()
+  expect(screen.getByTestId('notification-banner-v2')).toHaveTextContent(
+    'JJ commented on your ShadowPin',
+  )
+  fireEvent.click(screen.getByRole('switch', { name: /toggle foreground obsidian sounds/i }))
+  fireEvent.click(screen.getByRole('switch', { name: /toggle media previews/i }))
+  fireEvent.click(screen.getByRole('radio', { name: /^private/i }))
+
+  expect(mockUpdatePreference).toHaveBeenCalledWith(
+    'notification_foreground_sounds_enabled',
+    false,
+  )
+  expect(mockUpdatePreference).toHaveBeenCalledWith('notification_media_enabled', false)
+  expect(mockUpdatePreference).toHaveBeenCalledWith('notification_preview_mode', 'private')
 })
 
 test('settings exposes active-user audience and launcher badge controls', () => {
