@@ -22,7 +22,7 @@
           "INSendMessageIntent"
         ]
       },
-      "buildNumber": "8"
+      "buildNumber": "7"
     },
     "android": {
       "googleServicesFile": "./google-services.json",
