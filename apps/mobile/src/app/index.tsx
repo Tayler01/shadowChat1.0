@@ -145,7 +145,7 @@ function ConfigurationNotice() {
 
 export default function ShadowChatAppScreen() {
   const webViewRef = useRef<WebView>(null);
-  const authSyncRef = useRef<Promise<void> | null>(null);
+  const authSyncRef = useRef<Promise<Session | null> | null>(null);
   const commandQueueRef = useRef<SerializedCommandQueue | null>(null);
   const handledNativeCommandIdsRef = useRef(new Set<string>());
   commandQueueRef.current ??= createSerializedCommandQueue();
@@ -216,7 +216,7 @@ export default function ShadowChatAppScreen() {
       refreshToken: string;
       userId: string;
     } | null
-  ) => {
+  ): Promise<Session | null> => {
     const prior = authSyncRef.current ?? Promise.resolve();
     const sync = prior.catch(() => undefined).then(async () => {
       const client = getSupabase();
@@ -235,9 +235,10 @@ export default function ShadowChatAppScreen() {
           if (error) throw error;
         }
         setNativeUserId(null);
-        return;
+        return null;
       }
 
+      let synchronizedSession = current;
       if (!sameSession(current, nextSession)) {
         const { data: sessionData, error } = await runNotificationStage({
           stage: 'syncing_session',
@@ -250,15 +251,20 @@ export default function ShadowChatAppScreen() {
         if (sessionData.session?.user.id !== nextSession.userId) {
           throw new Error('The native session did not match the signed-in account.');
         }
+        synchronizedSession = sessionData.session;
       }
 
+      if (!synchronizedSession?.user) {
+        throw new Error('The signed-in session did not reach the native app.');
+      }
       setNativeUserId(nextSession.userId);
       setBridgeError(null);
+      return synchronizedSession;
     });
 
     authSyncRef.current = sync;
     try {
-      await sync;
+      return await sync;
     } finally {
       if (authSyncRef.current === sync) authSyncRef.current = null;
     }
@@ -293,10 +299,13 @@ export default function ShadowChatAppScreen() {
             requestId: message.requestId,
             stage: 'syncing_session',
           });
-          if (message.session !== undefined) {
-            await syncNativeSession(message.session);
-          }
-          await nativeNotifications.enable(message.requestId);
+          const synchronizedSession = message.session !== undefined
+            ? await syncNativeSession(message.session)
+            : undefined;
+          await nativeNotifications.enable(
+            message.requestId,
+            synchronizedSession
+          );
           return;
         }
         if (message.type === 'notifications_disable') {

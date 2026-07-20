@@ -231,6 +231,18 @@ test('signed mobile client contains the full production app and a secure native 
   assert.match(nativeBridgeSource, /requestId: string \| null/)
   assert.match(nativeAppSource, /createSerializedCommandQueue/)
   assert.match(nativeAppSource, /stage: 'syncing_session'/)
+  assert.match(
+    nativeAppSource,
+    /nativeNotifications\.enable\(\s*message\.requestId,\s*synchronizedSession\s*\)/,
+  )
+  assert.match(
+    nativeNotificationHookSource,
+    /synchronizedSession !== undefined\s*\?\s*synchronizedSession\s*:\s*sessionRef\.current/,
+  )
+  assert.match(
+    nativeNotificationHookSource,
+    /sessionRef\.current = activeSession;\s*setSession\(activeSession\);/,
+  )
   assert.match(nativeFreshTokenSource, /requireNativeModule/)
   assert.match(nativeFreshTokenSource, /ExpoPushTokenManager/)
   assert.match(

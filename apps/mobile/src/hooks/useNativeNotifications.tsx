@@ -52,7 +52,10 @@ type NativeNotificationsContextValue = {
   error: string | null;
   requestId: string | null;
   stage: NativeNotificationStage;
-  enable: (requestId?: string | null) => Promise<void>;
+  enable: (
+    requestId?: string | null,
+    synchronizedSession?: Session | null
+  ) => Promise<void>;
   disableThisDevice: (requestId?: string | null) => Promise<void>;
 };
 
@@ -307,7 +310,8 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
 
   const register = useCallback((
     requestPermission: boolean,
-    providedRequestId?: string | null
+    providedRequestId?: string | null,
+    synchronizedSession?: Session | null
   ) => {
     const activeRequestId =
       providedRequestId ??
@@ -331,8 +335,14 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
           });
         }
 
-        let activeSession = sessionRef.current;
-        if (!activeSession?.user) {
+        let activeSession = synchronizedSession !== undefined
+          ? synchronizedSession
+          : sessionRef.current;
+        if (activeSession?.user && synchronizedSession !== undefined) {
+          sessionRef.current = activeSession;
+          setSession(activeSession);
+        }
+        if (!activeSession?.user && synchronizedSession === undefined) {
           const { data, error: sessionError } = await runNotificationStage({
             stage: 'syncing_session',
             operation: () => getSupabase().auth.getSession(),
@@ -393,7 +403,10 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   }, []);
 
   const enable = useCallback(
-    (nextRequestId?: string | null) => register(true, nextRequestId),
+    (
+      nextRequestId?: string | null,
+      synchronizedSession?: Session | null
+    ) => register(true, nextRequestId, synchronizedSession),
     [register]
   );
 

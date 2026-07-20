@@ -64,6 +64,23 @@ synchronized native session. It also:
 - keeps malformed supplied sessions rejected and leaves native delivery
   shadow-gated until a physical build creates both installation and token rows
 
+### Build 10 immediate post-sign-in session authority
+
+Physical build `9` testing exposed a second, narrower race immediately after a
+fresh web sign-in. Live Auth logs showed Tayler's password login and subsequent
+authenticated WebView requests succeeding, while no iOS installation or native
+token row was created. The bridge could synchronize the verified web session
+into the native Supabase client, but the notification provider then consulted
+its separately updated session ref. That ref could still be null for the same
+turn, causing the false `Sign in to ShadoChat before enabling notifications`
+failure.
+
+The verified session returned by native `setSession` is now passed directly
+into notification registration and made authoritative for that request. The
+provider still falls back to its persisted native session for legacy commands,
+but it no longer waits for a React auth-listener render before registering a
+device immediately after sign-in.
+
 ## Product Outcome
 
 Every ShadowChat notification should feel intentionally designed for its

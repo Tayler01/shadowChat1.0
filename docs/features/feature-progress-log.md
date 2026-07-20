@@ -104,6 +104,12 @@ Canonical detail and release gates live in:
   parser backward-compatible with a cached sessionless enable command, adds a
   deduplicated same-origin fallback control and a short bridge-silence error,
   and disables the native WebView HTTP cache behind bridge epoch `2`.
+- Physical build `9` then reproduced a false signed-out result immediately
+  after a successful web login. Live Auth/API evidence confirmed the WebView
+  account was authenticated, but notification registration was consulting a
+  separate provider session ref before its listener caught up. Build `10`
+  makes the verified bridge session authoritative for that registration turn
+  and passes it directly into the provider.
 - Physical build `7` tracing then isolated the persistent switch freeze to an
   unresolved APNs device-token promise before installation registration. The
   build `8` candidate adds correlated bridge request ids, serialized session
