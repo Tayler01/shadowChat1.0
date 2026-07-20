@@ -915,13 +915,26 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="space-y-4">
           <ToggleRow
             label="Phone Push Notifications"
-            description="Allow background alerts on this browser or installed app."
+            description={
+              pushSaving
+                ? 'Updating notification access on this device...'
+                : 'Allow background alerts on this browser or installed app.'
+            }
             enabled={devicePushEnabled}
+            disabled={pushSaving || pushLoading}
             onChange={handlePushToggle}
           />
           <div className="rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 text-sm">
             <p className="text-[var(--text-primary)]">
-              Status: {pushLoading ? 'Checking this device...' : devicePushEnabled ? 'Enabled on this device' : 'Not enabled on this device'}
+              Status: {
+                pushSaving
+                  ? 'Updating this device...'
+                  : pushLoading
+                    ? 'Checking this device...'
+                    : devicePushEnabled
+                      ? 'Enabled on this device'
+                      : 'Not enabled on this device'
+              }
             </p>
             <p className="mt-1 text-[var(--text-muted)]">Permission: {permission === 'unsupported' ? 'Unsupported' : permission}</p>
             {supportReason && (!supported || !canPrompt) && (

@@ -178,12 +178,22 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
       const fallbackPreferences = getDefaultNotificationPreferences(user.id)
       setPreferences(fallbackPreferences)
       setSubscribed(false)
-      updateCachedPushState(user.id, {
-        preferences: fallbackPreferences,
-        subscribed: false,
-        permission: getNotificationPermission(),
-        support: getPushSupportStatus(),
-      })
+      if (nativeApp) {
+        setSupport(NATIVE_PUSH_SUPPORT)
+        requestNativeNotificationState()
+        updateCachedPushState(user.id, {
+          preferences: fallbackPreferences,
+          subscribed: false,
+          support: NATIVE_PUSH_SUPPORT,
+        })
+      } else {
+        updateCachedPushState(user.id, {
+          preferences: fallbackPreferences,
+          subscribed: false,
+          permission: getNotificationPermission(),
+          support: getPushSupportStatus(),
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -250,17 +260,23 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
         const { data, error: sessionError } = await supabase.auth.getSession()
         if (sessionError) throw sessionError
         const webSession = data.session
+        if (
+          !webSession?.access_token ||
+          !webSession.refresh_token ||
+          !webSession.user?.id
+        ) {
+          requestNativeNotificationState()
+          throw new Error(
+            'Your secure ShadoChat session is still syncing. Try the notification switch again.'
+          )
+        }
         const state = await requestNativeNotificationEnable(
-          webSession?.access_token &&
-          webSession.refresh_token &&
-          webSession.user?.id
-            ? {
-                accessToken: webSession.access_token,
-                refreshToken: webSession.refresh_token,
-                expiresAt: webSession.expires_at ?? null,
-                userId: webSession.user.id,
-              }
-            : null
+          {
+            accessToken: webSession.access_token,
+            refreshToken: webSession.refresh_token,
+            expiresAt: webSession.expires_at ?? null,
+            userId: webSession.user.id,
+          }
         )
         setSubscribed(state.enabled)
         setPermission(
@@ -303,7 +319,11 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to enable push notifications.'
       setError(message)
-      setPermission(getNotificationPermission())
+      if (nativeApp) {
+        requestNativeNotificationState()
+      } else {
+        setPermission(getNotificationPermission())
+      }
       throw err
     } finally {
       setSaving(false)

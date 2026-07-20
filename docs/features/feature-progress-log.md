@@ -92,6 +92,12 @@ Canonical detail and release gates live in:
   `ShadoChat Internal Beta`, while Android `4` is available as an internal APK.
   Native delivery remains in DM-only shadow mode pending physical-device
   registration and foreground/background/terminated acceptance.
+- The July 19 hosted-web follow-up preserves real native permission state,
+  blocks signed-out enable commands while the recoverable Supabase session is
+  syncing, exposes switch progress, and distinguishes stale idle bridge state
+  from a completed native permission cycle. Build `7` consumes this repair
+  without another binary; the next gate is a real iPhone installation/token
+  row and the physical delivery matrix.
 
 ## Current Goal
 

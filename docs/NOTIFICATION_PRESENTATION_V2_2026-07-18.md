@@ -423,6 +423,26 @@ The remaining gate is physical native-device proof. Shadow mode materializes
 and measures the candidate path without sending native pushes. It does not
 compete with the current PWA transport.
 
+## TestFlight Toggle Recovery - July 19, 2026
+
+Physical testing of iOS build `7` exposed two hosted-web bridge failures after
+the native session synchronization repair:
+
+- a native denied permission could be overwritten by the browser-only
+  `unsupported` fallback, hiding the route to iOS Settings
+- a signed-in web profile could briefly exist before the recoverable Supabase
+  session was available, allowing an invalid signed-out enable command
+
+The hosted Settings repair preserves native permission and support state,
+requires a complete web session before sending the atomic enable command, and
+shows an explicit updating state while the native request is active. The
+bridge ignores stale idle `undetermined` events but accepts that result after a
+real busy enable cycle, so it avoids both premature completion and a frozen
+switch. This is a hosted-web repair consumed by build `7`; no replacement
+binary is required for this checkpoint. Native delivery remains inactive until
+an installation and token are registered and the physical acceptance matrix
+passes.
+
 ## Required Acceptance
 
 - every active event type maps deterministically

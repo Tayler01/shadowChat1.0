@@ -109,12 +109,21 @@ export const requestNativeNotificationEnable = async (
     await new Promise(resolve => window.setTimeout(resolve, 1_000))
   }
 
+  let observedBusyState = false
   return waitForNativeNotificationState(
     { version: 1, type: 'notifications_enable', session },
-    state => !state.busy && (
-      state.enabled ||
-      state.permission === 'denied'
-    )
+    state => {
+      if (state.busy) {
+        observedBusyState = true
+        return false
+      }
+
+      return (
+        state.enabled ||
+        state.permission === 'denied' ||
+        (observedBusyState && state.permission === 'undetermined')
+      )
+    }
   )
 }
 
