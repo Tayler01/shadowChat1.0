@@ -28,7 +28,12 @@ import {
   publishNativeNotificationState,
   subscribeToNativeNotificationRoutes,
 } from '@/lib/nativeAppBridge';
+import { runNotificationStage } from '@/lib/notifications/registrationPipeline';
 import { getNotificationWebUrl } from '@/lib/notifications/routes';
+import {
+  createSerializedCommandQueue,
+  type SerializedCommandQueue,
+} from '@/lib/serializedCommandQueue';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const APP_ORIGIN = 'https://shadochat.online';
@@ -139,6 +144,8 @@ function ConfigurationNotice() {
 export default function ShadowChatAppScreen() {
   const webViewRef = useRef<WebView>(null);
   const authSyncRef = useRef<Promise<void> | null>(null);
+  const commandQueueRef = useRef<SerializedCommandQueue | null>(null);
+  commandQueueRef.current ??= createSerializedCommandQueue();
   const nativeNotifications = useNativeNotifications();
   const [webReady, setWebReady] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -154,11 +161,15 @@ export default function ShadowChatAppScreen() {
     permission: nativeNotifications.permission,
     busy: nativeNotifications.busy,
     error: nativeNotifications.error,
+    requestId: nativeNotifications.requestId,
+    stage: nativeNotifications.stage,
   }), [
     nativeNotifications.busy,
     nativeNotifications.enabled,
     nativeNotifications.error,
     nativeNotifications.permission,
+    nativeNotifications.requestId,
+    nativeNotifications.stage,
   ]);
 
   const publishNotificationState = useCallback(() => {
@@ -203,17 +214,21 @@ export default function ShadowChatAppScreen() {
       userId: string;
     } | null
   ) => {
-    const prior = authSyncRef.current;
-    if (prior) await prior.catch(() => undefined);
-
-    const sync = (async () => {
+    const prior = authSyncRef.current ?? Promise.resolve();
+    const sync = prior.catch(() => undefined).then(async () => {
       const client = getSupabase();
-      const { data } = await client.auth.getSession();
+      const { data } = await runNotificationStage({
+        stage: 'syncing_session',
+        operation: () => client.auth.getSession(),
+      });
       const current = data.session;
 
       if (!nextSession) {
         if (current) {
-          const { error } = await client.auth.signOut({ scope: 'local' });
+          const { error } = await runNotificationStage({
+            stage: 'syncing_session',
+            operation: () => client.auth.signOut({ scope: 'local' }),
+          });
           if (error) throw error;
         }
         setNativeUserId(null);
@@ -221,9 +236,12 @@ export default function ShadowChatAppScreen() {
       }
 
       if (!sameSession(current, nextSession)) {
-        const { data: sessionData, error } = await client.auth.setSession({
-          access_token: nextSession.accessToken,
-          refresh_token: nextSession.refreshToken,
+        const { data: sessionData, error } = await runNotificationStage({
+          stage: 'syncing_session',
+          operation: () => client.auth.setSession({
+            access_token: nextSession.accessToken,
+            refresh_token: nextSession.refreshToken,
+          }),
         });
         if (error) throw error;
         if (sessionData.session?.user.id !== nextSession.userId) {
@@ -233,7 +251,7 @@ export default function ShadowChatAppScreen() {
 
       setNativeUserId(nextSession.userId);
       setBridgeError(null);
-    })();
+    });
 
     authSyncRef.current = sync;
     try {
@@ -243,45 +261,60 @@ export default function ShadowChatAppScreen() {
     }
   }, []);
 
-  const handleMessage = useCallback(async (event: WebViewMessageEvent) => {
+  const handleMessage = useCallback((event: WebViewMessageEvent) => {
     const message = parseNativeWebMessage(event.nativeEvent.data);
     if (!message) return;
 
-    try {
-      if (message.type === 'auth_session') {
-        await syncNativeSession(message.session);
-        return;
+    void commandQueueRef.current?.enqueue(async () => {
+      try {
+        if (message.type === 'auth_session') {
+          await syncNativeSession(message.session);
+          return;
+        }
+        if (message.type === 'notifications_enable') {
+          publishNativeNotificationState(webViewRef.current, {
+            ...notificationState,
+            busy: true,
+            error: null,
+            requestId: message.requestId,
+            stage: 'syncing_session',
+          });
+          await syncNativeSession(message.session);
+          await nativeNotifications.enable(message.requestId);
+          return;
+        }
+        if (message.type === 'notifications_disable') {
+          await nativeNotifications.disableThisDevice(message.requestId);
+          return;
+        }
+        if (message.type === 'notifications_open_settings') {
+          await Linking.openSettings();
+          return;
+        }
+        if (
+          message.type === 'bridge_ready' ||
+          message.type === 'native_state_request'
+        ) {
+          publishNotificationState();
+        }
+      } catch (caught) {
+        const messageText = caught instanceof Error
+          ? caught.message
+          : 'Native app synchronization failed.';
+        const requestId = (
+          message.type === 'notifications_enable' ||
+          message.type === 'notifications_disable'
+        ) ? message.requestId : null;
+        setBridgeError(messageText);
+        publishNativeNotificationState(webViewRef.current, {
+          ...notificationState,
+          busy: false,
+          error: messageText,
+          requestId,
+          stage: 'failed',
+        });
       }
-      if (message.type === 'notifications_enable') {
-        await syncNativeSession(message.session);
-        await nativeNotifications.enable();
-        return;
-      }
-      if (message.type === 'notifications_disable') {
-        await nativeNotifications.disableThisDevice();
-        return;
-      }
-      if (message.type === 'notifications_open_settings') {
-        await Linking.openSettings();
-        return;
-      }
-      if (
-        message.type === 'bridge_ready' ||
-        message.type === 'native_state_request'
-      ) {
-        publishNotificationState();
-      }
-    } catch (caught) {
-      const messageText = caught instanceof Error
-        ? caught.message
-        : 'Native app synchronization failed.';
-      setBridgeError(messageText);
-      publishNativeNotificationState(webViewRef.current, {
-        ...notificationState,
-        busy: false,
-        error: messageText,
-      });
-    }
+    });
   }, [
     nativeNotifications,
     notificationState,

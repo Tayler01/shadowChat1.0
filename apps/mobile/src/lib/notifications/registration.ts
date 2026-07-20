@@ -9,6 +9,9 @@ import { Platform } from 'react-native';
 import { getSupabase } from '@/lib/supabase';
 import { registerNativeNotificationBackgroundTask } from './background';
 import { NOTIFICATION_CHANNEL_SCHEMA_VERSION } from './config';
+import { getFreshDevicePushTokenAsync } from './freshDevicePushToken';
+import { runNotificationStage } from './registrationPipeline';
+import type { NativeNotificationStage } from '../nativeAppBridge';
 
 const INSTALLATION_KEY = 'shadowchat-native-notification-installation-v2';
 const DEVICE_OPT_OUT_KEY = 'shadowchat-native-notification-device-opt-out-v2';
@@ -55,7 +58,8 @@ const getEnvironment = () => {
 };
 
 const persistExpoPushToken = async (
-  devicePushToken?: Notifications.DevicePushToken
+  devicePushToken: Notifications.DevicePushToken,
+  onStage?: (stage: NativeNotificationStage) => void
 ) => {
   const projectId = getEasProjectId();
   if (!projectId) {
@@ -63,19 +67,28 @@ const persistExpoPushToken = async (
   }
   const installationKey = await getNativeNotificationInstallationKey();
   const environment = getEnvironment();
-  const token = await Notifications.getExpoPushTokenAsync({
-    projectId,
-    ...(devicePushToken ? { devicePushToken } : {}),
+  onStage?.('requesting_expo_token');
+  const token = await runNotificationStage({
+    stage: 'requesting_expo_token',
+    operation: () => Notifications.getExpoPushTokenAsync({
+      projectId,
+      devicePushToken,
+    }),
   });
-  const { error } = await getSupabase().rpc(
-    'register_my_native_notification_token_v2',
-    {
-      target_installation_key: installationKey,
-      target_provider: 'expo',
-      target_environment: environment,
-      target_token: token.data,
-    }
-  );
+  onStage?.('registering_token');
+  const { error } = await runNotificationStage({
+    stage: 'registering_token',
+    operation: async () =>
+      await getSupabase().rpc(
+        'register_my_native_notification_token_v2',
+        {
+          target_installation_key: installationKey,
+          target_provider: 'expo',
+          target_environment: environment,
+          target_token: token.data,
+        }
+      ),
+  });
   if (error) throw error;
 };
 
@@ -88,14 +101,27 @@ export const refreshNativeNotificationToken = async (
 
 export const registerNativeNotificationInstallation = async ({
   requestPermission,
+  onStage,
+  onPermission,
 }: {
   requestPermission: boolean;
+  onStage?: (stage: NativeNotificationStage) => void;
+  onPermission?: (permission: Notifications.PermissionStatus) => void;
 }) => {
   if (!Device.isDevice) {
     throw new Error('Remote notifications require a physical iPhone or Android device.');
   }
-  if (await getNativeNotificationDeviceOptOut()) {
-    const currentPermissions = await Notifications.getPermissionsAsync();
+  onStage?.('reading_permission');
+  const optedOut = await runNotificationStage({
+    stage: 'reading_permission',
+    operation: getNativeNotificationDeviceOptOut,
+  });
+  if (optedOut) {
+    const currentPermissions = await runNotificationStage({
+      stage: 'reading_permission',
+      operation: Notifications.getPermissionsAsync,
+    });
+    onPermission?.(currentPermissions.status);
     return { enabled: false, permission: currentPermissions.status };
   }
 
@@ -104,39 +130,62 @@ export const registerNativeNotificationInstallation = async ({
     throw new Error('This build is missing its EAS project ID.');
   }
 
-  const currentPermissions = await Notifications.getPermissionsAsync();
+  const currentPermissions = await runNotificationStage({
+    stage: 'reading_permission',
+    operation: Notifications.getPermissionsAsync,
+  });
+  if (requestPermission && currentPermissions.status !== 'granted') {
+    onStage?.('requesting_permission');
+  }
   const permissions = (
     requestPermission && currentPermissions.status !== 'granted'
-      ? await Notifications.requestPermissionsAsync()
+      ? await runNotificationStage({
+          stage: 'requesting_permission',
+          operation: Notifications.requestPermissionsAsync,
+        })
       : currentPermissions
   );
+  onPermission?.(permissions.status);
   if (permissions.status !== 'granted') {
     return { enabled: false, permission: permissions.status };
   }
   await registerNativeNotificationBackgroundTask();
 
-  const installationKey = await getNativeNotificationInstallationKey();
+  onStage?.('registering_installation');
+  const installationKey = await runNotificationStage({
+    stage: 'registering_installation',
+    operation: getNativeNotificationInstallationKey,
+  });
   const client = getSupabase();
   const platform = Platform.OS === 'ios' ? 'ios' : 'android';
   const environment = getEnvironment();
-  const { error: installationError } = await client.rpc(
-    'register_my_notification_installation_v2',
-    {
-      target_installation_key: installationKey,
-      target_platform: platform,
-      target_app_id: Application.applicationId ?? 'com.shadowchat.mobile',
-      target_project_id: projectId,
-      target_environment: environment,
-      target_app_version: Application.nativeApplicationVersion,
-      target_build_number: Application.nativeBuildVersion,
-      target_locale: Intl.DateTimeFormat().resolvedOptions().locale,
-      target_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      target_channel_schema_version: NOTIFICATION_CHANNEL_SCHEMA_VERSION,
-    }
-  );
+  const { error: installationError } = await runNotificationStage({
+    stage: 'registering_installation',
+    operation: async () =>
+      await client.rpc(
+        'register_my_notification_installation_v2',
+        {
+          target_installation_key: installationKey,
+          target_platform: platform,
+          target_app_id: Application.applicationId ?? 'com.shadowchat.mobile',
+          target_project_id: projectId,
+          target_environment: environment,
+          target_app_version: Application.nativeApplicationVersion,
+          target_build_number: Application.nativeBuildVersion,
+          target_locale: Intl.DateTimeFormat().resolvedOptions().locale,
+          target_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          target_channel_schema_version: NOTIFICATION_CHANNEL_SCHEMA_VERSION,
+        }
+      ),
+  });
   if (installationError) throw installationError;
 
-  await persistExpoPushToken();
+  onStage?.('requesting_device_token');
+  const devicePushToken = await runNotificationStage({
+    stage: 'requesting_device_token',
+    operation: getFreshDevicePushTokenAsync,
+  });
+  await persistExpoPushToken(devicePushToken, onStage);
 
   return { enabled: true, permission: permissions.status };
 };

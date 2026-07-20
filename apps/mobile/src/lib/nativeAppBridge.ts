@@ -15,17 +15,32 @@ export type NativeWebMessage =
   | {
       version: 1;
       type: 'notifications_enable';
+      requestId: string | null;
       session: NativeWebSession | null;
     }
-  | { version: 1; type: 'notifications_disable' }
+  | { version: 1; type: 'notifications_disable'; requestId: string | null }
   | { version: 1; type: 'notifications_open_settings' }
   | { version: 1; type: 'native_state_request' };
+
+export type NativeNotificationStage =
+  | 'idle'
+  | 'syncing_session'
+  | 'reading_permission'
+  | 'requesting_permission'
+  | 'registering_installation'
+  | 'requesting_device_token'
+  | 'requesting_expo_token'
+  | 'registering_token'
+  | 'ready'
+  | 'failed';
 
 export type NativeNotificationBridgeState = {
   enabled: boolean;
   permission: 'granted' | 'denied' | 'undetermined' | 'unknown';
   busy: boolean;
   error: string | null;
+  requestId: string | null;
+  stage: NativeNotificationStage;
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -72,11 +87,18 @@ export const parseNativeWebMessage = (raw: string): NativeWebMessage | null => {
 
   if (
     value.type === 'bridge_ready' ||
-    value.type === 'notifications_disable' ||
     value.type === 'notifications_open_settings' ||
     value.type === 'native_state_request'
   ) {
     return { version: 1, type: value.type };
+  }
+
+  if (value.type === 'notifications_disable') {
+    return {
+      version: 1,
+      type: 'notifications_disable',
+      requestId: typeof value.requestId === 'string' ? value.requestId : null,
+    };
   }
 
   if (value.type === 'auth_session') {
@@ -88,7 +110,12 @@ export const parseNativeWebMessage = (raw: string): NativeWebMessage | null => {
   if (value.type === 'notifications_enable') {
     const session = parseSession(value.session);
     if (session === undefined) return null;
-    return { version: 1, type: 'notifications_enable', session };
+    return {
+      version: 1,
+      type: 'notifications_enable',
+      requestId: typeof value.requestId === 'string' ? value.requestId : null,
+      session,
+    };
   }
 
   return null;

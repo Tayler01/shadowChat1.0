@@ -98,6 +98,13 @@ Canonical detail and release gates live in:
   from a completed native permission cycle. Build `7` consumes this repair
   without another binary; the next gate is a real iPhone installation/token
   row and the physical delivery matrix.
+- Physical build `7` tracing then isolated the persistent switch freeze to an
+  unresolved APNs device-token promise before installation registration. The
+  build `8` candidate adds correlated bridge request ids, serialized session
+  and notification commands, bounded stage timeouts, a fresh native-token retry
+  path, and separate passive-native versus explicit-save state. Delivery stays
+  disabled/shadow-gated until build `8` creates the first verified iPhone token
+  and passes the real-device acceptance matrix.
 
 ## Current Goal
 

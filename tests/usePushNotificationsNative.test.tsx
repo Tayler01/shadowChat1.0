@@ -103,6 +103,8 @@ describe('usePushNotifications in the native container', () => {
       permission: 'denied',
       busy: false,
       error: null,
+      requestId: 'enable-denied',
+      stage: 'failed',
     }
     mockedRequestNativeNotificationEnable.mockImplementation(async () => {
       nativeStateListener?.(deniedState)
@@ -142,5 +144,25 @@ describe('usePushNotifications in the native container', () => {
 
     expect(mockedRequestNativeNotificationEnable).not.toHaveBeenCalled()
     expect(mockedRequestNativeNotificationState).toHaveBeenCalled()
+  })
+
+  it('keeps a late native busy snapshot from permanently relocking the switch', async () => {
+    const { result } = renderHook(() => usePushNotifications())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    act(() => {
+      nativeStateListener?.({
+        enabled: false,
+        permission: 'granted',
+        busy: true,
+        error: null,
+        requestId: 'stale-native-request',
+        stage: 'requesting_device_token',
+      })
+    })
+
+    expect(result.current.saving).toBe(false)
+    expect(result.current.nativeBusy).toBe(true)
+    expect(result.current.nativeStage).toBe('requesting_device_token')
   })
 })

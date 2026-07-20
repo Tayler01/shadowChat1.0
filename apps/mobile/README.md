@@ -86,6 +86,30 @@ Remove generated export output after inspection. These checks establish
 toolchain and bundle health; App Store/TestFlight processing and physical-device
 APNs/FCM delivery remain separate release gates.
 
+## Notification Registration Acceptance
+
+The Settings switch uses one correlated native command and reports these
+bounded stages: session sync, permission check/prompt, installation
+registration, APNs/FCM token request, Expo token request, and token
+persistence. A failed stage must return control to the switch with a clear
+error; it must never remain indefinitely disabled.
+
+For build `8` acceptance on a physical iPhone:
+
+1. install the latest TestFlight build and sign in
+2. open Settings > Notifications & Audio
+3. enable Phone Push Notifications and accept the iOS permission prompt
+4. confirm the switch becomes enabled rather than remaining on an updating
+   stage
+5. verify one `ios` installation and one active `expo` token exist for the
+   signed-in account
+6. run foreground, background, and terminated delivery checks before enabling
+   the native worker beyond its shadow/canary gate
+
+If APNs does not answer, the device-token stage times out and a later tap starts
+a fresh native request. A previous unresolved request must not trap the next
+attempt.
+
 ## EAS Build Hygiene
 
 Run signed builds from the clean `main` checkout after confirming it matches

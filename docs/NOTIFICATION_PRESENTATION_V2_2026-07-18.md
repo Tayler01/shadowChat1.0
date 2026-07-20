@@ -13,6 +13,34 @@ native remote push, and native rich media each have platform-specific
 limitations and must not be described as accepted until the matching physical
 device proof exists.
 
+## Native Registration Recovery - July 19, 2026
+
+Physical build `7` testing exposed a native registration hang after the web
+session had already synchronized. Production API evidence showed authenticated
+iPhone installation-state calls but no completed
+`register_my_notification_installation_v2` call. The remaining stall was before
+installation persistence, in the APNs device-token request.
+
+Build `8` hardens that path:
+
+- every enable/disable command has a request id, and web waiters ignore terminal
+  state from older commands
+- session synchronization and notification commands execute in order
+- permission, installation, APNs/FCM token, Expo token, and token-persistence
+  stages each have a bounded timeout with an actionable stage-specific error
+- iOS retry bypasses the `expo-notifications` module-level cached device-token
+  promise and asks the native token manager for a fresh request, so an older
+  unresolved APNs request cannot poison every later attempt
+- passive native progress no longer owns the web switch's active-save state, so
+  a late `busy` snapshot cannot permanently disable retry
+- Settings shows the current native registration stage while the explicit
+  operation is active
+
+The native delivery worker remains disabled/shadow-gated until build `8`
+creates a real installation and Expo token row and passes foreground,
+background, terminated, exact-route, duplicate-suppression, badge, and clearing
+proof on a physical iPhone. Android must pass the same matrix separately.
+
 ## Product Outcome
 
 Every ShadowChat notification should feel intentionally designed for its

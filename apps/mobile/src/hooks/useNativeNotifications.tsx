@@ -42,18 +42,25 @@ import {
   parseNotificationEnvelopeV2,
   type NotificationEnvelopeV2,
 } from '@/types/notification-envelope-v2';
+import { runNotificationStage } from '@/lib/notifications/registrationPipeline';
+import type { NativeNotificationStage } from '@/lib/nativeAppBridge';
 
 type NativeNotificationsContextValue = {
   enabled: boolean;
   permission: Notifications.PermissionStatus | 'unknown';
   busy: boolean;
   error: string | null;
-  enable: () => Promise<void>;
-  disableThisDevice: () => Promise<void>;
+  requestId: string | null;
+  stage: NativeNotificationStage;
+  enable: (requestId?: string | null) => Promise<void>;
+  disableThisDevice: (requestId?: string | null) => Promise<void>;
 };
 
 const NativeNotificationsContext =
   createContext<NativeNotificationsContextValue | null>(null);
+
+const createNativeNotificationRequestId = (prefix: string) =>
+  `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const revokeInstallationWithSession = async (session: Session) => {
   const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
@@ -156,6 +163,8 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     useState<Notifications.PermissionStatus | 'unknown'>('unknown');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requestId, setRequestId] = useState<string | null>(null);
+  const [stage, setStage] = useState<NativeNotificationStage>('idle');
   const [presentation, setPresentation] = useState<NotificationEnvelopeV2 | null>(null);
   const handledResponseIds = useRef(new Set<string>());
   const handledNotifeeActionIds = useRef(new Set<string>());
@@ -164,7 +173,10 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   const pendingNotifeeEventRef =
     useRef<Pick<NotifeeEvent, 'type' | 'detail'> | null>(null);
   const sessionRef = useRef<Session | null>(null);
-  const registrationInFlightRef = useRef<Promise<unknown> | null>(null);
+  const registrationInFlightRef = useRef<{
+    requestId: string;
+    promise: Promise<void>;
+  } | null>(null);
 
   const syncBadgeCount = useCallback(async () => {
     const { data, error: badgeError } = await getSupabase().rpc(
@@ -293,59 +305,105 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     await openEnvelope(envelope);
   }, [markEnvelopeRead, openEnvelope]);
 
-  const register = useCallback(async (requestPermission: boolean) => {
-    let activeSession = sessionRef.current;
-    if (!activeSession?.user) {
-      const { data, error: sessionError } = await getSupabase().auth.getSession();
-      if (sessionError) throw sessionError;
-      activeSession = data.session;
-      if (activeSession?.user) {
-        sessionRef.current = activeSession;
-        setSession(activeSession);
-      }
-    }
-    if (!activeSession?.user) {
-      throw new Error('Sign in to ShadoChat before enabling notifications.');
-    }
+  const register = useCallback((
+    requestPermission: boolean,
+    providedRequestId?: string | null
+  ) => {
+    const activeRequestId =
+      providedRequestId ??
+      createNativeNotificationRequestId(requestPermission ? 'enable' : 'refresh');
     const pending = registrationInFlightRef.current;
-    if (pending) {
-      await pending;
-      if (!requestPermission) return;
-      const current = await Notifications.getPermissionsAsync();
-      if (current.status === 'granted') return;
-    }
-    setBusy(true);
-    setError(null);
-    const registration = registerNativeNotificationInstallation({ requestPermission });
-    registrationInFlightRef.current = registration;
-    try {
-      const result = await registration;
-      if (sessionRef.current?.user.id === activeSession.user.id) {
-        setEnabled(result.enabled);
-        setPermission(result.permission);
+    if (pending?.requestId === activeRequestId) return pending.promise;
+
+    const registration = Promise.resolve().then(async () => {
+      const isCurrent = () =>
+        registrationInFlightRef.current?.requestId === activeRequestId;
+      setRequestId(activeRequestId);
+      setBusy(true);
+      setStage('syncing_session');
+      setError(null);
+
+      try {
+        if (requestPermission) {
+          await runNotificationStage({
+            stage: 'reading_permission',
+            operation: () => setNativeNotificationDeviceOptOut(false),
+          });
+        }
+
+        let activeSession = sessionRef.current;
+        if (!activeSession?.user) {
+          const { data, error: sessionError } = await runNotificationStage({
+            stage: 'syncing_session',
+            operation: () => getSupabase().auth.getSession(),
+          });
+          if (sessionError) throw sessionError;
+          activeSession = data.session;
+          if (activeSession?.user) {
+            sessionRef.current = activeSession;
+            setSession(activeSession);
+          }
+        }
+        if (!activeSession?.user) {
+          throw new Error('Sign in to ShadoChat before enabling notifications.');
+        }
+
+        const expectedUserId = activeSession.user.id;
+        const result = await registerNativeNotificationInstallation({
+          requestPermission,
+          onStage: nextStage => {
+            if (isCurrent()) setStage(nextStage);
+          },
+          onPermission: nextPermission => {
+            if (isCurrent()) setPermission(nextPermission);
+          },
+        });
+        if (
+          isCurrent() &&
+          sessionRef.current?.user.id === expectedUserId
+        ) {
+          setEnabled(result.enabled);
+          setPermission(result.permission);
+          setStage(result.enabled ? 'ready' : 'idle');
+        }
+      } catch (caught) {
+        if (isCurrent()) {
+          setEnabled(false);
+          setStage('failed');
+          setError(
+            caught instanceof Error
+              ? caught.message
+              : 'Notification setup failed.'
+          );
+        }
+        throw caught;
+      } finally {
+        if (isCurrent()) {
+          registrationInFlightRef.current = null;
+          setBusy(false);
+        }
       }
-    } catch (caught) {
-      if (sessionRef.current?.user.id === activeSession.user.id) {
-        setEnabled(false);
-        setError(caught instanceof Error ? caught.message : 'Notification setup failed.');
-      }
-      throw caught;
-    } finally {
-      if (registrationInFlightRef.current === registration) {
-        registrationInFlightRef.current = null;
-      }
-      setBusy(false);
-    }
+    });
+
+    registrationInFlightRef.current = {
+      requestId: activeRequestId,
+      promise: registration,
+    };
+    return registration;
   }, []);
 
-  const enable = useCallback(async () => {
-    await setNativeNotificationDeviceOptOut(false);
-    await register(true);
-  }, [register]);
+  const enable = useCallback(
+    (nextRequestId?: string | null) => register(true, nextRequestId),
+    [register]
+  );
 
-  const disableThisDevice = useCallback(async () => {
+  const disableThisDevice = useCallback(async (nextRequestId?: string | null) => {
     if (!session?.user) return;
+    setRequestId(
+      nextRequestId ?? createNativeNotificationRequestId('disable')
+    );
     setBusy(true);
+    setStage('idle');
     try {
       await setNativeNotificationDeviceOptOut(true);
       await revokeNativeNotificationInstallation();
@@ -356,6 +414,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
         notifee.setBadgeCount(0),
       ]);
       setEnabled(false);
+      setStage('idle');
     } finally {
       setBusy(false);
     }
@@ -386,7 +445,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       if (priorSession?.user && !nextSession?.user) {
         setEnabled(false);
         setPresentation(null);
-        const pendingRegistration = registrationInFlightRef.current;
+        const pendingRegistration = registrationInFlightRef.current?.promise;
         void (async () => {
           await pendingRegistration?.catch(() => undefined);
           await Promise.allSettled([
@@ -564,9 +623,20 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     permission,
     busy,
     error,
+    requestId,
+    stage,
     enable,
     disableThisDevice,
-  }), [busy, disableThisDevice, enable, enabled, error, permission]);
+  }), [
+    busy,
+    disableThisDevice,
+    enable,
+    enabled,
+    error,
+    permission,
+    requestId,
+    stage,
+  ]);
 
   return (
     <NativeNotificationsContext.Provider value={value}>

@@ -98,6 +98,16 @@ const ShadoLiveCaseCenter = SHADO_LIVE_REAL_ENABLED
   ? React.lazy(() => import('../../features/moderation/ShadoLiveCaseCenter'))
   : null
 
+const nativeNotificationStageText: Record<string, string> = {
+  syncing_session: 'Securing your ShadoChat session',
+  reading_permission: 'Checking iPhone notification access',
+  requesting_permission: 'Waiting for iPhone notification permission',
+  registering_installation: 'Registering this device',
+  requesting_device_token: 'Connecting this iPhone to Apple Push Notification service',
+  requesting_expo_token: 'Securing the ShadoChat push token',
+  registering_token: 'Finishing notification registration',
+}
+
 const AccessibilityComfortPanel = React.lazy(() =>
   import('./AccessibilityComfortPanel').then(module => ({ default: module.AccessibilityComfortPanel }))
 )
@@ -430,6 +440,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     subscribed,
     loading: pushLoading,
     saving: pushSaving,
+    nativeBusy,
+    nativeStage,
     error: pushError,
     nativeApp,
     enablePush,
@@ -917,8 +929,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             label="Phone Push Notifications"
             description={
               pushSaving
-                ? 'Updating notification access on this device...'
-                : 'Allow background alerts on this browser or installed app.'
+                ? `${nativeNotificationStageText[nativeStage] ?? 'Updating notification access on this device'}...`
+                : nativeBusy
+                  ? `${nativeNotificationStageText[nativeStage] ?? 'The native setup is still working'}. You can retry if this does not finish.`
+                  : 'Allow background alerts on this browser or installed app.'
             }
             enabled={devicePushEnabled}
             disabled={pushSaving || pushLoading}
@@ -928,12 +942,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <p className="text-[var(--text-primary)]">
               Status: {
                 pushSaving
-                  ? 'Updating this device...'
+                  ? nativeNotificationStageText[nativeStage] ?? 'Updating this device...'
                   : pushLoading
                     ? 'Checking this device...'
-                    : devicePushEnabled
-                      ? 'Enabled on this device'
-                      : 'Not enabled on this device'
+                    : nativeBusy
+                      ? 'Native setup is still working; the switch is available to retry'
+                      : devicePushEnabled
+                        ? 'Enabled on this device'
+                        : 'Not enabled on this device'
               }
             </p>
             <p className="mt-1 text-[var(--text-muted)]">Permission: {permission === 'unsupported' ? 'Unsupported' : permission}</p>

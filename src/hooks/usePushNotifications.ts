@@ -22,6 +22,7 @@ import {
   requestNativeNotificationEnable,
   requestNativeNotificationState,
   subscribeToNativeNotificationState,
+  type NativeNotificationStage,
 } from '../lib/nativeAppBridge'
 import { supabase } from '../lib/supabase'
 
@@ -99,6 +100,9 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
   const [subscribed, setSubscribed] = useState(() => cachedState?.subscribed ?? false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [nativeBusy, setNativeBusy] = useState(false)
+  const [nativeStage, setNativeStage] =
+    useState<NativeNotificationStage>('idle')
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -111,7 +115,8 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
             ? 'default'
             : state.permission
         )
-        setSaving(state.busy)
+        setNativeBusy(state.busy)
+        setNativeStage(state.stage)
         setError(state.error)
         if (user) {
           updateCachedPushState(user.id, {
@@ -130,6 +135,8 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
 
     setSupport(getPushSupportStatus())
     setPermission(getNotificationPermission())
+    setNativeBusy(false)
+    setNativeStage('idle')
   }, [nativeApp, user])
 
   const refreshState = useCallback(async (force = false) => {
@@ -394,6 +401,8 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     subscribed,
     loading: loading || Boolean(enabled && user && !cachedPushStateByUserId.has(user.id)),
     saving,
+    nativeBusy,
+    nativeStage,
     error,
     enablePush,
     disablePush,

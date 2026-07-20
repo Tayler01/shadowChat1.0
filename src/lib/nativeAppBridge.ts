@@ -6,11 +6,26 @@ export type NativeNotificationPermission =
   | 'undetermined'
   | 'unknown'
 
+export type NativeNotificationStage =
+  | 'idle'
+  | 'syncing_session'
+  | 'reading_permission'
+  | 'requesting_permission'
+  | 'registering_installation'
+  | 'requesting_device_token'
+  | 'requesting_expo_token'
+  | 'registering_token'
+  | 'ready'
+  | 'failed'
+  | 'unknown'
+
 export type NativeNotificationState = {
   enabled: boolean
   permission: NativeNotificationPermission
   busy: boolean
   error: string | null
+  requestId: string | null
+  stage: NativeNotificationStage
 }
 
 type NativeAppOutboundMessage =
@@ -28,6 +43,7 @@ type NativeAppOutboundMessage =
   | {
       version: 1
       type: 'notifications_enable'
+      requestId: string
       session: null | {
         accessToken: string
         refreshToken: string
@@ -35,7 +51,7 @@ type NativeAppOutboundMessage =
         userId: string
       }
     }
-  | { version: 1; type: 'notifications_disable' }
+  | { version: 1; type: 'notifications_disable'; requestId: string }
   | { version: 1; type: 'notifications_open_settings' }
   | { version: 1; type: 'native_state_request' }
 
@@ -65,6 +81,7 @@ export const postNativeAppMessage = (message: NativeAppOutboundMessage) => {
 
 const waitForNativeNotificationState = (
   message: NativeAppOutboundMessage,
+  isRelevant: (state: NativeNotificationState) => boolean,
   isComplete: (state: NativeNotificationState) => boolean
 ) => new Promise<NativeNotificationState>((resolve, reject) => {
   let completed = false
@@ -76,6 +93,7 @@ const waitForNativeNotificationState = (
     callback()
   }
   const unsubscribe = subscribeToNativeNotificationState(state => {
+    if (!isRelevant(state)) return
     const stateError = state.error
     if (stateError) {
       finish(() => reject(new Error(stateError)))
@@ -87,12 +105,19 @@ const waitForNativeNotificationState = (
   })
   const timeoutId = window.setTimeout(() => {
     finish(() => reject(new Error('The native notification request timed out.')))
-  }, 60_000)
+  }, 120_000)
 
   if (!postNativeAppMessage(message)) {
     finish(() => reject(new Error('The native notification bridge is unavailable.')))
   }
 })
+
+const createNativeRequestId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `native-${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
 
 export const requestNativeNotificationEnable = async (
   session: Extract<
@@ -100,18 +125,11 @@ export const requestNativeNotificationEnable = async (
     { type: 'notifications_enable' }
   >['session']
 ) => {
-  if (session) {
-    postNativeAppMessage({
-      version: 1,
-      type: 'auth_session',
-      session,
-    })
-    await new Promise(resolve => window.setTimeout(resolve, 1_000))
-  }
-
+  const requestId = createNativeRequestId()
   let observedBusyState = false
   return waitForNativeNotificationState(
-    { version: 1, type: 'notifications_enable', session },
+    { version: 1, type: 'notifications_enable', requestId, session },
+    state => state.requestId === null || state.requestId === requestId,
     state => {
       if (state.busy) {
         observedBusyState = true
@@ -127,11 +145,14 @@ export const requestNativeNotificationEnable = async (
   )
 }
 
-export const requestNativeNotificationDisable = () =>
-  waitForNativeNotificationState(
-    { version: 1, type: 'notifications_disable' },
+export const requestNativeNotificationDisable = () => {
+  const requestId = createNativeRequestId()
+  return waitForNativeNotificationState(
+    { version: 1, type: 'notifications_disable', requestId },
+    state => state.requestId === null || state.requestId === requestId,
     state => !state.busy && !state.enabled
   )
+}
 
 export const openNativeNotificationSettings = () =>
   postNativeAppMessage({ version: 1, type: 'notifications_open_settings' })
@@ -161,11 +182,27 @@ export const subscribeToNativeNotificationState = (
       return
     }
 
+    const stage = record.stage
+    const normalizedStage: NativeNotificationStage = (
+      stage === 'idle' ||
+      stage === 'syncing_session' ||
+      stage === 'reading_permission' ||
+      stage === 'requesting_permission' ||
+      stage === 'registering_installation' ||
+      stage === 'requesting_device_token' ||
+      stage === 'requesting_expo_token' ||
+      stage === 'registering_token' ||
+      stage === 'ready' ||
+      stage === 'failed'
+    ) ? stage : 'unknown'
+
     listener({
       enabled: record.enabled === true,
       permission,
       busy: record.busy === true,
       error: typeof record.error === 'string' ? record.error : null,
+      requestId: typeof record.requestId === 'string' ? record.requestId : null,
+      stage: normalizedStage,
     })
   }
 

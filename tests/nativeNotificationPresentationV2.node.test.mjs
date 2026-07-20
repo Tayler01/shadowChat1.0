@@ -29,6 +29,30 @@ const nativeBridgeSource = readFileSync(
   join(mobileRoot, 'src', 'lib', 'nativeAppBridge.ts'),
   'utf8',
 )
+const nativeRegistrationSource = readFileSync(
+  join(mobileRoot, 'src', 'lib', 'notifications', 'registration.ts'),
+  'utf8',
+)
+const nativeFreshTokenSource = readFileSync(
+  join(
+    mobileRoot,
+    'src',
+    'lib',
+    'notifications',
+    'freshDevicePushToken.ts',
+  ),
+  'utf8',
+)
+const nativeRegistrationPipelineSource = readFileSync(
+  join(
+    mobileRoot,
+    'src',
+    'lib',
+    'notifications',
+    'registrationPipeline.ts',
+  ),
+  'utf8',
+)
 const webNativeBridgeSource = readFileSync(
   join(repoRoot, 'src', 'components', 'native', 'NativeAppBridge.tsx'),
   'utf8',
@@ -190,8 +214,12 @@ test('signed mobile client contains the full production app and a secure native 
   assert.match(webBridgeTransportSource, /ReactNativeWebView/)
   assert.match(webBridgeTransportSource, /get\('nativeApp'\) === '1'/)
   assert.match(webBridgeTransportSource, /openNativeNotificationSettings/)
-  assert.match(webBridgeTransportSource, /type: 'notifications_enable', session/)
+  assert.match(
+    webBridgeTransportSource,
+    /type: 'notifications_enable', requestId, session/,
+  )
   assert.match(webBridgeTransportSource, /type: 'auth_session'/)
+  assert.match(webBridgeTransportSource, /state\.requestId === requestId/)
   assert.doesNotMatch(
     webBridgeTransportSource,
     /state\.permission === 'undetermined'\s*\n\s*\)/,
@@ -200,6 +228,20 @@ test('signed mobile client contains the full production app and a secure native 
   assert.match(webNativeBridgeSource, /refreshToken: session\.refresh_token/)
   assert.match(nativeBridgeSource, /parseNativeWebMessage/)
   assert.match(nativeBridgeSource, /publishNativeNotificationRoute/)
+  assert.match(nativeBridgeSource, /requestId: string \| null/)
+  assert.match(nativeAppSource, /createSerializedCommandQueue/)
+  assert.match(nativeAppSource, /stage: 'syncing_session'/)
+  assert.match(nativeFreshTokenSource, /requireNativeModule/)
+  assert.match(nativeFreshTokenSource, /ExpoPushTokenManager/)
+  assert.match(
+    nativeRegistrationSource,
+    /getExpoPushTokenAsync\(\{\s*projectId,\s*devicePushToken,/,
+  )
+  assert.match(nativeRegistrationPipelineSource, /Promise\.race/)
+  assert.match(
+    nativeRegistrationPipelineSource,
+    /requesting_device_token: 20_000/,
+  )
   assert.match(
     nativeNotificationHookSource,
     /publishNativeNotificationRoute\(normalizeNotificationRoute\(envelope\.route\)\)/,
