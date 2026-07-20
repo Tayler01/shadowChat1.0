@@ -559,6 +559,41 @@ native iOS prompt, confirming a linked iOS installation/token row, and then
 passing foreground, background, terminated, route, action, image, sound,
 badge, read-clearing, sign-out, and account-switch tests.
 
+## Build 12 TestFlight Lifecycle And Live Delivery Repair - July 20, 2026
+
+Physical build `11` registered a valid production iOS installation and Expo
+token, but exposed two independent release blockers:
+
+- `cacheEnabled={false}` made the iOS WebView use a nonpersistent WebKit data
+  store. A content-process restart after backgrounding could therefore erase
+  the hosted Supabase session and sign the user out.
+- the linked notification worker was still provider-silent in `shadow` mode,
+  and its delivery environment was `preview` while TestFlight tokens are
+  registered as `production`.
+
+Build `12` restores the persistent iOS WebKit data store while retaining
+request-level no-cache headers for fresh hosted assets. It also makes the
+hosted WebView the sole refresh-token owner: the native helper client is
+memory-only, does not auto-refresh, removes the obsolete native auth copy, and
+debounces a transient empty session before any installation revocation.
+These are native-container changes; ordinary browser and installed-PWA auth
+behavior is unchanged.
+
+The linked backend now uses `production` native delivery. Migration
+`20260720230920` exposes only two service-role RPCs so the Edge worker can read
+or invalidate native tokens without exposing the `private` schema through
+PostgREST. `deliver-notifications-v2` version `15` consumes those RPCs and
+preserves the provider error when a retry is required.
+
+The live runtime is deliberately limited to the `dm` category and the Tayler
+Kid canary account. Worker invocation and receipt reconciliation are active;
+all-user delivery and every other category remain disabled. A synthetic DM
+probe completed the full production path—outbox claim, Expo ticket acceptance,
+and Expo delivery receipt—then its event, outbox, and target rows were deleted
+and verified absent. Build `12` still requires physical TestFlight proof for
+session persistence plus foreground, background, and terminated presentation
+before the rollout can widen.
+
 ## Required Acceptance
 
 - every active event type maps deterministically

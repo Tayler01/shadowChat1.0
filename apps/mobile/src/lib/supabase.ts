@@ -8,43 +8,20 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-const memorySessionStore = new Map<string, string>();
-
-const secureSessionStorage = {
-  getItem: async (key: string) => {
-    try {
-      const value = await SecureStore.getItemAsync(key);
-      return value ?? memorySessionStore.get(key) ?? null;
-    } catch {
-      return memorySessionStore.get(key) ?? null;
-    }
-  },
-  setItem: async (key: string, value: string) => {
-    memorySessionStore.set(key, value);
-    try {
-      await SecureStore.setItemAsync(key, value);
-    } catch {
-      // Keep the in-memory session for this run if secure persistence is unavailable.
-    }
-  },
-  removeItem: async (key: string) => {
-    memorySessionStore.delete(key);
-    try {
-      await SecureStore.deleteItemAsync(key);
-    } catch {
-      // Nothing else to clean up.
-    }
-  },
-};
+// The hosted WebView is the only owner of the Supabase refresh-token chain.
+// Older native builds persisted the same session independently, allowing both
+// clients to rotate one refresh token when iOS resumed the app. Remove that
+// legacy copy and keep the native helper session memory-only.
+const LEGACY_NATIVE_AUTH_STORAGE_KEY = 'shadowchat-mobile-auth';
+void SecureStore.deleteItemAsync(LEGACY_NATIVE_AUTH_STORAGE_KEY)
+  .catch(() => undefined);
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl!, supabaseAnonKey!, {
       auth: {
-        autoRefreshToken: true,
+        autoRefreshToken: false,
         detectSessionInUrl: false,
-        persistSession: true,
-        storage: secureSessionStorage,
-        storageKey: 'shadowchat-mobile-auth',
+        persistSession: false,
       },
       realtime: {
         params: {

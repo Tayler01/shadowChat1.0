@@ -17,6 +17,14 @@ const hardeningSql = readFileSync(
   'utf8',
 )
 const hardeningCompact = hardeningSql.replace(/\s+/g, ' ').toLowerCase()
+const workerContractSql = readFileSync(
+  path.resolve(
+    process.cwd(),
+    'supabase/migrations/20260720230920_notification_v2_private_token_worker_contract.sql',
+  ),
+  'utf8',
+)
+const workerContractCompact = workerContractSql.replace(/\s+/g, ' ').toLowerCase()
 
 describe('notification presentation v2 database contract', () => {
   test('ships dormant with a forward-only activation watermark', () => {
@@ -66,6 +74,28 @@ describe('notification presentation v2 database contract', () => {
     )
     expect(compact).toContain("disabled_reason = 'installation account changed'")
     expect(compact).toContain('delete from private.notification_native_tokens tokens')
+  })
+
+  test('gives the delivery worker narrow service-role access to private native tokens', () => {
+    expect(workerContractCompact).toContain(
+      'create or replace function public.list_notification_native_delivery_tokens_v2(',
+    )
+    expect(workerContractCompact).toContain(
+      'create or replace function public.disable_notification_native_token_v2(',
+    )
+    expect(workerContractCompact).toContain(
+      "if coalesce(auth.jwt() ->> 'role', '') <> 'service_role' then",
+    )
+    expect(workerContractCompact).toContain(
+      'from private.notification_native_tokens tokens',
+    )
+    expect(workerContractCompact).toContain(
+      'update private.notification_native_tokens tokens',
+    )
+    expect(workerContractCompact).toContain(
+      'from public, anon, authenticated',
+    )
+    expect(workerContractCompact).toContain('to service_role')
   })
 
   test('uses owner RLS for preferences, installations, projections, and receipts', () => {

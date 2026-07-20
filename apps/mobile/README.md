@@ -9,17 +9,18 @@ Native `0.86.0`, React `19.2.3`, and TypeScript `~6.0.3`.
 Expo iOS-first native client for ShadoChat. The complete product UI continues
 to come from `https://shadochat.online` inside a strict same-origin WebView, so
 the signed app and installed PWA do not drift into separate feature shells.
-Native code owns push permissions, secure session persistence, token
-registration, foreground arbitration, rich presentation, actions, badges,
-custom sounds, and exact notification routing.
+The persistent authenticated session remains owned by the hosted WebView.
+Native code owns push permissions, the scoped device installation credential,
+token registration, foreground arbitration, rich presentation, actions,
+badges, custom sounds, and exact notification routing.
 
 ## Native Client Contract
 
 - Present the complete production ShadoChat app rather than a native imitation.
 - Allow only the canonical `https://shadochat.online` origin in the app
   container; external links open in the operating system.
-- Synchronize the signed-in web session into native secure storage without
-  exposing service-role credentials or provider secrets.
+- Use the current signed-in web session in native memory without persisting or
+  auto-refreshing a second copy of its refresh-token chain.
 - Register one native notification installation per signed-in account/device.
 - Keep PWA and native foreground leases separate so only one presentation
   surface wins.
@@ -94,7 +95,7 @@ registration, APNs/FCM token request, Expo token request, and token
 persistence. A failed stage must return control to the switch with a clear
 error; it must never remain indefinitely disabled.
 
-For build `8` acceptance on a physical iPhone:
+For build `12` acceptance on a physical iPhone:
 
 1. install the latest TestFlight build and sign in
 2. open Settings > Notifications & Audio
@@ -103,8 +104,10 @@ For build `8` acceptance on a physical iPhone:
    stage
 5. verify one `ios` installation and one active `expo` token exist for the
    signed-in account
-6. run foreground, background, and terminated delivery checks before enabling
-   the native worker beyond its shadow/canary gate
+6. background and resume the app at least five times and confirm the hosted
+   account remains signed in
+7. run foreground, background, and terminated DM delivery checks against the
+   single-account live canary before expanding categories or users
 
 If APNs does not answer, the device-token stage times out and a later tap starts
 a fresh native request. A previous unresolved request must not trap the next

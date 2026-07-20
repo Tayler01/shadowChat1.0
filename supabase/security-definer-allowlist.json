@@ -1,6 +1,6 @@
 {
   "reviewed_on": "2026-07-20",
-  "expected_total_security_definers": 147,
+  "expected_total_security_definers": 149,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
     "private.can_operator_read_moderation_evidence(uuid,uuid)",
@@ -131,12 +131,14 @@
     "create_art_board_link(uuid,uuid,text)",
     "delete_art_board_item(uuid)",
     "delete_art_board_link(uuid)",
+    "disable_notification_native_token_v2(text,uuid,uuid,text)",
     "fail_edge_request_claim(uuid,text,text,uuid,text)",
     "finish_presence_activation_dispatch(uuid,uuid)",
     "get_channel_ban_block_message(uuid,text)",
     "handle_new_user()",
     "initialize_notification_preferences()",
     "insert_channel_ban_announcement(uuid,text,text[],text,timestamp with time zone)",
+    "list_notification_native_delivery_tokens_v2(uuid,uuid[],text)",
     "log_user_role_change()",
     "probe_notification_v2_worker(text)",
     "read_edge_request_claim(uuid,text,text)",

@@ -25,6 +25,10 @@ const nativeAppSource = readFileSync(
   join(mobileRoot, 'src', 'app', 'index.tsx'),
   'utf8',
 )
+const nativeSupabaseSource = readFileSync(
+  join(mobileRoot, 'src', 'lib', 'supabase.ts'),
+  'utf8',
+)
 const nativeBridgeSource = readFileSync(
   join(mobileRoot, 'src', 'lib', 'nativeAppBridge.ts'),
   'utf8',
@@ -135,6 +139,12 @@ test('delivery worker uses a dedicated secret and platform-specific rich payload
   assert.doesNotMatch(deliveryWorkerSource, /_contentAvailable: true/)
   assert.doesNotMatch(deliveryWorkerSource, /richContent/)
   assert.match(deliveryWorkerSource, /mutableContent/)
+  assert.match(
+    deliveryWorkerSource,
+    /list_notification_native_delivery_tokens_v2/,
+  )
+  assert.match(deliveryWorkerSource, /disable_notification_native_token_v2/)
+  assert.doesNotMatch(deliveryWorkerSource, /schema\('private'\)/)
 })
 
 test('Android registers its headless task before Expo Router and presents rich groups', () => {
@@ -199,6 +209,11 @@ test('signed mobile client contains the full production app and ticketed native 
   assert.doesNotMatch(nativeAppSource, /publishWebSession/)
   assert.doesNotMatch(nativeAppSource, /window\.setInterval\(publishWebSession/)
   assert.match(nativeAppSource, /client\.auth\.setSession/)
+  assert.match(nativeAppSource, /cacheEnabled\s*$/m)
+  assert.match(nativeAppSource, /incognito=\{false\}/)
+  assert.doesNotMatch(nativeAppSource, /cacheEnabled=\{false\}/)
+  assert.match(nativeAppSource, /pendingSessionLossRef/)
+  assert.match(nativeAppSource, /}, 2_000\)/)
   assert.match(nativeAppSource, /identity-change-\$\{Date\.now\(\)\}/)
   assert.match(nativeAppSource, /installation\.userId !== message\.session\.userId/)
   assert.match(nativeAppSource, /Enable Notifications/)
@@ -234,6 +249,11 @@ test('signed mobile client contains the full production app and ticketed native 
   assert.match(nativeBridgeSource, /requestId: string \| null/)
   assert.match(nativeAppSource, /createSerializedCommandQueue/)
   assert.match(nativeAppSource, /stage: 'syncing_session'/)
+  assert.match(nativeSupabaseSource, /autoRefreshToken: false/)
+  assert.match(nativeSupabaseSource, /persistSession: false/)
+  assert.match(nativeSupabaseSource, /deleteItemAsync\(LEGACY_NATIVE_AUTH_STORAGE_KEY\)/)
+  assert.doesNotMatch(nativeSupabaseSource, /autoRefreshToken: true/)
+  assert.doesNotMatch(nativeSupabaseSource, /persistSession: true/)
   assert.match(
     nativeAppSource,
     /nativeNotifications\.enable\(\s*message\.requestId,\s*message\.ticket,\s*challenge\.verifier,\s*challenge\.installationCredential,\s*message\.userId\s*\)/,

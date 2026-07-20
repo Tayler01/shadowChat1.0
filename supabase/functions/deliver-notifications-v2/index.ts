@@ -477,6 +477,17 @@ const completeOutbox = async (
   if (completed !== true) throw new Error('Notification outbox lease is no longer owned')
 }
 
+const getErrorMessage = (caught: unknown) => {
+  if (caught instanceof Error) return caught.message
+  if (
+    caught &&
+    typeof caught === 'object' &&
+    'message' in caught &&
+    typeof caught.message === 'string'
+  ) return caught.message
+  return 'Native delivery failed'
+}
+
 const processClaim = async (
   supabase: ReturnType<typeof getAdminClient>,
   claim: OutboxClaim,
@@ -606,14 +617,14 @@ const processClaim = async (
     .in('installation_id', installationIds)
   if (existingTargetError) throw existingTargetError
 
-  const { data: tokenData, error: tokenError } = await supabase
-    .schema('private')
-    .from('notification_native_tokens')
-    .select('id, installation_id, provider, token, environment')
-    .eq('user_id', claim.user_id)
-    .eq('enabled', true)
-    .eq('environment', deliveryEnvironment)
-    .in('installation_id', installationIds)
+  const { data: tokenData, error: tokenError } = await supabase.rpc(
+    'list_notification_native_delivery_tokens_v2',
+    {
+      target_user_id: claim.user_id,
+      target_installation_ids: installationIds,
+      target_environment: deliveryEnvironment,
+    },
+  )
   if (tokenError) throw tokenError
   const tokens = ((tokenData ?? []) as NativeTokenRow[])
     .filter(token => (
@@ -933,17 +944,15 @@ const processClaim = async (
     target.status = decision.status
 
     if (decision.invalid) {
-      const { error: disableError } = await supabase
-        .schema('private')
-        .from('notification_native_tokens')
-        .update({
-          enabled: false,
-          disabled_at: now,
-          disabled_reason: 'DeviceNotRegistered',
-          updated_at: now,
-        })
-        .eq('id', token.id)
-        .eq('environment', deliveryEnvironment)
+      const { error: disableError } = await supabase.rpc(
+        'disable_notification_native_token_v2',
+        {
+          target_environment: deliveryEnvironment,
+          target_token_id: token.id,
+          target_installation_id: null,
+          target_reason: 'DeviceNotRegistered',
+        },
+      )
       if (disableError) throw disableError
     }
   }
@@ -1075,18 +1084,15 @@ const checkExpoReceipts = async (
       if (targetUpdateError) throw targetUpdateError
 
       if (deviceInvalid) {
-        const { error: disableError } = await supabase
-          .schema('private')
-          .from('notification_native_tokens')
-          .update({
-            enabled: false,
-            disabled_at: now,
-            disabled_reason: 'DeviceNotRegistered',
-            updated_at: now,
-          })
-          .eq('installation_id', target.installation_id)
-          .eq('provider', 'expo')
-          .eq('environment', deliveryEnvironment)
+        const { error: disableError } = await supabase.rpc(
+          'disable_notification_native_token_v2',
+          {
+            target_environment: deliveryEnvironment,
+            target_token_id: null,
+            target_installation_id: target.installation_id,
+            target_reason: 'DeviceNotRegistered',
+          },
+        )
         if (disableError) throw disableError
       }
       if (status === 'delivered') delivered += 1
@@ -1189,7 +1195,7 @@ export const handleNotificationDeliveryRequest = async (request: Request) => {
             supabase,
             claim,
             'pending',
-            caught instanceof Error ? caught.message : 'Native delivery failed',
+            getErrorMessage(caught),
             20,
           ).catch(() => undefined)
           return { delivered: false, retryable: true }

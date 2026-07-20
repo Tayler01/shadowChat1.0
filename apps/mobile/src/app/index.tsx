@@ -112,6 +112,7 @@ export default function ShadowChatAppScreen() {
     installationCredential: string;
     credentialChallenge: string;
   }>>());
+  const pendingSessionLossRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   commandQueueRef.current ??= createSerializedCommandQueue();
   notificationCommandQueueRef.current ??= createSerializedCommandQueue();
   const nativeNotifications = useNativeNotifications();
@@ -336,32 +337,51 @@ export default function ShadowChatAppScreen() {
     };
 
     if (message.type === 'auth_session') {
-      void notificationCommandQueueRef.current?.enqueue(async () => {
-        const installation =
-          await getNativeNotificationInstallationCredential();
-        const shouldDisableInstallation = Boolean(
-          installation && (
-            !message.session ||
-            installation.userId !== message.session.userId
-          )
-        );
-        let lifecycleError: unknown = null;
-        if (shouldDisableInstallation) {
-          try {
-            await nativeNotifications.disableThisDevice(
-              `identity-change-${Date.now()}`
-            );
-          } catch (caught) {
-            lifecycleError = caught;
+      const applySession = () => {
+        void notificationCommandQueueRef.current?.enqueue(async () => {
+          const installation =
+            await getNativeNotificationInstallationCredential();
+          const shouldDisableInstallation = Boolean(
+            installation && (
+              !message.session ||
+              installation.userId !== message.session.userId
+            )
+          );
+          let lifecycleError: unknown = null;
+          if (shouldDisableInstallation) {
+            try {
+              await nativeNotifications.disableThisDevice(
+                `identity-change-${Date.now()}`
+              );
+            } catch (caught) {
+              lifecycleError = caught;
+            }
           }
-        }
-        return lifecycleError;
-      }).then(lifecycleError =>
-        commandQueueRef.current?.enqueue(async () => {
-          await syncNativeSession(message.session);
-          if (lifecycleError) throw lifecycleError;
-        })
-      ).catch(caught => publishMessageError(caught));
+          return lifecycleError;
+        }).then(lifecycleError =>
+          commandQueueRef.current?.enqueue(async () => {
+            await syncNativeSession(message.session);
+            if (lifecycleError) throw lifecycleError;
+          })
+        ).catch(caught => publishMessageError(caught));
+      };
+
+      if (pendingSessionLossRef.current) {
+        clearTimeout(pendingSessionLossRef.current);
+        pendingSessionLossRef.current = null;
+      }
+
+      if (message.session) {
+        applySession();
+      } else {
+        // A WebKit process recovery can briefly report no hydrated web session.
+        // Give the persistent WebView store time to restore before treating it
+        // as a real sign-out and revoking this device's notification identity.
+        pendingSessionLossRef.current = setTimeout(() => {
+          pendingSessionLossRef.current = null;
+          applySession();
+        }, 2_000);
+      }
       return;
     }
 
@@ -454,6 +474,13 @@ export default function ShadowChatAppScreen() {
     syncNativeSession,
   ]);
 
+  useEffect(() => () => {
+    if (pendingSessionLossRef.current) {
+      clearTimeout(pendingSessionLossRef.current);
+      pendingSessionLossRef.current = null;
+    }
+  }, []);
+
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     if (!isAllowedAppUrl(event.nativeEvent.url)) return;
     const message = parseNativeWebMessage(event.nativeEvent.data);
@@ -496,7 +523,8 @@ export default function ShadowChatAppScreen() {
         applicationNameForUserAgent="ShadoChatNative/1.0"
         automaticallyAdjustContentInsets={false}
         bounces={false}
-        cacheEnabled={false}
+        cacheEnabled
+        incognito={false}
         contentInsetAdjustmentBehavior="never"
         decelerationRate="normal"
         injectedJavaScriptBeforeContentLoaded={NATIVE_BOOTSTRAP_SCRIPT}
