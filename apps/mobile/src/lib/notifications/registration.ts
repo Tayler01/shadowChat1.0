@@ -11,7 +11,7 @@ import { registerNativeNotificationBackgroundTask } from './background';
 import { NOTIFICATION_CHANNEL_SCHEMA_VERSION } from './config';
 import { getFreshDevicePushTokenAsync } from './freshDevicePushToken';
 import { runNotificationStage } from './registrationPipeline';
-import type { NativeNotificationStage } from '../nativeAppBridge';
+import type { NativeNotificationStage } from './stages';
 
 const INSTALLATION_KEY = 'shadowchat-native-notification-installation-v2';
 const DEVICE_OPT_OUT_KEY = 'shadowchat-native-notification-device-opt-out-v2';

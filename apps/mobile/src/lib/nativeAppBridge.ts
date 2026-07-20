@@ -1,6 +1,7 @@
 import type { WebView } from 'react-native-webview';
 
 import { getNotificationWebUrl, normalizeNotificationRoute } from './notifications/routes';
+import type { NativeNotificationStage } from './notifications/stages';
 
 export type NativeWebSession = {
   accessToken: string;
@@ -22,17 +23,7 @@ export type NativeWebMessage =
   | { version: 1; type: 'notifications_open_settings' }
   | { version: 1; type: 'native_state_request' };
 
-export type NativeNotificationStage =
-  | 'idle'
-  | 'syncing_session'
-  | 'reading_permission'
-  | 'requesting_permission'
-  | 'registering_installation'
-  | 'requesting_device_token'
-  | 'requesting_expo_token'
-  | 'registering_token'
-  | 'ready'
-  | 'failed';
+export type { NativeNotificationStage } from './notifications/stages';
 
 export type NativeNotificationBridgeState = {
   enabled: boolean;

@@ -1,4 +1,4 @@
-import type { NativeNotificationStage } from '../nativeAppBridge';
+import type { NativeNotificationStage } from './stages';
 
 export const NATIVE_NOTIFICATION_STAGE_TIMEOUT_MS: Partial<
   Record<NativeNotificationStage, number>
