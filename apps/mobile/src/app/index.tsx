@@ -24,9 +24,11 @@ import {
 
 import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 import {
+  parseNativeNotificationControlUrl,
   parseNativeWebMessage,
   publishNativeNotificationState,
   subscribeToNativeNotificationRoutes,
+  type NativeWebMessage,
 } from '@/lib/nativeAppBridge';
 import { runNotificationStage } from '@/lib/notifications/registrationPipeline';
 import { getNotificationWebUrl } from '@/lib/notifications/routes';
@@ -37,7 +39,7 @@ import {
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const APP_ORIGIN = 'https://shadochat.online';
-const APP_URL = getNotificationWebUrl('/?nativeApp=1');
+const APP_URL = getNotificationWebUrl('/?nativeApp=1&nativeBridge=2');
 const NATIVE_BOOTSTRAP_SCRIPT = `
   (function () {
     window.__SHADOWCHAT_NATIVE_APP__ = true;
@@ -145,6 +147,7 @@ export default function ShadowChatAppScreen() {
   const webViewRef = useRef<WebView>(null);
   const authSyncRef = useRef<Promise<void> | null>(null);
   const commandQueueRef = useRef<SerializedCommandQueue | null>(null);
+  const handledNativeCommandIdsRef = useRef(new Set<string>());
   commandQueueRef.current ??= createSerializedCommandQueue();
   const nativeNotifications = useNativeNotifications();
   const [webReady, setWebReady] = useState(false);
@@ -261,9 +264,20 @@ export default function ShadowChatAppScreen() {
     }
   }, []);
 
-  const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    const message = parseNativeWebMessage(event.nativeEvent.data);
-    if (!message) return;
+  const processNativeMessage = useCallback((message: NativeWebMessage) => {
+    const commandRequestId = (
+      message.type === 'notifications_enable' ||
+      message.type === 'notifications_disable'
+    ) ? message.requestId : null;
+    if (commandRequestId) {
+      const handled = handledNativeCommandIdsRef.current;
+      if (handled.has(commandRequestId)) return;
+      handled.add(commandRequestId);
+      if (handled.size > 128) {
+        const oldest = handled.values().next().value;
+        if (typeof oldest === 'string') handled.delete(oldest);
+      }
+    }
 
     void commandQueueRef.current?.enqueue(async () => {
       try {
@@ -279,7 +293,9 @@ export default function ShadowChatAppScreen() {
             requestId: message.requestId,
             stage: 'syncing_session',
           });
-          await syncNativeSession(message.session);
+          if (message.session !== undefined) {
+            await syncNativeSession(message.session);
+          }
           await nativeNotifications.enable(message.requestId);
           return;
         }
@@ -322,11 +338,24 @@ export default function ShadowChatAppScreen() {
     syncNativeSession,
   ]);
 
+  const handleMessage = useCallback((event: WebViewMessageEvent) => {
+    const message = parseNativeWebMessage(event.nativeEvent.data);
+    if (message) processNativeMessage(message);
+  }, [processNativeMessage]);
+
   const handleNavigationChange = useCallback((navigation: WebViewNavigation) => {
     setCanGoBack(navigation.canGoBack);
   }, []);
 
   const handleNavigationRequest = useCallback((request: { url: string }) => {
+    const nativeControl = parseNativeNotificationControlUrl(
+      request.url,
+      APP_ORIGIN
+    );
+    if (nativeControl) {
+      processNativeMessage(nativeControl);
+      return false;
+    }
     if (isAllowedAppUrl(request.url)) return true;
     if (
       request.url.startsWith('mailto:') ||
@@ -337,7 +366,7 @@ export default function ShadowChatAppScreen() {
       void Linking.openURL(request.url);
     }
     return false;
-  }, []);
+  }, [processNativeMessage]);
 
   const showNotificationPrompt =
     Boolean(nativeUserId) &&
@@ -358,6 +387,7 @@ export default function ShadowChatAppScreen() {
         applicationNameForUserAgent="ShadoChatNative/1.0"
         automaticallyAdjustContentInsets={false}
         bounces={false}
+        cacheEnabled={false}
         contentInsetAdjustmentBehavior="never"
         decelerationRate="normal"
         injectedJavaScriptBeforeContentLoaded={NATIVE_BOOTSTRAP_SCRIPT}
@@ -390,7 +420,13 @@ export default function ShadowChatAppScreen() {
         pullToRefreshEnabled
         setSupportMultipleWindows={false}
         sharedCookiesEnabled
-        source={{ uri: APP_URL }}
+        source={{
+          uri: APP_URL,
+          headers: {
+            'Cache-Control': 'no-cache',
+            Pragma: 'no-cache',
+          },
+        }}
         startInLoadingState
         style={styles.webView}
         thirdPartyCookiesEnabled

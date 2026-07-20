@@ -264,6 +264,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
 
     try {
       if (nativeApp) {
+        setNativeStage('syncing_session')
         const { data, error: sessionError } = await supabase.auth.getSession()
         if (sessionError) throw sessionError
         const webSession = data.session

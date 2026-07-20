@@ -18,8 +18,10 @@ device proof exists.
 Physical build `7` testing exposed a native registration hang after the web
 session had already synchronized. Production API evidence showed authenticated
 iPhone installation-state calls but no completed
-`register_my_notification_installation_v2` call. The remaining stall was before
-installation persistence, in the APNs device-token request.
+`register_my_notification_installation_v2` call. That proved only that the
+remaining stall was at or before installation persistence; the cached APNs
+device-token promise was a suspected downstream risk, not yet the proven first
+blocker.
 
 Build `8` hardens that path:
 
@@ -40,6 +42,27 @@ The native delivery worker remains disabled/shadow-gated until build `8`
 creates a real installation and Expo token row and passes foreground,
 background, terminated, exact-route, duplicate-suppression, badge, and clearing
 proof on a physical iPhone. Android must pass the same matrix separately.
+
+### Build 8 bridge finding
+
+Physical build `8` testing still froze before the first installation RPC.
+Linked production evidence showed the signed-in iPhone continuing normal app
+traffic while `notification_installations` remained empty. The failure was
+therefore earlier than APNs: the persisted hosted WebView could issue an older
+sessionless enable command that the stricter build `8` native parser discarded.
+
+The build `9` recovery keeps current session-bearing commands strict while
+accepting the legacy sessionless enable shape without clearing the already
+synchronized native session. It also:
+
+- uses a request-id-deduplicated same-origin navigation control as a fallback
+  when the normal WebView message channel gives no acknowledgement
+- fails the web request with an actionable error after the fallback is also
+  silent, instead of showing an indefinite saving state
+- loads the hosted native shell with a bridge compatibility epoch and disables
+  the WebView HTTP cache so app updates do not preserve an incompatible shell
+- keeps malformed supplied sessions rejected and leaves native delivery
+  shadow-gated until a physical build creates both installation and token rows
 
 ## Product Outcome
 

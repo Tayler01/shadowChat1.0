@@ -1,4 +1,5 @@
 import {
+  getNativeNotificationEnableFallbackUrl,
   NATIVE_APP_MESSAGE_EVENT,
   requestNativeNotificationEnable,
 } from '../src/lib/nativeAppBridge'
@@ -90,6 +91,15 @@ describe('native app notification bridge', () => {
       enabled: true,
       permission: 'granted',
     })
+  })
+
+  it('builds a same-origin native notification fallback route', () => {
+    expect(getNativeNotificationEnableFallbackUrl(
+      'fallback-request',
+      'https://shadochat.online'
+    )).toBe(
+      'https://shadochat.online/?nativeApp=1&nativeControl=notifications_enable&requestId=fallback-request'
+    )
   })
 
   it('ignores stale idle state but resolves an undetermined result after a real enable cycle', async () => {

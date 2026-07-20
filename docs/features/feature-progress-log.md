@@ -98,6 +98,12 @@ Canonical detail and release gates live in:
   from a completed native permission cycle. Build `7` consumes this repair
   without another binary; the next gate is a real iPhone installation/token
   row and the physical delivery matrix.
+- Build `8` proved the remaining freeze was before installation persistence,
+  not inside APNs: the live iPhone remained authenticated while the linked
+  `notification_installations` table stayed empty. Build `9` makes the native
+  parser backward-compatible with a cached sessionless enable command, adds a
+  deduplicated same-origin fallback control and a short bridge-silence error,
+  and disables the native WebView HTTP cache behind bridge epoch `2`.
 - Physical build `7` tracing then isolated the persistent switch freeze to an
   unresolved APNs device-token promise before installation registration. The
   build `8` candidate adds correlated bridge request ids, serialized session
