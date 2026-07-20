@@ -41,7 +41,13 @@ test('linked active-table grant cleanup removes only reviewed historical extras'
 
 test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', () => {
   assert.match(contract.reviewed_on, /^\d{4}-\d{2}-\d{2}$/)
-  assert.deepEqual(contract.anon_signatures, ['is_username_available(text)'])
+  assert.deepEqual(contract.anon_signatures, [
+    'is_username_available(text)',
+    'redeem_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,text,text,text,text,integer,text)',
+    'register_native_notification_token_by_credential_v2(uuid,text,text)',
+    'revoke_notification_installation_by_credential_v2(uuid,text)',
+    'set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)',
+  ])
   assert.equal(new Set(contract.internal_signatures).size, contract.internal_signatures.length)
   assert.ok(contract.internal_signatures.every(signature => /^[a-z0-9_]+\(.*\)$/.test(signature)))
   assert.equal(new Set(contract.private_security_definers).size, contract.private_security_definers.length)

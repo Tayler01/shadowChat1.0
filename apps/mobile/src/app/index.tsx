@@ -1,4 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
+import * as Crypto from 'expo-crypto';
 import * as Linking from 'expo-linking';
 import React, {
   useCallback,
@@ -24,14 +25,19 @@ import {
 
 import { useNativeNotifications } from '@/hooks/useNativeNotifications';
 import {
-  parseNativeNotificationControlUrl,
   parseNativeWebMessage,
+  publishNativeNotificationEnrollmentChallenge,
   publishNativeNotificationState,
   subscribeToNativeNotificationRoutes,
+  type NativeNotificationBridgeState,
   type NativeWebMessage,
 } from '@/lib/nativeAppBridge';
 import { runNotificationStage } from '@/lib/notifications/registrationPipeline';
 import { getNotificationWebUrl } from '@/lib/notifications/routes';
+import {
+  getNativeNotificationInstallationCredential,
+  getNativeNotificationInstallationKey,
+} from '@/lib/notifications/registration';
 import {
   createSerializedCommandQueue,
   type SerializedCommandQueue,
@@ -39,16 +45,13 @@ import {
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 
 const APP_ORIGIN = 'https://shadochat.online';
-const APP_URL = getNotificationWebUrl('/?nativeApp=1&nativeBridge=2');
+const APP_URL = getNotificationWebUrl('/?nativeApp=1&nativeBridge=3');
 const NATIVE_BOOTSTRAP_SCRIPT = `
   (function () {
     window.__SHADOWCHAT_NATIVE_APP__ = true;
     if (document.documentElement) {
       document.documentElement.dataset.shadowchatNativeApp = 'true';
     }
-
-    var storageKey = 'sb-shsqqouecvdoifzufkqm-auth-token';
-    var lastSessionFingerprint = null;
 
     function postToNative(message) {
       if (
@@ -59,56 +62,7 @@ const NATIVE_BOOTSTRAP_SCRIPT = `
       }
     }
 
-    function readWebSession() {
-      try {
-        var raw = window.localStorage.getItem(storageKey);
-        if (!raw) return null;
-        var stored = JSON.parse(raw);
-        var session = stored && (
-          stored.currentSession ||
-          stored.session ||
-          stored
-        );
-        if (
-          !session ||
-          typeof session.access_token !== 'string' ||
-          typeof session.refresh_token !== 'string' ||
-          !session.user ||
-          typeof session.user.id !== 'string'
-        ) {
-          return null;
-        }
-        return {
-          accessToken: session.access_token,
-          refreshToken: session.refresh_token,
-          expiresAt: typeof session.expires_at === 'number'
-            ? session.expires_at
-            : null,
-          userId: session.user.id
-        };
-      } catch (_) {
-        return null;
-      }
-    }
-
-    function publishWebSession() {
-      var session = readWebSession();
-      var fingerprint = session
-        ? session.userId + ':' + session.accessToken.slice(-16)
-        : 'signed-out';
-      if (fingerprint === lastSessionFingerprint) return;
-      lastSessionFingerprint = fingerprint;
-      postToNative({
-        version: 1,
-        type: 'auth_session',
-        session: session
-      });
-    }
-
     postToNative({ version: 1, type: 'bridge_ready' });
-    publishWebSession();
-    window.addEventListener('storage', publishWebSession);
-    window.setInterval(publishWebSession, 1200);
   })();
   true;
 `;
@@ -147,8 +101,19 @@ export default function ShadowChatAppScreen() {
   const webViewRef = useRef<WebView>(null);
   const authSyncRef = useRef<Promise<Session | null> | null>(null);
   const commandQueueRef = useRef<SerializedCommandQueue | null>(null);
+  const notificationCommandQueueRef = useRef<SerializedCommandQueue | null>(null);
   const handledNativeCommandIdsRef = useRef(new Set<string>());
+  const notificationStatesByRequestIdRef =
+    useRef(new Map<string, NativeNotificationBridgeState>());
+  const enrollmentChallengesRef = useRef(new Map<string, Promise<{
+    installationKey: string;
+    verifier: string;
+    challenge: string;
+    installationCredential: string;
+    credentialChallenge: string;
+  }>>());
   commandQueueRef.current ??= createSerializedCommandQueue();
+  notificationCommandQueueRef.current ??= createSerializedCommandQueue();
   const nativeNotifications = useNativeNotifications();
   const [webReady, setWebReady] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -175,9 +140,23 @@ export default function ShadowChatAppScreen() {
     nativeNotifications.stage,
   ]);
 
+  const publishTrackedNotificationState = useCallback((
+    state: NativeNotificationBridgeState
+  ) => {
+    if (state.requestId) {
+      const states = notificationStatesByRequestIdRef.current;
+      states.set(state.requestId, state);
+      if (states.size > 128) {
+        const oldest = states.keys().next().value;
+        if (typeof oldest === 'string') states.delete(oldest);
+      }
+    }
+    publishNativeNotificationState(webViewRef.current, state);
+  }, []);
+
   const publishNotificationState = useCallback(() => {
-    publishNativeNotificationState(webViewRef.current, notificationState);
-  }, [notificationState]);
+    publishTrackedNotificationState(notificationState);
+  }, [notificationState, publishTrackedNotificationState]);
 
   useEffect(() => {
     if (!webReady) return;
@@ -270,14 +249,134 @@ export default function ShadowChatAppScreen() {
     }
   }, []);
 
+  const prepareEnrollmentChallenge = useCallback(async (requestId: string) => {
+    const challenges = enrollmentChallengesRef.current;
+    let pending = challenges.get(requestId);
+    if (!pending) {
+      if (challenges.size >= 32) {
+        const oldestRequestId = challenges.keys().next().value;
+        if (typeof oldestRequestId === 'string') {
+          challenges.delete(oldestRequestId);
+        }
+      }
+      pending = (async () => {
+        const [
+          installationKey,
+          verifierBytes,
+          installationCredentialBytes,
+        ] = await Promise.all([
+          getNativeNotificationInstallationKey(),
+          Crypto.getRandomBytesAsync(32),
+          Crypto.getRandomBytesAsync(32),
+        ]);
+        const verifier = Array.from(verifierBytes)
+          .map(value => value.toString(16).padStart(2, '0'))
+          .join('');
+        const challenge = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          verifier
+        );
+        const installationCredential = Array.from(installationCredentialBytes)
+          .map(value => value.toString(16).padStart(2, '0'))
+          .join('');
+        const credentialChallenge = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          installationCredential
+        );
+        return {
+          installationKey,
+          verifier,
+          challenge,
+          installationCredential,
+          credentialChallenge,
+        };
+      })();
+      challenges.set(requestId, pending);
+      setTimeout(() => {
+        if (challenges.get(requestId) === pending) {
+          challenges.delete(requestId);
+        }
+      }, 5 * 60_000);
+    }
+    const challenge = await pending;
+    publishNativeNotificationEnrollmentChallenge(webViewRef.current, {
+      requestId,
+      installationKey: challenge.installationKey,
+      challenge: challenge.challenge,
+      credentialChallenge: challenge.credentialChallenge,
+    });
+  }, []);
+
   const processNativeMessage = useCallback((message: NativeWebMessage) => {
+    if (message.type === 'notifications_enrollment_prepare') {
+      void prepareEnrollmentChallenge(message.requestId).catch(caught => {
+        const messageText = caught instanceof Error
+          ? caught.message
+          : 'The native notification handshake failed.';
+        setBridgeError(messageText);
+      });
+      return;
+    }
+
+    const publishMessageError = (
+      caught: unknown,
+      failedRequestId: string | null = null
+    ) => {
+      const messageText = caught instanceof Error
+        ? caught.message
+        : 'Native app synchronization failed.';
+      setBridgeError(messageText);
+      publishTrackedNotificationState({
+        ...notificationState,
+        busy: false,
+        error: messageText,
+        requestId: failedRequestId,
+        stage: 'failed',
+      });
+    };
+
+    if (message.type === 'auth_session') {
+      void notificationCommandQueueRef.current?.enqueue(async () => {
+        const installation =
+          await getNativeNotificationInstallationCredential();
+        const shouldDisableInstallation = Boolean(
+          installation && (
+            !message.session ||
+            installation.userId !== message.session.userId
+          )
+        );
+        let lifecycleError: unknown = null;
+        if (shouldDisableInstallation) {
+          try {
+            await nativeNotifications.disableThisDevice(
+              `identity-change-${Date.now()}`
+            );
+          } catch (caught) {
+            lifecycleError = caught;
+          }
+        }
+        return lifecycleError;
+      }).then(lifecycleError =>
+        commandQueueRef.current?.enqueue(async () => {
+          await syncNativeSession(message.session);
+          if (lifecycleError) throw lifecycleError;
+        })
+      ).catch(caught => publishMessageError(caught));
+      return;
+    }
+
     const commandRequestId = (
       message.type === 'notifications_enable' ||
       message.type === 'notifications_disable'
     ) ? message.requestId : null;
     if (commandRequestId) {
       const handled = handledNativeCommandIdsRef.current;
-      if (handled.has(commandRequestId)) return;
+      if (handled.has(commandRequestId)) {
+        const cachedState =
+          notificationStatesByRequestIdRef.current.get(commandRequestId);
+        if (cachedState) publishTrackedNotificationState(cachedState);
+        return;
+      }
       handled.add(commandRequestId);
       if (handled.size > 128) {
         const oldest = handled.values().next().value;
@@ -285,27 +384,43 @@ export default function ShadowChatAppScreen() {
       }
     }
 
-    void commandQueueRef.current?.enqueue(async () => {
+    if (message.type === 'notifications_enable') {
+      publishTrackedNotificationState({
+        ...notificationState,
+        busy: true,
+        error: null,
+        requestId: message.requestId,
+        stage: 'reading_permission',
+      });
+    }
+
+    const queue = (
+      message.type === 'notifications_enable' ||
+      message.type === 'notifications_disable'
+    ) ? notificationCommandQueueRef.current : commandQueueRef.current;
+
+    void queue?.enqueue(async () => {
       try {
-        if (message.type === 'auth_session') {
-          await syncNativeSession(message.session);
-          return;
-        }
         if (message.type === 'notifications_enable') {
-          publishNativeNotificationState(webViewRef.current, {
-            ...notificationState,
-            busy: true,
-            error: null,
-            requestId: message.requestId,
-            stage: 'syncing_session',
-          });
-          const synchronizedSession = message.session !== undefined
-            ? await syncNativeSession(message.session)
-            : undefined;
-          await nativeNotifications.enable(
-            message.requestId,
-            synchronizedSession
-          );
+          const pendingChallenge =
+            enrollmentChallengesRef.current.get(message.requestId);
+          if (!pendingChallenge) {
+            throw new Error(
+              'The secure notification handshake expired. Try enabling notifications again.'
+            );
+          }
+          const challenge = await pendingChallenge;
+          try {
+            await nativeNotifications.enable(
+              message.requestId,
+              message.ticket,
+              challenge.verifier,
+              challenge.installationCredential,
+              message.userId
+            );
+          } finally {
+            enrollmentChallengesRef.current.delete(message.requestId);
+          }
           return;
         }
         if (message.type === 'notifications_disable') {
@@ -323,31 +438,24 @@ export default function ShadowChatAppScreen() {
           publishNotificationState();
         }
       } catch (caught) {
-        const messageText = caught instanceof Error
-          ? caught.message
-          : 'Native app synchronization failed.';
         const requestId = (
           message.type === 'notifications_enable' ||
           message.type === 'notifications_disable'
         ) ? message.requestId : null;
-        setBridgeError(messageText);
-        publishNativeNotificationState(webViewRef.current, {
-          ...notificationState,
-          busy: false,
-          error: messageText,
-          requestId,
-          stage: 'failed',
-        });
+        publishMessageError(caught, requestId);
       }
     });
   }, [
     nativeNotifications,
     notificationState,
+    prepareEnrollmentChallenge,
     publishNotificationState,
+    publishTrackedNotificationState,
     syncNativeSession,
   ]);
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
+    if (!isAllowedAppUrl(event.nativeEvent.url)) return;
     const message = parseNativeWebMessage(event.nativeEvent.data);
     if (message) processNativeMessage(message);
   }, [processNativeMessage]);
@@ -357,14 +465,6 @@ export default function ShadowChatAppScreen() {
   }, []);
 
   const handleNavigationRequest = useCallback((request: { url: string }) => {
-    const nativeControl = parseNativeNotificationControlUrl(
-      request.url,
-      APP_ORIGIN
-    );
-    if (nativeControl) {
-      processNativeMessage(nativeControl);
-      return false;
-    }
     if (isAllowedAppUrl(request.url)) return true;
     if (
       request.url.startsWith('mailto:') ||
@@ -375,7 +475,7 @@ export default function ShadowChatAppScreen() {
       void Linking.openURL(request.url);
     }
     return false;
-  }, [processNativeMessage]);
+  }, []);
 
   const showNotificationPrompt =
     Boolean(nativeUserId) &&
@@ -498,7 +598,10 @@ export default function ShadowChatAppScreen() {
                   if (nativeNotifications.permission === 'denied') {
                     void Linking.openSettings();
                   } else {
-                    void nativeNotifications.enable();
+                    setNotificationPromptDismissed(true);
+                    navigateInsideApp(getNotificationWebUrl(
+                      '/?nativeApp=1&view=settings&settingsSection=notifications-audio'
+                    ));
                   }
                 }}
                 style={({ pressed }) => [

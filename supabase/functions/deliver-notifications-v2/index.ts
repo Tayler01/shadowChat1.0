@@ -123,6 +123,17 @@ export const classifyExpoTicket = (
 
 export const shouldAttemptExpoTarget = (status: DeliveryTargetStatus) => status === 'pending'
 
+export const isNativeInstallationForeground = (
+  installation: Pick<InstallationRow, 'platform' | 'foreground_until'>,
+  nowMs = Date.now(),
+) => {
+  if (installation.platform === 'web' || !installation.foreground_until) {
+    return false
+  }
+  const foregroundUntil = Date.parse(installation.foreground_until)
+  return Number.isFinite(foregroundUntil) && foregroundUntil > nowMs
+}
+
 export const decideExpoOutboxCompletion = (
   statuses: DeliveryTargetStatus[],
   canRetry: boolean,
@@ -578,7 +589,8 @@ const processClaim = async (
 
   const installations = (installationsResult.data ?? []) as InstallationRow[]
   const eligibleInstallations = installations.filter(installation => (
-    installation.platform !== 'web'
+    installation.platform !== 'web' &&
+    !isNativeInstallationForeground(installation)
   ))
   if (eligibleInstallations.length === 0) {
     await completeOutbox(supabase, claim, 'cancelled', 'No native installation')

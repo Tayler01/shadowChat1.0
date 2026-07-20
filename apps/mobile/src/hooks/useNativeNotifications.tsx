@@ -24,8 +24,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { configureNativeNotifications } from '@/lib/notifications/config';
 import {
+  clearNativeNotificationInstallationCredential,
   getNativeNotificationDeviceOptOut,
-  getNativeNotificationInstallationKey,
+  getNativeNotificationInstallationCredential,
+  isNativeNotificationCredentialRejectedError,
+  reconcileNativeNotificationInstallation,
   registerNativeNotificationInstallation,
   refreshNativeNotificationToken,
   revokeNativeNotificationInstallation,
@@ -54,7 +57,10 @@ type NativeNotificationsContextValue = {
   stage: NativeNotificationStage;
   enable: (
     requestId?: string | null,
-    synchronizedSession?: Session | null
+    enrollmentTicket?: string | null,
+    enrollmentVerifier?: string | null,
+    installationCredential?: string | null,
+    enrollmentUserId?: string | null
   ) => Promise<void>;
   disableThisDevice: (requestId?: string | null) => Promise<void>;
 };
@@ -64,30 +70,6 @@ const NativeNotificationsContext =
 
 const createNativeNotificationRequestId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-const revokeInstallationWithSession = async (session: Session) => {
-  const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) return false;
-
-  const installationKey = await getNativeNotificationInstallationKey();
-  const response = await fetch(
-    `${supabaseUrl.replace(/\/+$/, '')}/rest/v1/rpc/revoke_my_notification_installation_v2`,
-    {
-      method: 'POST',
-      headers: {
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ target_installation_key: installationKey }),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(`Notification installation revocation failed (${response.status}).`);
-  }
-  return true;
-};
 
 const getEnvelopeFromNotification = (
   notification: Notifications.Notification
@@ -180,6 +162,44 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     requestId: string;
     promise: Promise<void>;
   } | null>(null);
+  const credentialReconcileInFlightRef = useRef<Promise<void> | null>(null);
+  const lastCredentialReconcileAtRef = useRef(0);
+
+  const handleCredentialRejection = useCallback(async (caught: unknown) => {
+    if (!isNativeNotificationCredentialRejectedError(caught)) return false;
+    await clearNativeNotificationInstallationCredential();
+    setEnabled(false);
+    setError('Notification access expired on this device. Turn it on again.');
+    return true;
+  }, []);
+
+  const reconcileCredential = useCallback((force = false) => {
+    if (credentialReconcileInFlightRef.current) {
+      return credentialReconcileInFlightRef.current;
+    }
+    if (
+      !force &&
+      Date.now() - lastCredentialReconcileAtRef.current < 5 * 60_000
+    ) {
+      return Promise.resolve();
+    }
+
+    lastCredentialReconcileAtRef.current = Date.now();
+    const request = (async () => {
+      try {
+        const reconciled = await reconcileNativeNotificationInstallation();
+        if (reconciled) setEnabled(true);
+      } catch (caught) {
+        await handleCredentialRejection(caught);
+      }
+    })().finally(() => {
+      if (credentialReconcileInFlightRef.current === request) {
+        credentialReconcileInFlightRef.current = null;
+      }
+    });
+    credentialReconcileInFlightRef.current = request;
+    return request;
+  }, [handleCredentialRejection]);
 
   const syncBadgeCount = useCallback(async () => {
     const { data, error: badgeError } = await getSupabase().rpc(
@@ -311,7 +331,10 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   const register = useCallback((
     requestPermission: boolean,
     providedRequestId?: string | null,
-    synchronizedSession?: Session | null
+    enrollmentTicket?: string | null,
+    enrollmentVerifier?: string | null,
+    installationCredential?: string | null,
+    enrollmentUserId?: string | null
   ) => {
     const activeRequestId =
       providedRequestId ??
@@ -324,7 +347,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
         registrationInFlightRef.current?.requestId === activeRequestId;
       setRequestId(activeRequestId);
       setBusy(true);
-      setStage('syncing_session');
+      setStage('reading_permission');
       setError(null);
 
       try {
@@ -335,32 +358,22 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
           });
         }
 
-        let activeSession = synchronizedSession !== undefined
-          ? synchronizedSession
-          : sessionRef.current;
-        if (activeSession?.user && synchronizedSession !== undefined) {
-          sessionRef.current = activeSession;
-          setSession(activeSession);
-        }
-        if (!activeSession?.user && synchronizedSession === undefined) {
-          const { data, error: sessionError } = await runNotificationStage({
-            stage: 'syncing_session',
-            operation: () => getSupabase().auth.getSession(),
-          });
-          if (sessionError) throw sessionError;
-          activeSession = data.session;
-          if (activeSession?.user) {
-            sessionRef.current = activeSession;
-            setSession(activeSession);
-          }
-        }
-        if (!activeSession?.user) {
-          throw new Error('Sign in to ShadoChat before enabling notifications.');
+        if (
+          !enrollmentTicket ||
+          !enrollmentVerifier ||
+          !installationCredential ||
+          !enrollmentUserId
+        ) {
+          throw new Error('A secure notification enrollment handshake is required.');
         }
 
-        const expectedUserId = activeSession.user.id;
         const result = await registerNativeNotificationInstallation({
           requestPermission,
+          enrollmentTicket,
+          enrollmentVerifier,
+          installationCredential,
+          enrollmentUserId,
+          requestId: activeRequestId,
           onStage: nextStage => {
             if (isCurrent()) setStage(nextStage);
           },
@@ -368,10 +381,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
             if (isCurrent()) setPermission(nextPermission);
           },
         });
-        if (
-          isCurrent() &&
-          sessionRef.current?.user.id === expectedUserId
-        ) {
+        if (isCurrent()) {
           setEnabled(result.enabled);
           setPermission(result.permission);
           setStage(result.enabled ? 'ready' : 'idle');
@@ -405,20 +415,31 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   const enable = useCallback(
     (
       nextRequestId?: string | null,
-      synchronizedSession?: Session | null
-    ) => register(true, nextRequestId, synchronizedSession),
+      enrollmentTicket?: string | null,
+      enrollmentVerifier?: string | null,
+      installationCredential?: string | null,
+      enrollmentUserId?: string | null
+    ) => register(
+      true,
+      nextRequestId,
+      enrollmentTicket,
+      enrollmentVerifier,
+      installationCredential,
+      enrollmentUserId
+    ),
     [register]
   );
 
   const disableThisDevice = useCallback(async (nextRequestId?: string | null) => {
-    if (!session?.user) return;
     setRequestId(
       nextRequestId ?? createNativeNotificationRequestId('disable')
     );
     setBusy(true);
     setStage('idle');
+    setError(null);
     try {
       await setNativeNotificationDeviceOptOut(true);
+      setEnabled(false);
       await revokeNativeNotificationInstallation();
       await Promise.all([
         Notifications.dismissAllNotificationsAsync(),
@@ -428,10 +449,16 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       ]);
       setEnabled(false);
       setStage('idle');
+      setError(null);
+    } catch (caught) {
+      setError(caught instanceof Error
+        ? caught.message
+        : 'Notification device revocation failed.');
+      throw caught;
     } finally {
       setBusy(false);
     }
-  }, [session?.user]);
+  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -442,9 +469,20 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       .then(() => Notifications.getPermissionsAsync())
       .then(async nextPermissions => {
         if (!active) return;
-        const optedOut = await getNativeNotificationDeviceOptOut();
+        const [optedOut, installationCredential] = await Promise.all([
+          getNativeNotificationDeviceOptOut(),
+          getNativeNotificationInstallationCredential(),
+        ]);
         setPermission(nextPermissions.status);
-        setEnabled(nextPermissions.status === 'granted' && !optedOut);
+        const locallyEnabled =
+          nextPermissions.status === 'granted' &&
+          !optedOut &&
+          Boolean(installationCredential)
+        setEnabled(locallyEnabled);
+        if (locallyEnabled) void reconcileCredential(true);
+        if (optedOut && installationCredential) {
+          void revokeNativeNotificationInstallation().catch(() => undefined);
+        }
       })
       .catch(caught => {
         if (active) setError(caught instanceof Error ? caught.message : 'Notification setup failed.');
@@ -455,22 +493,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       sessionRef.current = nextSession;
       setSession(nextSession);
 
-      if (priorSession?.user && !nextSession?.user) {
-        setEnabled(false);
-        setPresentation(null);
-        const pendingRegistration = registrationInFlightRef.current?.promise;
-        void (async () => {
-          await pendingRegistration?.catch(() => undefined);
-          await Promise.allSettled([
-            revokeInstallationWithSession(priorSession),
-            Notifications.unregisterForNotificationsAsync(),
-            Notifications.dismissAllNotificationsAsync(),
-            Notifications.setBadgeCountAsync(0),
-            notifee.cancelAllNotifications(),
-            notifee.setBadgeCount(0),
-          ]);
-        })();
-      }
+      if (priorSession?.user && !nextSession?.user) setPresentation(null);
     };
 
     void client.auth.getSession().then(({ data }) => {
@@ -484,36 +507,36 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       active = false;
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, [reconcileCredential]);
 
   useEffect(() => {
-    if (!session?.user || permission !== 'granted') return;
-    void register(false).catch(() => undefined);
-  }, [permission, register, session?.user]);
-
-  useEffect(() => {
-    if (!session?.user || permission !== 'granted') return;
+    if (!enabled || permission !== 'granted') return;
     const subscription = Notifications.addPushTokenListener(devicePushToken => {
       void refreshNativeNotificationToken(devicePushToken).catch(caught => {
+        if (isNativeNotificationCredentialRejectedError(caught)) {
+          void handleCredentialRejection(caught);
+          return;
+        }
         setError(caught instanceof Error
           ? caught.message
           : 'Notification token refresh failed.');
       });
     });
     return () => subscription.remove();
-  }, [permission, session?.user]);
+  }, [enabled, handleCredentialRejection, permission]);
 
   useEffect(() => {
-    if (!session?.user) return;
+    if (!enabled) return;
     const syncLease = (foreground: boolean) => {
-      void updateNativeNotificationForegroundLease(foreground).catch(() => undefined);
+      void updateNativeNotificationForegroundLease(foreground).catch(caught => {
+        void handleCredentialRejection(caught);
+      });
     };
     syncLease(AppState.currentState === 'active');
     const appStateSubscription = AppState.addEventListener('change', state => {
       syncLease(state === 'active');
-      if (state === 'active' && permission === 'granted') {
-        void register(false).catch(() => undefined);
-        void syncBadgeCount().catch(() => undefined);
+      if (state === 'active') {
+        if (session?.user) void syncBadgeCount().catch(() => undefined);
       }
     });
     const intervalId = setInterval(() => {
@@ -526,10 +549,34 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     };
   }, [
     permission,
-    register,
+    enabled,
     session?.user,
     syncBadgeCount,
+    handleCredentialRejection,
   ]);
+
+  useEffect(() => {
+    const refreshPermission = async () => {
+      const nextPermissions = await Notifications.getPermissionsAsync();
+      const [optedOut, installationCredential] = await Promise.all([
+        getNativeNotificationDeviceOptOut(),
+        getNativeNotificationInstallationCredential(),
+      ]);
+      setPermission(nextPermissions.status);
+      const locallyEnabled =
+        nextPermissions.status === 'granted' &&
+        !optedOut &&
+        Boolean(installationCredential)
+      setEnabled(locallyEnabled);
+      if (locallyEnabled) void reconcileCredential();
+    };
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') {
+        void refreshPermission().catch(() => undefined);
+      }
+    });
+    return () => subscription.remove();
+  }, [reconcileCredential]);
 
   useEffect(() => {
     const receiveSubscription = Notifications.addNotificationReceivedListener(notification => {

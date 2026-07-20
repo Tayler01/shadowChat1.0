@@ -7,12 +7,14 @@ import {
   getNotificationPermission,
 } from '../src/lib/push'
 import {
+  createNativeNotificationRequestId,
+  prepareNativeNotificationEnrollment,
   requestNativeNotificationEnable,
   requestNativeNotificationState,
   subscribeToNativeNotificationState,
   type NativeNotificationState,
 } from '../src/lib/nativeAppBridge'
-import { supabase } from '../src/lib/supabase'
+import { createNativeNotificationEnrollmentTicket } from '../src/lib/nativeNotificationEnrollment'
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: jest.fn(),
@@ -38,20 +40,18 @@ jest.mock('../src/lib/push', () => ({
 }))
 
 jest.mock('../src/lib/nativeAppBridge', () => ({
+  createNativeNotificationRequestId: jest.fn(),
   isNativeAppWebView: jest.fn(() => true),
   openNativeNotificationSettings: jest.fn(() => true),
+  prepareNativeNotificationEnrollment: jest.fn(),
   requestNativeNotificationDisable: jest.fn(),
   requestNativeNotificationEnable: jest.fn(),
   requestNativeNotificationState: jest.fn(),
   subscribeToNativeNotificationState: jest.fn(),
 }))
 
-jest.mock('../src/lib/supabase', () => ({
-  supabase: {
-    auth: {
-      getSession: jest.fn(),
-    },
-  },
+jest.mock('../src/lib/nativeNotificationEnrollment', () => ({
+  createNativeNotificationEnrollmentTicket: jest.fn(),
 }))
 
 const mockedUseAuth = useAuth as jest.Mock
@@ -61,18 +61,24 @@ const mockedGetNotificationPermission =
   getNotificationPermission as jest.Mock
 const mockedRequestNativeNotificationEnable =
   requestNativeNotificationEnable as jest.Mock
+const mockedCreateNativeNotificationRequestId =
+  createNativeNotificationRequestId as jest.Mock
+const mockedPrepareNativeNotificationEnrollment =
+  prepareNativeNotificationEnrollment as jest.Mock
+const mockedCreateNativeNotificationEnrollmentTicket =
+  createNativeNotificationEnrollmentTicket as jest.Mock
 const mockedRequestNativeNotificationState =
   requestNativeNotificationState as jest.Mock
 const mockedSubscribeToNativeNotificationState =
   subscribeToNativeNotificationState as jest.Mock
-const mockedGetSession = supabase.auth.getSession as jest.Mock
-
 const user = { id: '11111111-1111-4111-8111-111111111111' }
-const session = {
-  access_token: 'access-token-value-long-enough-for-native-bridge',
-  refresh_token: 'refresh-token-value-long-enough-for-native-bridge',
-  expires_at: 1_900_000_000,
-  user,
+const requestId = '22222222-2222-4222-8222-222222222222'
+const ticket = `${requestId}.${'a'.repeat(64)}`
+const challenge = {
+  requestId,
+  installationKey: '33333333-3333-4333-8333-333333333333',
+  challenge: 'b'.repeat(64),
+  credentialChallenge: 'c'.repeat(64),
 }
 
 let nativeStateListener:
@@ -85,9 +91,11 @@ describe('usePushNotifications in the native container', () => {
     nativeStateListener = null
     mockedUseAuth.mockReturnValue({ user })
     mockedFetchNotificationPreferences.mockResolvedValue({ user_id: user.id })
-    mockedGetSession.mockResolvedValue({
-      data: { session },
-      error: null,
+    mockedCreateNativeNotificationRequestId.mockReturnValue(requestId)
+    mockedPrepareNativeNotificationEnrollment.mockResolvedValue(challenge)
+    mockedCreateNativeNotificationEnrollmentTicket.mockResolvedValue({
+      ticket,
+      expiresAt: '2099-01-01T00:00:00.000Z',
     })
     mockedSubscribeToNativeNotificationState.mockImplementation(
       (listener: (state: NativeNotificationState) => void) => {
@@ -127,23 +135,51 @@ describe('usePushNotifications in the native container', () => {
     expect(mockedRequestNativeNotificationState).toHaveBeenCalled()
   })
 
-  it('never sends a signed-out enable command while the web session is still syncing', async () => {
-    mockedGetSession.mockResolvedValueOnce({
-      data: { session: null },
+  it('uses the authenticated web ticket without waiting for a second native session', async () => {
+    const readyState: NativeNotificationState = {
+      enabled: true,
+      permission: 'granted',
+      busy: false,
       error: null,
-    })
+      requestId,
+      stage: 'ready',
+    }
+    mockedRequestNativeNotificationEnable.mockResolvedValue(readyState)
 
     const { result } = renderHook(() => usePushNotifications())
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     await act(async () => {
-      await expect(result.current.enablePush()).rejects.toThrow(
-        'Your secure ShadoChat session is still syncing.'
-      )
+      await result.current.enablePush()
+    })
+
+    expect(mockedPrepareNativeNotificationEnrollment).toHaveBeenCalledWith(requestId)
+    expect(mockedCreateNativeNotificationEnrollmentTicket).toHaveBeenCalledWith(
+      user.id,
+      requestId,
+      challenge.installationKey,
+      challenge.challenge,
+      challenge.credentialChallenge,
+    )
+    expect(mockedRequestNativeNotificationEnable).toHaveBeenCalledWith(
+      requestId,
+      ticket,
+      user.id,
+    )
+  })
+
+  it('does not send a native command when secure ticket minting fails', async () => {
+    mockedCreateNativeNotificationEnrollmentTicket.mockRejectedValueOnce(
+      new Error('Ticket mint failed.')
+    )
+    const { result } = renderHook(() => usePushNotifications())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await expect(result.current.enablePush()).rejects.toThrow('Ticket mint failed.')
     })
 
     expect(mockedRequestNativeNotificationEnable).not.toHaveBeenCalled()
-    expect(mockedRequestNativeNotificationState).toHaveBeenCalled()
   })
 
   it('keeps a late native busy snapshot from permanently relocking the switch', async () => {

@@ -511,6 +511,54 @@ binary is required for this checkpoint. Native delivery remains inactive until
 an installation and token are registered and the physical acceptance matrix
 passes.
 
+## Build 11 Durable Native Enrollment - July 20, 2026
+
+Physical build `10` proved that the prior repair still had the wrong authority
+boundary. The hosted account was authenticated, but notification setup waited
+for a second native GoTrue session and its sessionless custom-URL fallback
+discarded that identity. Production traces showed successful hosted
+`/auth/v1/token` and `/auth/v1/user` requests with no native notification
+registration RPC. That is why an already signed-in user saw `Sign in to
+ShadoChat before enabling notifications`.
+
+Build `11` replaces that path instead of extending its timeout:
+
+- the native container creates a 256-bit verifier, a SHA-256 verifier
+  challenge, a device-only installation credential, and its credential hash
+- the authenticated hosted app mints a five-minute, single-use Supabase ticket
+  bound to the exact request, installation key, verifier challenge, credential
+  hash, and signed-in user
+- native redeems the ticket with the verifier, plaintext device credential,
+  and production Expo token; no Supabase access token, refresh token,
+  enrollment ticket, verifier, or installation credential is placed in a URL
+- only the credential hash is stored server-side, while the plaintext
+  credential is stored with iOS/Android device-only secure storage
+- token rotation, foreground suppression leases, sign-out/account-change
+  revocation, and retry after a lost redemption response use the scoped device
+  credential and no longer depend on native session timing
+- the production delivery worker now honors each native installation's active
+  foreground lease, suppressing only that foreground device while preserving
+  delivery to inactive sibling devices
+- WebView messages are same-origin checked, request-id correlated, retried,
+  deduplicated, bounded, and expired after five minutes
+- the duplicate local-storage auth poller and the secret-bearing custom-scheme
+  fallback are removed
+
+Linked migrations `20260720152414` and `20260720155850` are applied. The
+enrollment transaction passed wrong-verifier, replay, rollback, credential
+rotation, token refresh, foreground lease, revoke, and post-revoke checks
+against the linked database. The security-definer allowlist and linked
+security contract include the intentionally anonymous, credential-scoped
+endpoints. The two private enrollment tables remain deny-by-default with RLS
+and no browser policies. `deliver-notifications-v2` version `12` is deployed
+with the foreground arbitration fix.
+
+Build `10` cannot consume this protocol. Acceptance requires installing build
+`11`, enabling notifications from the signed-in Settings page, observing the
+native iOS prompt, confirming a linked iOS installation/token row, and then
+passing foreground, background, terminated, route, action, image, sound,
+badge, read-clearing, sign-out, and account-switch tests.
+
 ## Required Acceptance
 
 - every active event type maps deterministically

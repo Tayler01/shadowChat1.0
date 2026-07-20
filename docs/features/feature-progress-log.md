@@ -31,6 +31,35 @@ Canonical detail and release gates live in:
 - [REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1)
 - [DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
 
+## July 20 Durable TestFlight Notification Enrollment
+
+- Build `10` still showed `Sign in to ShadoChat before enabling
+  notifications` for a valid hosted session. Production evidence confirmed
+  hosted Auth succeeded while native registration never reached Supabase.
+- Notification enrollment is now a device-bound, PKCE-style bridge flow: an
+  authenticated hosted session mints a five-minute single-use ticket, native
+  proves its retained verifier, and a native-generated installation credential
+  owns token refresh, foreground leases, and revocation.
+- The secret-bearing custom-URL fallback and duplicate local-storage session
+  poller are removed. The bridge now uses exact request correlation,
+  same-origin message validation, bounded retries, deduplication, and
+  five-minute challenge expiry.
+- Linked migrations `20260720152414` and `20260720155850` are applied and
+  migration state is aligned. Live transaction checks cover rollback, wrong
+  verifier, replay, rotation, refresh, foreground lease, revoke, and
+  post-revoke rejection.
+- Pre-build proof: root and mobile lint/TypeScript pass; production build and
+  budgets pass; 245 Jest suites / 1,348 passing tests; 50 Node contracts;
+  documentation integrity; Expo Doctor 20/20; linked security contract and
+  migration dry run pass.
+- `deliver-notifications-v2` version `12` is deployed and now suppresses native
+  system delivery only for installations with a currently active foreground
+  lease, preventing duplicate foreground in-app and phone alerts without
+  suppressing inactive sibling devices.
+- Build `11` is the first compatible TestFlight binary. Physical-device proof
+  remains required before native delivery expands beyond its current guarded
+  rollout.
+
 ## July 17 Production Notification Follow-Up
 
 - Catch-Up swipe-to-read now follows the full gesture, supports distance and

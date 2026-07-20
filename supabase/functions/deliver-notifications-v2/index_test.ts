@@ -5,6 +5,7 @@ import {
   decideExpoOutboxCompletion,
   getNotificationDeliveryEnvironment,
   handleNotificationDeliveryRequest,
+  isNativeInstallationForeground,
   shouldAttemptExpoTarget,
   toExpoMessage,
 } from './index.ts'
@@ -78,6 +79,33 @@ Deno.test('delivery environment is explicit and fails closed', () => {
     () => getNotificationDeliveryEnvironment(''),
     /not configured/,
   )
+})
+
+Deno.test('native foreground leases suppress only the active device', () => {
+  const now = Date.parse('2026-07-20T16:30:00.000Z')
+  assert.equal(isNativeInstallationForeground({
+    platform: 'ios',
+    foreground_until: '2026-07-20T16:31:00.000Z',
+  }, now), true)
+  assert.equal(isNativeInstallationForeground({
+    platform: 'android',
+    foreground_until: '2026-07-20T16:29:59.999Z',
+  }, now), false)
+  assert.equal(isNativeInstallationForeground({
+    platform: 'ios',
+    foreground_until: null,
+  }, now), false)
+  assert.equal(isNativeInstallationForeground({
+    platform: 'web',
+    foreground_until: '2026-07-20T16:31:00.000Z',
+  }, now), false)
+})
+
+Deno.test('an invalid foreground lease cannot suppress native delivery forever', () => {
+  assert.equal(isNativeInstallationForeground({
+    platform: 'ios',
+    foreground_until: 'not-a-timestamp',
+  }), false)
 })
 
 Deno.test('the delivery worker rejects requests without its dedicated secret', async () => {

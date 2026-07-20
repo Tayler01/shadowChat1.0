@@ -1,4 +1,7 @@
 export const NATIVE_APP_MESSAGE_EVENT = 'shadowchat:native-message'
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const ENROLLMENT_CHALLENGE_PATTERN = /^[0-9a-f]{64}$/i
 
 export type NativeNotificationPermission =
   | 'granted'
@@ -42,14 +45,15 @@ type NativeAppOutboundMessage =
     }
   | {
       version: 1
+      type: 'notifications_enrollment_prepare'
+      requestId: string
+    }
+  | {
+      version: 1
       type: 'notifications_enable'
       requestId: string
-      session: null | {
-        accessToken: string
-        refreshToken: string
-        expiresAt: number | null
-        userId: string
-      }
+      ticket: string
+      userId: string
     }
   | { version: 1; type: 'notifications_disable'; requestId: string }
   | { version: 1; type: 'notifications_open_settings' }
@@ -82,28 +86,22 @@ export const postNativeAppMessage = (message: NativeAppOutboundMessage) => {
 const waitForNativeNotificationState = (
   message: NativeAppOutboundMessage,
   isRelevant: (state: NativeNotificationState) => boolean,
-  isComplete: (state: NativeNotificationState) => boolean,
-  onBridgeSilent?: () => void
+  isComplete: (state: NativeNotificationState) => boolean
 ) => new Promise<NativeNotificationState>((resolve, reject) => {
   let completed = false
-  let observedRelevantState = false
   let timeoutId = 0
-  let fallbackId = 0
-  let fallbackFailureId = 0
+  const retryIds: number[] = []
   let unsubscribe: () => void = () => undefined
   const finish = (callback: () => void) => {
     if (completed) return
     completed = true
     window.clearTimeout(timeoutId)
-    window.clearTimeout(fallbackId)
-    window.clearTimeout(fallbackFailureId)
+    retryIds.forEach(retryId => window.clearTimeout(retryId))
     unsubscribe()
     callback()
   }
   unsubscribe = subscribeToNativeNotificationState(state => {
     if (!isRelevant(state)) return
-    observedRelevantState = true
-    window.clearTimeout(fallbackId)
     const stateError = state.error
     if (stateError) {
       finish(() => reject(new Error(stateError)))
@@ -116,54 +114,106 @@ const waitForNativeNotificationState = (
   timeoutId = window.setTimeout(() => {
     finish(() => reject(new Error('The native notification request timed out.')))
   }, 120_000)
-  if (onBridgeSilent) {
-    fallbackId = window.setTimeout(() => {
-      if (completed || observedRelevantState) return
-      onBridgeSilent()
-      fallbackFailureId = window.setTimeout(() => {
-        if (!completed && !observedRelevantState) {
-          finish(() => reject(new Error(
-            'The ShadoChat app did not answer the notification request. Reopen the app and try again.'
-          )))
-        }
-      }, 8_000)
-    }, 1_500)
-  }
 
   if (!postNativeAppMessage(message)) {
     finish(() => reject(new Error('The native notification bridge is unavailable.')))
+    return
+  }
+
+  for (const delay of [800, 2_000, 5_000]) {
+    retryIds.push(window.setTimeout(() => {
+      if (!completed) postNativeAppMessage(message)
+    }, delay))
   }
 })
 
-const createNativeRequestId = () => {
+export const createNativeNotificationRequestId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
   }
   return `native-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-export const getNativeNotificationEnableFallbackUrl = (
-  requestId: string,
-  origin: string
-) => {
-  const fallbackUrl = new URL('/', origin)
-  fallbackUrl.searchParams.set('nativeApp', '1')
-  fallbackUrl.searchParams.set('nativeControl', 'notifications_enable')
-  fallbackUrl.searchParams.set('requestId', requestId)
-  return fallbackUrl.href
+export type NativeNotificationEnrollmentChallenge = {
+  requestId: string
+  installationKey: string
+  challenge: string
+  credentialChallenge: string
 }
 
+export const prepareNativeNotificationEnrollment = (
+  requestId: string,
+) => new Promise<NativeNotificationEnrollmentChallenge>((resolve, reject) => {
+  let completed = false
+  let timeoutId = 0
+  const retryIds: number[] = []
+  const finish = (callback: () => void) => {
+    if (completed) return
+    completed = true
+    window.clearTimeout(timeoutId)
+    retryIds.forEach(retryId => window.clearTimeout(retryId))
+    window.removeEventListener(NATIVE_APP_MESSAGE_EVENT, handleMessage)
+    callback()
+  }
+  const handleMessage = (event: Event) => {
+    const detail = (event as CustomEvent<unknown>).detail
+    if (!detail || typeof detail !== 'object' || Array.isArray(detail)) return
+    const record = detail as Record<string, unknown>
+    if (
+      record.version !== 1 ||
+      record.type !== 'notification_enrollment_challenge' ||
+      record.requestId !== requestId ||
+      typeof record.installationKey !== 'string' ||
+      !UUID_PATTERN.test(record.installationKey) ||
+      typeof record.challenge !== 'string' ||
+      !ENROLLMENT_CHALLENGE_PATTERN.test(record.challenge) ||
+      typeof record.credentialChallenge !== 'string' ||
+      !ENROLLMENT_CHALLENGE_PATTERN.test(record.credentialChallenge)
+    ) return
+    finish(() => resolve({
+      requestId,
+      installationKey: record.installationKey as string,
+      challenge: record.challenge as string,
+      credentialChallenge: record.credentialChallenge as string,
+    }))
+  }
+  const message: NativeAppOutboundMessage = {
+    version: 1,
+    type: 'notifications_enrollment_prepare',
+    requestId,
+  }
+  window.addEventListener(NATIVE_APP_MESSAGE_EVENT, handleMessage)
+  if (!postNativeAppMessage(message)) {
+    finish(() => reject(new Error('The native notification bridge is unavailable.')))
+    return
+  }
+  for (const delay of [500, 1_500, 3_000]) {
+    retryIds.push(window.setTimeout(() => {
+      if (!completed) postNativeAppMessage(message)
+    }, delay))
+  }
+  timeoutId = window.setTimeout(() => {
+    finish(() => reject(new Error(
+      'The ShadoChat app did not answer the secure notification handshake. Reopen the app and try again.'
+    )))
+  }, 8_000)
+})
+
 export const requestNativeNotificationEnable = async (
-  session: Extract<
-    NativeAppOutboundMessage,
-    { type: 'notifications_enable' }
-  >['session']
+  requestId: string,
+  ticket: string,
+  userId: string,
 ) => {
-  const requestId = createNativeRequestId()
   let observedBusyState = false
   return waitForNativeNotificationState(
-    { version: 1, type: 'notifications_enable', requestId, session },
-    state => state.requestId === null || state.requestId === requestId,
+    {
+      version: 1,
+      type: 'notifications_enable',
+      requestId,
+      ticket,
+      userId,
+    },
+    state => state.requestId === requestId,
     state => {
       if (state.busy) {
         observedBusyState = true
@@ -176,20 +226,14 @@ export const requestNativeNotificationEnable = async (
         (observedBusyState && state.permission === 'undetermined')
       )
     },
-    () => {
-      window.location.assign(getNativeNotificationEnableFallbackUrl(
-        requestId,
-        window.location.origin
-      ))
-    },
   )
 }
 
 export const requestNativeNotificationDisable = () => {
-  const requestId = createNativeRequestId()
+  const requestId = createNativeNotificationRequestId()
   return waitForNativeNotificationState(
     { version: 1, type: 'notifications_disable', requestId },
-    state => state.requestId === null || state.requestId === requestId,
+    state => state.requestId === requestId,
     state => !state.busy && !state.enabled
   )
 }

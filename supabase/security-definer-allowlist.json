@@ -1,6 +1,6 @@
 {
-  "reviewed_on": "2026-07-18",
-  "expected_total_security_definers": 142,
+  "reviewed_on": "2026-07-20",
+  "expected_total_security_definers": 147,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
     "private.can_operator_read_moderation_evidence(uuid,uuid)",
@@ -38,11 +38,14 @@
     "private.refresh_shadow_runner_medals_for_user(uuid)",
     "private.refresh_shadow_runner_medals()",
     "private.record_presence_heartbeat(boolean)",
+    "private.register_native_notification_token_for_user_v2(uuid,uuid,text,text,text)",
+    "private.register_notification_installation_for_user_v2(uuid,uuid,text,text,text,text,text,text,text,text,integer)",
     "private.reject_moderation_audit_mutation()",
     "private.reject_shado_live_append_only_mutation()",
     "private.request_notification_delivery_v2(text)",
     "private.request_notification_delivery_v2_after_insert()",
     "private.revoke_signup_invite(uuid,uuid,text)",
+    "private.resolve_notification_installation_credential_v2(uuid,text)",
     "private.sync_shadow_pin_category_latest_image()",
     "private.sync_dm_notification_reads()",
     "private.sync_notification_delivery_job()",
@@ -107,7 +110,11 @@
     "shadow_pin_private.set_my_feed_mode_impl(text)"
   ],
   "anon_signatures": [
-    "is_username_available(text)"
+    "is_username_available(text)",
+    "redeem_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,text,text,text,text,integer,text)",
+    "register_native_notification_token_by_credential_v2(uuid,text,text)",
+    "revoke_notification_installation_by_credential_v2(uuid,text)",
+    "set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)"
   ],
   "internal_signatures": [
     "block_hype_message_reactions()",
@@ -298,6 +305,7 @@
       "justification": "Owner-scoped installation, native token, foreground lease, and presentation claims cross service-only credential and receipt tables without exposing raw device tokens.",
       "signatures": [
         "claim_my_notification_presentation_v2(uuid,uuid,text)",
+        "create_my_native_notification_enrollment_ticket_v2(text,uuid,text,text)",
         "register_my_native_notification_token_v2(uuid,text,text,text)",
         "register_my_notification_installation_v2(uuid,text,text,text,text,text,text,text,text,integer)",
         "revoke_my_notification_installation_v2(uuid)",

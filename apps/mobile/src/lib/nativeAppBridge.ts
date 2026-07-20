@@ -3,7 +3,6 @@ import type { WebView } from 'react-native-webview';
 import { getNotificationWebUrl, normalizeNotificationRoute } from './notifications/routes';
 import type { NativeNotificationStage } from './notifications/stages';
 export {
-  parseNativeNotificationControlUrl,
   parseNativeWebMessage,
 } from './nativeWebProtocol';
 export type {
@@ -43,6 +42,29 @@ export const publishNativeNotificationState = (
   state: NativeNotificationBridgeState
 ) => {
   webView?.injectJavaScript(buildNativeStateScript(state));
+};
+
+export const publishNativeNotificationEnrollmentChallenge = (
+  webView: WebView | null,
+  challenge: {
+    requestId: string;
+    installationKey: string;
+    challenge: string;
+    credentialChallenge: string;
+  }
+) => {
+  const detail = JSON.stringify({
+    version: 1,
+    type: 'notification_enrollment_challenge',
+    ...challenge,
+  });
+  webView?.injectJavaScript(`
+    window.dispatchEvent(new CustomEvent(
+      'shadowchat:native-message',
+      { detail: ${detail} }
+    ));
+    true;
+  `);
 };
 
 type RouteListener = (url: string) => void;

@@ -10,13 +10,15 @@ export type NativeWebMessage =
   | { version: 1; type: 'auth_session'; session: NativeWebSession | null }
   | {
       version: 1;
+      type: 'notifications_enrollment_prepare';
+      requestId: string;
+    }
+  | {
+      version: 1;
       type: 'notifications_enable';
-      requestId: string | null;
-      /**
-       * Older cached web shells did not send a session with this command.
-       * Undefined means preserve the native session instead of signing out.
-       */
-      session?: NativeWebSession | null;
+      requestId: string;
+      ticket: string;
+      userId: string;
     }
   | { version: 1; type: 'notifications_disable'; requestId: string | null }
   | { version: 1; type: 'notifications_open_settings' }
@@ -24,6 +26,19 @@ export type NativeWebMessage =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const ENROLLMENT_TICKET_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[0-9a-f]{64}$/i;
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const parseRequestId = (value: unknown) => {
+  const requestId = typeof value === 'string' ? value : '';
+  return (
+    requestId.length >= 16 &&
+    requestId.length <= 160 &&
+    /^[A-Za-z0-9._:-]+$/.test(requestId)
+  ) ? requestId : null;
+};
 
 const parseSession = (value: unknown): NativeWebSession | null | undefined => {
   if (value === null) return null;
@@ -80,6 +95,16 @@ export const parseNativeWebMessage = (raw: string): NativeWebMessage | null => {
     };
   }
 
+  if (value.type === 'notifications_enrollment_prepare') {
+    const requestId = parseRequestId(value.requestId);
+    if (!requestId) return null;
+    return {
+      version: 1,
+      type: 'notifications_enrollment_prepare',
+      requestId,
+    };
+  }
+
   if (value.type === 'auth_session') {
     const session = parseSession(value.session);
     if (session === undefined) return null;
@@ -87,51 +112,22 @@ export const parseNativeWebMessage = (raw: string): NativeWebMessage | null => {
   }
 
   if (value.type === 'notifications_enable') {
-    const hasSession = Object.prototype.hasOwnProperty.call(value, 'session');
-    if (!hasSession) {
-      return {
-        version: 1,
-        type: 'notifications_enable',
-        requestId: typeof value.requestId === 'string' ? value.requestId : null,
-      };
-    }
-
-    const session = parseSession(value.session);
-    if (session === undefined) return null;
+    const requestId = parseRequestId(value.requestId);
+    const ticket = typeof value.ticket === 'string' ? value.ticket : '';
+    const userId = typeof value.userId === 'string' ? value.userId : '';
+    if (
+      !requestId ||
+      !ENROLLMENT_TICKET_PATTERN.test(ticket) ||
+      !UUID_PATTERN.test(userId)
+    ) return null;
     return {
       version: 1,
       type: 'notifications_enable',
-      requestId: typeof value.requestId === 'string' ? value.requestId : null,
-      session,
+      requestId,
+      ticket,
+      userId,
     };
   }
 
   return null;
-};
-
-export const parseNativeNotificationControlUrl = (
-  value: string,
-  appOrigin: string
-) => {
-  try {
-    const url = new URL(value);
-    if (
-      url.origin !== appOrigin ||
-      url.pathname !== '/' ||
-      url.searchParams.get('nativeApp') !== '1' ||
-      url.searchParams.get('nativeControl') !== 'notifications_enable'
-    ) {
-      return null;
-    }
-
-    const requestId = url.searchParams.get('requestId');
-    if (!requestId || requestId.length > 160) return null;
-    return {
-      version: 1 as const,
-      type: 'notifications_enable' as const,
-      requestId,
-    };
-  } catch {
-    return null;
-  }
 };

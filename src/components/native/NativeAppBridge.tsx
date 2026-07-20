@@ -1,7 +1,10 @@
 import { useEffect } from 'react'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 
-import { supabase } from '../../lib/supabase'
+import {
+  getStoredRefreshToken,
+  supabase,
+} from '../../lib/supabase'
 import {
   isNativeAppWebView,
   postNativeAppMessage,
@@ -14,12 +17,16 @@ export function NativeAppBridge() {
     document.documentElement.dataset.shadowchatNativeApp = 'true'
     document.body.dataset.shadowchatNativeApp = 'true'
 
-    const publishSession = (session: Session | null) => {
+    const publishSession = (
+      session: Session | null,
+      confirmedSignedOut = false,
+    ) => {
       if (
         !session?.access_token ||
         !session.refresh_token ||
         !session.user?.id
       ) {
+        if (!confirmedSignedOut && getStoredRefreshToken()) return
         postNativeAppMessage({
           version: 1,
           type: 'auth_session',
@@ -40,20 +47,40 @@ export function NativeAppBridge() {
       })
     }
 
+    void Promise.allSettled([
+      navigator.serviceWorker?.getRegistrations?.()
+        .then(registrations => Promise.all(
+          registrations.map(registration => registration.unregister())
+        )),
+      typeof caches !== 'undefined'
+        ? caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))))
+        : Promise.resolve([]),
+    ])
+
     postNativeAppMessage({ version: 1, type: 'bridge_ready' })
+    let authEventVersion = 0
     void supabase.auth.getSession().then((response: {
       data: { session: Session | null }
     }) => {
-      publishSession(response.data.session)
+      if (authEventVersion === 0) publishSession(response.data.session)
     })
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((
-      _event: AuthChangeEvent,
+      event: AuthChangeEvent,
       session: Session | null
     ) => {
-      window.setTimeout(() => publishSession(session), 0)
+      authEventVersion += 1
+      window.setTimeout(() => {
+        if (session) {
+          publishSession(session)
+          return
+        }
+        if (event === 'SIGNED_OUT' && !getStoredRefreshToken()) {
+          publishSession(null, true)
+        }
+      }, 0)
     })
 
     return () => {

@@ -16,15 +16,17 @@ import {
   upsertNotificationPreferences,
 } from '../lib/push'
 import {
+  createNativeNotificationRequestId,
   isNativeAppWebView,
   openNativeNotificationSettings,
+  prepareNativeNotificationEnrollment,
   requestNativeNotificationDisable,
   requestNativeNotificationEnable,
   requestNativeNotificationState,
   subscribeToNativeNotificationState,
   type NativeNotificationStage,
 } from '../lib/nativeAppBridge'
-import { supabase } from '../lib/supabase'
+import { createNativeNotificationEnrollmentTicket } from '../lib/nativeNotificationEnrollment'
 
 type UsePushNotificationsOptions = {
   enabled?: boolean
@@ -264,27 +266,20 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
 
     try {
       if (nativeApp) {
-        setNativeStage('syncing_session')
-        const { data, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError) throw sessionError
-        const webSession = data.session
-        if (
-          !webSession?.access_token ||
-          !webSession.refresh_token ||
-          !webSession.user?.id
-        ) {
-          requestNativeNotificationState()
-          throw new Error(
-            'Your secure ShadoChat session is still syncing. Try the notification switch again.'
-          )
-        }
+        setNativeStage('registering_installation')
+        const requestId = createNativeNotificationRequestId()
+        const challenge = await prepareNativeNotificationEnrollment(requestId)
+        const enrollment = await createNativeNotificationEnrollmentTicket(
+          user.id,
+          requestId,
+          challenge.installationKey,
+          challenge.challenge,
+          challenge.credentialChallenge,
+        )
         const state = await requestNativeNotificationEnable(
-          {
-            accessToken: webSession.access_token,
-            refreshToken: webSession.refresh_token,
-            expiresAt: webSession.expires_at ?? null,
-            userId: webSession.user.id,
-          }
+          requestId,
+          enrollment.ticket,
+          user.id,
         )
         setSubscribed(state.enabled)
         setPermission(

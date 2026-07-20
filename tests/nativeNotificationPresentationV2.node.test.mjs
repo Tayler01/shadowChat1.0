@@ -179,26 +179,28 @@ test('iOS ships a communication-aware notification service extension', () => {
 })
 
 test('native auth loss, opt-out, read state, and badges are durable', () => {
-  assert.match(nativeNotificationHookSource, /revokeInstallationWithSession\(priorSession\)/)
-  assert.match(nativeNotificationHookSource, /unregisterForNotificationsAsync\(\)/)
+  assert.match(nativeNotificationHookSource, /revokeNativeNotificationInstallation\(\)/)
   assert.match(nativeNotificationHookSource, /dismissAllNotificationsAsync\(\)/)
   assert.match(nativeNotificationHookSource, /setBadgeCountAsync\(0\)/)
   assert.match(nativeNotificationHookSource, /registrationInFlightRef/)
   assert.match(nativeNotificationHookSource, /authEventVersion === 0/)
-  assert.match(nativeNotificationHookSource, /getSupabase\(\)\.auth\.getSession\(\)/)
+  assert.match(nativeNotificationHookSource, /client\.auth\.getSession\(\)/)
   assert.match(nativeNotificationHookSource, /setNativeNotificationDeviceOptOut\(true\)/)
   assert.match(nativeNotificationHookSource, /get_app_badge_state_v2/)
   assert.match(nativeNotificationHookSource, /mark_my_notification_event_read/)
 })
 
-test('signed mobile client contains the full production app and a secure native session bridge', () => {
+test('signed mobile client contains the full production app and ticketed native enrollment', () => {
   assert.equal(typeof mobilePackage.dependencies['react-native-webview'], 'string')
   assert.match(nativeAppSource, /from 'react-native-webview'/)
   assert.match(nativeAppSource, /https:\/\/shadochat\.online/)
   assert.match(nativeAppSource, /new URL\(value\)\.origin === APP_ORIGIN/)
-  assert.match(nativeAppSource, /sb-shsqqouecvdoifzufkqm-auth-token/)
-  assert.match(nativeAppSource, /window\.setInterval\(publishWebSession, 1200\)/)
+  assert.doesNotMatch(nativeAppSource, /sb-shsqqouecvdoifzufkqm-auth-token/)
+  assert.doesNotMatch(nativeAppSource, /publishWebSession/)
+  assert.doesNotMatch(nativeAppSource, /window\.setInterval\(publishWebSession/)
   assert.match(nativeAppSource, /client\.auth\.setSession/)
+  assert.match(nativeAppSource, /identity-change-\$\{Date\.now\(\)\}/)
+  assert.match(nativeAppSource, /installation\.userId !== message\.session\.userId/)
   assert.match(nativeAppSource, /Enable Notifications/)
   assert.match(nativeAppSource, /<SafeAreaView edges=\{\['top', 'bottom'\]\}/)
   assert.match(nativeAppSource, /message\.type === 'notifications_open_settings'/)
@@ -216,7 +218,7 @@ test('signed mobile client contains the full production app and a secure native 
   assert.match(webBridgeTransportSource, /openNativeNotificationSettings/)
   assert.match(
     webBridgeTransportSource,
-    /type: 'notifications_enable', requestId, session/,
+    /type: 'notifications_enable'/,
   )
   assert.match(webBridgeTransportSource, /type: 'auth_session'/)
   assert.match(webBridgeTransportSource, /state\.requestId === requestId/)
@@ -227,21 +229,47 @@ test('signed mobile client contains the full production app and a secure native 
   assert.match(webNativeBridgeSource, /accessToken: session\.access_token/)
   assert.match(webNativeBridgeSource, /refreshToken: session\.refresh_token/)
   assert.match(nativeBridgeSource, /parseNativeWebMessage/)
+  assert.match(nativeBridgeSource, /publishNativeNotificationEnrollmentChallenge/)
   assert.match(nativeBridgeSource, /publishNativeNotificationRoute/)
   assert.match(nativeBridgeSource, /requestId: string \| null/)
   assert.match(nativeAppSource, /createSerializedCommandQueue/)
   assert.match(nativeAppSource, /stage: 'syncing_session'/)
   assert.match(
     nativeAppSource,
-    /nativeNotifications\.enable\(\s*message\.requestId,\s*synchronizedSession\s*\)/,
+    /nativeNotifications\.enable\(\s*message\.requestId,\s*message\.ticket,\s*challenge\.verifier,\s*challenge\.installationCredential,\s*message\.userId\s*\)/,
   )
   assert.match(
     nativeNotificationHookSource,
-    /synchronizedSession !== undefined\s*\?\s*synchronizedSession\s*:\s*sessionRef\.current/,
+    /A secure notification enrollment handshake is required/,
   )
   assert.match(
-    nativeNotificationHookSource,
-    /sessionRef\.current = activeSession;\s*setSession\(activeSession\);/,
+    nativeRegistrationSource,
+    /redeem_native_notification_enrollment_ticket_v2/,
+  )
+  assert.match(nativeRegistrationSource, /installation_credential/)
+  assert.match(
+    nativeRegistrationSource,
+    /register_native_notification_token_by_credential_v2/,
+  )
+  assert.match(
+    nativeRegistrationSource,
+    /set_notification_installation_foreground_by_credential_v2/,
+  )
+  assert.match(
+    nativeRegistrationSource,
+    /revoke_notification_installation_by_credential_v2/,
+  )
+  assert.doesNotMatch(
+    nativeRegistrationSource,
+    /register_my_native_notification_token_v2/,
+  )
+  assert.doesNotMatch(
+    nativeRegistrationSource,
+    /set_my_notification_installation_foreground_v2/,
+  )
+  assert.doesNotMatch(
+    nativeRegistrationSource,
+    /revoke_my_notification_installation_v2/,
   )
   assert.match(nativeFreshTokenSource, /requireNativeModule/)
   assert.match(nativeFreshTokenSource, /ExpoPushTokenManager/)
