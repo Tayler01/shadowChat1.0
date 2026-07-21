@@ -582,7 +582,7 @@ behavior is unchanged.
 The linked backend now uses `production` native delivery. Migration
 `20260720230920` exposes only two service-role RPCs so the Edge worker can read
 or invalidate native tokens without exposing the `private` schema through
-PostgREST. `deliver-notifications-v2` version `15` consumes those RPCs and
+PostgREST. `deliver-notifications-v2` version `16` consumes those RPCs and
 preserves the provider error when a retry is required.
 
 The live runtime is deliberately limited to the `dm` category and the Tayler
@@ -593,6 +593,40 @@ and Expo delivery receipt—then its event, outbox, and target rows were deleted
 and verified absent. Build `12` still requires physical TestFlight proof for
 session persistence plus foreground, background, and terminated presentation
 before the rollout can widen.
+
+## Build 12 Supported-Category Canary Expansion - July 20, 2026
+
+Physical TestFlight proof confirmed that production DM push reaches the device.
+The native v2 runtime is now widened for the Tayler Kid canary account to the
+nine event families with complete producer, preference, route, sound, badge,
+worker, and native-presentation support:
+
+- `dm`
+- `general_chat`
+- `mentions_replies`
+- `reactions_hype`
+- `shadow_pin`
+- `connections`
+- `presence`
+- `shado_live`
+- `shadow_checkers`
+
+Worker invocation and Expo receipt reconciliation remain active, while
+`all_users_enabled` remains false. The activation watermark was reset at the
+expansion so historical unread events cannot become fresh phone pushes. A
+synthetic General Chat event then completed the production provider path from
+v2 outbox through Expo ticket and delivered receipt with no error; the exact
+event, envelope, outbox, target, and receipt rows were deleted and verified
+absent afterward.
+
+`shadow_war`, `weather`, `security`, and `system` remain disabled. Their catalog
+entries are reserved, but the current foundation deliberately prevents the
+first three from creating native outbox work, and `system` can contain silent
+bookkeeping events such as `connection_changed`. Do not enable those categories
+until their producer, preference, delivery, and physical-device contracts are
+implemented and tested. Add other TestFlight users as named canaries only after
+their production native installations are registered; resolve native-versus-PWA
+transport ownership before any all-user rollout.
 
 ## Required Acceptance
 
