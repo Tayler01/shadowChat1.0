@@ -19,6 +19,8 @@ interface SoundEffectsContextValue {
   playHypeBell: () => void
   playHypeMessage: () => void
   playNotificationCue: (soundId: NotificationSoundId) => void
+  previewNotificationCue: (soundId: NotificationSoundId) => Promise<boolean>
+  stopNotificationCuePreview: () => void
 }
 
 const SoundEffectsContext = createContext<SoundEffectsContextValue | undefined>(undefined)
@@ -158,6 +160,7 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
   const enabled = preferences.uiSounds
   const hypeEnabled = preferences.celebrationSounds
   const audioContextRef = useRef<AudioContext | null>(null)
+  const notificationPreviewRef = useRef<HTMLAudioElement | null>(null)
   const soundPolicyRef = useRef({ enabled, hypeEnabled })
   const lastNotificationCueAtRef = useRef(0)
   soundPolicyRef.current = { enabled, hypeEnabled }
@@ -240,6 +243,12 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
       if (context && context.state !== 'closed') {
         context.close().catch(() => {})
       }
+      const preview = notificationPreviewRef.current
+      notificationPreviewRef.current = null
+      if (preview) {
+        preview.pause()
+        preview.currentTime = 0
+      }
     }
   }, [unlockAudioContext])
 
@@ -304,6 +313,44 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     playTone(soundId === 'system_default' ? 'message' : soundId)
   }, [enabled, playTone])
 
+  const stopNotificationCuePreview = useCallback(() => {
+    const preview = notificationPreviewRef.current
+    notificationPreviewRef.current = null
+    if (!preview) return
+    preview.pause()
+    preview.currentTime = 0
+  }, [])
+
+  const previewNotificationCue = useCallback(async (
+    soundId: NotificationSoundId,
+  ) => {
+    stopNotificationCuePreview()
+    if (
+      typeof Audio === 'undefined' ||
+      soundId === 'silent' ||
+      soundId === 'system_default'
+    ) return false
+
+    const preview = new Audio(`/notification-sounds/${soundId}.wav`)
+    preview.preload = 'auto'
+    preview.volume = 0.82
+    notificationPreviewRef.current = preview
+    preview.onended = () => {
+      if (notificationPreviewRef.current === preview) {
+        notificationPreviewRef.current = null
+      }
+    }
+    try {
+      await preview.play()
+      return true
+    } catch {
+      if (notificationPreviewRef.current === preview) {
+        notificationPreviewRef.current = null
+      }
+      return false
+    }
+  }, [stopNotificationCuePreview])
+
   return {
     enabled,
     setEnabled,
@@ -314,6 +361,8 @@ function useProvideSoundEffects(): SoundEffectsContextValue {
     playHypeBell,
     playHypeMessage,
     playNotificationCue,
+    previewNotificationCue,
+    stopNotificationCuePreview,
   }
 }
 

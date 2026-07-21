@@ -31,6 +31,31 @@ Canonical detail and release gates live in:
 - [REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1)
 - [DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
 
+## July 20 Build 13 Rich Notification Presentation Candidate
+
+- The candidate fixes generic native alerts at their source: notification
+  events now receive actor, route, title, and body enrichment before the v2
+  envelope and outbox are materialized.
+- ShadowPin can carry its image into iOS rich content and Android Big Picture;
+  the iOS service extension uses an actor PFP fallback for other
+  user-originated alerts and keeps private-preview mode media-free.
+- Notification sounds are selectable per event in a mobile bottom-sheet picker
+  with exact bundled-WAV playback, a category fallback for existing users, and
+  separate Default and Silent choices.
+- The default Expo artwork is replaced by generated obsidian-and-gold ShadoChat
+  launcher/adaptive/splash assets. The next native candidate is iOS Build `13`
+  / Android version code `5`.
+- Local proof: root and mobile lint/TypeScript, production web build and budgets,
+  246 Jest suites / 1,353 passing tests, 12 Deno worker tests, 8 native contract
+  tests, Expo Doctor 20/20, iOS JS export, and 14-screen iPhone WebKit/Android
+  Chromium notification QA all pass. The linked baseline security contract
+  passed before the pending grant allowlist was added; the post-migration
+  contract is a required deployment gate.
+- Pending approval: apply migration `20260721011500`, deploy
+  `deliver-notifications-v2`, publish the hosted settings assets, create and
+  submit Build `13` to TestFlight, then run the physical iPhone rich-image/PFP/
+  sound/privacy/route/badge matrix. No production deployment is claimed here.
+
 ## July 20 Durable TestFlight Notification Enrollment
 
 - Build `10` still showed `Sign in to ShadoChat before enabling

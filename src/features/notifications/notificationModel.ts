@@ -41,6 +41,9 @@ export type NotificationCoordinatorPreferences = NotificationPreferences & {
   notification_sound_map?: Partial<
     Record<NotificationPresentationCategory, NotificationSoundId>
   >
+  notification_event_sound_map?: Partial<
+    Record<string, NotificationSoundId>
+  >
 }
 
 export interface NotificationPresentation {

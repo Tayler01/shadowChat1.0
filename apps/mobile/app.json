@@ -9,7 +9,7 @@
     "scheme": "shadowchat",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.shadowchat.mobile",
       "entitlements": {
         "com.apple.developer.usernotifications.communication": true,
@@ -22,7 +22,7 @@
           "INSendMessageIntent"
         ]
       },
-      "buildNumber": "12"
+      "buildNumber": "13"
     },
     "android": {
       "googleServicesFile": "./google-services.json",
@@ -34,7 +34,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "versionCode": 4
+      "versionCode": 5
     },
     "web": {
       "output": "static",

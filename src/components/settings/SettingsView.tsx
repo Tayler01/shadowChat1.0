@@ -35,6 +35,7 @@ import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { usePushNotifications } from '../../hooks/usePushNotifications'
 import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
 import { NotificationSetupModal } from './NotificationSetupModal'
+import { NotificationSoundPicker } from './NotificationSoundPicker'
 import { PhoneInstallGuide } from '../onboarding/PhoneInstallGuide'
 import { FeedbackSubmissionModal } from './FeedbackSubmissionModal'
 import { AdminAutomationApprovals } from './AdminAutomationApprovals'
@@ -60,15 +61,19 @@ import { COMFORT_RESET_EVENT } from '../../lib/comfortPreferences'
 import { requestAppBadgeRefresh } from '../../lib/appBadge'
 import { NotificationBannerV2 } from '../../features/notifications/NotificationBannerV2'
 import {
-  NOTIFICATION_CATEGORY_PRESENTATION_OPTIONS,
-  NOTIFICATION_SOUND_OPTIONS,
+  NOTIFICATION_EVENT_PRESENTATION_OPTIONS,
   fetchNotificationCategoryPresentationPreferences,
-  getDefaultNotificationSoundMap,
-  updateNotificationCategorySound,
+  fetchNotificationEventPresentationPreferences,
+  getDefaultNotificationEventSoundMap,
+  getNotificationSoundLabel,
+  updateNotificationEventSound,
+} from '../../features/notifications/notificationPresentationPreferences'
+import type {
+  ActiveNotificationEventType,
+  NotificationSoundSection,
 } from '../../features/notifications/notificationPresentationPreferences'
 import type {
   NotificationEnvelopeV2,
-  NotificationPresentationCategory,
   NotificationSoundId,
 } from '../../features/notifications/notificationEnvelopeV2'
 
@@ -107,6 +112,14 @@ const nativeNotificationStageText: Record<string, string> = {
   requesting_expo_token: 'Securing the ShadoChat push token',
   registering_token: 'Finishing notification registration',
 }
+
+const notificationSoundSections: NotificationSoundSection[] = [
+  'Messages',
+  'Social & ShadowPin',
+  'Shado Live',
+  'Games',
+  'Weather & Security',
+]
 
 const AccessibilityComfortPanel = React.lazy(() =>
   import('./AccessibilityComfortPanel').then(module => ({ default: module.AccessibilityComfortPanel }))
@@ -396,7 +409,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setEnabled: setSounds,
     hypeEnabled: hypeSounds,
     setHypeEnabled: setHypeSounds,
-    playNotificationCue,
   } = useSoundEffects()
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const [activeSection, setActiveSection] = useState<SettingsSectionId | null>(() => getInitialSettingsSection())
@@ -409,10 +421,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [showFeedbackSubmission, setShowFeedbackSubmission] = useState(false)
   const [adminUserSearch, setAdminUserSearch] = useState('')
   const [notificationSoundMap, setNotificationSoundMap] = useState(
-    getDefaultNotificationSoundMap,
+    getDefaultNotificationEventSoundMap,
   )
-  const [savingNotificationSound, setSavingNotificationSound] =
-    useState<NotificationPresentationCategory | null>(null)
+  const [activeNotificationSoundEvent, setActiveNotificationSoundEvent] =
+    useState<ActiveNotificationEventType | null>(null)
   const { scheme, setScheme } = useTheme()
   const isDesktop = useIsDesktop()
   const { signOut, deleteAccount, user: currentUser } = useAuth()
@@ -495,7 +507,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           alt: 'ShadowPin preview',
         },
     actions: ['open', 'mark_read'],
-    soundId: notificationSoundMap.shadow_pin,
+    soundId: notificationSoundMap.shadow_pin_comment,
     androidChannelKey: 'social_v1',
     badgeCategory: 'shadow_pin',
     autoRead: false,
@@ -503,7 +515,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     expiresAt: new Date(Date.now() + 90_000).toISOString(),
   }), [
     currentUser?.id,
-    notificationSoundMap.shadow_pin,
+    notificationSoundMap.shadow_pin_comment,
     preferences?.notification_media_enabled,
     preferences?.notification_preview_mode,
   ])
@@ -516,6 +528,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     [isFullAdmin]
   )
   const activeSectionConfig = sections.find(section => section.id === activeSection) ?? null
+  const activeNotificationSoundOption = NOTIFICATION_EVENT_PRESENTATION_OPTIONS.find(
+    option => option.eventType === activeNotificationSoundEvent,
+  ) ?? null
   const activeAdminSectionConfig =
     visibleAdminSections.find(section => section.id === activeAdminSection) ?? null
   const headerTitle = activeAdminSectionConfig?.title
@@ -677,11 +692,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
     let active = true
     void fetchNotificationCategoryPresentationPreferences(currentUser.id)
-      .then(next => {
-        if (active) setNotificationSoundMap(next)
+      .then(categoryMap => fetchNotificationEventPresentationPreferences(
+        currentUser.id,
+        categoryMap,
+      ))
+      .then(eventMap => {
+        if (active) setNotificationSoundMap(eventMap)
       })
       .catch(() => {
-        if (active) setNotificationSoundMap(getDefaultNotificationSoundMap())
+        if (active) setNotificationSoundMap(getDefaultNotificationEventSoundMap())
       })
     return () => {
       active = false
@@ -701,21 +720,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   }, [activeAdminSection, activeSection])
 
   const handleNotificationSoundChange = async (
-    category: NotificationPresentationCategory,
+    eventType: ActiveNotificationEventType,
     soundId: NotificationSoundId,
   ) => {
-    if (!currentUser?.id) return
-    const previous = notificationSoundMap[category]
-    setNotificationSoundMap(current => ({ ...current, [category]: soundId }))
-    setSavingNotificationSound(category)
-    if (soundId !== 'silent') playNotificationCue(soundId)
+    if (!currentUser?.id) return false
     try {
-      await updateNotificationCategorySound(currentUser.id, category, soundId)
+      await updateNotificationEventSound(currentUser.id, eventType, soundId)
+      setNotificationSoundMap(current => ({ ...current, [eventType]: soundId }))
+      toast.success('Notification sound updated')
+      return true
     } catch (error) {
-      setNotificationSoundMap(current => ({ ...current, [category]: previous }))
       toast.error(error instanceof Error ? error.message : 'Failed to save notification sound')
-    } finally {
-      setSavingNotificationSound(null)
+      return false
     }
   }
 
@@ -1249,8 +1265,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
         <div className="space-y-3">
           <ToggleRow
-            label="Sound Effects"
-            description="Play sounds for message notifications and app feedback."
+            label="In-app sound effects"
+            description="Play interface feedback and foreground notification cues while ShadoChat is open."
             enabled={sounds}
             onChange={setSounds}
           />
@@ -1264,33 +1280,45 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         {preferences && (
           <div className="mt-5 border-t border-[var(--border-subtle)] pt-4">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Notification sound by category</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Sound for each notification</h3>
             <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
-              These original cues play for foreground notifications and ship as bundled sounds in the native app. Installed PWA background alerts use your phone's configured notification sound.
+              Choose an original ShadoChat cue for every alert. Tap any row to open the sound picker and hear the exact bundled sample. Native background alerts use your selection; installed PWA background sound remains controlled by the browser and phone.
             </p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {NOTIFICATION_CATEGORY_PRESENTATION_OPTIONS.map(option => (
-                <label
-                  key={option.category}
-                  className="rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.18)] p-3 text-sm text-[var(--text-secondary)]"
-                >
-                  <span className="block font-semibold text-[var(--text-primary)]">{option.label}</span>
-                  <span className="mt-0.5 block text-[0.6875rem] leading-4 text-[var(--text-muted)]">{option.description}</span>
-                  <select
-                    value={notificationSoundMap[option.category]}
-                    disabled={savingNotificationSound === option.category}
-                    onChange={event => void handleNotificationSoundChange(
-                      option.category,
-                      event.target.value as NotificationSoundId,
-                    )}
-                    className="mt-2 min-h-11 w-full rounded-[var(--radius-sm)] border border-[var(--border-subtle)] bg-[var(--bg-panel-strong)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-glow)]"
-                    aria-label={`${option.label} notification sound`}
+            <div className="mt-4 space-y-5">
+              {notificationSoundSections.map(section => (
+                <section key={section} aria-labelledby={`notification-sounds-${section.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}>
+                  <h4
+                    id={`notification-sounds-${section.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+                    className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[var(--text-gold)]"
                   >
-                    {NOTIFICATION_SOUND_OPTIONS.map(sound => (
-                      <option key={sound.id} value={sound.id}>{sound.label}</option>
-                    ))}
-                  </select>
-                </label>
+                    {section}
+                  </h4>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {NOTIFICATION_EVENT_PRESENTATION_OPTIONS
+                      .filter(option => option.section === section)
+                      .map(option => (
+                        <button
+                          key={option.eventType}
+                          type="button"
+                          onClick={() => setActiveNotificationSoundEvent(option.eventType)}
+                          className="flex min-h-16 items-center gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(0,0,0,0.18)] px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow] hover:border-[var(--border-panel)] hover:bg-[var(--theme-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
+                          aria-label={`Choose ${option.label} notification sound. Current sound ${getNotificationSoundLabel(notificationSoundMap[option.eventType])}`}
+                        >
+                          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[var(--theme-accent-soft)] text-[var(--text-gold)]">
+                            <Volume2 className="h-4 w-4" aria-hidden="true" />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-semibold text-[var(--text-primary)]">{option.label}</span>
+                            <span className="mt-0.5 block text-[0.6875rem] leading-4 text-[var(--text-muted)]">{option.description}</span>
+                            <span className="mt-1 block text-xs font-medium text-[var(--theme-accent-readable)]">
+                              {getNotificationSoundLabel(notificationSoundMap[option.eventType])}
+                            </span>
+                          </span>
+                          <ChevronRight className="h-4 w-4 shrink-0 text-[var(--text-muted)]" aria-hidden="true" />
+                        </button>
+                      ))}
+                  </div>
+                </section>
               ))}
             </div>
           </div>
@@ -1934,6 +1962,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           open={showFeedbackSubmission}
           onClose={() => setShowFeedbackSubmission(false)}
         />
+        {activeNotificationSoundOption && (
+          <NotificationSoundPicker
+            open
+            title={activeNotificationSoundOption.label}
+            description={activeNotificationSoundOption.description}
+            value={notificationSoundMap[activeNotificationSoundOption.eventType]}
+            onClose={() => setActiveNotificationSoundEvent(null)}
+            onApply={soundId => handleNotificationSoundChange(
+              activeNotificationSoundOption.eventType,
+              soundId,
+            )}
+          />
+        )}
       </motion.div>
     </div>
   )

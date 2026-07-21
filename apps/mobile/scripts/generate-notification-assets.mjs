@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const outputDir = resolve(here, '../assets/sounds')
+const webOutputDir = resolve(here, '../../../public/notification-sounds')
 const sampleRate = 44_100
 
 const cues = {
@@ -66,18 +67,22 @@ const renderCue = (notes) => {
 }
 
 mkdirSync(outputDir, { recursive: true })
+mkdirSync(webOutputDir, { recursive: true })
 for (const [name, notes] of Object.entries(cues)) {
-  writeFileSync(resolve(outputDir, `${name}.wav`), renderCue(notes))
+  const rendered = renderCue(notes)
+  writeFileSync(resolve(outputDir, `${name}.wav`), rendered)
+  writeFileSync(resolve(webOutputDir, `${name}.wav`), rendered)
 }
 
-writeFileSync(
-  resolve(outputDir, 'manifest.json'),
-  `${JSON.stringify({
+const manifest = `${JSON.stringify({
     version: 1,
     sampleRate,
     license: 'Original ShadowChat generated assets',
     sounds: Object.keys(cues),
-  }, null, 2)}\n`,
-)
+  }, null, 2)}\n`
+writeFileSync(resolve(outputDir, 'manifest.json'), manifest)
+writeFileSync(resolve(webOutputDir, 'manifest.json'), manifest)
 
-console.log(`Generated ${Object.keys(cues).length} notification sounds in ${outputDir}`)
+console.log(
+  `Generated ${Object.keys(cues).length} notification sounds for native and web preview.`,
+)

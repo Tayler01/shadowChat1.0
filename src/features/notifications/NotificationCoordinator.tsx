@@ -244,7 +244,8 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
       const envelope = buildNotificationEnvelopeV2(event, presentation, {
         previewMode: preferences.notification_preview_mode,
         mediaEnabled: preferences.notification_media_enabled,
-        soundId: preferences.notification_sound_map?.[
+        soundId: preferences.notification_event_sound_map?.[event.type] ??
+          preferences.notification_sound_map?.[
           getNotificationTypePolicyV2(event.type).category
         ],
       })

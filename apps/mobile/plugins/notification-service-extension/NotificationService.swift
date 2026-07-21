@@ -71,7 +71,7 @@ final class NotificationService: UNNotificationServiceExtension, URLSessionTaskD
     ]
     let actor = envelope["actor"] as? [String: Any]
     let media = privacy == "full" ? envelope["media"] as? [String: Any] : nil
-    let actorURL = privacy == "private" || !communicationCategories.contains(category)
+    let actorURL = privacy == "private"
       ? nil
       : allowedURL(actor?["avatarUrl"] as? String)
     let mediaURL = allowedURL(media?["thumbnailUrl"] as? String)
@@ -81,15 +81,31 @@ final class NotificationService: UNNotificationServiceExtension, URLSessionTaskD
     let downloadedAvatar = await avatarFile
     let downloadedMedia = await mediaFile
 
+    var richStatus = "content_only"
     if let downloadedMedia,
-       let attachment = try? UNNotificationAttachment(
+       let attachment = notificationAttachment(
          identifier: "shadowchat-media",
-         url: downloadedMedia,
-         options: nil
+         file: downloadedMedia
+       ) {
+      content.attachments = [attachment]
+      richStatus = "media_attached"
+      setBestAttempt(content)
+    } else if
+      !communicationCategories.contains(category),
+      let downloadedAvatar,
+      let attachment = notificationAttachment(
+        identifier: "shadowchat-actor",
+        file: downloadedAvatar
       ) {
       content.attachments = [attachment]
+      richStatus = "actor_attached"
       setBestAttempt(content)
     }
+
+    var updatedUserInfo = content.userInfo
+    updatedUserInfo["shadowchatRichStatus"] = richStatus
+    content.userInfo = updatedUserInfo
+    setBestAttempt(content)
 
     guard
       communicationCategories.contains(category),
@@ -141,6 +157,17 @@ final class NotificationService: UNNotificationServiceExtension, URLSessionTaskD
     } catch {
       finish(content)
     }
+  }
+
+  private func notificationAttachment(
+    identifier: String,
+    file: URL
+  ) -> UNNotificationAttachment? {
+    try? UNNotificationAttachment(
+      identifier: identifier,
+      url: file,
+      options: nil
+    )
   }
 
   private func notificationEnvelope(

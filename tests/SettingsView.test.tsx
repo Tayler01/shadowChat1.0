@@ -59,6 +59,8 @@ jest.mock('../src/hooks/useSoundEffects', () => ({
     hypeEnabled: true,
     setHypeEnabled: jest.fn(),
     playNotificationCue: jest.fn(),
+    previewNotificationCue: jest.fn().mockResolvedValue(true),
+    stopNotificationCuePreview: jest.fn(),
   }),
 }))
 
@@ -310,6 +312,9 @@ test('settings exposes the real rich-notification preview and saves presentation
   expect(screen.getByTestId('notification-banner-v2')).toHaveTextContent(
     'JJ commented on your ShadowPin',
   )
+  expect(screen.getByRole('button', {
+    name: /choose shadowpin comment notification sound/i,
+  })).toBeInTheDocument()
   fireEvent.click(screen.getByRole('switch', { name: /toggle foreground obsidian sounds/i }))
   fireEvent.click(screen.getByRole('switch', { name: /toggle media previews/i }))
   fireEvent.click(screen.getByRole('radio', { name: /^private/i }))

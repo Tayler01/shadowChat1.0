@@ -628,6 +628,40 @@ implemented and tested. Add other TestFlight users as named canaries only after
 their production native installations are registered; resolve native-versus-PWA
 transport ownership before any all-user rollout.
 
+## Build 13 Rich Presentation Candidate - July 20, 2026
+
+The Build `13` candidate completes the code-side rich presentation pass. It is
+not deployed or submitted until the migration, Edge Function, hosted settings
+UI, and native binary are approved as one ordered release.
+
+- a `before insert` enrichment trigger gives v2 materialization the actor id,
+  route, event-specific title, and useful body before an outbox row can exist;
+  this removes the race where legacy enrichment arrived after the v2 envelope
+- iOS ShadowPin pushes send Expo `richContent.image`, keep
+  `mutableContent`, and use the embedded Notification Service Extension to
+  download either the pin preview or a user avatar; Android Big Picture also
+  accepts a video poster thumbnail
+- sender avatars are eligible for every user-originated category, while
+  private-preview mode still strips rich identity and media
+- users can select a sound for each supported notification event, with the old
+  category preference retained as the compatibility fallback; Shadow War,
+  Weather, and Security choices are reserved in settings while those delivery
+  categories remain disabled
+- the sound picker is a mobile bottom sheet with one-at-a-time playback of the
+  exact WAV file bundled in the native app; previewing never saves a choice
+- native and hosted preview WAV files are generated from the same source and
+  checked for byte-for-byte equality
+- the iOS and Android launcher assets now use the obsidian-and-gold ShadoChat
+  icon instead of the default Expo artwork; iOS build number is `13` and
+  Android version code is `5`
+
+iOS owns the compact notification layout. The attachment is most visibly
+presented when the notification is expanded or long-pressed; an entirely custom
+compact card is not available to third-party apps. A physical Build `13` test
+must still prove ShadowPin image download, sender PFP fallback, per-event sound,
+privacy modes, exact routing, badge/read clearing, and degraded network fallback
+before rich presentation is accepted.
+
 ## Required Acceptance
 
 - every active event type maps deterministically

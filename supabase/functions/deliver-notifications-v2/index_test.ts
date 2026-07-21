@@ -6,6 +6,7 @@ import {
   getNotificationDeliveryEnvironment,
   handleNotificationDeliveryRequest,
   isNativeInstallationForeground,
+  resolveNotificationSoundPreference,
   shouldAttemptExpoTarget,
   toExpoMessage,
 } from './index.ts'
@@ -203,8 +204,87 @@ Deno.test('Android delivery is data-only while iOS invokes the rich notification
     3,
   )
   assert.equal(ios.mutableContent, true)
+  assert.equal(ios.richContent, undefined)
   assert.equal(ios.threadId, envelope.groupKey)
   assert.equal(ios.collapseId, envelope.eventId)
+})
+
+Deno.test('iOS ShadowPin delivery carries an explicit rich image and actor envelope', () => {
+  const envelope = {
+    schemaVersion: 2 as const,
+    eventId: '11111111-1111-4111-8111-111111111111',
+    eventIds: ['11111111-1111-4111-8111-111111111111'],
+    type: 'shadow_pin_post',
+    category: 'shadow_pin',
+    entityId: '22222222-2222-4222-8222-222222222222',
+    route: '/?view=pins&pin=22222222-2222-4222-8222-222222222222',
+    groupKey: 'pin:22222222-2222-4222-8222-222222222222',
+    priority: 'normal' as const,
+    privacy: 'full' as const,
+    actor: {
+      id: '33333333-3333-4333-8333-333333333333',
+      label: 'JJ',
+      avatarUrl: 'https://shadochat.online/avatar.jpg',
+    },
+    content: {
+      eyebrow: 'ShadowPin',
+      title: 'New ShadowPin from JJ',
+      body: 'Midnight flight',
+      privateTitle: 'New ShadowChat notification',
+      privateBody: 'Open ShadowChat to view it.',
+    },
+    media: {
+      kind: 'image' as const,
+      thumbnailUrl: 'https://shadochat.online/pin.jpg',
+      alt: 'Midnight flight',
+    },
+    actions: ['open', 'mark_read'],
+    soundId: 'pin_shutter',
+    androidChannelKey: 'social_v1',
+    badgeCategory: 'shadow_pin',
+    autoRead: false,
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 60_000).toISOString(),
+  }
+  const ios = toExpoMessage(
+    {
+      id: 'token',
+      installation_id: 'installation',
+      provider: 'expo',
+      token: 'ExponentPushToken[test]',
+      environment: 'preview',
+    },
+    {
+      id: 'installation',
+      platform: 'ios',
+      environment: 'preview',
+      foreground_until: null,
+      channel_schema_version: 2,
+    },
+    envelope,
+    envelope.type,
+    envelope.entityId,
+    4,
+  )
+
+  assert.equal(ios.mutableContent, true)
+  assert.deepEqual(ios.richContent, { image: envelope.media.thumbnailUrl })
+  assert.deepEqual(
+    (ios.data as Record<string, unknown>).envelopeV2,
+    envelope,
+  )
+})
+
+Deno.test('event sound overrides category sound and category remains the fallback', () => {
+  assert.equal(
+    resolveNotificationSoundPreference('gold_signal', 'low_glass'),
+    'gold_signal',
+  )
+  assert.equal(
+    resolveNotificationSoundPreference(null, 'low_glass'),
+    'low_glass',
+  )
+  assert.equal(resolveNotificationSoundPreference(null, null), null)
 })
 
 Deno.test('oversized Android data is trimmed below the provider payload limit', () => {

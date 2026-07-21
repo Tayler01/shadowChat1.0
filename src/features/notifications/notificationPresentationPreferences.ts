@@ -19,6 +19,50 @@ export interface NotificationCategoryPresentationOption {
   defaultSoundId: NotificationSoundId
 }
 
+export const ACTIVE_NOTIFICATION_EVENT_TYPES = [
+  'dm_message',
+  'group_message',
+  'mention',
+  'reply',
+  'reaction',
+  'hype_event',
+  'shadow_pin_post',
+  'shadow_pin_comment',
+  'shadow_pin_reply',
+  'connection_request',
+  'connection_accepted',
+  'presence_active',
+  'shado_live_room_started',
+  'shado_live_room_ended',
+  'shado_live_speaker_promoted',
+  'shado_live_speaker_demoted',
+  'shado_live_participant_muted',
+  'shado_live_participant_removed',
+  'shadow_checkers_turn',
+  'shadow_war_turn',
+  'weather_alert',
+  'security_alert',
+] as const
+
+export type ActiveNotificationEventType =
+  typeof ACTIVE_NOTIFICATION_EVENT_TYPES[number]
+
+export type NotificationSoundSection =
+  | 'Messages'
+  | 'Social & ShadowPin'
+  | 'Shado Live'
+  | 'Games'
+  | 'Weather & Security'
+
+export interface NotificationEventPresentationOption {
+  eventType: ActiveNotificationEventType
+  category: NotificationPresentationCategory
+  section: NotificationSoundSection
+  label: string
+  description: string
+  defaultSoundId: NotificationSoundId
+}
+
 export const NOTIFICATION_SOUND_OPTIONS: Array<{
   id: NotificationSoundId
   label: string
@@ -115,6 +159,48 @@ export const NOTIFICATION_CATEGORY_PRESENTATION_OPTIONS:
     },
   ]
 
+const eventOption = (
+  eventType: ActiveNotificationEventType,
+  section: NotificationSoundSection,
+  label: string,
+  description: string,
+): NotificationEventPresentationOption => {
+  const policy = getNotificationTypePolicyV2(eventType)
+  return {
+    eventType,
+    category: policy.category,
+    section,
+    label,
+    description,
+    defaultSoundId: policy.soundId,
+  }
+}
+
+export const NOTIFICATION_EVENT_PRESENTATION_OPTIONS: NotificationEventPresentationOption[] = [
+  eventOption('dm_message', 'Messages', 'Direct message', 'A new private message'),
+  eventOption('group_message', 'Messages', 'General Chat message', 'A new room message'),
+  eventOption('mention', 'Messages', 'Mention', 'Someone mentions you'),
+  eventOption('reply', 'Messages', 'Reply', 'Someone replies directly to you'),
+  eventOption('reaction', 'Social & ShadowPin', 'Reaction', 'Someone reacts to your message'),
+  eventOption('hype_event', 'Social & ShadowPin', 'Hype', 'Someone hypes your message'),
+  eventOption('shadow_pin_post', 'Social & ShadowPin', 'New ShadowPin', 'A new post is published'),
+  eventOption('shadow_pin_comment', 'Social & ShadowPin', 'ShadowPin comment', 'A comment on your pin'),
+  eventOption('shadow_pin_reply', 'Social & ShadowPin', 'ShadowPin reply', 'A reply in a pin conversation'),
+  eventOption('connection_request', 'Social & ShadowPin', 'Connection request', 'A member wants to connect'),
+  eventOption('connection_accepted', 'Social & ShadowPin', 'Connection accepted', 'A request is accepted'),
+  eventOption('presence_active', 'Social & ShadowPin', 'Member active', 'An eligible member becomes active'),
+  eventOption('shado_live_room_started', 'Shado Live', 'Room started', 'A Shado Live room begins'),
+  eventOption('shado_live_room_ended', 'Shado Live', 'Room ended', 'A Shado Live room closes'),
+  eventOption('shado_live_speaker_promoted', 'Shado Live', 'Invited to speak', 'You are invited onto the stage'),
+  eventOption('shado_live_speaker_demoted', 'Shado Live', 'Returned to listener', 'Your stage role changes'),
+  eventOption('shado_live_participant_muted', 'Shado Live', 'Muted by host', 'A host mutes your microphone'),
+  eventOption('shado_live_participant_removed', 'Shado Live', 'Removed from room', 'A host removes you from a room'),
+  eventOption('shadow_checkers_turn', 'Games', 'Shadow Checkers turn', 'Your next move is ready'),
+  eventOption('shadow_war_turn', 'Games', 'Shadow War turn', 'Your next move is ready'),
+  eventOption('weather_alert', 'Weather & Security', 'Weather alert', 'Important weather near a saved location'),
+  eventOption('security_alert', 'Weather & Security', 'Security alert', 'Important account and safety information'),
+]
+
 export const getDefaultNotificationSoundMap = () => (
   Object.fromEntries(
     NOTIFICATION_CATEGORY_PRESENTATION_OPTIONS.map(option => [
@@ -122,6 +208,18 @@ export const getDefaultNotificationSoundMap = () => (
       option.defaultSoundId,
     ]),
   ) as Record<NotificationPresentationCategory, NotificationSoundId>
+)
+
+export const getDefaultNotificationEventSoundMap = (
+  categorySoundMap: Record<NotificationPresentationCategory, NotificationSoundId> =
+    getDefaultNotificationSoundMap(),
+) => (
+  Object.fromEntries(
+    NOTIFICATION_EVENT_PRESENTATION_OPTIONS.map(option => [
+      option.eventType,
+      categorySoundMap[option.category] ?? option.defaultSoundId,
+    ]),
+  ) as Record<ActiveNotificationEventType, NotificationSoundId>
 )
 
 export const fetchNotificationCategoryPresentationPreferences = async (
@@ -172,3 +270,60 @@ export const updateNotificationCategorySound = async (
 
   if (error) throw error
 }
+
+export const fetchNotificationEventPresentationPreferences = async (
+  userId: string,
+  categorySoundMap?: Record<NotificationPresentationCategory, NotificationSoundId>,
+) => {
+  const fallback = categorySoundMap ??
+    await fetchNotificationCategoryPresentationPreferences(userId)
+  const result = getDefaultNotificationEventSoundMap(fallback)
+  const client = await getWorkingClient()
+  const { data, error } = await client
+    .from('notification_event_presentation_preferences')
+    .select('event_type, sound_id')
+    .eq('user_id', userId)
+
+  if (error) {
+    if (
+      error.code === '42P01' ||
+      error.message?.includes('notification_event_presentation_preferences')
+    ) {
+      return result
+    }
+    throw error
+  }
+
+  for (const row of data ?? []) {
+    const eventType = row.event_type as ActiveNotificationEventType
+    if (eventType in result && isNotificationSoundId(row.sound_id)) {
+      result[eventType] = row.sound_id
+    }
+  }
+  return result
+}
+
+export const updateNotificationEventSound = async (
+  userId: string,
+  eventType: ActiveNotificationEventType,
+  soundId: NotificationSoundId,
+) => {
+  const client = await getWorkingClient()
+  const { error } = await client
+    .from('notification_event_presentation_preferences')
+    .upsert({
+      user_id: userId,
+      event_type: eventType,
+      sound_id: soundId,
+      updated_at: new Date().toISOString(),
+    }, {
+      onConflict: 'user_id,event_type',
+    })
+
+  if (error) throw error
+}
+
+export const getNotificationSoundLabel = (soundId: NotificationSoundId) => (
+  NOTIFICATION_SOUND_OPTIONS.find(option => option.id === soundId)?.label ??
+  'System Default'
+)

@@ -369,6 +369,9 @@ export const toExpoMessage = (
     type: eventType,
     entityId,
   }
+  const richImage = envelope.privacy === 'full'
+    ? envelope.media?.thumbnailUrl
+    : null
   const message: Record<string, unknown> = installation.platform === 'android'
     ? {
       to: token.token,
@@ -405,23 +408,13 @@ export const toExpoMessage = (
     categoryId,
     threadId: envelope.groupKey.slice(0, 64),
     collapseId: envelope.eventId.slice(0, 64),
-    mutableContent: Boolean(
-      envelope.media ||
-      (
-        envelope.actor &&
-        (
-          envelope.category === 'dm' ||
-          envelope.category === 'general_chat' ||
-          envelope.category === 'mentions_replies'
-        )
-      ),
-    ),
+    mutableContent: Boolean(envelope.media || envelope.actor),
+    ...(richImage ? { richContent: { image: richImage } } : {}),
   }
 
   const payloadBytes = () =>
     new TextEncoder().encode(JSON.stringify(message)).byteLength
   if (payloadBytes() > 3_800) {
-    deliveryEnvelope.media = null
     if (deliveryEnvelope.actor) {
       deliveryEnvelope.actor = {
         ...deliveryEnvelope.actor,
@@ -435,6 +428,10 @@ export const toExpoMessage = (
       ...deliveryEnvelope.content,
       body: null,
     }
+  }
+  if (payloadBytes() > 3_800) {
+    deliveryEnvelope.media = null
+    delete message.richContent
   }
   if (payloadBytes() > 3_800) {
     deliveryEnvelope.actor = null
@@ -455,6 +452,15 @@ export const toExpoMessage = (
   }
   return message
 }
+
+export const resolveNotificationSoundPreference = (
+  eventSoundId: unknown,
+  categorySoundId: unknown,
+) => typeof eventSoundId === 'string'
+  ? eventSoundId
+  : typeof categorySoundId === 'string'
+    ? categorySoundId
+    : null
 
 const completeOutbox = async (
   supabase: ReturnType<typeof getAdminClient>,
@@ -653,9 +659,21 @@ const processClaim = async (
   }
 
   const envelope = envelopeResult.data as NotificationEnvelopeV2Row
-  const [actor, media, soundPreference, badge] = await Promise.all([
+  const [
+    actor,
+    media,
+    eventSoundPreference,
+    categorySoundPreference,
+    badge,
+  ] = await Promise.all([
     getActor(supabase, event.actor_id),
     getMedia(supabase, envelope.media_ref),
+    supabase
+      .from('notification_event_presentation_preferences')
+      .select('sound_id')
+      .eq('user_id', claim.user_id)
+      .eq('event_type', event.type)
+      .maybeSingle(),
     supabase
       .from('notification_category_presentation_preferences')
       .select('sound_id')
@@ -664,7 +682,8 @@ const processClaim = async (
       .maybeSingle(),
     getBadgeCount(supabase, claim.user_id),
   ])
-  if (soundPreference.error) throw soundPreference.error
+  if (eventSoundPreference.error) throw eventSoundPreference.error
+  if (categorySoundPreference.error) throw categorySoundPreference.error
 
   const previewMode = (
     preferences.notification_preview_mode === 'sender_only' ||
@@ -676,9 +695,10 @@ const processClaim = async (
     previewMode,
     actor,
     media: preferences.notification_media_enabled === false ? null : media,
-    soundId: typeof soundPreference.data?.sound_id === 'string'
-      ? soundPreference.data.sound_id
-      : null,
+    soundId: resolveNotificationSoundPreference(
+      eventSoundPreference.data?.sound_id,
+      categorySoundPreference.data?.sound_id,
+    ),
   })
   const installationById = new Map(eligibleInstallations.map(item => [item.id, item]))
   const initialTargetByInstallation = new Map(

@@ -5,7 +5,10 @@ import type {
   NotificationCoordinatorPreferences,
   NotificationEventRecord,
 } from './notificationModel'
-import { fetchNotificationCategoryPresentationPreferences } from './notificationPresentationPreferences'
+import {
+  fetchNotificationCategoryPresentationPreferences,
+  fetchNotificationEventPresentationPreferences,
+} from './notificationPresentationPreferences'
 import { claimWebNotificationPresentation } from '../../lib/notificationInstallation'
 
 const EVENT_SELECT = [
@@ -41,10 +44,13 @@ export const fetchNotificationCoordinatorPreferences = async (
   if (error) throw error
   const notificationSoundMap =
     await fetchNotificationCategoryPresentationPreferences(userId)
+  const notificationEventSoundMap =
+    await fetchNotificationEventPresentationPreferences(userId, notificationSoundMap)
   return {
     ...getDefaultNotificationPreferences(userId),
     ...(data ?? {}),
     notification_sound_map: notificationSoundMap,
+    notification_event_sound_map: notificationEventSoundMap,
   } as NotificationCoordinatorPreferences
 }
 

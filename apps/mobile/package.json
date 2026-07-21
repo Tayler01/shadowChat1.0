@@ -42,6 +42,7 @@
     "typescript-eslint": "8.63.0"
   },
   "scripts": {
+    "assets:brand": "node scripts/generate-brand-icons.mjs",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

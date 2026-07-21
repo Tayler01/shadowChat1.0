@@ -25,6 +25,21 @@ const workerContractSql = readFileSync(
   'utf8',
 )
 const workerContractCompact = workerContractSql.replace(/\s+/g, ' ').toLowerCase()
+const richPresentationSql = readFileSync(
+  path.resolve(
+    process.cwd(),
+    'supabase/migrations/20260721011500_rich_notification_content_and_event_sounds.sql',
+  ),
+  'utf8',
+)
+const richPresentationCompact = richPresentationSql.replace(/\s+/g, ' ').toLowerCase()
+const securityContract = JSON.parse(readFileSync(
+  path.resolve(process.cwd(), 'supabase/security-definer-allowlist.json'),
+  'utf8',
+)) as {
+  private_security_definers: string[]
+  required_active_table_privileges: string[]
+}
 
 describe('notification presentation v2 database contract', () => {
   test('ships dormant with a forward-only activation watermark', () => {
@@ -109,6 +124,46 @@ describe('notification presentation v2 database contract', () => {
     }
     expect(compact).toContain('using ((select auth.uid()) = user_id)')
     expect(compact).toContain('with check ((select auth.uid()) = user_id)')
+  })
+
+  test('supports owner-private event sounds with category fallback preserved', () => {
+    expect(richPresentationCompact).toContain(
+      'create table if not exists public.notification_event_presentation_preferences',
+    )
+    expect(richPresentationCompact).toContain(
+      'primary key (user_id, event_type)',
+    )
+    expect(richPresentationCompact).toContain(
+      'alter table public.notification_event_presentation_preferences enable row level security',
+    )
+    expect(richPresentationCompact).toContain(
+      'using ((select auth.uid()) = user_id)',
+    )
+    expect(richPresentationCompact).toContain(
+      'with check ((select auth.uid()) = user_id)',
+    )
+    expect(richPresentationCompact).toContain("'shadow_pin_post'")
+    expect(richPresentationCompact).toContain("'shado_live_participant_removed'")
+    expect(securityContract.private_security_definers).toContain(
+      'private.enrich_notification_v2_event()',
+    )
+    expect(securityContract.required_active_table_privileges).toEqual(
+      expect.arrayContaining([
+        'authenticated:notification_event_presentation_preferences:SELECT',
+        'authenticated:notification_event_presentation_preferences:UPDATE',
+        'service_role:notification_event_presentation_preferences:SELECT',
+      ]),
+    )
+  })
+
+  test('enriches canonical events before v2 materialization without backfilling pushes', () => {
+    expect(richPresentationCompact).toContain(
+      'create trigger enrich_notification_v2_event_insert before insert on public.notification_events',
+    )
+    expect(richPresentationCompact).toContain('new.actor_id := actor_id_text::uuid')
+    expect(richPresentationCompact).toContain("nullif(event_payload ->> 'url', '')")
+    expect(richPresentationCompact).toContain("'new shadowpin from ' || actor_label")
+    expect(richPresentationCompact).not.toContain('insert into public.notification_outbox_v2')
   })
 
   test('isolates the service worker and disables unowned future producers', () => {

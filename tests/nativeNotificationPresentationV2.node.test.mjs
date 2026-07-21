@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -6,6 +7,7 @@ import test from 'node:test'
 const repoRoot = join(import.meta.dirname, '..')
 const mobileRoot = join(repoRoot, 'apps', 'mobile')
 const soundRoot = join(mobileRoot, 'assets', 'sounds')
+const webSoundRoot = join(repoRoot, 'public', 'notification-sounds')
 const manifest = JSON.parse(readFileSync(join(soundRoot, 'manifest.json'), 'utf8'))
 const appConfig = JSON.parse(readFileSync(join(mobileRoot, 'app.json'), 'utf8'))
 const nativeConfigSource = readFileSync(
@@ -106,6 +108,14 @@ test('all original ShadowChat notification sounds exist and ship through Expo', 
   for (const soundId of manifest.sounds) {
     const filename = `${soundId}.wav`
     assert.ok(existsSync(join(soundRoot, filename)), `Missing ${filename}`)
+    assert.ok(existsSync(join(webSoundRoot, filename)), `Missing web preview ${filename}`)
+    const nativeHash = createHash('sha256')
+      .update(readFileSync(join(soundRoot, filename)))
+      .digest('hex')
+    const previewHash = createHash('sha256')
+      .update(readFileSync(join(webSoundRoot, filename)))
+      .digest('hex')
+    assert.equal(previewHash, nativeHash, `Preview differs from native ${filename}`)
     assert.ok(
       configuredSounds.includes(`./assets/sounds/${filename}`),
       `Expo does not include ${filename}`,
@@ -137,7 +147,7 @@ test('delivery worker uses a dedicated secret and platform-specific rich payload
   assert.match(deliveryWorkerSource, /installation\.platform === 'android'/)
   assert.match(deliveryWorkerSource, /badgeCount: badge/)
   assert.doesNotMatch(deliveryWorkerSource, /_contentAvailable: true/)
-  assert.doesNotMatch(deliveryWorkerSource, /richContent/)
+  assert.match(deliveryWorkerSource, /richContent/)
   assert.match(deliveryWorkerSource, /mutableContent/)
   assert.match(
     deliveryWorkerSource,
@@ -183,9 +193,27 @@ test('iOS ships a communication-aware notification service extension', () => {
   assert.match(iosExtensionSource, /UNNotificationServiceExtension/)
   assert.match(iosExtensionSource, /INSendMessageIntent/)
   assert.match(iosExtensionSource, /downloadedAvatar\.flatMap/)
+  assert.match(iosExtensionSource, /shadowchatRichStatus/)
+  assert.match(iosExtensionSource, /identifier: "shadowchat-actor"/)
   assert.match(iosExtensionSource, /INInteractionDirection\.incoming/)
   assert.match(iosExtensionSource, /interaction\.donate \{ _ in \}/)
   assert.match(iosExtensionSource, /serviceExtensionTimeWillExpire/)
+})
+
+test('native build uses branded icons and increments the store build', () => {
+  assert.equal(appConfig.expo.icon, './assets/images/icon.png')
+  assert.equal(appConfig.expo.ios.icon, './assets/images/icon.png')
+  assert.equal(appConfig.expo.ios.buildNumber, '13')
+  assert.equal(appConfig.expo.android.versionCode, 5)
+  assert.notEqual(appConfig.expo.ios.icon, './assets/expo.icon')
+  for (const filename of [
+    'icon.png',
+    'android-icon-foreground.png',
+    'android-icon-background.png',
+    'android-icon-monochrome.png',
+  ]) {
+    assert.ok(existsSync(join(mobileRoot, 'assets', 'images', filename)))
+  }
 })
 
 test('native auth loss, opt-out, read state, and badges are durable', () => {

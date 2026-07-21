@@ -135,6 +135,12 @@ const installNotificationContractFixtures = async (page, fixture) => {
       }
       if (
         request.method === 'GET' &&
+        url.pathname.endsWith('/rest/v1/notification_event_presentation_preferences')
+      ) {
+        return createJsonResponse([], '*/0')
+      }
+      if (
+        request.method === 'GET' &&
         url.pathname.endsWith('/rest/v1/notification_events') &&
         url.searchParams.has('created_at') &&
         url.searchParams.has('presentation_expires_at')
@@ -574,6 +580,46 @@ for (const profile of profiles) {
     await notificationsSettings.click()
     await page.getByRole('heading', { name: 'Presentation & Privacy' })
       .waitFor({ timeout: 20_000 })
+
+    const directMessageSound = page.getByRole('button', {
+      name: /Choose Direct message notification sound/i,
+    })
+    await directMessageSound.scrollIntoViewIfNeeded()
+    await directMessageSound.click()
+    const soundPicker = page.getByTestId('notification-sound-picker')
+    await soundPicker.waitFor({ timeout: 10_000 })
+    assert.equal(await soundPicker.getByRole('radio').count(), 14)
+    const soundPickerGeometry = await soundPicker.evaluate((element, viewport) => {
+      const rect = element.getBoundingClientRect()
+      const controls = [...element.querySelectorAll('button')].map(control => {
+        const controlRect = control.getBoundingClientRect()
+        return {
+          width: Math.round(controlRect.width),
+          height: Math.round(controlRect.height),
+        }
+      })
+      return {
+        inViewport:
+          rect.left >= -1 &&
+          rect.right <= viewport.width + 1 &&
+          rect.top >= -1 &&
+          rect.bottom <= viewport.height + 1,
+        controls,
+      }
+    }, profile.viewport)
+    assert.ok(soundPickerGeometry.inViewport, JSON.stringify(soundPickerGeometry))
+    assert.ok(
+      soundPickerGeometry.controls.every(control => control.height >= 44),
+      JSON.stringify(soundPickerGeometry),
+    )
+    const soundPickerArtifact = path.join(
+      artifactDir,
+      `${profile.id}-notification-sound-picker.png`,
+    )
+    await page.screenshot({ path: soundPickerArtifact, fullPage: false })
+    artifacts.push(soundPickerArtifact)
+    await soundPicker.getByRole('button', { name: 'Cancel' }).click()
+    await soundPicker.waitFor({ state: 'hidden' })
 
     const banner = page.getByTestId('notification-banner-v2')
     await banner.scrollIntoViewIfNeeded()

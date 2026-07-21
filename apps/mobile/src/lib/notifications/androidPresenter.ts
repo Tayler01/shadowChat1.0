@@ -78,7 +78,7 @@ const androidStyle = (
   }
   if (
     envelope.privacy === 'full' &&
-    envelope.media?.kind === 'image'
+    envelope.media?.thumbnailUrl
   ) {
     return {
       type: AndroidStyle.BIGPICTURE,
