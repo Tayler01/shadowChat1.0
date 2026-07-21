@@ -6,7 +6,10 @@ import sharp from 'sharp'
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, '../../..')
 const output = resolve(here, '../assets/images')
-const sourceIcon = resolve(root, 'public/icons/icon-512.svg')
+// Keep the native launcher identity aligned with the established PWA mark.
+// The SVG is a simplified chat glyph used for small UI surfaces, not the
+// product icon users recognize as ShadoChat.
+const sourceIcon = resolve(root, 'public/icons/app-icon-512.png')
 
 const adaptiveForeground = Buffer.from(`
   <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
