@@ -21,7 +21,7 @@
       }
     },
     "production": {
-      "autoIncrement": true,
+      "autoIncrement": false,
       "channel": "production",
       "env": {
         "EXPO_PUBLIC_NOTIFICATION_ENVIRONMENT": "production"
