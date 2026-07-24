@@ -33,7 +33,10 @@
       "ios": {
         "ascAppId": "6792533179",
         "appleTeamId": "89M6KGXTBS",
-        "bundleIdentifier": "com.shadowchat.mobile"
+        "bundleIdentifier": "com.shadowchat.mobile",
+        "groups": [
+          "ShadoChat Internal Beta"
+        ]
       }
     }
   }

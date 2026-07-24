@@ -139,6 +139,10 @@ CLI to archive the shared Git object store; the July 19 incident inflated a
 normal 1.4 MB mobile upload to 240 MB. Prefer the primary checkout so EAS keeps
 normal Git commit metadata and excludes repository history.
 
+The production submit profile assigns accepted iOS builds to
+`ShadoChat Internal Beta`. Keep that group name aligned with App Store Connect
+so an uploaded build does not remain invisible to internal testers.
+
 For an emergency build from a linked worktree, first prove the worktree is
 clean, record its exact commit SHA, inspect the archive, and use
 `EAS_NO_VCS=1` only for that invocation. Do not make no-VCS mode the default.
