@@ -88,6 +88,13 @@ creator can read only objects under their own top-level `shadow-pin` folder.
 It does not expose bucket listing to other authenticated users; public delivery
 continues through known public object URLs.
 
+Migration
+`20260724150115_abandon_deleted_shadow_pin_edit_drafts.sql` closes existing
+Creator Studio edit receipts whose target Pin was soft-deleted. The client
+shows Drafts / Needs attention only for a real unfinished new Pin or an edit
+whose metadata or media differs from the still-live target; merely opening Edit
+does not create a persistent attention warning.
+
 The mobile media derivative migration keeps `latest_image_created_at` current
 with a trigger on `shadow_pin_images`. Category lists sort by newest added image
 first, with empty categories below categories that have visible images.

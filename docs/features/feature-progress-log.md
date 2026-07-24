@@ -42,8 +42,10 @@ Canonical detail and release gates live in:
   smaller media retains the standard upload path.
 - ShadowPin creator videos no longer attach a fresh Bunny VideoId to an older
   file-fingerprint upload. Draft discard and attention-state cleanup are
-  authoritative, and creator/operator Pin deletion is visible in both radial
-  controls and the immersive viewer.
+  authoritative. The Drafts / Needs attention pill ignores untouched edit
+  prefills and edit receipts whose canonical Pin was deleted, while preserving
+  real unsynced metadata or media changes. Creator/operator Pin deletion is
+  visible in both radial controls and the immersive viewer.
 - Explicit empty DM unread state no longer falls back to an old read cursor.
   Existing-account sign-in cannot trigger new-account onboarding, and the
   native TestFlight/App Store shell never auto-opens that flow.

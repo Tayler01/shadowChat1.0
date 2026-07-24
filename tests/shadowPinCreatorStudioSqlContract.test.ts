@@ -9,8 +9,12 @@ const hardeningMigrationPath = path.resolve(
   process.cwd(),
   'supabase/migrations/20260713042749_shadow_pin_creator_studio_hardening.sql'
 )
+const deletedTargetCleanupMigrationPath = path.resolve(
+  process.cwd(),
+  'supabase/migrations/20260724150115_abandon_deleted_shadow_pin_edit_drafts.sql'
+)
 
-const source = [migrationPath, hardeningMigrationPath]
+const source = [migrationPath, hardeningMigrationPath, deletedTargetCleanupMigrationPath]
   .map(file => fs.readFileSync(file, 'utf8'))
   .join('\n')
 const sql = source.toLowerCase().replace(/\s+/g, ' ')
@@ -124,5 +128,15 @@ describe('ShadowPin Creator Studio backend source contract', () => {
     expect(sql).toMatch(/generation\s+between\s+1\s+and\s+32/)
     expect(sql).toContain('enforce_shadow_pin_draft_asset_caps')
     expect(sql).toContain('too many active creator studio assets')
+  })
+
+  test('abandons stale edit receipts after their target Pin is soft-deleted', () => {
+    expect(sql).toMatch(
+      /update public\.shadow_pin_creator_drafts draft[\s\S]*?from public\.shadow_pin_images image/
+    )
+    expect(sql).toMatch(
+      /image\.id = draft\.target_image_id[\s\S]*?image\.deleted_at is not null/
+    )
+    expect(sql).toMatch(/state = 'abandoned'/)
   })
 })

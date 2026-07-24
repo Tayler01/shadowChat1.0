@@ -1,5 +1,6 @@
 import {
   creatorLocalDraftNeedsAttention,
+  creatorRemoteDraftNeedsAttention,
   hasCreatorDraftsNeedingAttention,
 } from '../src/features/shadow-pin/creator/creatorAttention'
 import type { CreatorLocalDraft } from '../src/features/shadow-pin/creator/creatorModel'
@@ -66,6 +67,122 @@ test('recognizes unsynced or meaningful local creator work', () => {
       },
     },
   }))).toBe(true)
+})
+
+test('does not treat an untouched edit prefill as an unfinished local Pin', () => {
+  expect(creatorLocalDraftNeedsAttention(localDraft({
+    targetImageId: 'pin-1',
+    values: {
+      ...localDraft().values,
+      title: 'Existing Pin',
+      keepExistingMedia: true,
+    },
+  }))).toBe(false)
+
+  expect(creatorLocalDraftNeedsAttention(localDraft({
+    targetImageId: 'pin-1',
+    dirtyRevision: 2,
+    savedRevision: 1,
+    values: {
+      ...localDraft().values,
+      title: 'Changed title',
+      keepExistingMedia: true,
+    },
+  }))).toBe(true)
+
+  expect(creatorLocalDraftNeedsAttention(localDraft({
+    targetImageId: 'pin-1',
+    values: {
+      ...localDraft().values,
+      fileFingerprint: {
+        name: 'replacement.jpg',
+        size: 2048,
+        type: 'image/jpeg',
+        lastModified: 2,
+      },
+      keepExistingMedia: false,
+    },
+  }))).toBe(true)
+})
+
+const existingTarget = {
+  id: 'pin-1',
+  category_id: 'category-1',
+  title: 'Existing Pin',
+  description: 'Existing description',
+  media_type: 'image',
+  provider: 'shadow_pin_storage',
+  image_url: 'https://example.com/original.jpg',
+  image_path: 'owner/pin/original.jpg',
+  thumbnail_url: 'https://example.com/thumb.webp',
+  thumbnail_path: 'owner/pin/thumb.webp',
+  medium_url: 'https://example.com/medium.webp',
+  medium_path: 'owner/pin/medium.webp',
+  source_url: null,
+  provider_asset_id: null,
+  video_preview_url: null,
+  video_playback_url: null,
+  video_hls_url: null,
+  video_embed_url: null,
+  tag_links: [{ tag: { slug: 'retro' } }],
+}
+
+const copiedTargetAsset = {
+  id: 'asset-1',
+  asset_kind: 'image',
+  provider: 'shadow_pin_storage',
+  final_image_url: existingTarget.image_url,
+  final_image_path: existingTarget.image_path,
+  final_thumbnail_url: existingTarget.thumbnail_url,
+  final_thumbnail_path: existingTarget.thumbnail_path,
+  final_medium_url: existingTarget.medium_url,
+  final_medium_path: existingTarget.medium_path,
+  source_url: null,
+  provider_asset_id: null,
+  video_preview_url: null,
+  video_playback_url: null,
+  video_hls_url: null,
+  video_embed_url: null,
+}
+
+const copiedEditDraft = {
+  id: 'draft-1',
+  state: 'publish_ready' as const,
+  category_id: existingTarget.category_id,
+  title: existingTarget.title,
+  description: existingTarget.description,
+  tags: ['retro'],
+  active_asset_id: copiedTargetAsset.id,
+  target_image_id: existingTarget.id,
+}
+
+test('does not treat a copied edit receipt as unfinished server work', () => {
+  expect(creatorRemoteDraftNeedsAttention(
+    copiedEditDraft,
+    copiedTargetAsset,
+    existingTarget
+  )).toBe(false)
+})
+
+test('keeps a changed edit draft visible for recovery', () => {
+  expect(creatorRemoteDraftNeedsAttention(
+    { ...copiedEditDraft, title: 'Unpublished title change' },
+    copiedTargetAsset,
+    existingTarget
+  )).toBe(true)
+  expect(creatorRemoteDraftNeedsAttention(
+    copiedEditDraft,
+    { ...copiedTargetAsset, final_image_path: 'owner/draft/replacement.jpg' },
+    existingTarget
+  )).toBe(true)
+})
+
+test('ignores an edit draft after its target Pin is no longer available', () => {
+  expect(creatorRemoteDraftNeedsAttention(
+    copiedEditDraft,
+    copiedTargetAsset,
+    undefined
+  )).toBe(false)
 })
 
 test('clears a stale local receipt when its server draft is no longer active', async () => {
