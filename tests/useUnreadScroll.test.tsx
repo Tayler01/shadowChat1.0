@@ -551,6 +551,43 @@ describe('useUnreadScroll', () => {
     document.body.removeChild(container)
   })
 
+  it('does not reopen old DM history when authoritative unread state is empty', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+
+    const scrollTo = jest.fn((options?: ScrollToOptions | number) => {
+      const top = typeof options === 'number' ? options : options?.top
+      container.scrollTop = Number(top)
+    })
+    Object.defineProperty(container, 'scrollTo', {
+      configurable: true,
+      value: scrollTo,
+    })
+
+    const { result } = renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages: [makeMessage('m1', 1), makeMessage('m2', 2)],
+        loading: false,
+        cursor: makeCursor('m1', 1),
+        cursorLoading: false,
+        enabled: true,
+        surfaceKey: 'dm:conversation-1',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        getUnreadMessages: () => [],
+        onMarkReadToLatest: jest.fn(),
+      })
+    )
+
+    await waitFor(() => expect(container.scrollTop).toBe(600))
+    expect(result.current.firstUnreadMessageId).toBeNull()
+    expect(scrollTo).toHaveBeenCalledWith({ top: 600, behavior: 'auto' })
+    document.body.removeChild(container)
+  })
+
   it('uses the oldest loaded unread row when the stored cursor predates the loaded window', async () => {
     useFakeTimersWithImmediateRaf()
     const container = document.createElement('div')

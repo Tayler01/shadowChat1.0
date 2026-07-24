@@ -177,7 +177,7 @@ test('initial session keeps retrying instead of logging out when a saved refresh
 });
 
 test('signUp sets user when session returned', async () => {
-  const profile = { id: '1', email: 'x@y.com' } as any;
+  const profile = { id: '1', email: 'x@y.com', created_at: new Date().toISOString() } as any;
   authModule.signUp.mockResolvedValue({ session: {}, profile, user: {} } as any);
 
   const { result } = await renderUseAuth();
@@ -202,7 +202,11 @@ test('signUp sets user when session returned', async () => {
 });
 
 test('signUp leaves user unauthenticated when email confirmation returns no session', async () => {
-  const pendingUser = { id: 'pending-user', email: 'pending@example.com' } as any;
+  const pendingUser = {
+    id: 'pending-user',
+    email: 'pending@example.com',
+    created_at: new Date().toISOString(),
+  } as any;
   authModule.signUp.mockResolvedValue({ session: null, profile: null, user: pendingUser } as any);
 
   const { result } = await renderUseAuth();

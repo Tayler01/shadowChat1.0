@@ -8,3 +8,4 @@ export const VITE_APP_DEPLOY_CONTEXT = 'production'
 export const VITE_APP_IS_PROD = true
 export const VITE_APP_MODE = 'test'
 export const VITE_SENTRY_DSN = ''
+export const VITE_SUPABASE_IMAGE_TRANSFORMS_ENABLED = 'true'

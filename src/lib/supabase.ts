@@ -633,6 +633,62 @@ export const UPLOADS_BUCKET = 'chat-uploads'
 export const ART_BOARD_BUCKET = 'art-board'
 export const SHADOW_PIN_BUCKET = 'shadow-pin'
 export const SHADO_TV_BUCKET = 'shado-tv'
+const RESUMABLE_UPLOAD_THRESHOLD_BYTES = 6 * 1024 * 1024
+const RESUMABLE_UPLOAD_CHUNK_BYTES = 6 * 1024 * 1024
+
+const getResumableStorageEndpoint = () => {
+  const url = new URL(SUPABASE_URL)
+  const hostname = url.hostname.endsWith('.supabase.co')
+    ? url.hostname.replace(/\.supabase\.co$/, '.storage.supabase.co')
+    : url.hostname
+  return `${url.protocol}//${hostname}/storage/v1/upload/resumable`
+}
+
+const uploadResumableStorageObject = async (
+  workingClient: AnySupabaseClient,
+  bucketName: string,
+  objectName: string,
+  file: File,
+  contentType: string
+) => {
+  let { data: { session }, error } = await workingClient.auth.getSession()
+  if (error || !session?.access_token) {
+    await ensureSession(true)
+    const refreshed = await workingClient.auth.getSession()
+    session = refreshed.data.session
+    error = refreshed.error
+  }
+  if (error || !session?.access_token) throw error || new Error('Not authenticated')
+
+  const { Upload } = await import('tus-js-client')
+  await new Promise<void>((resolve, reject) => {
+    const upload = new Upload(file, {
+      endpoint: getResumableStorageEndpoint(),
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      headers: {
+        authorization: `Bearer ${session.access_token}`,
+        'x-upsert': 'false',
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      metadata: {
+        bucketName,
+        objectName,
+        contentType,
+        cacheControl: '31536000',
+      },
+      chunkSize: RESUMABLE_UPLOAD_CHUNK_BYTES,
+      onError: reject,
+      onSuccess: () => resolve(),
+    })
+
+    // The object path is deliberately unique. A tus fingerprint is based on
+    // the local file and can point at an older object path, so cross-session
+    // fingerprint recovery would make the newly returned public URL invalid.
+    // Retries within this Upload instance remain resumable and reliable.
+    upload.start()
+  })
+}
 
 export type ShadoTvArtworkTarget =
   | 'channel-ticket'
@@ -690,11 +746,21 @@ export const uploadChatFile = async (file: File) => {
   const contentType = validateUpload(uploadFile, CHAT_FILE_UPLOAD_RULE)
   const safeName = sanitizeUploadFileName(uploadFile.name)
   const filePath = `${user.id}/${Date.now()}_${safeName}`
-  const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
-    contentType,
-    cacheControl: '31536000',
-  })
-  if (error) throw error
+  if (uploadFile.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES) {
+    await uploadResumableStorageObject(
+      workingClient,
+      UPLOADS_BUCKET,
+      filePath,
+      uploadFile,
+      contentType
+    )
+  } else {
+    const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
+      contentType,
+      cacheControl: '31536000',
+    })
+    if (error) throw error
+  }
   const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
   return data.publicUrl
 }

@@ -662,6 +662,27 @@ must still prove ShadowPin image download, sender PFP fallback, per-event sound,
 privacy modes, exact routing, badge/read clearing, and degraded network fallback
 before rich presentation is accepted.
 
+## Build 15 Media Delivery Recovery - July 24, 2026
+
+Production diagnosis after the Supabase interruption found that notification
+envelopes and ShadowPin `media_ref` values were present, while requests to the
+optional `/storage/v1/render/image/public/` endpoint returned `403`. The
+canonical public objects remained healthy.
+
+The web envelope normalizer, Edge delivery envelope, native TypeScript parser,
+and iOS Notification Service Extension now convert an approved Supabase render
+URL to its corresponding `/storage/v1/object/public/` URL and remove transform
+query parameters. Private and sender-only preview rules are unchanged. The iOS
+extension retains its HTTPS host allow-list, size limits, MIME validation,
+redirect validation, and expiry checks.
+
+Build `15` must be tested with a new ready ShadowPin image while the app is
+backgrounded and terminated. On iOS, attachment presentation is verified by
+expanding or long-pressing the notification; the compact system layout remains
+owned by iOS. The same pass must confirm actor-avatar fallback, private-preview
+redaction, selected sound, exact Pin route, badge clearing, and ordinary
+content-only fallback when media download is unavailable.
+
 ## Required Acceptance
 
 - every active event type maps deterministically

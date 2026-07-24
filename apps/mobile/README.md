@@ -1,6 +1,6 @@
 # ShadowChat Mobile
 
-## Documentation Status - July 20, 2026
+## Documentation Status - July 24, 2026
 
 The native workspace is the signed iPhone/Android notification companion for
 the production ShadoChat web client. It is aligned to Expo `~57.0.4`, React
@@ -95,7 +95,7 @@ registration, APNs/FCM token request, Expo token request, and token
 persistence. A failed stage must return control to the switch with a clear
 error; it must never remain indefinitely disabled.
 
-For build `13` acceptance on a physical iPhone:
+For build `15` acceptance on a physical iPhone:
 
 1. install the latest TestFlight build and sign in
 2. open Settings > Notifications & Audio
@@ -111,6 +111,13 @@ For build `13` acceptance on a physical iPhone:
    exact per-event sound, preview privacy, route, badge, and read clearing
 8. confirm the Home Screen and TestFlight build card use the obsidian-and-gold
    ShadoChat icon; Apple's separate TestFlight app retains its own Apple icon
+
+Build `15` is the outage-recovery candidate. It keeps the hosted WebView as the
+single product frontend, canonicalizes obsolete Supabase Image Transformation
+URLs before native attachment download, and must prove a newly posted
+ShadowPin image in an expanded/long-pressed notification. Existing-account
+sign-in must not launch the web new-account onboarding, and the native shell
+must never auto-launch that onboarding.
 
 Generate the checked-in icon and exact native/web sound copies before a signed
 build:

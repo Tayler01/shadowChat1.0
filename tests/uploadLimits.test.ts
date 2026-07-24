@@ -3,6 +3,7 @@ import {
   AVATAR_UPLOAD_RULE,
   CHAT_FILE_UPLOAD_RULE,
   CHAT_UPLOAD_MAX_BYTES,
+  getUploadErrorMessage,
   resolveUploadMimeType,
   sanitizeUploadFileName,
   UploadValidationError,
@@ -49,5 +50,12 @@ describe('upload limits', () => {
       type: 'application/zip',
       size: CHAT_UPLOAD_MAX_BYTES,
     }, CHAT_FILE_UPLOAD_RULE)).toBe('application/zip')
+  })
+
+  test('turns upload transport and authorization failures into actionable messages', () => {
+    expect(getUploadErrorMessage(new Error('TypeError: Failed to fetch'), 'Upload failed'))
+      .toBe('The upload was interrupted. Check your connection and try again.')
+    expect(getUploadErrorMessage(new Error('new row violates row-level security policy'), 'Upload failed'))
+      .toBe('ShadowChat could not authorize this upload. Refresh the app and try again.')
   })
 })

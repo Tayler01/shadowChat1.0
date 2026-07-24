@@ -1,4 +1,7 @@
-import { getSupabaseImageTransformUrl } from '../src/lib/storageImageTransforms'
+import {
+  getSupabaseImageTransformUrl,
+  getSupabasePublicObjectUrl,
+} from '../src/lib/storageImageTransforms'
 
 test('builds Supabase backend image transformation URLs for public storage objects', () => {
   const url = getSupabaseImageTransformUrl(
@@ -26,4 +29,12 @@ test('does not transform animated or vector-friendly formats', () => {
 test('leaves non-storage URLs unchanged', () => {
   expect(getSupabaseImageTransformUrl('https://cdn.example.com/image.jpg', { width: 320 }))
     .toBe('https://cdn.example.com/image.jpg')
+})
+
+test('recovers a durable public object URL from a persisted transform URL', () => {
+  expect(getSupabasePublicObjectUrl(
+    'https://example.supabase.co/storage/v1/render/image/public/chat-uploads/user/image.jpg?width=480&quality=76'
+  )).toBe(
+    'https://example.supabase.co/storage/v1/object/public/chat-uploads/user/image.jpg'
+  )
 })

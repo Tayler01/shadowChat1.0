@@ -11,14 +11,16 @@ import {
 import { createInitialCreatorState } from '../src/features/shadow-pin/creator/creatorModel'
 
 const mockTusUpload = jest.fn()
+const mockTusFindPreviousUploads = jest.fn(async () => [])
+const mockTusResumeFromPreviousUpload = jest.fn()
 
 jest.mock('tus-js-client', () => ({
   Upload: function MockUpload(file: File, options: Record<string, (...args: unknown[]) => void>) {
     mockTusUpload(file, options)
     return {
       abort: jest.fn(async () => undefined),
-      findPreviousUploads: jest.fn(async () => []),
-      resumeFromPreviousUpload: jest.fn(),
+      findPreviousUploads: mockTusFindPreviousUploads,
+      resumeFromPreviousUpload: mockTusResumeFromPreviousUpload,
       start: jest.fn(() => options.onSuccess?.()),
     }
   },
@@ -343,8 +345,11 @@ describe('ShadowPin Creator Studio API', () => {
       expect(mockTusUpload).toHaveBeenCalledWith(file, expect.objectContaining({
         endpoint: 'https://video.test/tus',
         uploadUrl: 'https://video.test/tus/upload-1',
+        removeFingerprintOnSuccess: true,
         headers: expect.objectContaining({ VideoId: 'video-1', LibraryId: 'library-1' }),
       }))
+      expect(mockTusFindPreviousUploads).not.toHaveBeenCalled()
+      expect(mockTusResumeFromPreviousUpload).not.toHaveBeenCalled()
       expect(invoke).toHaveBeenNthCalledWith(2, 'shadow-pin-video', {
         body: expect.objectContaining({ action: 'complete-draft-upload', bunnyVideoId: 'video-1' }),
       })

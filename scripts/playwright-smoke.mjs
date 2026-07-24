@@ -1,5 +1,6 @@
 import { chromium, devices } from 'playwright'
-import { spawn } from 'node:child_process'
+import { createClient } from '@supabase/supabase-js'
+import { execFileSync, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -54,6 +55,7 @@ const runState = {
     accountMode: config.accountMode,
     fixtures,
     scenarios: [],
+    cleanups: [],
   },
 }
 
@@ -165,9 +167,299 @@ try {
   if (browser) {
     await browser.close().catch(() => {})
   }
+  try {
+    await cleanupSmokeRunData(runState, [
+      desktopA?.account,
+      desktopB?.account,
+    ].filter(Boolean))
+  } catch (cleanupError) {
+    runState.summary.status = 'failed'
+    runState.summary.cleanupError = serializeError(cleanupError)
+    await writeJson(resultPath, runState.summary)
+    console.error(
+      `Smoke data cleanup failed: ${
+        cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+      }`,
+    )
+    process.exitCode = 1
+  }
   if (previewServer?.cleanup) {
     await previewServer.cleanup()
   }
+}
+
+async function cleanupSmokeRunData(state, accounts) {
+  if (accounts.length === 0) return
+
+  const admin = getSmokeAdminClient(state)
+  const accountEmails = new Set(accounts.map(account => account.email).filter(Boolean))
+  const accountIds = []
+
+  for (let page = 1; accountIds.length < accountEmails.size; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error) throw error
+
+    for (const user of data.users) {
+      if (user.email && accountEmails.has(user.email)) {
+        accountIds.push(user.id)
+      }
+    }
+
+    if (data.users.length < 1000) break
+  }
+
+  if (accountIds.length !== accountEmails.size) {
+    throw new Error(
+      `Could not resolve every controlled smoke account for cleanup (${accountIds.length}/${accountEmails.size}).`,
+    )
+  }
+
+  const startedAt = state.summary.startedAt
+  const storagePaths = new Map([
+    ['chat-uploads', new Set()],
+    ['message-media', new Set()],
+  ])
+
+  const { data: deletedEvents, error: eventError } = await admin
+    .from('notification_events')
+    .delete()
+    .in('actor_id', accountIds)
+    .gte('created_at', startedAt)
+    .select('id')
+  if (eventError) throw eventError
+
+  const deletedMessages = {}
+  const deletedDmMessages = []
+  for (const [table, senderColumn, selectColumns] of [
+    ['dm_messages', 'sender_id', 'id,conversation_id,file_url,thumbnail_url,audio_url'],
+    ['messages', 'user_id', 'id,file_url,thumbnail_url,audio_url'],
+  ]) {
+    const { data, error } = await admin
+      .from(table)
+      .delete()
+      .in(senderColumn, accountIds)
+      .gte('created_at', startedAt)
+      .select(selectColumns)
+    if (error) throw error
+
+    deletedMessages[table] = data.length
+    if (table === 'dm_messages') {
+      deletedDmMessages.push(...data)
+    }
+    for (const row of data) {
+      for (const url of [row.file_url, row.thumbnail_url, row.audio_url]) {
+        const parsed = parseSupabaseStorageUrl(url)
+        if (parsed && storagePaths.has(parsed.bucket)) {
+          storagePaths.get(parsed.bucket).add(parsed.path)
+        }
+      }
+    }
+  }
+
+  const recentThresholdMs = new Date(startedAt).getTime() - 60_000
+  for (const bucket of storagePaths.keys()) {
+    for (const accountId of accountIds) {
+      const entries = await listSmokeStorageFiles(admin, bucket, accountId)
+      for (const entry of entries) {
+        const createdAtMs = new Date(entry.createdAt || 0).getTime()
+        if (createdAtMs >= recentThresholdMs) {
+          storagePaths.get(bucket).add(entry.path)
+        }
+      }
+    }
+  }
+
+  const removedStorage = {}
+  for (const [bucket, paths] of storagePaths) {
+    const values = [...paths]
+    for (let index = 0; index < values.length; index += 100) {
+      const { error } = await admin.storage
+        .from(bucket)
+        .remove(values.slice(index, index + 100))
+      if (error) throw error
+    }
+    removedStorage[bucket] = values.length
+  }
+
+  const repairedReadCursors = await repairSmokeReadCursors(
+    admin,
+    accountIds,
+    deletedDmMessages.map(message => message.conversation_id).filter(Boolean),
+  )
+
+  for (const [table, senderColumn] of [
+    ['messages', 'user_id'],
+    ['dm_messages', 'sender_id'],
+  ]) {
+    const { count, error } = await admin
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .in(senderColumn, accountIds)
+      .gte('created_at', startedAt)
+    if (error) throw error
+    if (count !== 0) {
+      throw new Error(`${count} ${table} smoke rows remain after cleanup.`)
+    }
+  }
+
+  const cleanup = {
+    startedAt,
+    accounts: accountIds.length,
+    notificationEvents: deletedEvents.length,
+    messages: deletedMessages.messages || 0,
+    directMessages: deletedMessages.dm_messages || 0,
+    storageObjects: removedStorage,
+    repairedReadCursors,
+    verified: true,
+  }
+  state.summary.cleanups.push(cleanup)
+  await writeJson(resultPath, state.summary)
+  logLine(`Smoke data cleanup verified: ${JSON.stringify(cleanup)}`)
+}
+
+async function repairSmokeReadCursors(admin, accountIds, affectedConversationIds) {
+  let repaired = 0
+  const { data: latestGroupMessage, error: groupError } = await admin
+    .from('messages')
+    .select('id,created_at')
+    .is('reply_to', null)
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (groupError) throw groupError
+
+  if (latestGroupMessage) {
+    const { error } = await admin
+      .from('user_read_cursors')
+      .upsert(accountIds.map(userId => ({
+        user_id: userId,
+        surface: 'general_chat',
+        scope_id: 'main',
+        last_read_message_id: latestGroupMessage.id,
+        last_read_at: latestGroupMessage.created_at,
+        updated_at: new Date().toISOString(),
+      })))
+    if (error) throw error
+    repaired += accountIds.length
+  }
+
+  for (const conversationId of [...new Set(affectedConversationIds)]) {
+    const { data: latestDmMessage, error: latestDmError } = await admin
+      .from('dm_messages')
+      .select('id,created_at')
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (latestDmError) throw latestDmError
+
+    if (!latestDmMessage) {
+      const { error } = await admin
+        .from('user_read_cursors')
+        .delete()
+        .in('user_id', accountIds)
+        .eq('surface', 'dm')
+        .eq('scope_id', conversationId)
+      if (error) throw error
+      continue
+    }
+
+    const { error } = await admin
+      .from('user_read_cursors')
+      .upsert(accountIds.map(userId => ({
+        user_id: userId,
+        surface: 'dm',
+        scope_id: conversationId,
+        last_read_message_id: latestDmMessage.id,
+        last_read_at: latestDmMessage.created_at,
+        updated_at: new Date().toISOString(),
+      })))
+    if (error) throw error
+    repaired += accountIds.length
+  }
+
+  return repaired
+}
+
+function getSmokeAdminClient(state) {
+  const supabaseUrl = getEnvValue(
+    state.config.envValues,
+    ['SUPABASE_URL', 'VITE_SUPABASE_URL'],
+  )
+  let serviceRoleKey = getEnvValue(
+    state.config.envValues,
+    ['SUPABASE_SERVICE_ROLE_KEY'],
+  )
+
+  if (!supabaseUrl) {
+    throw new Error('Missing SUPABASE_URL/VITE_SUPABASE_URL for smoke cleanup.')
+  }
+
+  if (!serviceRoleKey) {
+    const projectRef = new URL(supabaseUrl).hostname.split('.')[0]
+    const raw = execFileSync(
+      'supabase',
+      ['projects', 'api-keys', '--project-ref', projectRef, '-o', 'json'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+    )
+    const keys = JSON.parse(raw)
+    serviceRoleKey = keys.find(
+      key => key.name === 'service_role' || key.type === 'service_role',
+    )?.api_key
+  }
+
+  if (!serviceRoleKey) {
+    throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY for smoke cleanup.')
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+function parseSupabaseStorageUrl(value) {
+  if (!value || typeof value !== 'string') return null
+
+  try {
+    const url = new URL(value)
+    const match = url.pathname.match(
+      /\/storage\/v1\/(?:object|render\/image)\/public\/([^/]+)\/(.+)$/u,
+    )
+    if (!match) return null
+
+    return {
+      bucket: decodeURIComponent(match[1]),
+      path: match[2].split('/').map(decodeURIComponent).join('/'),
+    }
+  } catch {
+    return null
+  }
+}
+
+async function listSmokeStorageFiles(admin, bucket, prefix) {
+  const { data, error } = await admin.storage
+    .from(bucket)
+    .list(prefix, {
+      limit: 1000,
+      sortBy: { column: 'name', order: 'asc' },
+    })
+  if (error) throw error
+
+  const entries = []
+  for (const item of data) {
+    const itemPath = `${prefix}/${item.name}`
+    if (item.id) {
+      entries.push({
+        path: itemPath,
+        createdAt: item.created_at || item.updated_at,
+      })
+    } else {
+      entries.push(...await listSmokeStorageFiles(admin, bucket, itemPath))
+    }
+  }
+  return entries
 }
 
 function parseArgs(argv) {
@@ -682,7 +974,11 @@ async function scenarioSettings(state, _sessionA, sessionB) {
   await goToSettings(sessionB.page)
   await openSettingsSection(sessionB.page, 'Notifications & Audio')
 
-  await assertSwitchGeometry(sessionB.page, 'Toggle Push Notifications', 'Toggle Sound Effects')
+  await assertSwitchGeometry(
+    sessionB.page,
+    'Toggle Phone Push Notifications',
+    'Toggle Foreground Obsidian Sounds',
+  )
   await capture(sessionB.page, state.artifactDir, 'settings-desktop-before-modal')
 
   await sessionB.page.getByRole('button', { name: 'Notification Setup' }).click()
@@ -698,7 +994,7 @@ async function scenarioSettings(state, _sessionA, sessionB) {
   await toggleSwitch(sessionB.page, reactionsSwitchLabel)
   await expectSwitchState(sessionB.page, reactionsSwitchLabel, reactionsInitiallyEnabled)
 
-  const pushSwitchLabel = 'Toggle Push Notifications'
+  const pushSwitchLabel = 'Toggle Phone Push Notifications'
   if (!(await isSwitchChecked(sessionB.page, pushSwitchLabel))) {
     await toggleSwitch(sessionB.page, pushSwitchLabel)
   }
@@ -852,7 +1148,11 @@ async function scenarioMobileSettingsVisual(state, mobileSession) {
   await dismissAppReleaseDialog(mobileSession.page)
   await goToSettings(mobileSession.page)
   await openSettingsSection(mobileSession.page, 'Notifications & Audio')
-  await assertSwitchGeometry(mobileSession.page, 'Toggle Push Notifications', 'Toggle Sound Effects')
+  await assertSwitchGeometry(
+    mobileSession.page,
+    'Toggle Phone Push Notifications',
+    'Toggle Foreground Obsidian Sounds',
+  )
   await capture(mobileSession.page, state.artifactDir, 'settings-mobile')
 }
 
@@ -940,7 +1240,7 @@ async function goToSettings(page) {
   } else {
     const mobileSettings = page.getByRole('button', { name: 'Open app preferences' })
     if (!(await mobileSettings.isVisible().catch(() => false))) {
-      await page.getByRole('button', { name: 'Show app tools' }).click()
+      await page.getByRole('button', { name: /^Show more navigation/i }).click()
       await mobileSettings.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
     }
     await mobileSettings.click()

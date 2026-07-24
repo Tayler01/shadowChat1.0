@@ -245,6 +245,15 @@ final class NotificationService: UNNotificationServiceExtension, URLSessionTaskD
          url.path.hasPrefix("/storage/v1/object/public/")
           || url.path.hasPrefix("/storage/v1/render/image/public/")
        ) {
+      if url.path.hasPrefix("/storage/v1/render/image/public/"),
+         var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+        components.path = url.path.replacingOccurrences(
+          of: "/storage/v1/render/image/public/",
+          with: "/storage/v1/object/public/"
+        )
+        components.query = nil
+        return components.url
+      }
       return url
     }
     return nil

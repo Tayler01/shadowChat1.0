@@ -1,3 +1,5 @@
+import { VITE_SUPABASE_IMAGE_TRANSFORMS_ENABLED } from './env'
+
 type SupabaseImageResizeMode = 'cover' | 'contain' | 'fill'
 
 export type SupabaseImageTransformOptions = {
@@ -10,9 +12,31 @@ export type SupabaseImageTransformOptions = {
 const OBJECT_PUBLIC_MARKER = '/storage/v1/object/public/'
 const RENDER_PUBLIC_MARKER = '/storage/v1/render/image/public/'
 const UNSAFE_TRANSFORM_EXTENSIONS = /\.(gif|svg)(?:$|[?#])/i
+const IMAGE_TRANSFORMS_ENABLED =
+  String(VITE_SUPABASE_IMAGE_TRANSFORMS_ENABLED || '').toLowerCase() === 'true'
 
 const clampInteger = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Math.round(value)))
+
+/**
+ * Converts a persisted Supabase render URL back to its durable public-object
+ * URL. Public-object delivery does not depend on the optional Image
+ * Transformations add-on and remains valid when that service is unavailable.
+ */
+export function getSupabasePublicObjectUrl(publicUrl?: string | null) {
+  if (!publicUrl) return ''
+
+  try {
+    const url = new URL(publicUrl)
+    if (!url.pathname.includes(RENDER_PUBLIC_MARKER)) return publicUrl
+
+    url.pathname = url.pathname.replace(RENDER_PUBLIC_MARKER, OBJECT_PUBLIC_MARKER)
+    url.search = ''
+    return url.toString()
+  } catch {
+    return publicUrl
+  }
+}
 
 export function getSupabaseImageTransformUrl(
   publicUrl?: string | null,
@@ -20,17 +44,16 @@ export function getSupabaseImageTransformUrl(
 ) {
   if (!publicUrl) return ''
 
-  try {
-    const url = new URL(publicUrl)
-    const marker = url.pathname.includes(RENDER_PUBLIC_MARKER)
-      ? RENDER_PUBLIC_MARKER
-      : OBJECT_PUBLIC_MARKER
+  const durablePublicUrl = getSupabasePublicObjectUrl(publicUrl)
+  if (!IMAGE_TRANSFORMS_ENABLED) return durablePublicUrl
 
-    if (!url.pathname.includes(marker) || UNSAFE_TRANSFORM_EXTENSIONS.test(url.pathname)) {
-      return publicUrl
+  try {
+    const url = new URL(durablePublicUrl)
+    if (!url.pathname.includes(OBJECT_PUBLIC_MARKER) || UNSAFE_TRANSFORM_EXTENSIONS.test(url.pathname)) {
+      return durablePublicUrl
     }
 
-    url.pathname = url.pathname.replace(marker, RENDER_PUBLIC_MARKER)
+    url.pathname = url.pathname.replace(OBJECT_PUBLIC_MARKER, RENDER_PUBLIC_MARKER)
     url.search = ''
 
     const params = new URLSearchParams()
@@ -42,6 +65,6 @@ export function getSupabaseImageTransformUrl(
 
     return url.toString()
   } catch {
-    return publicUrl
+    return durablePublicUrl
   }
 }

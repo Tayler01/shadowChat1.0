@@ -669,13 +669,16 @@ test('rasterizes the whole notification into a pixel-sourced sand effect for ful
 
   swipeLeft(swipeSurface)
 
-  expect(screen.queryByTestId('notification-disintegration-notification:event-shatter')).not.toBeInTheDocument()
+  const effect = await screen.findByTestId('notification-disintegration-notification:event-shatter')
+  expect(screen.getByTestId('notification-row-notification:event-shatter')).toHaveAttribute(
+    'data-dismiss-phase',
+    'dismissing'
+  )
   await act(async () => {
     confirmRead?.(true)
     await Promise.resolve()
   })
 
-  const effect = await screen.findByTestId('notification-disintegration-notification:event-shatter')
   expect(swipeSurface).toHaveAttribute('data-card-disintegration', 'active')
   expect(captureSandSnapshot).toHaveBeenCalledTimes(1)
   expect(effect).toHaveAttribute('data-notification-sand-effect', 'active')

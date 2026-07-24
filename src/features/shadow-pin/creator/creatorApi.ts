@@ -160,15 +160,22 @@ export async function deleteCreatorDraft(
   const assetId = asset?.id || draft.activeAssetId
   if (!assetId) return { draft: abandoned, asset: null }
 
-  if (asset?.assetKind === 'video' || asset?.assetKind === 'external_video' || draft.sourceKind.includes('video')) {
-    return normalizeCreatorBundle(await callVideoFunction({
-      action: 'delete-draft-video-asset',
-      draftId: draft.id,
-      assetId,
-    }))
-  }
+  try {
+    if (asset?.assetKind === 'video' || asset?.assetKind === 'external_video' || draft.sourceKind.includes('video')) {
+      return normalizeCreatorBundle(await callVideoFunction({
+        action: 'delete-draft-video-asset',
+        draftId: draft.id,
+        assetId,
+      }))
+    }
 
-  return cleanupCreatorImageAsset(draft, { id: assetId })
+    return await cleanupCreatorImageAsset(draft, { id: assetId })
+  } catch {
+    // The revision-guarded RPC above is the authoritative discard. Provider or
+    // Storage cleanup is best effort and must not resurrect the local draft or
+    // leave the attention pill stuck after the server accepted the discard.
+    return { draft: abandoned, asset }
+  }
 }
 
 export async function publishCreatorDraft(
@@ -445,6 +452,7 @@ async function uploadDraftVideo(
       endpoint,
       uploadUrl: session.uploadUrl,
       retryDelays: [0, 1000, 3000, 5000],
+      removeFingerprintOnSuccess: true,
       metadata: { filetype: file.type || 'video/mp4', title: file.name, collection: 'shadow-pin-drafts' },
       headers: session.authorizationSignature ? {
         AuthorizationSignature: session.authorizationSignature,
@@ -458,10 +466,12 @@ async function uploadDraftVideo(
     })
     const abort = () => { void upload.abort(false).finally(() => reject(new DOMException('Upload paused.', 'AbortError'))) }
     signal?.addEventListener('abort', abort, { once: true })
-    upload.findPreviousUploads().then(previous => {
-      if (previous[0] && !session.uploadUrl) upload.resumeFromPreviousUpload(previous[0])
-      upload.start()
-    }).catch(reject)
+    // The Edge Function creates a fresh Bunny VideoId for this exact draft
+    // asset. tus-js-client fingerprints are file-based, so resuming an
+    // arbitrary prior fingerprint can upload into an older VideoId and leave
+    // the newly-created asset permanently empty. Retry within this Upload
+    // instance; only use a server-bound uploadUrl when one is supplied.
+    upload.start()
   })
   const assetId = normalizeCreatorAsset(session.asset)?.id
   const complete = await callVideoFunction({

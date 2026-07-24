@@ -60,6 +60,7 @@ import type { PinRouteAction } from '../../lib/appRouting'
 import { useShadowPinCategories } from './hooks/useShadowPinCategories'
 import { useShadowPinImages } from './hooks/useShadowPinImages'
 import {
+  deleteShadowPinImage,
   fetchMyShadowPinConnectionFeedWindow,
   fetchShadowPinImage,
   fetchShadowPinImageNeighbors,
@@ -702,7 +703,7 @@ const getImageAspectRatio = (item: { image_width?: number | null; image_height?:
 
 const isProcessingMedia = (status?: string | null) => status === 'pending' || status === 'processing'
 
-type PinQuickAction = 'heart' | 'share' | 'comment' | 'open' | 'edit' | 'report'
+type PinQuickAction = 'heart' | 'share' | 'comment' | 'open' | 'edit' | 'delete' | 'report'
 type PinActionSide = 'left' | 'right'
 type PinColumnSide = 'left' | 'right'
 type PinActionConfig = {
@@ -759,11 +760,12 @@ const BASE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
   pinArcAction('open', 'Open', 6, Maximize2),
 ]
 const BASE_MANAGE_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
-  pinArcAction('share', 'Share', -120, Share2),
-  pinArcAction('heart', 'Heart', -84, Heart),
-  pinArcAction('comment', 'Comment', -48, MessageSquare),
-  pinArcAction('open', 'Open', -12, Maximize2),
-  pinArcAction('edit', 'Edit', 24, Edit3),
+  pinArcAction('share', 'Share', -138, Share2),
+  pinArcAction('heart', 'Heart', -102, Heart),
+  pinArcAction('comment', 'Comment', -66, MessageSquare),
+  pinArcAction('open', 'Open', -30, Maximize2),
+  pinArcAction('edit', 'Edit', 6, Edit3),
+  pinArcAction('delete', 'Delete', 42, Trash2),
 ]
 const BASE_REPORT_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
   pinArcAction('share', 'Share', -102, Share2),
@@ -773,11 +775,12 @@ const BASE_REPORT_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
   pinArcAction('report', 'Report', 42, Flag),
 ]
 const BASE_MANAGE_REPORT_PIN_ACTIONS_RIGHT: PinActionConfig[] = [
-  pinArcAction('share', 'Share', -138, Share2),
-  pinArcAction('heart', 'Heart', -102, Heart),
-  pinArcAction('comment', 'Comment', -66, MessageSquare),
-  pinArcAction('open', 'Open', -30, Maximize2),
-  pinArcAction('edit', 'Edit', 6, Edit3),
+  pinArcAction('share', 'Share', -174, Share2),
+  pinArcAction('heart', 'Heart', -138, Heart),
+  pinArcAction('comment', 'Comment', -102, MessageSquare),
+  pinArcAction('open', 'Open', -66, Maximize2),
+  pinArcAction('edit', 'Edit', -30, Edit3),
+  pinArcAction('delete', 'Delete', 6, Trash2),
   pinArcAction('report', 'Report', 42, Flag),
 ]
 const PIN_ACTIONS: Record<PinActionSide, PinActionConfig[]> = {
@@ -1697,6 +1700,8 @@ function PinActionFeedback({ feedback }: { feedback: PinActionFeedbackState | nu
         ? Flag
       : feedback.action === 'edit'
         ? Edit3
+      : feedback.action === 'delete'
+        ? Trash2
         : Heart
 
   return (
@@ -1748,6 +1753,7 @@ function ImageCard({
   onToggleSound,
   onViewer,
   onEdit,
+  onDelete,
   onHeart,
   onComments,
   onShare,
@@ -1773,6 +1779,7 @@ function ImageCard({
   onToggleSound: () => void
   onViewer: () => void
   onEdit: () => void
+  onDelete: () => void
   onHeart: () => void
   onComments: () => void
   onShare: () => void
@@ -2214,6 +2221,11 @@ function ImageCard({
 
     if (action === 'edit') {
       window.setTimeout(onEdit, 90)
+      return
+    }
+
+    if (action === 'delete') {
+      window.setTimeout(onDelete, 90)
       return
     }
 
@@ -2716,6 +2728,7 @@ function ShadowPinMasonryGrid({
   testId = 'shadow-pin-feed',
   onViewer,
   onEdit,
+  onDelete,
   onHeart,
   onComments,
   onShare,
@@ -2728,6 +2741,7 @@ function ShadowPinMasonryGrid({
   testId?: string
   onViewer: (image: ShadowPinImage) => void
   onEdit: (image: ShadowPinImage) => void
+  onDelete: (image: ShadowPinImage) => void
   onHeart: (image: ShadowPinImage) => void
   onComments: (image: ShadowPinImage) => void
   onShare: (image: ShadowPinImage) => void
@@ -2867,6 +2881,7 @@ function ShadowPinMasonryGrid({
                 }}
                 onViewer={() => onViewer(image)}
                 onEdit={() => onEdit(image)}
+                onDelete={() => onDelete(image)}
                 onHeart={() => onHeart(image)}
                 onComments={() => onComments(image)}
                 onShare={() => onShare(image)}
@@ -3249,6 +3264,21 @@ function ShadowPinHome({
         setViewerSessionImages(current => current.map(item => item.id === image.id ? image : item))
         toast.error(error instanceof Error ? error.message : 'Heart failed')
       })
+  }
+
+  const removeConnectionImage = async (image: ShadowPinImage) => {
+    if (!window.confirm(`Delete "${image.title}"?`)) return
+    try {
+      const removedImage = await deleteShadowPinImage(image.id)
+      tracker.recordPinMutation(removedImage ?? image, 'pin_deleted', null)
+      setCommentsImage(null)
+      setViewerSessionImages(current => current.filter(item => item.id !== image.id))
+      setModal(null)
+      await activeConnectionsState.refresh()
+      toast.success('Pin removed')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to delete this Pin')
+    }
   }
 
   const openConnectionImageViewer = (image: ShadowPinImage, pushRoute = true) => {
@@ -4053,6 +4083,7 @@ function ShadowPinHome({
                   testId="shadow-pin-feed"
                   onViewer={openConnectionImageViewer}
                   onEdit={image => { setCreatorTargetImage(image); setCreatorOpen(true) }}
+                  onDelete={image => { void removeConnectionImage(image) }}
                   onHeart={toggleConnectionImageHeart}
                   onComments={openConnectionImageComments}
                   onShare={image => tracker.recordShareTapped(image, null)}
@@ -4194,6 +4225,7 @@ function ShadowPinHome({
             setCreatorTargetImage(image)
             setCreatorOpen(true)
           }}
+          onDelete={image => { void removeConnectionImage(image) }}
           onClose={closeConnectionImageViewer}
         />
       )}
@@ -4494,6 +4526,7 @@ function ShadowPinCategoryScreen({
               label="ShadowPin pin masonry grid"
               onViewer={openImageViewer}
               onEdit={image => { setCreatorTargetImage(image); setCreatorOpen(true) }}
+              onDelete={image => { void removeImage(image) }}
               onHeart={toggleImageHeart}
               onComments={openImageComments}
               onShare={image => tracker.recordShareTapped(image, imagesState.category)}
@@ -4587,6 +4620,7 @@ function ShadowPinCategoryScreen({
             setCreatorTargetImage(image)
             setCreatorOpen(true)
           }}
+          onDelete={image => { void removeImage(image) }}
           onClose={closeImageViewer}
         />
       )}
@@ -4810,6 +4844,7 @@ export function ShadowPin({
           onComments={() => {}}
           onShare={() => {}}
           onEdit={() => {}}
+          onDelete={() => {}}
           onClose={() => onPinRoute('close-viewer', initialImageId)}
         />
       </div>

@@ -6,6 +6,7 @@ import {
   markPhoneInstallOnboardingSeen,
   shouldShowPhoneInstallOnboarding,
 } from '../../lib/phoneInstallOnboarding'
+import { isNativeAppWebView } from '../../lib/nativeAppBridge'
 import { PhoneInstallGuide } from './PhoneInstallGuide'
 
 const isInstalledApp = () => {
@@ -46,7 +47,11 @@ export function PhoneInstallOnboarding() {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
-    if (profile && shouldShowPhoneInstallOnboarding(profile, isInstalledApp(), isPhoneLikeDevice())) {
+    if (
+      profile &&
+      !isNativeAppWebView() &&
+      shouldShowPhoneInstallOnboarding(profile, isInstalledApp(), isPhoneLikeDevice())
+    ) {
       toast.dismiss()
       setOpen(true)
     }

@@ -66,6 +66,7 @@ const createViewerProps = (overrides: Record<string, unknown> = {}) => ({
     onComments: jest.fn(),
     onShare: jest.fn(),
     onEdit: jest.fn(),
+    onDelete: jest.fn(),
     onClose: jest.fn(),
     ...overrides,
   })
@@ -97,6 +98,17 @@ test('Theater is a focus-managed dialog with 48px controls and one active media 
   expect(screen.getByLabelText('Previous Pin')).not.toHaveClass('border', 'bg-black/55')
   expect(props.onSettled).toHaveBeenCalledWith(expect.objectContaining({ id: 'two' }))
   expect(screen.getByLabelText('Pin 2 of 3')).toBeInTheDocument()
+})
+
+test('owners and operators can delete a Pin directly from Theater controls', () => {
+  const onDelete = jest.fn()
+  renderViewer({
+    canManageImage: () => true,
+    onDelete,
+  })
+
+  fireEvent.click(screen.getByRole('button', { name: 'Delete Pin two' }))
+  expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ id: 'two' }))
 })
 
 test('all swipe slides share one stable full-opacity media stage and exact destination source', () => {

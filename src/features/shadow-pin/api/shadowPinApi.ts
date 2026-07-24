@@ -631,6 +631,7 @@ async function uploadBunnyTusFile(
     const upload = new Upload(file, {
       endpoint: session.endpoint,
       retryDelays: [0, 1000, 3000, 5000],
+      removeFingerprintOnSuccess: true,
       metadata: {
         filetype: file.type || 'video/mp4',
         title: file.name,
@@ -651,14 +652,10 @@ async function uploadBunnyTusFile(
       onSuccess: () => resolve(),
     })
 
-    upload.findPreviousUploads()
-      .then(previousUploads => {
-        if (previousUploads.length > 0) {
-          upload.resumeFromPreviousUpload(previousUploads[0])
-        }
-        upload.start()
-      })
-      .catch(reject)
+    // The session is tied to the fresh Bunny VideoId returned by the server.
+    // A tus file fingerprint can belong to an older Pin upload and must never
+    // be resumed into this new server-owned asset.
+    upload.start()
   })
 }
 

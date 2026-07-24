@@ -162,8 +162,12 @@ export function useUnreadScroll<TMessage>({
   }, [])
 
   const findFirstUnreadMessage = useCallback(() => {
-    const explicitUnread = getUnreadMessages?.(messages)
-    if (explicitUnread?.length) {
+    if (getUnreadMessages) {
+      const explicitUnread = getUnreadMessages(messages)
+      // Callers such as DMs provide authoritative per-message read state.
+      // An empty result means there is nothing unread; falling back to an
+      // older cursor here reopens already-read history on every return.
+      if (explicitUnread.length === 0) return null
       if (!cursor) return explicitUnread[0] ?? null
       return explicitUnread.find(message => isMessageAfterCursor({
         created_at: getMessageCreatedAt(message),

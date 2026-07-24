@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Share2,
   ShieldCheck,
+  Trash2,
   Volume2,
   VolumeX,
   X,
@@ -88,6 +89,7 @@ type ShadowPinImmersiveViewerProps = {
   onComments: (image: ShadowPinImage) => void
   onShare: (image: ShadowPinImage) => void
   onEdit: (image: ShadowPinImage) => void
+  onDelete: (image: ShadowPinImage) => void
   onClose: () => void
 }
 
@@ -130,6 +132,7 @@ export function ShadowPinImmersiveViewer({
   onComments,
   onShare,
   onEdit,
+  onDelete,
   onClose,
 }: ShadowPinImmersiveViewerProps) {
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -741,7 +744,7 @@ export function ShadowPinImmersiveViewer({
               </button>}
             </div>
 
-            <div className="mt-2 grid grid-cols-4 gap-1 sm:grid-cols-5">
+            <div className="mt-2 grid grid-cols-4 gap-1 sm:grid-cols-6">
               <button
                 type="button"
                 onClick={() => onHeart(activeImage)}
@@ -783,14 +786,25 @@ export function ShadowPinImmersiveViewer({
                 Details
               </button>
               {canManageImage(activeImage) && (
-                <button
-                  type="button"
-                  onClick={() => onEdit(activeImage)}
-                  className="col-span-4 inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full text-xs font-semibold text-white/80 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] sm:col-span-1"
-                >
-                  <Edit3 className="h-5 w-5" />
-                  Edit
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onEdit(activeImage)}
+                    className="col-span-2 inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full text-xs font-semibold text-white/80 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] sm:col-span-1"
+                  >
+                    <Edit3 className="h-5 w-5" />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(activeImage)}
+                    className="col-span-2 inline-flex min-h-12 items-center justify-center gap-1.5 rounded-full text-xs font-semibold text-red-200/85 hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/50 sm:col-span-1"
+                    aria-label={`Delete ${activeImage.title}`}
+                  >
+                    <Trash2 className="h-5 w-5" />
+                    Delete
+                  </button>
+                </>
               )}
             </div>
 

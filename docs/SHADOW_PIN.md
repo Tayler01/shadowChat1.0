@@ -1,6 +1,6 @@
 # ShadowPin
 
-## Documentation Status - July 10, 2026
+## Documentation Status - July 24, 2026
 
 Updated for the ShadowPin social/discovery work shipped in Release A. The
 production surface includes normalized tags, indexed cross-entity search,
@@ -33,7 +33,7 @@ Short video planning and rollout details live in
   creator display identity, and category metadata.
 - Threaded member comments/replies with creator/operator moderation.
 - A mobile-first long-press radial menu with Share, Heart, Comment, and Open;
-  pin creators and operators also receive Edit.
+  pin creators and operators also receive Edit and Delete.
 - Recipient-owned in-app notifications and background push for eligible new
   posts, comments, and replies.
 
@@ -80,6 +80,13 @@ a 15MB image limit and JPEG, PNG, WebP, and GIF MIME allow-list. Storage paths
 are user-prefixed so authenticated users can upload only under their own folder.
 Native video files are uploaded directly to Bunny Stream; ShadowPin stores the
 poster image in Supabase Storage.
+
+Migration
+`20260724131717_restore_shadow_pin_upload_returning_select.sql` restores the
+narrow authenticated SELECT policy required by Storage's upload response: a
+creator can read only objects under their own top-level `shadow-pin` folder.
+It does not expose bucket listing to other authenticated users; public delivery
+continues through known public object URLs.
 
 The mobile media derivative migration keeps `latest_image_created_at` current
 with a trigger on `shadow_pin_images`. Category lists sort by newest added image
@@ -223,6 +230,14 @@ available. If the Bunny pull-zone URL is not configured, native Bunny uploads
 fall back to Bunny iframe playback until direct rendition URLs are available.
 Processing and failed videos are visible to creators and app operators, but
 non-owners only see ready video pins.
+
+Every new Bunny upload session is bound to the fresh server-created VideoId.
+The client retries within that exact session and does not resume a file-based
+tus fingerprint from an older Pin, which would leave the new asset empty.
+Creator-draft discard is server-authoritative: successful draft abandonment
+clears local recovery state even when best-effort provider or Storage cleanup
+must be retried later. Untouched blank editing drafts do not produce the
+`Needs attention` launcher pill.
 
 ## Image Layout
 

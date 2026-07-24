@@ -46,6 +46,11 @@ const must = (condition, message) => {
   if (!condition) throw new Error(message)
 }
 
+const isExpectedNavigationCancellation = value => (
+  /set_my_notification_installation_foreground_v2/iu.test(value) &&
+  /(ERR_ABORTED|Load request cancelled|access control checks)/iu.test(value)
+)
+
 must(requestedBaseUrl, '--base-url or PLAYWRIGHT_BASE_URL is required.')
 const base = new URL(requestedBaseUrl)
 must(['http:', 'https:'].includes(base.protocol), 'The base URL must be HTTP(S).')
@@ -125,8 +130,14 @@ for (const profile of profiles) {
     const text = message.text()
     if (!/content security policy/iu.test(text)) diagnostics.consoleErrors.push(text)
   })
-  page.on('pageerror', error => diagnostics.pageErrors.push(error.stack || error.message))
-  page.on('requestfailed', request => diagnostics.requestFailures.push(`${request.method()} ${request.url()} ${request.failure()?.errorText || ''}`))
+  page.on('pageerror', error => {
+    const detail = error.stack || error.message
+    if (!isExpectedNavigationCancellation(detail)) diagnostics.pageErrors.push(detail)
+  })
+  page.on('requestfailed', request => {
+    const detail = `${request.method()} ${request.url()} ${request.failure()?.errorText || ''}`
+    if (!isExpectedNavigationCancellation(detail)) diagnostics.requestFailures.push(detail)
+  })
   page.on('response', response => {
     if (response.status() >= 400) diagnostics.errorResponses.push(`${response.status()} ${response.url()}`)
   })

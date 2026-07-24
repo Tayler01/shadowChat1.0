@@ -290,6 +290,7 @@ function SwipeToReadNotification({
   const surfaceRef = useRef<HTMLDivElement>(null)
   const sandSnapshotPromiseRef = useRef<Promise<NotificationSandSnapshot | null> | null>(null)
   const offsetRef = useRef(0)
+  const dismissOriginXRef = useRef(0)
   const maxTravelRef = useRef(344)
   const phaseRef = useRef<SwipePhase>('idle')
   const settleAnimationRef = useRef<ReturnType<typeof animate> | null>(null)
@@ -478,15 +479,6 @@ function SwipeToReadNotification({
         ? NOTIFICATION_SAND_DURATION_MS / 1_000
         : 0.64
       : 0.08
-    const target = motionPreference === 'full' ? 0 : offsetRef.current
-    settleAnimationRef.current = animate(x, target, {
-      duration,
-      ease: [0.22, 0.72, 0.24, 1],
-      onUpdate: latest => {
-        offsetRef.current = latest
-        surfaceRef.current?.setAttribute('data-swipe-offset', String(Math.round(latest)))
-      },
-    })
     clearPhaseTimer()
     phaseTimerRef.current = globalThis.setTimeout(() => {
       completeDeparture(attempt)
@@ -506,27 +498,22 @@ function SwipeToReadNotification({
     setDissolveActive(false)
     departureCompletedRef.current = false
     readConfirmedRef.current = false
+    dismissOriginXRef.current = offsetRef.current
     const attempt = dismissalAttemptRef.current + 1
     dismissalAttemptRef.current = attempt
     void primeSandSnapshot()
+    // Begin the visual departure immediately. Persistence runs in parallel;
+    // collapse waits for both the animation and the server acknowledgement.
+    // This removes the visible "saving" pause without allowing a failed read
+    // acknowledgement to remove the row.
+    void startDisintegration(attempt)
     void onReadStart().then(confirmed => {
       if (!confirmed) throw new Error('Notification read acknowledgement was not confirmed.')
       if (attempt !== dismissalAttemptRef.current || dismissCompletedRef.current) return
       readConfirmedRef.current = true
-      void startDisintegration(attempt)
+      tryBeginCollapse()
     }).catch(() => restoreAfterReadFailure(attempt))
     settleAnimationRef.current?.stop()
-    if (motionPreference !== 'none') {
-      const savingOffset = Math.max(offsetRef.current, -Math.round(SWIPE_ACTION_WIDTH_PX * 0.42))
-      settleAnimationRef.current = animate(x, savingOffset, {
-        duration: motionPreference === 'full' ? 0.18 : 0.08,
-        ease: [0.22, 0.72, 0.24, 1],
-        onUpdate: latest => {
-          offsetRef.current = latest
-          surfaceRef.current?.setAttribute('data-swipe-offset', String(Math.round(latest)))
-        },
-      })
-    }
   }
 
   const finishGesture = (pointerId: number) => {
@@ -865,6 +852,7 @@ function SwipeToReadNotification({
         <NotificationSandDisintegration
           itemId={item.id}
           snapshot={sandSnapshot}
+          originX={dismissOriginXRef.current}
           onComplete={() => completeDeparture(dismissalAttemptRef.current)}
         />
       ) : showDust ? (

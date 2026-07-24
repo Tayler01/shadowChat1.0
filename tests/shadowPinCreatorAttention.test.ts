@@ -107,3 +107,26 @@ test('keeps a matching active server draft visible for recovery', async () => {
   await expect(hasCreatorDraftsNeedingAttention('user-1')).resolves.toBe(true)
   expect(mockClearCreatorLocalDraft).not.toHaveBeenCalled()
 })
+
+test('does not show the attention pill for an untouched server editing draft', async () => {
+  const limit = jest.fn().mockResolvedValue({
+    data: [{
+      id: 'blank-draft',
+      state: 'editing',
+      title: '',
+      description: '',
+      tags: [],
+      active_asset_id: null,
+      target_image_id: null,
+    }],
+    error: null,
+  })
+  const inFilter = jest.fn(() => ({ limit }))
+  const eqCreator = jest.fn(() => ({ in: inFilter }))
+  const select = jest.fn(() => ({ eq: eqCreator }))
+  mockGetWorkingClient.mockResolvedValue({
+    from: jest.fn(() => ({ select })),
+  })
+
+  await expect(hasCreatorDraftsNeedingAttention('user-1')).resolves.toBe(false)
+})

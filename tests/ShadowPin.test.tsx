@@ -2864,6 +2864,7 @@ test('ShadowPin radial menu opens Creator Studio for image owners', async () => 
       'comment',
       'open',
       'edit',
+      'delete',
     ])
 
     fireShadowPinPointer(imageCard!, 'pointermove', {
@@ -3518,7 +3519,7 @@ test('ShadowPin edit image keeps draft discard secondary to save and exit', asyn
 
     expect(screen.getByRole('heading', { name: /creator studio/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /save & exit/i })).toBeInTheDocument()
-    const discardButton = screen.getByRole('button', { name: /^discard$/i })
+    const discardButton = screen.getByRole('button', { name: /^cancel draft$/i })
     expect(discardButton).toHaveClass('text-red-300/75')
     expect(screen.queryByRole('button', { name: /delete shadowpin pin/i })).not.toBeInTheDocument()
   } finally {

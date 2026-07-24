@@ -20,10 +20,12 @@ function easeInOutCubic(progress: number) {
 export function NotificationSandDisintegration({
   itemId,
   snapshot,
+  originX = 0,
   onComplete,
 }: {
   itemId: string
   snapshot: NotificationSandSnapshot
+  originX?: number
   onComplete: () => void
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -80,6 +82,16 @@ export function NotificationSandDisintegration({
     const sourcePixels = sourceImage.data
     const remainingPixels = remainingImage.data
     const thresholds = createNotificationErosionThresholds(width, height)
+    const erosionBuckets: number[][] = Array.from({ length: 128 }, () => [])
+    for (let pixel = 0; pixel < thresholds.length; pixel += 1) {
+      const bucket = Math.min(
+        erosionBuckets.length - 1,
+        Math.max(0, Math.floor((thresholds[pixel] ?? 1) * erosionBuckets.length))
+      )
+      erosionBuckets[bucket]?.push((pixel * 4) + 3)
+    }
+    remainingPixels.set(sourcePixels)
+    remainingContext.putImageData(remainingImage, 0, 0)
     const particles = createNotificationSandParticles(
       sourcePixels,
       width,
@@ -92,6 +104,7 @@ export function NotificationSandDisintegration({
     let animationFrame = 0
     let startedAt = 0
     let completed = false
+    let lastClearedBucket = -1
 
     const complete = () => {
       if (completed) return
@@ -105,13 +118,19 @@ export function NotificationSandDisintegration({
       const erosionProgress = easeInOutCubic(rawProgress)
       outputCanvas.setAttribute('data-sand-progress', erosionProgress.toFixed(3))
 
-      remainingPixels.set(sourcePixels)
-      for (let pixel = 0; pixel < thresholds.length; pixel += 1) {
-        if ((thresholds[pixel] ?? 1) <= erosionProgress) {
-          remainingPixels[(pixel * 4) + 3] = 0
+      const targetBucket = Math.min(
+        erosionBuckets.length - 1,
+        Math.floor(erosionProgress * erosionBuckets.length)
+      )
+      if (targetBucket > lastClearedBucket) {
+        for (let bucket = lastClearedBucket + 1; bucket <= targetBucket; bucket += 1) {
+          for (const alphaOffset of erosionBuckets[bucket] ?? []) {
+            remainingPixels[alphaOffset] = 0
+          }
         }
+        lastClearedBucket = targetBucket
+        remainingContext.putImageData(remainingImage, 0, 0)
       }
-      remainingContext.putImageData(remainingImage, 0, 0)
 
       outputContext.setTransform(renderScale, 0, 0, renderScale, 0, 0)
       outputContext.clearRect(0, 0, outputWidth, outputHeight)
@@ -159,6 +178,7 @@ export function NotificationSandDisintegration({
       data-testid={`notification-disintegration-${itemId}`}
       data-notification-sand-effect="active"
       className="pointer-events-none absolute inset-0 z-[3] overflow-visible"
+      style={{ transform: `translate3d(${originX}px, 0, 0)` }}
       aria-hidden="true"
     >
       <canvas

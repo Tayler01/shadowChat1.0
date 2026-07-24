@@ -1,23 +1,26 @@
 # Phone Install Onboarding
 
-## Documentation Status - June 2, 2026
+## Documentation Status - July 24, 2026
 
-Reviewed during the June 2, 2026 invite/email auth rollout. This doc reflects the shipped phone-install tutorial and the current post-login onboarding behavior.
+Reviewed during the July 24 cross-platform recovery pass. This doc reflects the shipped phone-install tutorial and its new-account-only behavior.
 
 Shadow Chat is a mobile-first PWA. First-time phone users should see a short, silent setup tutorial after login so they know how to install the app and enable notifications.
 
 ## Product Behavior
 
-- `PhoneInstallOnboarding` opens once per user/browser on phone-like devices after the authenticated profile loads.
+- `PhoneInstallOnboarding` auto-opens only when that browser still has the pending marker written by successful account creation.
 - The tutorial does not auto-open if the app is already running in standalone/Home Screen mode.
+- The tutorial never auto-opens inside the native TestFlight/App Store shell.
 - Closing, skipping, finishing setup, or accepting the Android native install prompt marks the tutorial as seen for that user and onboarding version.
 - Settings keeps the same tutorial under `App Setup & User Guide` so users can replay it later.
 - The setup video is the main surface, plays silently without native controls, and is framed by the Shado border.
 - The written steps remain below the video for accessibility, failed media loads, and users who prefer scanning.
 - Notification Setup is a compact steps-and-actions modal; it no longer embeds the Android walkthrough video mid-flow.
-- Account creation can still mark setup as pending in local storage, but the current auto-open rule is first mobile post-login launch, not pending-only.
+- Established accounts that sign in again do not enter onboarding. They can still open the guide manually from Settings.
 
-The marker is local to the browser/device. A user who signs in on a new phone browser can see the tutorial there even if they already dismissed it elsewhere.
+The pending and seen markers are local to the browser/device. A new account can
+complete its first-run browser guide there; ordinary login on another device
+does not recreate that new-account marker.
 
 ## iPhone Flow
 
@@ -58,12 +61,14 @@ Use disposable, confirmed Supabase users for this flow. Do not replace or delete
 
 Recommended checks:
 
-1. Open a fresh phone-sized browser context for a user with no `shadowchat:phone-install-onboarding:v2` seen marker.
-2. Sign in and verify the setup tutorial modal opens after the profile loads.
+1. Create a disposable account in a fresh phone-sized browser context and verify signup writes the `shadowchat:phone-install-onboarding:v2` pending marker.
+2. Verify the setup tutorial opens after the new profile loads.
 3. Check iPhone and Android tabs, locked video playback, written steps, skip, and finish buttons.
 4. Confirm the modal does not auto-open again after dismissal.
 5. Confirm Settings > App Setup & User Guide can reopen the tutorial and Notification Setup, and that Notification Setup stays steps-first without an embedded video.
-6. Delete any temporary auth user and confirm its `public.users` row is gone.
+6. Sign in as an established account with no pending marker and verify the tutorial does not auto-open.
+7. Open the native shell and verify the tutorial never auto-opens there.
+8. Delete any temporary auth user and confirm its `public.users` row is gone.
 
 Useful references:
 

@@ -34,16 +34,35 @@ export async function hasCreatorDraftsNeedingAttention(userId: string) {
   const client = await getWorkingClient()
   const { data, error } = await client
     .from('shadow_pin_creator_drafts')
-    .select('id')
+    .select('id,state,title,description,tags,active_asset_id,target_image_id')
     .eq('creator_id', userId)
     .in('state', ATTENTION_DRAFT_STATES)
-    .limit(1)
+    .limit(25)
 
   if (error) throw error
+  type RemoteCreatorAttentionDraft = {
+    id: string
+    state: ShadowPinCreatorDraftState
+    title?: string | null
+    description?: string | null
+    tags?: string[] | null
+    active_asset_id?: string | null
+    target_image_id?: string | null
+  }
+  const activeDrafts = ((data ?? []) as RemoteCreatorAttentionDraft[]).filter(draft => (
+    draft.state !== 'editing' ||
+    Boolean(
+      draft.active_asset_id ||
+      draft.target_image_id ||
+      draft.title?.trim() ||
+      draft.description?.trim() ||
+      draft.tags?.length
+    )
+  ))
   if (localNeedsAttention && localDraft?.draftId) {
-    const localDraftIsActive = data?.some((draft: { id: string }) => draft.id === localDraft.draftId)
+    const localDraftIsActive = activeDrafts.some(draft => draft.id === localDraft.draftId)
     if (localDraftIsActive) return true
     clearCreatorLocalDraft(userId)
   }
-  return Boolean(data?.length)
+  return activeDrafts.length > 0
 }

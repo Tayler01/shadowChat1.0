@@ -183,8 +183,33 @@ export const validateUpload = (
   return mimeType
 }
 
-export const getUploadErrorMessage = (error: unknown, fallback: string) =>
-  error instanceof UploadValidationError ? error.message : fallback
+export const getUploadErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof UploadValidationError) return error.message
+  const message = error instanceof Error ? error.message.trim() : ''
+  const normalized = message.toLowerCase()
+  if (normalized.includes('maximum') || normalized.includes('too large')) {
+    return message || 'This file is too large to upload.'
+  }
+  if (
+    normalized.includes('network') ||
+    normalized.includes('fetch') ||
+    normalized.includes('timeout') ||
+    normalized.includes('connection')
+  ) {
+    return 'The upload was interrupted. Check your connection and try again.'
+  }
+  if (
+    normalized.includes('jwt') ||
+    normalized.includes('not authenticated') ||
+    normalized.includes('unauthorized')
+  ) {
+    return 'Your session needs to be refreshed. Reopen ShadowChat and try the upload again.'
+  }
+  if (normalized.includes('row-level security') || normalized.includes('forbidden')) {
+    return 'ShadowChat could not authorize this upload. Refresh the app and try again.'
+  }
+  return fallback
+}
 
 export const sanitizeUploadFileName = (name: string, fallback = 'attachment') => {
   const leafName = name.split(/[\\/]/).pop() || ''

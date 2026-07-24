@@ -31,6 +31,30 @@ Canonical detail and release gates live in:
 - [REALTIME_PUSH_NOTIFICATIONS_PLAN.md](C:/repos/chat2.0/docs/REALTIME_PUSH_NOTIFICATIONS_PLAN.md:1)
 - [DEPLOYMENT_GUIDE.md](C:/repos/chat2.0/docs/DEPLOYMENT_GUIDE.md:1)
 
+## July 24 Supabase-Outage Recovery Candidate
+
+- Direct public Supabase object URLs are now the durable default for chat,
+  avatar, and notification media. Persisted Image Transformation URLs are
+  canonicalized back to public-object URLs so an unavailable optional
+  transformation service cannot make successful uploads appear broken.
+- General Chat and DMs use the same upload path. Files over 6 MiB now use
+  Supabase's resumable upload endpoint with 6 MiB chunks and bounded retry;
+  smaller media retains the standard upload path.
+- ShadowPin creator videos no longer attach a fresh Bunny VideoId to an older
+  file-fingerprint upload. Draft discard and attention-state cleanup are
+  authoritative, and creator/operator Pin deletion is visible in both radial
+  controls and the immersive viewer.
+- Explicit empty DM unread state no longer falls back to an old read cursor.
+  Existing-account sign-in cannot trigger new-account onboarding, and the
+  native TestFlight/App Store shell never auto-opens that flow.
+- Catch-Up begins its disintegration at the actual swipe release position while
+  persistence completes in parallel, then reflows only after both succeed.
+- iOS Build `15` canonicalizes Supabase notification attachment URLs before the
+  Notification Service Extension downloads ShadowPin media or actor avatars.
+- Required rollout order: linked migration and notification worker, verified
+  `main`/Netlify production deploy, then signed TestFlight Build `15` and
+  physical upload/DM/Pin/rich-notification acceptance.
+
 ## July 20 Build 13 Rich Notification Presentation Candidate
 
 - The candidate fixes generic native alerts at their source: notification

@@ -188,6 +188,12 @@ describe('notification envelope v2', () => {
       expect(normalizeNotificationDeliveryMediaUrl(candidate)).toBeNull()
       expect(normalizeNativeNotificationMediaUrl(candidate)).toBeNull()
     }
+
+    expect(normalizeNotificationDeliveryMediaUrl(
+      'https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/render/image/public/avatars/user/avatar.jpg?width=240&quality=82'
+    )).toBe(
+      'https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/avatars/user/avatar.jpg'
+    )
   })
 
   test('validates golden web and Edge envelopes against the executable JSON schema', () => {

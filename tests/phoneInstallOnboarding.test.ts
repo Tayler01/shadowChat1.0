@@ -9,6 +9,7 @@ import {
 const profile = {
   id: 'user-1',
   email: 'NewUser@Example.com',
+  created_at: new Date().toISOString(),
 }
 
 beforeEach(() => {
@@ -29,9 +30,19 @@ test('shows onboarding when signup marked the account pending by user id', () =>
   expect(shouldShowPhoneInstallOnboarding(profile, false, true)).toBe(true)
 })
 
-test('shows onboarding on first post-login mobile launch even without a pending signup marker', () => {
+test('does not show onboarding to an established account without a signup marker', () => {
   expect(hasPhoneInstallOnboardingPending(profile)).toBe(false)
-  expect(shouldShowPhoneInstallOnboarding(profile, false, true)).toBe(true)
+  expect(shouldShowPhoneInstallOnboarding(profile, false, true)).toBe(false)
+})
+
+test('ignores a legacy pending flag that was not tied to this signup', () => {
+  window.localStorage.setItem(
+    'shadowchat:phone-install-onboarding:pending-user:v2:user-1',
+    '1'
+  )
+
+  expect(hasPhoneInstallOnboardingPending(profile)).toBe(false)
+  expect(shouldShowPhoneInstallOnboarding(profile, false, true)).toBe(false)
 })
 
 test('does not show onboarding after the account has seen it', () => {

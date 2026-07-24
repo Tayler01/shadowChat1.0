@@ -8,3 +8,5 @@ export const VITE_APP_DEPLOY_CONTEXT = import.meta.env.VITE_APP_DEPLOY_CONTEXT
 export const VITE_APP_IS_PROD = import.meta.env.PROD
 export const VITE_APP_MODE = import.meta.env.MODE
 export const VITE_SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN
+export const VITE_SUPABASE_IMAGE_TRANSFORMS_ENABLED =
+  import.meta.env.VITE_SUPABASE_IMAGE_TRANSFORMS_ENABLED

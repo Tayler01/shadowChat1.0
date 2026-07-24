@@ -719,8 +719,14 @@ export function ShadowPinCreatorStudio({
   const discard = async () => {
     if (!window.confirm('Discard this ShadowPin draft and its staged media?')) return
     uploadAbortRef.current?.abort()
-    if (state.draft) {
-      try { await deleteCreatorDraft(state.draft, asset) } catch (error) {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current)
+      saveTimerRef.current = null
+    }
+    await flushCurrentDraft()
+    const currentDraft = stateRef.current.draft
+    if (currentDraft) {
+      try { await deleteCreatorDraft(currentDraft, asset) } catch (error) {
         dispatch({ type: 'operation', operation: 'failed', error: error instanceof Error ? error.message : 'Unable to discard draft.' })
         return
       }
@@ -935,7 +941,7 @@ export function ShadowPinCreatorStudio({
 
         <footer className="z-10 shrink-0 border-t border-[var(--border-panel)] bg-[rgba(5,6,8,0.96)] px-3 pb-[calc(env(safe-area-inset-bottom)_+_0.45rem)] pt-2 backdrop-blur-md" data-testid="creator-studio-footer">
           <div className="mx-auto flex max-w-3xl items-center gap-2">
-            {stepIndex > 0 ? <Button type="button" variant="secondary" onClick={() => void goTo(CREATOR_STEPS[stepIndex - 1])} disabled={busy}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button> : <button type="button" onClick={() => void discard()} disabled={busy} className="min-h-11 px-3 text-sm text-red-300/75">Discard</button>}
+            {stepIndex > 0 ? <Button type="button" variant="secondary" onClick={() => void goTo(CREATOR_STEPS[stepIndex - 1])} disabled={busy}><ArrowLeft className="mr-1 h-4 w-4" /> Back</Button> : <button type="button" onClick={() => void discard()} disabled={busy} className="min-h-11 px-3 text-sm text-red-300/75">Cancel draft</button>}
             <div className="min-w-0 flex-1 text-center text-xs text-[var(--text-muted)]" aria-live="polite">{statusLabel(state.operation)}{state.operation === 'uploading' && state.progress > 0 ? ` ${state.progress}%` : ''}</div>
             {stepIndex < CREATOR_STEPS.length - 1 && <Button type="button" onClick={() => void goTo(CREATOR_STEPS[stepIndex + 1])} disabled={busy}>Continue <ArrowRight className="ml-1 h-4 w-4" /></Button>}
           </div>

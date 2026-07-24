@@ -3,7 +3,8 @@ import type { AuthenticatedUser } from './supabase'
 const STORAGE_PREFIX = 'shadowchat:phone-install-onboarding'
 export const PHONE_INSTALL_ONBOARDING_VERSION = 'v2'
 
-type PhoneInstallProfile = Pick<AuthenticatedUser, 'id' | 'email'>
+type PhoneInstallProfile = Pick<AuthenticatedUser, 'id' | 'email' | 'created_at'>
+const SIGNUP_MARKER_MATCH_WINDOW_MS = 30 * 60 * 1000
 
 const normalizeEmail = (email?: string | null) => email?.trim().toLowerCase() || ''
 
@@ -38,13 +39,14 @@ export const markPhoneInstallOnboardingPending = (
   }
 
   const normalizedEmail = normalizeEmail(email)
+  const createdAt = new Date().toISOString()
 
   try {
     if (userId) {
-      storage.setItem(pendingUserKey(userId), '1')
+      storage.setItem(pendingUserKey(userId), createdAt)
     }
     if (normalizedEmail) {
-      storage.setItem(pendingEmailKey(normalizedEmail), '1')
+      storage.setItem(pendingEmailKey(normalizedEmail), createdAt)
     }
   } catch {
     // localStorage can be blocked in private modes; onboarding still remains optional.
@@ -92,10 +94,13 @@ export const hasPhoneInstallOnboardingPending = (profile: PhoneInstallProfile) =
   const normalizedEmail = normalizeEmail(profile.email)
 
   try {
-    return Boolean(
-      storage.getItem(pendingUserKey(profile.id)) ||
-      (normalizedEmail && storage.getItem(pendingEmailKey(normalizedEmail)))
-    )
+    const marker = storage.getItem(pendingUserKey(profile.id)) ||
+      (normalizedEmail ? storage.getItem(pendingEmailKey(normalizedEmail)) : null)
+    const markerTime = marker ? Date.parse(marker) : Number.NaN
+    const accountTime = Date.parse(profile.created_at)
+    return Number.isFinite(markerTime) &&
+      Number.isFinite(accountTime) &&
+      Math.abs(markerTime - accountTime) <= SIGNUP_MARKER_MATCH_WINDOW_MS
   } catch {
     return false
   }
@@ -110,5 +115,7 @@ export const shouldShowPhoneInstallOnboarding = (
     return false
   }
 
-  return true
+  // Signup is the only automatic entry point. Existing accounts that sign in
+  // again (or on another device) must not be treated as newly created.
+  return hasPhoneInstallOnboardingPending(profile)
 }

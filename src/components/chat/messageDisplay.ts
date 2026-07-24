@@ -59,10 +59,10 @@ export const getImageMessageDisplaySrc = (
   fileUrl?: string | null,
   thumbnailUrl?: string | null
 ) => {
-  if (thumbnailUrl) return thumbnailUrl
-  if (!fileUrl) return ''
+  const sourceUrl = thumbnailUrl || fileUrl
+  if (!sourceUrl) return ''
 
-  return getSupabaseImageTransformUrl(fileUrl, {
+  return getSupabaseImageTransformUrl(sourceUrl, {
     width: IMAGE_THUMBNAIL_DISPLAY_WIDTH,
     height: IMAGE_THUMBNAIL_DISPLAY_HEIGHT,
     resize: 'contain',

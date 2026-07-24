@@ -19,7 +19,7 @@ describe('member reporting entry points', () => {
 
   test('ShadowPin posts preserve dormant Report wiring while the feature flag removes it from the radial control', () => {
     const content = source('src/features/shadow-pin/ShadowPin.tsx')
-    expect(content).toContain("type PinQuickAction = 'heart' | 'share' | 'comment' | 'open' | 'edit' | 'report'")
+    expect(content).toContain("type PinQuickAction = 'heart' | 'share' | 'comment' | 'open' | 'edit' | 'delete' | 'report'")
     expect(content).toContain("pinArcAction('report', 'Report'")
     expect(content).toContain("type: 'shadow_pin_image'")
     expect(content).toContain("if (action === 'report')")

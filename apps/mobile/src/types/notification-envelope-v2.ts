@@ -238,6 +238,13 @@ export const normalizeNativeNotificationMediaUrl = (value: unknown) => {
       isUnsafeNotificationMediaHostname(hostname) ||
       !approved
     ) return null;
+    if (parsed.pathname.startsWith('/storage/v1/render/image/public/')) {
+      parsed.pathname = parsed.pathname.replace(
+        '/storage/v1/render/image/public/',
+        '/storage/v1/object/public/'
+      );
+      parsed.search = '';
+    }
     return parsed.href;
   } catch {
     return null;
