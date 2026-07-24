@@ -51,7 +51,7 @@
     "doctor": "expo-doctor"
   },
   "overrides": {
-    "postcss": "8.5.16",
+    "postcss": "8.5.23",
     "uuid": "11.1.1"
   },
   "expo": {
