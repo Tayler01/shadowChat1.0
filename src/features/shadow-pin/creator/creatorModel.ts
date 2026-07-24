@@ -57,6 +57,7 @@ export type ShadowPinCreatorAction =
   | { type: 'set-step'; step: ShadowPinCreatorStep }
   | { type: 'operation'; operation: CreatorOperation; error?: string | null; progress?: number }
   | { type: 'draft-saved'; draft: ShadowPinCreatorDraft; savedRevision: number }
+  | { type: 'draft-status-synced'; draft: ShadowPinCreatorDraft }
   | { type: 'publish-confirmed'; confirmed: boolean }
   | { type: 'reset'; categoryId?: string; targetImageId?: string | null }
 
@@ -236,6 +237,14 @@ export const creatorReducer = (
           ? state.updatedAt
           : action.draft.updatedAt || state.updatedAt,
         error: null,
+      }
+    case 'draft-status-synced':
+      return {
+        ...state,
+        draft: action.draft,
+        updatedAt: state.dirtyRevision > state.savedRevision
+          ? state.updatedAt
+          : action.draft.updatedAt || state.updatedAt,
       }
     case 'publish-confirmed':
       return { ...state, publishConfirmed: action.confirmed }

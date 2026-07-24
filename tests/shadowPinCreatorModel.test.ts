@@ -86,6 +86,33 @@ describe('ShadowPin Creator Studio model', () => {
     expect(reset.clientMutationId).not.toBe(state.clientMutationId)
   })
 
+  test('keeps an in-flight publish locked while only provider status is synchronized', () => {
+    const original = {
+      id: 'draft-1', creatorId: 'user-1', categoryId: 'category-1', targetImageId: null,
+      clientMutationId: 'mutation-1', sourceKind: 'video_upload' as const, title: 'Video',
+      description: '', tags: [], state: 'processing' as const, revision: 4, activeAssetId: 'asset-1',
+      publishedImageId: null, publishIdempotencyKey: 'publish-1', lastErrorCode: null,
+      lastErrorMessage: null, expiresAt: null, createdAt: '2026-07-24T00:00:00Z',
+      updatedAt: '2026-07-24T00:00:00Z', publishedAt: null,
+    }
+    let state = creatorReducer(createInitialCreatorState(), {
+      type: 'restored',
+      values: { title: 'Video' },
+      draft: original,
+    })
+    state = creatorReducer(state, { type: 'operation', operation: 'processing' })
+    const synced = {
+      ...original,
+      state: 'ready' as const,
+      updatedAt: '2026-07-24T00:01:00Z',
+    }
+    state = creatorReducer(state, { type: 'draft-status-synced', draft: synced })
+
+    expect(state.draft).toEqual(synced)
+    expect(state.operation).toBe('processing')
+    expect(state.savedRevision).toBe(4)
+  })
+
   test('validates only the requirements reached by each stage', () => {
     const values = createInitialCreatorState().values
 

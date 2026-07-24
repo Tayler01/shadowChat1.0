@@ -46,6 +46,10 @@ Canonical detail and release gates live in:
   prefills and edit receipts whose canonical Pin was deleted, while preserving
   real unsynced metadata or media changes. Creator/operator Pin deletion is
   visible in both radial controls and the immersive viewer.
+- Native Creator Studio uploads now map Bunny's complete status contract
+  correctly, including finished status `3`, and automatically refresh while
+  encoding. Publish waits through bounded status checks instead of immediately
+  presenting normal provider processing as a failed draft.
 - Explicit empty DM unread state no longer falls back to an old read cursor.
   Existing-account sign-in cannot trigger new-account onboarding, and the
   native TestFlight/App Store shell never auto-opens that flow.

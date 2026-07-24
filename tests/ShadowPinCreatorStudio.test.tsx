@@ -11,6 +11,7 @@ const mockCreateCreatorDraft = jest.fn()
 const mockUpdateCreatorDraft = jest.fn()
 const mockStageCreatorDraftMedia = jest.fn()
 const mockPublishCreatorDraft = jest.fn()
+const mockSyncCreatorDraftStatus = jest.fn()
 const mockListCreatorDrafts = jest.fn()
 const mockLoadCreatorLocalDraft = jest.fn()
 const mockSaveCreatorLocalDraft = jest.fn()
@@ -66,7 +67,7 @@ jest.mock('../src/features/shadow-pin/creator/creatorApi', () => ({
   listCreatorDrafts: (...args: unknown[]) => mockListCreatorDrafts(...args),
   deleteCreatorDraft: jest.fn(),
   inspectCreatorVideoFile: jest.fn(),
-  syncCreatorDraftStatus: jest.fn(),
+  syncCreatorDraftStatus: (...args: unknown[]) => mockSyncCreatorDraftStatus(...args),
 }))
 
 const draft = (
@@ -135,6 +136,7 @@ beforeEach(() => {
   mockCreateCreatorDraft.mockResolvedValue({ draft: draft(1, 'editing'), asset: null })
   mockUpdateCreatorDraft.mockResolvedValue({ draft: draft(3, 'publish_ready'), asset: readyAsset })
   mockStageCreatorDraftMedia.mockResolvedValue({ draft: draft(2, 'publish_ready'), asset: readyAsset })
+  mockSyncCreatorDraftStatus.mockResolvedValue({ draft: draft(3, 'publish_ready'), asset: readyAsset })
   mockPublishCreatorDraft.mockResolvedValue({
     draft: { ...draft(4, 'published'), publishedImageId: 'pin-1' },
     image: publishedImage,
@@ -325,6 +327,49 @@ test('moves through Preview and requires explicit confirmation before publishing
   expect(mockPublishCreatorDraft).toHaveBeenCalledWith(expect.objectContaining({ id: 'draft-1' }), readyAsset)
   expect(mockClearCreatorLocalDraft).toHaveBeenCalledWith('user-1')
   expect(onClose).toHaveBeenCalledTimes(1)
+})
+
+test('explains normal video encoding on the Publish screen while automatic checks continue', async () => {
+  const processingAsset: ShadowPinCreatorAsset = {
+    ...readyAsset,
+    assetKind: 'video',
+    provider: 'bunny_stream',
+    state: 'processing',
+    mimeType: 'video/quicktime',
+    previewUrl: null,
+    providerAssetId: 'bunny-video-1',
+  }
+  mockStageCreatorDraftMedia.mockResolvedValue({
+    draft: draft(2, 'processing'),
+    asset: processingAsset,
+  })
+  mockSyncCreatorDraftStatus.mockResolvedValue({
+    draft: draft(2, 'processing'),
+    asset: processingAsset,
+  })
+
+  render(
+    <ShadowPinCreatorStudio
+      open
+      initialCategoryId="category-1"
+      initialMediaUrl="https://example.com/video.mp4"
+      initialTitle="Encoding video"
+      onClose={jest.fn()}
+      onPublished={jest.fn()}
+    />
+  )
+
+  await waitFor(() => expect(screen.getByLabelText(/public media url/i)).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+  })
+  await waitFor(() => expect(screen.getByTestId('creator-step-preview')).toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button', { name: /continue/i }))
+
+  expect(await screen.findByRole('status')).toHaveTextContent('Finishing your video')
+  expect(screen.getByRole('status')).toHaveTextContent('checks automatically')
+  expect(screen.queryByText(/Media is still processing/i)).not.toBeInTheDocument()
 })
 
 test('reopens a mounted Studio without leaking the previous create session', async () => {

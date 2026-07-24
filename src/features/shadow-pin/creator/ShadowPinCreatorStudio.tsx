@@ -62,6 +62,11 @@ import {
   replaceCreatorStudioHistory,
   requestCreatorStudioClose,
 } from './creatorHistory'
+import {
+  CREATOR_PROCESSING_POLL_INTERVAL_MS,
+  isCreatorAssetReady,
+  refreshCreatorAssetUntilSettled,
+} from './creatorProcessing'
 
 export type ShadowPinCreatorStudioProps = {
   open: boolean
@@ -85,10 +90,6 @@ const sourceKey = (values: ReturnType<typeof createInitialCreatorState>['values'
   url: values.sourceUrl.trim(),
   file: values.fileFingerprint,
 })
-
-const isAssetReady = (asset: ShadowPinCreatorAsset | null) => (
-  asset?.state === 'ready' || asset?.state === 'publish_ready'
-)
 
 const statusLabel = (operation: ReturnType<typeof createInitialCreatorState>['operation']) => ({
   idle: '',
@@ -208,6 +209,10 @@ export function ShadowPinCreatorStudio({
   const previewRequestTokenRef = useRef(0)
   const closeInFlightRef = useRef(false)
   const closeRequestTokenRef = useRef(0)
+  const processingSyncRef = useRef<{
+    draftId: string
+    request: Promise<ShadowPinCreatorDraftBundle>
+  } | null>(null)
   const popstateCloseRef = useRef<() => void>(() => undefined)
   const focusedEditorRef = useRef<HTMLElement | null>(null)
   const scrollRegionRef = useRef<HTMLElement | null>(null)
@@ -270,6 +275,31 @@ export function ShadowPinCreatorStudio({
     dispatch(action)
   }, [])
 
+  const refreshProcessingDraft = useCallback((draft: ShadowPinCreatorDraftBundle['draft']) => {
+    const inFlight = processingSyncRef.current
+    if (inFlight?.draftId === draft.id) return inFlight.request
+
+    const request = syncCreatorDraftStatus(draft)
+      .then(bundle => {
+        const current = stateRef.current
+        if (current.draft?.id !== draft.id) return bundle
+        setAsset(previous => bundle.asset ?? previous)
+        applyAsyncAction({
+          type: 'draft-status-synced',
+          draft: bundle.draft,
+        })
+        return bundle
+      })
+      .finally(() => {
+        if (processingSyncRef.current?.request === request) {
+          processingSyncRef.current = null
+        }
+      })
+
+    processingSyncRef.current = { draftId: draft.id, request }
+    return request
+  }, [applyAsyncAction])
+
   useEffect(() => {
     if (open) return
     restoredRef.current = false
@@ -280,6 +310,7 @@ export function ShadowPinCreatorStudio({
     closeInFlightRef.current = false
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
+    processingSyncRef.current = null
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current)
     saveTimerRef.current = null
     savePromiseRef.current = null
@@ -589,6 +620,27 @@ export function ShadowPinCreatorStudio({
     }
   }, [draftSwitching, open, recoveryPending, saveNow, state.dirtyRevision, state.operation, state.savedRevision, state.values.categoryId, state.values.fileFingerprint, state.values.keepExistingMedia, state.values.sourceMode, state.values.sourceUrl])
 
+  useEffect(() => {
+    if (!open || !state.draft?.id || asset?.state !== 'processing') return
+    let cancelled = false
+    const poll = () => {
+      if (cancelled || document.visibilityState === 'hidden') return
+      const currentDraft = stateRef.current.draft
+      if (!currentDraft || stateRef.current.operation === 'uploading' || stateRef.current.operation === 'publishing') return
+      void refreshProcessingDraft(currentDraft).catch(() => {
+        // Automatic polling is best effort. The explicit status button and
+        // Publish action surface provider/network errors to the member.
+      })
+    }
+    const initialTimer = window.setTimeout(poll, 1_500)
+    const interval = window.setInterval(poll, CREATOR_PROCESSING_POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      window.clearTimeout(initialTimer)
+      window.clearInterval(interval)
+    }
+  }, [asset?.state, open, refreshProcessingDraft, state.draft?.id])
+
   const stageMedia = useCallback(async () => {
     // Staging is revision guarded on the server. Drain any in-flight or
     // scheduled metadata save first so the media request cannot race a newer
@@ -602,12 +654,10 @@ export function ShadowPinCreatorStudio({
     const currentValues = current.values
     const currentKey = sourceKey(currentValues)
     if (currentValues.keepExistingMedia && asset) {
-      if (isAssetReady(asset)) return { draft: bundle.draft, asset: bundle.asset ?? asset }
-      const synced = await syncCreatorDraftStatus(bundle.draft)
-      setAsset(current => synced.asset ?? current)
-      return synced
+      if (isCreatorAssetReady(asset)) return { draft: bundle.draft, asset: bundle.asset ?? asset }
+      return refreshProcessingDraft(bundle.draft)
     }
-    if (isAssetReady(asset) && stagedSourceKeyRef.current === currentKey) return { draft: bundle.draft, asset }
+    if (isCreatorAssetReady(asset) && stagedSourceKeyRef.current === currentKey) return { draft: bundle.draft, asset }
     uploadAbortRef.current?.abort()
     const controller = new AbortController()
     uploadAbortRef.current = controller
@@ -629,7 +679,7 @@ export function ShadowPinCreatorStudio({
     } finally {
       if (uploadAbortRef.current === controller) uploadAbortRef.current = null
     }
-  }, [applyAsyncAction, asset, flushCurrentDraft])
+  }, [applyAsyncAction, asset, flushCurrentDraft, refreshProcessingDraft])
 
   const openAvailableDraft = async (bundle: ShadowPinCreatorDraftBundle) => {
     if (bundle.draft.id === stateRef.current.draft?.id || draftSwitching) return
@@ -743,9 +793,8 @@ export function ShadowPinCreatorStudio({
     if (!state.draft) return
     dispatch({ type: 'operation', operation: 'processing', error: null })
     try {
-      const bundle = await syncCreatorDraftStatus(state.draft)
-      setAsset(current => bundle.asset ?? current)
-      applyAsyncAction({ type: 'draft-saved', draft: bundle.draft, savedRevision: state.dirtyRevision })
+      await refreshProcessingDraft(state.draft)
+      dispatch({ type: 'operation', operation: 'saved', error: null })
     } catch (error) {
       dispatch({ type: 'operation', operation: 'failed', error: error instanceof Error ? error.message : 'Unable to refresh processing.' })
     }
@@ -760,11 +809,16 @@ export function ShadowPinCreatorStudio({
     let bundle: ShadowPinCreatorDraftBundle
     try {
       bundle = await stageMedia()
-      if (!isAssetReady(bundle.asset)) {
-        bundle = await syncCreatorDraftStatus(bundle.draft)
-        setAsset(current => bundle.asset ?? current)
+      if (!isCreatorAssetReady(bundle.asset)) {
+        dispatch({ type: 'operation', operation: 'processing', error: null })
+        bundle = await refreshCreatorAssetUntilSettled(bundle, refreshProcessingDraft)
       }
-      if (!isAssetReady(bundle.asset)) throw new Error('Media is still processing. Refresh its status before publishing.')
+      if (bundle.asset?.state === 'failed') {
+        throw new Error(bundle.asset.errorMessage || 'Bunny Stream could not process this video.')
+      }
+      if (!isCreatorAssetReady(bundle.asset)) {
+        throw new Error('This video is still encoding. Creator Studio will keep checking automatically; you can keep this screen open or Save & exit and return shortly.')
+      }
       dispatch({ type: 'operation', operation: 'publishing', error: null })
       const result = await publishCreatorDraft(bundle.draft, bundle.asset)
       dispatch({ type: 'operation', operation: 'published', progress: 100 })
@@ -921,7 +975,7 @@ export function ShadowPinCreatorStudio({
               <section className="space-y-5" aria-labelledby="creator-preview-title">
                 <div><h2 id="creator-preview-title" className="text-2xl font-semibold">Preview your Pin</h2><p className="mt-1 text-sm text-[var(--text-muted)]">This is how the media and details will feel in ShadowPin.</p></div>
                 <div className="mx-auto max-w-lg rounded-[var(--radius-xl)] border border-[var(--border-panel)] bg-white/[0.025] p-3 shadow-[var(--shadow-panel)]"><MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={previewAsset} title={state.values.title} discoveredPreviewUrl={discoveredPreviewUrl} discoveringPreview={discoveringPreview} /><div className="p-2 pt-4"><h3 className="text-xl font-semibold">{state.values.title}</h3>{state.values.description && <p className="mt-2 whitespace-pre-line text-sm leading-6 text-[var(--text-secondary)]">{state.values.description}</p>}<div className="mt-3 flex flex-wrap gap-2">{state.values.tags.map(tag => <span key={tag} className="rounded-full border border-[var(--border-subtle)] px-2.5 py-1 text-xs text-[var(--text-muted)]">#{tag}</span>)}</div></div></div>
-                {asset && !isAssetReady(asset) && <button type="button" onClick={() => void retryProcessing()} className="mx-auto flex min-h-11 items-center gap-2 rounded-full border border-[var(--theme-accent-border-soft)] px-4 text-sm text-[var(--theme-accent-readable)]"><RotateCcw className="h-4 w-4" /> Refresh processing status</button>}
+                {asset && !isCreatorAssetReady(asset) && <button type="button" onClick={() => void retryProcessing()} className="mx-auto flex min-h-11 items-center gap-2 rounded-full border border-[var(--theme-accent-border-soft)] px-4 text-sm text-[var(--theme-accent-readable)]"><RotateCcw className="h-4 w-4" /> Check processing now</button>}
               </section>
             )}
 
@@ -929,8 +983,14 @@ export function ShadowPinCreatorStudio({
               <section className="space-y-5" aria-labelledby="creator-publish-title">
                 <div><h2 id="creator-publish-title" className="text-2xl font-semibold">Ready for the spotlight?</h2><p className="mt-1 text-sm text-[var(--text-muted)]">Publishing makes this Pin visible and may notify members who follow ShadowPin updates.</p></div>
                 <div className="grid gap-4 rounded-[var(--radius-xl)] border border-[var(--border-panel)] bg-white/[0.025] p-4 sm:grid-cols-[9rem,1fr]"><MediaPreview objectUrl={objectUrl} sourceUrl={state.values.sourceUrl} fileType={previewFileType} asset={previewAsset} title={state.values.title} discoveredPreviewUrl={discoveredPreviewUrl} discoveringPreview={discoveringPreview} /><div><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--theme-accent-readable)]">{categoriesState.categories.find(category => category.id === state.values.categoryId)?.title || 'ShadowPin'}</p><h3 className="mt-1 text-xl font-semibold">{state.values.title}</h3><p className="mt-2 text-sm text-[var(--text-secondary)]">{state.values.description || 'No description'}</p></div></div>
+                {asset?.state === 'processing' && (
+                  <div className="flex items-start gap-3 rounded-[var(--radius-md)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] p-3 text-sm text-[var(--text-secondary)]" role="status">
+                    <Loader2 className={cn('mt-0.5 h-4 w-4 shrink-0 text-[var(--theme-accent-readable)]', !isReducedMotion && 'animate-spin')} />
+                    <span><strong className="block text-[var(--text-primary)]">Finishing your video</strong>Bunny is encoding it now. Creator Studio checks automatically, and it is safe to Save &amp; exit while it finishes.</span>
+                  </div>
+                )}
                 <label className="flex cursor-pointer items-start gap-3 rounded-[var(--radius-lg)] border border-[var(--theme-accent-border-soft)] bg-[var(--theme-accent-softer)] p-4"><input type="checkbox" checked={state.publishConfirmed} onChange={event => dispatch({ type: 'publish-confirmed', confirmed: event.target.checked })} className="mt-1 h-5 w-5 accent-[var(--theme-accent)]" /><span><span className="block font-semibold">I am ready to publish this Pin</span><span className="mt-1 block text-sm text-[var(--text-muted)]">I reviewed the media, category, title, and description.</span></span></label>
-                <Button type="button" size="lg" className="w-full" loading={state.operation === 'publishing'} disabled={!state.publishConfirmed || busy} onClick={() => void publish()}><Check className="mr-2 h-5 w-5" /> Publish Pin</Button>
+                <Button type="button" size="lg" className="w-full" loading={state.operation === 'processing' || state.operation === 'publishing'} disabled={!state.publishConfirmed || busy} onClick={() => void publish()}><Check className="mr-2 h-5 w-5" /> Publish Pin</Button>
               </section>
             )}
             </fieldset>

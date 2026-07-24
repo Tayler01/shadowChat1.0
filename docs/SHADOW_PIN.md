@@ -241,6 +241,13 @@ non-owners only see ready video pins.
 Every new Bunny upload session is bound to the fresh server-created VideoId.
 The client retries within that exact session and does not resume a file-based
 tus fingerprint from an older Pin, which would leave the new asset empty.
+Creator Studio treats Bunny status `3` (finished) and status `4` (resolution
+finished/playable) as publish-ready, and treats both provider failure statuses
+as terminal failures. While a native upload is encoding, the phone UI checks
+its draft status automatically every eight seconds. A Publish attempt performs
+a bounded sequence of faster checks before explaining that the member can
+safely save and return; it does not turn normal transcoding into a stuck-draft
+error after one request.
 Creator-draft discard is server-authoritative: successful draft abandonment
 clears local recovery state even when best-effort provider or Storage cleanup
 must be retried later. Untouched blank editing drafts do not produce the

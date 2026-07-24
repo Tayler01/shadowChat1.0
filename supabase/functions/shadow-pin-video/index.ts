@@ -12,6 +12,7 @@ import {
   readLimitedArrayBuffer,
   safeFetch,
 } from '../_shared/safe-fetch.ts'
+import { getBunnyStreamReadyState } from '../_shared/bunny-stream-status.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -1435,27 +1436,6 @@ const handleCompleteUpload = async (req: Request, body: VideoPayload) => {
   return json({ ok: true, image: data })
 }
 
-const getBunnyReadyState = (payload: Record<string, unknown>) => {
-  const status = payload.status
-  const statusText = String(payload.status ?? payload.statusText ?? payload.state ?? '').toLowerCase()
-  const encodeProgress = Number(payload.encodeProgress ?? payload.encodingProgress ?? payload.progress ?? NaN)
-  const availableResolutions = payload.availableResolutions
-  const ready = (
-    status === 4 ||
-    statusText.includes('finished') ||
-    statusText.includes('ready') ||
-    encodeProgress >= 100 ||
-    (typeof availableResolutions === 'string' && availableResolutions.trim().length > 0)
-  )
-  const failed = (
-    status === 5 ||
-    statusText.includes('fail') ||
-    statusText.includes('error')
-  )
-
-  return { ready, failed, encodeProgress: Number.isFinite(encodeProgress) ? encodeProgress : null }
-}
-
 const handleSyncStatus = async (req: Request, body: VideoPayload) => {
   const auth = await authenticate(req)
   if ('error' in auth) return auth.error
@@ -1470,7 +1450,7 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
 
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
   const bunnyStatus = await getBunnyVideo(libraryId, apiKey, pin.provider_asset_id)
-  const state = getBunnyReadyState(bunnyStatus)
+  const state = getBunnyStreamReadyState(bunnyStatus)
   const playback = buildBunnyPlaybackUrls(libraryId, pin.provider_asset_id, pullZoneUrl, bunnyStatus.availableResolutions)
   const duration = normalizeNonNegativeInteger(
     bunnyStatus.length ?? bunnyStatus.duration ?? bunnyStatus.durationSeconds
@@ -2076,7 +2056,7 @@ const handleSyncDraftStatus = async (req: Request, body: VideoPayload) => {
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'sync-draft-status')
   const { libraryId, apiKey } = getBunnyEnv()
   const bunnyStatus = await getBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
-  const providerState = getBunnyReadyState(bunnyStatus)
+  const providerState = getBunnyStreamReadyState(bunnyStatus)
   const duration = normalizeNonNegativeInteger(bunnyStatus.length ?? bunnyStatus.duration ?? bunnyStatus.durationSeconds)
   const tooLong = duration !== null && duration > MAX_VIDEO_SECONDS
   const state = providerState.failed || tooLong ? 'failed' : providerState.ready ? 'ready' : 'processing'
@@ -2146,7 +2126,7 @@ const handlePublishDraftVideo = async (req: Request, body: VideoPayload) => {
   if (draft.state !== 'published') {
     const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
     const bunnyStatus = await getBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
-    const providerState = getBunnyReadyState(bunnyStatus)
+    const providerState = getBunnyStreamReadyState(bunnyStatus)
     const duration = normalizeNonNegativeInteger(
       bunnyStatus.length ?? bunnyStatus.duration ?? bunnyStatus.durationSeconds,
     )
