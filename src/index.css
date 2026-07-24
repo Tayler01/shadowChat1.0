@@ -1186,6 +1186,7 @@ html, body, #root {
   height: 0;
   width: 0;
   filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.38));
+  isolation: isolate;
 }
 
 .shadow-pin-radial-thumb-dot {
@@ -1233,6 +1234,113 @@ html, body, #root {
   border-color: rgba(255, 255, 255, 0.42);
   color: #fff9f9;
   transform: translate(-50%, -50%) scale(1.12);
+}
+
+.shadow-pin-radial-menu--spin-reveal .shadow-pin-radial-thumb-dot {
+  z-index: 4;
+}
+
+.shadow-pin-radial-origin-aperture {
+  position: absolute;
+  z-index: 1;
+  height: 3.45rem;
+  width: 3.45rem;
+  border: 1px solid rgba(var(--theme-accent-strong-rgb), 0.4);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 14px rgba(var(--theme-accent-strong-rgb), 0.18),
+    0 0 18px rgba(255, 77, 95, 0.12),
+    0 0 28px rgba(var(--theme-accent-strong-rgb), 0.12);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.62) rotate(-12deg);
+  animation: shadow-pin-radial-aperture var(--shadow-pin-radial-total-duration) var(--ease-premium) both;
+}
+
+.shadow-pin-radial-origin-aperture::before,
+.shadow-pin-radial-origin-aperture::after {
+  content: '';
+  position: absolute;
+  inset: 0.24rem;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 246, 214, 0.18);
+}
+
+.shadow-pin-radial-origin-aperture::after {
+  inset: 0.62rem;
+  border-color: rgba(255, 77, 95, 0.18);
+  transform: rotate(28deg);
+}
+
+.shadow-pin-radial-origin-wash {
+  position: absolute;
+  z-index: 2;
+  height: 5.75rem;
+  width: 5.75rem;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.72), transparent 15%),
+    radial-gradient(circle at 44% 54%, rgba(245, 207, 116, 0.68), transparent 36%),
+    radial-gradient(circle at 62% 42%, rgba(255, 77, 95, 0.48), transparent 48%);
+  filter: blur(0.35px) saturate(1.34);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.24) rotate(-10deg);
+  transform-origin: 50% 50%;
+  animation: shadow-pin-radial-origin-wash var(--shadow-pin-radial-wash-duration) var(--ease-premium) var(--shadow-pin-radial-delay) both;
+}
+
+.shadow-pin-radial-origin-wash::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 42%;
+  height: 1rem;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 77, 95, 0.52),
+    rgba(255, 239, 184, 0.9),
+    rgba(255, 255, 255, 0.58),
+    transparent
+  );
+  box-shadow:
+    0 0 12px rgba(245, 207, 116, 0.34),
+    0 0 20px rgba(255, 77, 95, 0.2);
+  transform: rotate(-16deg) scaleX(0.72);
+}
+
+.shadow-pin-radial-orbit {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  top: 0;
+  height: 0;
+  width: 0;
+  opacity: 1;
+  transform: rotate(var(--shadow-pin-radial-to-angle));
+  transform-origin: 0 0;
+  will-change: opacity, transform;
+  animation: shadow-pin-radial-spin-out var(--shadow-pin-radial-duration) cubic-bezier(0.2, 0.78, 0.12, 1) var(--shadow-pin-radial-delay) both;
+}
+
+.shadow-pin-radial-counter-spin {
+  position: absolute;
+  left: var(--shadow-pin-radial-radius);
+  top: 0;
+  height: 0;
+  width: 0;
+  transform: rotate(var(--shadow-pin-radial-counter-to-angle));
+  transform-origin: 0 0;
+  will-change: transform;
+  animation: shadow-pin-radial-counter-spin var(--shadow-pin-radial-duration) cubic-bezier(0.2, 0.78, 0.12, 1) var(--shadow-pin-radial-delay) both;
+}
+
+.shadow-pin-radial-menu--spin-reveal .shadow-pin-radial-action {
+  left: 0;
+  top: 0;
+  animation: none;
 }
 
 .shadow-pin-action-feedback {
@@ -1376,6 +1484,13 @@ html, body, #root {
 
   .app-viewport {
     height: 100dvh;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .shadowchat-mobile-nav-button:hover {
+    background: var(--nav-hover-bg);
+    color: var(--text-primary);
   }
 }
 
@@ -1628,6 +1743,68 @@ html, body, #root {
   }
   100% {
     transform: translate(-50%, -50%) scale(0.86);
+  }
+}
+
+@keyframes shadow-pin-radial-spin-out {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--shadow-pin-radial-from-angle));
+  }
+  12% {
+    opacity: 0.82;
+  }
+  24% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: rotate(var(--shadow-pin-radial-to-angle));
+  }
+}
+
+@keyframes shadow-pin-radial-counter-spin {
+  0% {
+    transform: rotate(var(--shadow-pin-radial-counter-from-angle));
+  }
+  100% {
+    transform: rotate(var(--shadow-pin-radial-counter-to-angle));
+  }
+}
+
+@keyframes shadow-pin-radial-origin-wash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.24) rotate(-10deg);
+  }
+  14% {
+    opacity: 0.92;
+  }
+  46% {
+    opacity: 0.76;
+    transform: translate(-50%, -50%) scale(0.92) rotate(4deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.42) rotate(12deg);
+  }
+}
+
+@keyframes shadow-pin-radial-aperture {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.62) rotate(-12deg);
+  }
+  12% {
+    opacity: 0.68;
+  }
+  76% {
+    opacity: 0.42;
+    transform: translate(-50%, -50%) scale(0.94) rotate(18deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08) rotate(28deg);
   }
 }
 
@@ -2160,6 +2337,8 @@ html, body, #root {
   .shadow-pin-heart-burst-core,
   .shadow-pin-heart-burst-particle,
   .shadow-pin-radial-action,
+  .shadow-pin-radial-origin-aperture,
+  .shadow-pin-radial-origin-wash,
   .shadow-pin-radial-thumb-dot,
   .shadow-pin-action-wash,
   .shadow-pin-action-wash::before,
@@ -2180,8 +2359,21 @@ html, body, #root {
     animation: none !important;
   }
 
+  .shadow-pin-radial-orbit {
+    animation: none !important;
+    opacity: 1;
+    transform: rotate(var(--shadow-pin-radial-to-angle));
+  }
+
+  .shadow-pin-radial-counter-spin {
+    animation: none !important;
+    transform: rotate(var(--shadow-pin-radial-counter-to-angle));
+  }
+
   .shadow-pin-heart-burst-particle,
   .shadow-pin-heart-burst-ring,
+  .shadow-pin-radial-origin-aperture,
+  .shadow-pin-radial-origin-wash,
   .gold-egg-discovery__ring,
   .gold-egg-discovery__particle {
     display: none;
@@ -2191,6 +2383,22 @@ html, body, #root {
     opacity: 1;
     transform: translate(-50%, -50%) scale(0.9);
   }
+}
+
+html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .shadow-pin-radial-orbit {
+  animation: none !important;
+  opacity: 1;
+  transform: rotate(var(--shadow-pin-radial-to-angle));
+}
+
+html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .shadow-pin-radial-counter-spin {
+  animation: none !important;
+  transform: rotate(var(--shadow-pin-radial-counter-to-angle));
+}
+
+html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .shadow-pin-radial-origin-aperture,
+html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .shadow-pin-radial-origin-wash {
+  display: none;
 }
 
 .hype-celebration {

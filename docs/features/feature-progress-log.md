@@ -57,6 +57,14 @@ Canonical detail and release gates live in:
   persistence completes in parallel, then reflows only after both succeed.
 - iOS Build `15` canonicalizes Supabase notification attachment URLs before the
   Notification Service Extension downloads ShadowPin media or actor avatars.
+- ShadowPin radial controls now assemble from the Share position as a
+  direction-aware spinning train: each action materializes at that origin with
+  a contained gold/rose wash, Share lands last, and reduced-motion modes render
+  the completed control arc immediately.
+- Mobile-nav More/Back page swaps transfer focus only for keyboard activation.
+  Touch activation clears the trigger instead, and hover treatment is limited
+  to fine-pointer devices so the hosted web app and native WebView cannot leave
+  a random destination visually highlighted.
 - Required rollout order: linked migration and notification worker, verified
   `main`/Netlify production deploy, then signed TestFlight Build `15` and
   physical upload/DM/Pin/rich-notification acceptance.

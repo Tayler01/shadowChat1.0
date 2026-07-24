@@ -2670,6 +2670,23 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
       'comment',
       'open',
     ])
+    expect(menu).toHaveAttribute('data-reveal-origin', 'share')
+    expect(menu).toHaveAttribute('data-reveal-duration-ms', '285')
+    const openOrbit = menu.querySelector<HTMLElement>('[data-radial-orbit="open"]')
+    const shareOrbit = menu.querySelector<HTMLElement>('[data-radial-orbit="share"]')
+    expect(openOrbit).toHaveAttribute('data-reveal-order', '0')
+    expect(shareOrbit).toHaveAttribute('data-reveal-order', '3')
+    expect(menu.querySelectorAll('[data-reveal-action]')).toHaveLength(4)
+    expect(menu.querySelector('[data-reveal-action="share"]')).toHaveAttribute('data-reveal-order', '3')
+    expect(openOrbit?.style.getPropertyValue('--shadow-pin-radial-from-angle')).toBe(
+      shareOrbit?.style.getPropertyValue('--shadow-pin-radial-from-angle')
+    )
+    expect(openOrbit?.style.getPropertyValue('--shadow-pin-radial-to-angle')).not.toBe(
+      openOrbit?.style.getPropertyValue('--shadow-pin-radial-from-angle')
+    )
+    expect(shareOrbit?.style.getPropertyValue('--shadow-pin-radial-to-angle')).toBe(
+      shareOrbit?.style.getPropertyValue('--shadow-pin-radial-from-angle')
+    )
     expect(screen.queryByTestId('shadow-pin-radial-action-report')).not.toBeInTheDocument()
 
     fireShadowPinPointer(imageCard!, 'pointermove', {

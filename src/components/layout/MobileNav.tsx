@@ -1,4 +1,13 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
+} from 'react'
 import { Bell, ChevronLeft, ChevronRight, Gamepad2, Images, ListChecks, MessageSquare, Newspaper, Settings, Users } from 'lucide-react'
 import { useOptionalClientReset } from '../../hooks/ClientResetContext'
 import { useAppBadgeState } from '../../hooks/useAppBadgeState'
@@ -98,19 +107,29 @@ export function MobileNav({
     onViewChange(view)
   }
 
-  const showMore = () => {
-    setToolsMounted(true)
-    setPage(1)
+  const transferPageFocus = (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    pageRef: RefObject<HTMLUListElement | null>
+  ) => {
+    if (event.detail !== 0) {
+      event.currentTarget.blur()
+      return
+    }
+
     window.requestAnimationFrame(() => {
-      toolsPageRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus({ preventScroll: true })
+      pageRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus({ preventScroll: true })
     })
   }
 
-  const showPrimary = () => {
+  const showMore = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    setToolsMounted(true)
+    setPage(1)
+    transferPageFocus(event, toolsPageRef)
+  }
+
+  const showPrimary = (event: ReactMouseEvent<HTMLButtonElement>) => {
     setPage(0)
-    window.requestAnimationFrame(() => {
-      primaryPageRef.current?.querySelector<HTMLButtonElement>('button:not([disabled])')?.focus({ preventScroll: true })
-    })
+    transferPageFocus(event, primaryPageRef)
   }
 
   const openActiveUsers = () => {
@@ -140,7 +159,7 @@ export function MobileNav({
     ? 'shadowchat-mobile-nav shadowchat-mobile-nav--embedded border-t border-[var(--border-panel)] bg-transparent'
     : 'shadowchat-mobile-nav shadowchat-mobile-nav--standalone glass-panel-strong border-t border-[var(--border-panel)]'
 
-  const pageButtonClass = 'flex h-full min-h-11 w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[0.625rem] text-[var(--text-muted)] transition-colors hover:bg-[var(--nav-hover-bg)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent)]'
+  const pageButtonClass = 'shadowchat-mobile-nav-button flex h-full min-h-11 w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[0.625rem] text-[var(--text-muted)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent)]'
 
   return (
     <nav

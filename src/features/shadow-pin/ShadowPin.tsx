@@ -720,6 +720,8 @@ const PIN_ACTION_SELECT_RADIUS_PX = 48
 const PIN_ACTION_SAFE_MARGIN_PX = 18
 const PIN_ACTION_ICON_RADIUS_PX = 28
 const PIN_ACTION_ARC_RADIUS_PX = 104
+const PIN_ACTION_REVEAL_STAGGER_MS = 55
+const PIN_ACTION_REVEAL_SETTLE_MS = 120
 const CATEGORY_SEARCH_PULL_DISTANCE_PX = 22
 const CATEGORY_SEARCH_PULL_MAX_PX = 46
 const CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX = 18
@@ -805,6 +807,81 @@ const getPinActions = (canManageImage: boolean, canReportImage: boolean, side: P
   if (canManageImage) return MANAGE_PIN_ACTIONS[side]
   if (canReportImage) return REPORT_PIN_ACTIONS[side]
   return PIN_ACTIONS[side]
+}
+
+type PinRadialMotionStyle = CSSProperties & {
+  '--shadow-pin-radial-from-angle': string
+  '--shadow-pin-radial-to-angle': string
+  '--shadow-pin-radial-counter-from-angle': string
+  '--shadow-pin-radial-counter-to-angle': string
+  '--shadow-pin-radial-radius': string
+  '--shadow-pin-radial-delay': string
+  '--shadow-pin-radial-duration': string
+  '--shadow-pin-radial-wash-duration': string
+}
+
+type PinRadialOriginStyle = CSSProperties & {
+  '--shadow-pin-radial-delay': string
+  '--shadow-pin-radial-duration': string
+  '--shadow-pin-radial-wash-duration': string
+}
+
+const getPinActionAngle = (action: PinActionConfig) =>
+  Math.atan2(action.y, action.x) * 180 / Math.PI
+
+const unwrapPinActionAngle = (
+  originAngle: number,
+  finalAngle: number,
+  direction: 1 | -1
+) => {
+  let delta = finalAngle - originAngle
+  if (direction === 1) {
+    while (delta < 0) delta += 360
+  } else {
+    while (delta > 0) delta -= 360
+  }
+  return originAngle + delta
+}
+
+const getPinRadialRevealTotalMs = (actionCount: number) =>
+  Math.max(0, actionCount - 1) * PIN_ACTION_REVEAL_STAGGER_MS + PIN_ACTION_REVEAL_SETTLE_MS
+
+const getPinRadialMotion = (
+  actions: PinActionConfig[],
+  action: PinActionConfig,
+  index: number,
+  side: PinActionSide
+) => {
+  const shareAction = actions.find(candidate => candidate.id === 'share') ?? actions[0] ?? action
+  const originAngle = getPinActionAngle(shareAction)
+  const direction: 1 | -1 = side === 'right' ? 1 : -1
+  const finalAngle = unwrapPinActionAngle(originAngle, getPinActionAngle(action), direction)
+  const revealOrder = action.id === 'share'
+    ? Math.max(0, actions.length - 1)
+    : Math.max(0, actions.length - 1 - index)
+  const delayMs = revealOrder * PIN_ACTION_REVEAL_STAGGER_MS
+  const durationMs = Math.max(
+    PIN_ACTION_REVEAL_SETTLE_MS,
+    getPinRadialRevealTotalMs(actions.length) - delayMs
+  )
+  const washDurationMs = Math.min(190, durationMs)
+  const style: PinRadialMotionStyle = {
+    '--shadow-pin-radial-from-angle': `${originAngle.toFixed(2)}deg`,
+    '--shadow-pin-radial-to-angle': `${finalAngle.toFixed(2)}deg`,
+    '--shadow-pin-radial-counter-from-angle': `${(-originAngle).toFixed(2)}deg`,
+    '--shadow-pin-radial-counter-to-angle': `${(-finalAngle).toFixed(2)}deg`,
+    '--shadow-pin-radial-radius': `${Math.hypot(action.x, action.y).toFixed(2)}px`,
+    '--shadow-pin-radial-delay': `${delayMs}ms`,
+    '--shadow-pin-radial-duration': `${durationMs}ms`,
+    '--shadow-pin-radial-wash-duration': `${washDurationMs}ms`,
+  }
+
+  return {
+    delayMs,
+    durationMs,
+    revealOrder,
+    style,
+  }
 }
 
 const getPinControlSide = (columnSide: PinColumnSide): PinActionSide => columnSide === 'left' ? 'right' : 'left'
@@ -1650,17 +1727,51 @@ function PinActionRadialMenu({
 
   if (typeof document === 'undefined') return null
 
+  const shareAction = state.actions.find(action => action.id === 'share') ?? state.actions[0]
+  const revealTotalMs = getPinRadialRevealTotalMs(state.actions.length)
+  const actionMotions = state.actions.map((action, index) => ({
+    action,
+    motion: getPinRadialMotion(state.actions, action, index, state.controlSide),
+  }))
+
   return createPortal(
     <div className="shadow-pin-radial-layer" data-testid="shadow-pin-radial-layer" aria-hidden="true">
       <div
-        className="shadow-pin-radial-menu"
-        style={{ left: state.originX, top: state.originY }}
+        className="shadow-pin-radial-menu shadow-pin-radial-menu--spin-reveal"
+        style={{
+          left: state.originX,
+          top: state.originY,
+          '--shadow-pin-radial-total-duration': `${revealTotalMs}ms`,
+        } as CSSProperties}
         data-testid="shadow-pin-radial-menu"
         data-selected-action={state.selected || ''}
         data-control-side={state.controlSide}
+        data-reveal-origin="share"
+        data-reveal-duration-ms={revealTotalMs}
       >
         <span className="shadow-pin-radial-thumb-dot" />
-        {state.actions.map(action => {
+        {shareAction ? (
+          <span
+            className="shadow-pin-radial-origin-aperture"
+            style={{ left: `${shareAction.x}px`, top: `${shareAction.y}px` }}
+          />
+        ) : null}
+        {shareAction ? actionMotions.map(({ action, motion }) => (
+          <span
+            key={`wash-${action.id}`}
+            className="shadow-pin-radial-origin-wash"
+            style={{
+              left: `${shareAction.x}px`,
+              top: `${shareAction.y}px`,
+              '--shadow-pin-radial-delay': `${motion.delayMs}ms`,
+              '--shadow-pin-radial-duration': `${motion.durationMs}ms`,
+              '--shadow-pin-radial-wash-duration': motion.style['--shadow-pin-radial-wash-duration'],
+            } as PinRadialOriginStyle}
+            data-reveal-action={action.id}
+            data-reveal-order={motion.revealOrder}
+          />
+        )) : null}
+        {actionMotions.map(({ action, motion }) => {
           const Icon = action.icon
           const selected = state.selected === action.id
           const label = action.id === 'heart' && hearted ? 'Unlike' : action.label
@@ -1668,16 +1779,21 @@ function PinActionRadialMenu({
           return (
             <span
               key={action.id}
-              className={`shadow-pin-radial-action${selected ? ' shadow-pin-radial-action--selected' : ''}`}
-              style={{
-                left: `${action.x}px`,
-                top: `${action.y}px`,
-              }}
-              data-testid={`shadow-pin-radial-action-${action.id}`}
-              data-action={action.id}
+              className="shadow-pin-radial-orbit"
+              style={motion.style}
+              data-radial-orbit={action.id}
+              data-reveal-order={motion.revealOrder}
             >
-              <Icon className={cn('h-5 w-5', action.id === 'heart' && hearted && 'fill-current')} />
-              <span className="sr-only">{label}</span>
+              <span className="shadow-pin-radial-counter-spin">
+                <span
+                  className={`shadow-pin-radial-action${selected ? ' shadow-pin-radial-action--selected' : ''}`}
+                  data-testid={`shadow-pin-radial-action-${action.id}`}
+                  data-action={action.id}
+                >
+                  <Icon className={cn('h-5 w-5', action.id === 'heart' && hearted && 'fill-current')} />
+                  <span className="sr-only">{label}</span>
+                </span>
+              </span>
             </span>
           )
         })}

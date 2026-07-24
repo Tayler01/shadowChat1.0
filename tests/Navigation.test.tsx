@@ -110,6 +110,25 @@ test('mobile navigation slides to utility controls and back', async () => {
   expect(screen.getByTestId('mobile-nav-pages')).toHaveClass('translate-x-0')
 })
 
+test('touch page swaps do not leave a random destination focused or highlighted', async () => {
+  render(<MobileNav currentView="chat" onViewChange={jest.fn()} />)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Show more navigation, 2 unread' }), { detail: 1 })
+  const weather = await screen.findByRole('button', { name: 'Open weather' })
+  const play = screen.getByRole('button', { name: 'Open Play, 2 unread' })
+  const search = screen.getByRole('button', { name: 'Open search and saved messages' })
+
+  expect(weather).not.toHaveFocus()
+  expect(play).not.toHaveFocus()
+  expect(search).not.toHaveFocus()
+  expect(screen.getAllByRole('button').filter(button => button.hasAttribute('aria-current'))).toHaveLength(0)
+
+  fireEvent.click(screen.getByRole('button', { name: 'Return to main navigation' }), { detail: 1 })
+  const chat = screen.getByRole('button', { name: 'Chat, 3 unread' })
+  expect(chat).not.toHaveFocus()
+  expect(chat).toHaveAttribute('aria-current', 'page')
+})
+
 test('active users route keeps its existing utility icon visible and current', async () => {
   render(<MobileNav currentView="active-users" onViewChange={jest.fn()} />)
 
