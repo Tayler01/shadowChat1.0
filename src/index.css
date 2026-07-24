@@ -1236,8 +1236,13 @@ html, body, #root {
   transform: translate(-50%, -50%) scale(1.12);
 }
 
-.shadow-pin-radial-menu--spin-reveal .shadow-pin-radial-thumb-dot {
+.shadow-pin-radial-menu--spin-reveal .shadow-pin-radial-thumb-dot,
+.shadow-pin-radial-menu--spin-dismiss .shadow-pin-radial-thumb-dot {
   z-index: 4;
+}
+
+.shadow-pin-radial-menu--spin-dismiss .shadow-pin-radial-thumb-dot {
+  animation: shadow-pin-radial-thumb-dismiss 180ms var(--ease-premium) both;
 }
 
 .shadow-pin-radial-origin-aperture {
@@ -1254,6 +1259,10 @@ html, body, #root {
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.62) rotate(-12deg);
   animation: shadow-pin-radial-aperture var(--shadow-pin-radial-total-duration) var(--ease-premium) both;
+}
+
+.shadow-pin-radial-menu--spin-dismiss .shadow-pin-radial-origin-aperture {
+  animation-name: shadow-pin-radial-aperture-dismiss;
 }
 
 .shadow-pin-radial-origin-aperture::before,
@@ -1287,6 +1296,10 @@ html, body, #root {
   transform: translate(-50%, -50%) scale(0.24) rotate(-10deg);
   transform-origin: 50% 50%;
   animation: shadow-pin-radial-origin-wash var(--shadow-pin-radial-wash-duration) var(--ease-premium) var(--shadow-pin-radial-delay) both;
+}
+
+.shadow-pin-radial-menu--spin-dismiss .shadow-pin-radial-origin-wash {
+  animation-name: shadow-pin-radial-origin-wash-dismiss;
 }
 
 .shadow-pin-radial-origin-wash::before {
@@ -1337,7 +1350,16 @@ html, body, #root {
   animation: shadow-pin-radial-counter-spin var(--shadow-pin-radial-duration) cubic-bezier(0.2, 0.78, 0.12, 1) var(--shadow-pin-radial-delay) both;
 }
 
-.shadow-pin-radial-menu--spin-reveal .shadow-pin-radial-action {
+.shadow-pin-radial-menu--spin-dismiss .shadow-pin-radial-orbit {
+  animation: shadow-pin-radial-spin-in var(--shadow-pin-radial-duration) cubic-bezier(0.38, 0, 0.22, 1) both;
+}
+
+.shadow-pin-radial-menu--spin-dismiss .shadow-pin-radial-counter-spin {
+  animation: shadow-pin-radial-counter-spin-in var(--shadow-pin-radial-duration) cubic-bezier(0.38, 0, 0.22, 1) both;
+}
+
+.shadow-pin-radial-menu--spin-reveal .shadow-pin-radial-action,
+.shadow-pin-radial-menu--spin-dismiss .shadow-pin-radial-action {
   left: 0;
   top: 0;
   animation: none;
@@ -1763,12 +1785,38 @@ html, body, #root {
   }
 }
 
+@keyframes shadow-pin-radial-spin-in {
+  0% {
+    opacity: 1;
+    transform: rotate(var(--shadow-pin-radial-to-angle));
+  }
+  72% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 0.82;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--shadow-pin-radial-from-angle));
+  }
+}
+
 @keyframes shadow-pin-radial-counter-spin {
   0% {
     transform: rotate(var(--shadow-pin-radial-counter-from-angle));
   }
   100% {
     transform: rotate(var(--shadow-pin-radial-counter-to-angle));
+  }
+}
+
+@keyframes shadow-pin-radial-counter-spin-in {
+  0% {
+    transform: rotate(var(--shadow-pin-radial-counter-to-angle));
+  }
+  100% {
+    transform: rotate(var(--shadow-pin-radial-counter-from-angle));
   }
 }
 
@@ -1790,6 +1838,24 @@ html, body, #root {
   }
 }
 
+@keyframes shadow-pin-radial-origin-wash-dismiss {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.42) rotate(12deg);
+  }
+  46% {
+    opacity: 0.76;
+    transform: translate(-50%, -50%) scale(0.92) rotate(4deg);
+  }
+  86% {
+    opacity: 0.92;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.24) rotate(-10deg);
+  }
+}
+
 @keyframes shadow-pin-radial-aperture {
   0% {
     opacity: 0;
@@ -1808,6 +1874,24 @@ html, body, #root {
   }
 }
 
+@keyframes shadow-pin-radial-aperture-dismiss {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08) rotate(28deg);
+  }
+  24% {
+    opacity: 0.42;
+    transform: translate(-50%, -50%) scale(0.94) rotate(18deg);
+  }
+  88% {
+    opacity: 0.68;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.62) rotate(-12deg);
+  }
+}
+
 @keyframes shadow-pin-radial-thumb {
   0% {
     opacity: 0;
@@ -1816,6 +1900,26 @@ html, body, #root {
   100% {
     opacity: 0.88;
     transform: translate(-50%, -50%) scale(0.96);
+  }
+}
+
+@keyframes shadow-pin-radial-thumb-dismiss {
+  0% {
+    opacity: 0.88;
+    transform: translate(-50%, -50%) scale(0.96);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.74);
+  }
+}
+
+@keyframes shadow-pin-radial-menu-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 
@@ -2370,6 +2474,10 @@ html, body, #root {
     transform: rotate(var(--shadow-pin-radial-counter-to-angle));
   }
 
+  .shadow-pin-radial-menu--spin-dismiss {
+    animation: shadow-pin-radial-menu-fade-out 80ms linear both;
+  }
+
   .shadow-pin-heart-burst-particle,
   .shadow-pin-heart-burst-ring,
   .shadow-pin-radial-origin-aperture,
@@ -2394,6 +2502,14 @@ html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .shadow-p
 html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .shadow-pin-radial-counter-spin {
   animation: none !important;
   transform: rotate(var(--shadow-pin-radial-counter-to-angle));
+}
+
+html[data-comfort-motion='reduced'] .shadow-pin-radial-menu--spin-dismiss {
+  animation: shadow-pin-radial-menu-fade-out 80ms linear both;
+}
+
+html[data-comfort-motion='none'] .shadow-pin-radial-menu--spin-dismiss {
+  opacity: 0;
 }
 
 html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .shadow-pin-radial-origin-aperture,

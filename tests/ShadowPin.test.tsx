@@ -31,6 +31,7 @@ let mockAuthUser = {
 }
 let mockAdminRole: 'admin' | 'sub_admin' | null = null
 let mockShouldAutoplayMedia = true
+let mockMotionPreference: 'full' | 'reduced' | 'none' = 'full'
 let mockAppBadgeState = {
   total: 0,
   dm: 0,
@@ -79,7 +80,8 @@ jest.mock('../src/components/chat/WeatherWidget', () => ({
 jest.mock('../src/hooks/useComfortPreferences', () => ({
   useComfortPreferences: () => ({
     shouldAutoplayMedia: mockShouldAutoplayMedia,
-    isReducedMotion: false,
+    isReducedMotion: mockMotionPreference !== 'full',
+    effectivePreferences: { motion: mockMotionPreference },
   }),
 }))
 
@@ -220,6 +222,7 @@ const openPinFromCard = (card: Element) => {
 beforeEach(() => {
   window.history.replaceState({}, '', '/')
   mockShouldAutoplayMedia = true
+  mockMotionPreference = 'full'
   mockAppBadgeState = {
     ...mockAppBadgeState,
     shadow_pin: 0,
@@ -2659,6 +2662,7 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
     expect(menu).toBeInTheDocument()
     expect(menu).toHaveAttribute('data-selected-action', '')
     expect(menu).toHaveAttribute('data-control-side', 'right')
+    expect(menu).toHaveAttribute('data-motion-phase', 'opening')
     expect(screen.getByTestId('shadow-pin-radial-layer').parentElement).toBe(document.body)
     expect(imageCard!.querySelector('[data-testid="shadow-pin-radial-menu"]')).toBeNull()
     expect(screen.queryByTestId('shadow-pin-radial-action-edit')).not.toBeInTheDocument()
@@ -2671,7 +2675,8 @@ test('ShadowPin image long-press opens a radial thumb menu and slide-heart trigg
       'open',
     ])
     expect(menu).toHaveAttribute('data-reveal-origin', 'share')
-    expect(menu).toHaveAttribute('data-reveal-duration-ms', '285')
+    expect(menu).toHaveAttribute('data-reveal-duration-ms', '436')
+    expect(menu).toHaveAttribute('data-dismiss-duration-ms', '436')
     const openOrbit = menu.querySelector<HTMLElement>('[data-radial-orbit="open"]')
     const shareOrbit = menu.querySelector<HTMLElement>('[data-radial-orbit="share"]')
     expect(openOrbit).toHaveAttribute('data-reveal-order', '0')
@@ -2778,10 +2783,72 @@ test('ShadowPin long-press release without an action never opens Theater, even a
     })
     fireEvent.click(mediaOpener)
 
+    const closingMenu = screen.getByTestId('shadow-pin-radial-menu')
+    expect(closingMenu).toHaveAttribute('data-motion-phase', 'closing')
+    expect(closingMenu).toHaveClass('shadow-pin-radial-menu--spin-dismiss')
+    expect(closingMenu.querySelector('[data-reveal-action="share"]')).toHaveStyle({
+      '--shadow-pin-radial-delay': '0ms',
+    })
+    expect(closingMenu.querySelector('[data-reveal-action="open"]')).toHaveStyle({
+      '--shadow-pin-radial-delay': '206ms',
+    })
     expect(screen.queryByTestId('shadow-pin-theater')).not.toBeInTheDocument()
+
+    act(() => {
+      jest.advanceTimersByTime(435)
+    })
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-motion-phase', 'closing')
+
+    act(() => {
+      jest.advanceTimersByTime(1)
+    })
+    expect(screen.queryByTestId('shadow-pin-radial-menu')).not.toBeInTheDocument()
 
     fireEvent.click(mediaOpener)
     expect(screen.getByTestId('shadow-pin-theater')).toBeInTheDocument()
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('ShadowPin reduced motion dismisses a blank radial release with a short fade', () => {
+  jest.useFakeTimers()
+  mockMotionPreference = 'reduced'
+
+  try {
+    render(<ShadowPin onBack={() => {}} />)
+    fireEvent.click(screen.getByText('Fam & Friends'))
+
+    const imageCard = screen.getByAltText('Pin one').closest('article')
+    expect(imageCard).not.toBeNull()
+
+    fireShadowPinPointer(imageCard!, 'pointerdown', {
+      pointerId: 28,
+      button: 0,
+      clientX: 160,
+      clientY: 320,
+    })
+    act(() => {
+      jest.advanceTimersByTime(440)
+    })
+
+    fireShadowPinPointer(imageCard!, 'pointerup', {
+      pointerId: 28,
+      clientX: 160,
+      clientY: 320,
+    })
+
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toHaveAttribute('data-motion-phase', 'closing')
+
+    act(() => {
+      jest.advanceTimersByTime(79)
+    })
+    expect(screen.getByTestId('shadow-pin-radial-menu')).toBeInTheDocument()
+
+    act(() => {
+      jest.advanceTimersByTime(1)
+    })
+    expect(screen.queryByTestId('shadow-pin-radial-menu')).not.toBeInTheDocument()
   } finally {
     jest.useRealTimers()
   }

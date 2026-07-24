@@ -720,8 +720,9 @@ const PIN_ACTION_SELECT_RADIUS_PX = 48
 const PIN_ACTION_SAFE_MARGIN_PX = 18
 const PIN_ACTION_ICON_RADIUS_PX = 28
 const PIN_ACTION_ARC_RADIUS_PX = 104
-const PIN_ACTION_REVEAL_STAGGER_MS = 55
-const PIN_ACTION_REVEAL_SETTLE_MS = 120
+const PIN_ACTION_REVEAL_STAGGER_MS = 82
+const PIN_ACTION_REVEAL_SETTLE_MS = 190
+const PIN_ACTION_REDUCED_DISMISS_MS = 80
 const CATEGORY_SEARCH_PULL_DISTANCE_PX = 22
 const CATEGORY_SEARCH_PULL_MAX_PX = 46
 const CATEGORY_SEARCH_HIDE_SCROLL_TOP_PX = 18
@@ -864,7 +865,8 @@ const getPinRadialMotion = (
     PIN_ACTION_REVEAL_SETTLE_MS,
     getPinRadialRevealTotalMs(actions.length) - delayMs
   )
-  const washDurationMs = Math.min(190, durationMs)
+  const washDurationMs = Math.min(230, durationMs)
+  const dismissWashDelayMs = Math.max(0, durationMs - washDurationMs)
   const style: PinRadialMotionStyle = {
     '--shadow-pin-radial-from-angle': `${originAngle.toFixed(2)}deg`,
     '--shadow-pin-radial-to-angle': `${finalAngle.toFixed(2)}deg`,
@@ -878,6 +880,7 @@ const getPinRadialMotion = (
 
   return {
     delayMs,
+    dismissWashDelayMs,
     durationMs,
     revealOrder,
     style,
@@ -1675,6 +1678,7 @@ function CategoryDetailsModal({
 
 type PinRadialState = {
   open: boolean
+  phase: 'opening' | 'closing'
   originX: number
   originY: number
   selected: PinQuickAction | null
@@ -1694,6 +1698,7 @@ type PinShareSheetState = {
 
 const EMPTY_PIN_RADIAL_STATE: PinRadialState = {
   open: false,
+  phase: 'opening',
   originX: 0,
   originY: 0,
   selected: null,
@@ -1729,6 +1734,7 @@ function PinActionRadialMenu({
 
   const shareAction = state.actions.find(action => action.id === 'share') ?? state.actions[0]
   const revealTotalMs = getPinRadialRevealTotalMs(state.actions.length)
+  const closing = state.phase === 'closing'
   const actionMotions = state.actions.map((action, index) => ({
     action,
     motion: getPinRadialMotion(state.actions, action, index, state.controlSide),
@@ -1737,7 +1743,9 @@ function PinActionRadialMenu({
   return createPortal(
     <div className="shadow-pin-radial-layer" data-testid="shadow-pin-radial-layer" aria-hidden="true">
       <div
-        className="shadow-pin-radial-menu shadow-pin-radial-menu--spin-reveal"
+        className={`shadow-pin-radial-menu ${
+          closing ? 'shadow-pin-radial-menu--spin-dismiss' : 'shadow-pin-radial-menu--spin-reveal'
+        }`}
         style={{
           left: state.originX,
           top: state.originY,
@@ -1746,8 +1754,10 @@ function PinActionRadialMenu({
         data-testid="shadow-pin-radial-menu"
         data-selected-action={state.selected || ''}
         data-control-side={state.controlSide}
+        data-motion-phase={state.phase}
         data-reveal-origin="share"
         data-reveal-duration-ms={revealTotalMs}
+        data-dismiss-duration-ms={revealTotalMs}
       >
         <span className="shadow-pin-radial-thumb-dot" />
         {shareAction ? (
@@ -1763,7 +1773,9 @@ function PinActionRadialMenu({
             style={{
               left: `${shareAction.x}px`,
               top: `${shareAction.y}px`,
-              '--shadow-pin-radial-delay': `${motion.delayMs}ms`,
+              '--shadow-pin-radial-delay': `${
+                closing ? motion.dismissWashDelayMs : motion.delayMs
+              }ms`,
               '--shadow-pin-radial-duration': `${motion.durationMs}ms`,
               '--shadow-pin-radial-wash-duration': motion.style['--shadow-pin-radial-wash-duration'],
             } as PinRadialOriginStyle}
@@ -1905,6 +1917,7 @@ function ImageCard({
 }) {
   const { user } = useAuth()
   const { openReport } = useModerationReport()
+  const { effectivePreferences } = useComfortPreferences()
   const cardRef = useRef<HTMLElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
@@ -1925,6 +1938,7 @@ function ImageCard({
   const pressConsumedRef = useRef(false)
   const feedbackKeyRef = useRef(0)
   const feedbackTimerRef = useRef<number | null>(null)
+  const radialDismissTimerRef = useRef<number | null>(null)
   const imageSources = useMemo(() => getPinImageSources(image, 'thumb'), [image])
   const imageSourcesKey = imageSources.join('\n')
   const [sourceIndex, setSourceIndex] = useState(0)
@@ -2054,6 +2068,7 @@ function ImageCard({
     if (clickTimer.current) window.clearTimeout(clickTimer.current)
     if (pressRef.current?.timerId) window.clearTimeout(pressRef.current.timerId)
     if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current)
+    if (radialDismissTimerRef.current) window.clearTimeout(radialDismissTimerRef.current)
     pressListenerCleanupRef.current?.()
     pressListenerCleanupRef.current = null
     unlockGestureScrollRef.current?.()
@@ -2199,6 +2214,13 @@ function ImageCard({
     }
   }
 
+  const clearRadialDismissTimer = () => {
+    if (radialDismissTimerRef.current) {
+      window.clearTimeout(radialDismissTimerRef.current)
+      radialDismissTimerRef.current = null
+    }
+  }
+
   const cleanupPressListeners = () => {
     pressListenerCleanupRef.current?.()
     pressListenerCleanupRef.current = null
@@ -2210,6 +2232,29 @@ function ImageCard({
     pressRef.current = null
   }
 
+  const startRadialReverseDismiss = (actions: PinActionConfig[]) => {
+    const dismissDurationMs = effectivePreferences.motion === 'full'
+      ? getPinRadialRevealTotalMs(actions.length)
+      : effectivePreferences.motion === 'reduced'
+        ? PIN_ACTION_REDUCED_DISMISS_MS
+        : 0
+
+    if (dismissDurationMs <= 0) {
+      dismissShadowPinRadials()
+      return
+    }
+
+    clearRadialDismissTimer()
+    setRadialState(state => state.open
+      ? { ...state, phase: 'closing', selected: null }
+      : state)
+    radialDismissTimerRef.current = window.setTimeout(() => {
+      radialDismissTimerRef.current = null
+      setRadialState(EMPTY_PIN_RADIAL_STATE)
+      setShadowPinRadialOwner(null)
+    }, dismissDurationMs)
+  }
+
   useEffect(() => {
     const dismissCurrentGesture = () => {
       const press = pressRef.current
@@ -2217,6 +2262,7 @@ function ImageCard({
       pressListenerCleanupRef.current?.()
       pressListenerCleanupRef.current = null
       pressRef.current = null
+      clearRadialDismissTimer()
       setRadialState(EMPTY_PIN_RADIAL_STATE)
       unlockGestureScrollRef.current?.()
       unlockGestureScrollRef.current = null
@@ -2365,6 +2411,7 @@ function ImageCard({
     ) {
       return
     }
+    if (radialState.phase === 'closing') return
 
     // If the previous long press produced no synthetic click, the next real
     // pointer sequence is the safe boundary for restoring ordinary taps.
@@ -2404,6 +2451,7 @@ function ImageCard({
 
         setRadialState({
           open: true,
+          phase: 'opening',
           originX,
           originY,
           selected: null,
@@ -2513,20 +2561,24 @@ function ImageCard({
 
     event.preventDefault()
     event.stopPropagation()
-    dismissShadowPinRadials()
     unlockGestureScroll()
 
     if (selected) {
+      dismissShadowPinRadials()
       void runQuickAction(selected)
+    } else {
+      startRadialReverseDismiss(press.actions)
     }
   }
 
   const handlePointerCancel = (event: ReactPointerEvent<HTMLElement>) => {
-    const wasActive = Boolean(pressRef.current?.active)
+    const press = pressRef.current
+    const wasActive = Boolean(press?.active)
     clearPress()
     releasePointerCapture(event)
-    dismissShadowPinRadials()
     unlockGestureScroll()
+    if (wasActive && press) startRadialReverseDismiss(press.actions)
+    else dismissShadowPinRadials()
     if (wasActive) resetPressConsumed()
   }
 

@@ -61,6 +61,10 @@ Canonical detail and release gates live in:
   direction-aware spinning train: each action materializes at that origin with
   a contained gold/rose wash, Share lands last, and reduced-motion modes render
   the completed control arc immediately.
+- The follow-up motion pass slows the standard four-control reveal to 436 ms.
+  Releasing without choosing a control keeps the radial mounted for the exact
+  reverse orbit and origin-wash sequence; choosing a control still dismisses
+  immediately and runs the selected action.
 - Mobile-nav More/Back page swaps transfer focus only for keyboard activation.
   Touch activation clears the trigger instead, and hover treatment is limited
   to fine-pointer devices so the hosted web app and native WebView cannot leave
