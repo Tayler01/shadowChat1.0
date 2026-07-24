@@ -149,3 +149,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/shadow-pin-import-image/deno.json"
 entrypoint = "./functions/shadow-pin-import-image/index.ts"
+
+# Keep the optional paid Vector Buckets service disabled. Recent Supabase CLI
+# releases otherwise treat the omitted section as enabled during `config push`,
+# which makes production alignment fail on projects without that add-on.
+[storage.vector]
+enabled = false
