@@ -203,7 +203,7 @@ test('iOS ships a communication-aware notification service extension', () => {
 test('native build uses branded icons and increments the store build', () => {
   assert.equal(appConfig.expo.icon, './assets/images/icon.png')
   assert.equal(appConfig.expo.ios.icon, './assets/images/icon.png')
-  assert.equal(appConfig.expo.ios.buildNumber, '15')
+  assert.equal(appConfig.expo.ios.buildNumber, '16')
   assert.equal(appConfig.expo.android.versionCode, 5)
   assert.notEqual(appConfig.expo.ios.icon, './assets/expo.icon')
   for (const filename of [
