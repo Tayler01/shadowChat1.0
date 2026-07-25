@@ -1,6 +1,6 @@
 # Realtime Push Notifications Plan
 
-## Documentation Status - July 18, 2026
+## Documentation Status - July 24, 2026
 
 This file documents the notification architecture shipped in Release A rather
 than only the original plan. The deployed release includes targeted
@@ -26,8 +26,9 @@ presentation envelope, privacy modes, per-category sounds, original native
 sound pack, rich actor/media presentation, installation-scoped native tokens,
 per-install receipts, Expo delivery worker, and Expo client registration and
 routing. It deliberately leaves `notification_events` as the only unread/read
-and badge authority and remains runtime-disabled until physical iPhone and
-Android acceptance. See
+and badge authority. Its named-account canary was paused on July 24 after
+notification fan-out contributed to production database contention; Web Push,
+recipient-owned events, unread/read state, and badges remain active. See
 [NOTIFICATION_PRESENTATION_V2_2026-07-18.md](./NOTIFICATION_PRESENTATION_V2_2026-07-18.md).
 
 ## Goal

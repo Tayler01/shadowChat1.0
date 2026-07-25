@@ -43,6 +43,13 @@ describe('notification delivery parity contracts', () => {
     expect(sendPush).toContain('sendshadowpincommentpush')
   })
 
+  test('batches broad General Chat and ShadowPin event fan-out before push delivery', () => {
+    expect(sendPush).toContain('const upsertnotificationevents = async')
+    expect(sendPush).toContain(".select('id, sent_at, dedupe_key')")
+    expect(sendPush).toContain('const eventrecords = await upsertnotificationevents')
+    expect(sendPush.match(/const eventrecords = await upsertnotificationevents/g)).toHaveLength(2)
+  })
+
   test('does not reactivate paused notification domains', () => {
     expect(migration).not.toContain('news_')
     expect(migration).not.toContain('board_')

@@ -17,7 +17,6 @@ import {
   refreshSessionLocked,
   getRealtimeClient,
   getWorkingClient,
-  withTimeout,
   type GeneralChatMessageKey,
   type GeneralChatMessageWindowMode,
   type GeneralChatMessageWindowRequest,
@@ -61,7 +60,9 @@ import { embedPublicProfile } from '../../supabase/functions/_shared/public-prof
 
 export { useMessages, useOptionalMessages };
 
-const SEND_OPERATION_TIMEOUT_MS = 12000;
+const MESSAGE_INSERT_TIMEOUT_MS = 10000;
+const MESSAGE_RECONCILE_QUERY_TIMEOUT_MS = 1000;
+const MESSAGE_RECONCILE_DELAYS_MS = [0, 250, 500] as const;
 const GROUP_OUTBOX_SCOPE = 'general';
 const MESSAGE_WITH_USER_SELECT = `
   *,
@@ -521,20 +522,83 @@ export const insertMessage = async (messageData: {
   reply_to?: string;
 }) => {
   const workingClient = await getWorkingClient();
-  const insertPromise = workingClient
-    .from('messages')
-    .insert(messageData)
-    .select(MESSAGE_WITH_USER_SELECT)
-    .single();
 
-  const timeout = new Promise((_, reject) =>
-    setTimeout(
-      () => reject(new Error('Database insert timeout after 10 seconds')),
-      10000
-    )
+  const withBoundedWait = <T,>(
+    promise: PromiseLike<T>,
+    timeoutMs: number,
+    timeoutMessage: string
+  ) => new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    Promise.resolve(promise).then(
+      value => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
+
+  const reconcileCommittedMessage = async () => {
+    if (!messageData.client_message_id) return null;
+
+    for (const delayMs of MESSAGE_RECONCILE_DELAYS_MS) {
+      if (delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+
+      try {
+        let query = workingClient
+          .from('messages')
+          .select(MESSAGE_WITH_USER_SELECT)
+          .eq('user_id', messageData.user_id)
+          .eq('client_message_id', messageData.client_message_id);
+        if (typeof query.retry === 'function') {
+          query = query.retry(false);
+        }
+        const reconciled = await withBoundedWait(
+          query.maybeSingle(),
+          MESSAGE_RECONCILE_QUERY_TIMEOUT_MS,
+          'Message reconciliation timed out'
+        );
+        if ((reconciled as any)?.data) {
+          return reconciled as { data: Message; error: null };
+        }
+      } catch {
+        // The original insert may still be completing. Try the next bounded lookup.
+      }
+    }
+
+    return null;
+  };
+
+  const isAmbiguousInsertFailure = (error: any) =>
+    error?.code === '23505' ||
+    [408, 409, 503, 504].includes(Number(error?.status)) ||
+    /timeout|timed out|network|failed to fetch|load failed/i.test(String(error?.message || error || ''));
+
+  const runInsert = (payload: Record<string, unknown>) => withBoundedWait(
+    workingClient
+      .from('messages')
+      .insert(payload)
+      .select(MESSAGE_WITH_USER_SELECT)
+      .single(),
+    MESSAGE_INSERT_TIMEOUT_MS,
+    'Database insert timeout after 10 seconds'
   );
 
-  let result = (await Promise.race([insertPromise, timeout])) as any;
+  let result: any;
+  try {
+    result = await runInsert(messageData);
+  } catch (error) {
+    if (messageData.client_message_id && isAmbiguousInsertFailure(error)) {
+      const reconciled = await reconcileCommittedMessage();
+      if (reconciled) return reconciled;
+    }
+    throw error;
+  }
 
   if (result.error && isMediaThumbnailSchemaError(result.error)) {
     const {
@@ -542,13 +606,7 @@ export const insertMessage = async (messageData: {
       media_processed_at: _mediaProcessedAt,
       ...legacyMediaMessageData
     } = messageData;
-    const legacyMediaInsertPromise = workingClient
-      .from('messages')
-      .insert(legacyMediaMessageData)
-      .select(MESSAGE_WITH_USER_SELECT)
-      .single();
-
-    result = (await Promise.race([legacyMediaInsertPromise, timeout])) as any;
+    result = await runInsert(legacyMediaMessageData);
   }
 
   if (result.error && messageData.client_message_id && isClientMessageIdSchemaError(result.error)) {
@@ -558,26 +616,12 @@ export const insertMessage = async (messageData: {
       media_processed_at: _mediaProcessedAt,
       ...legacyMessageData
     } = messageData;
-    const legacyInsertPromise = workingClient
-      .from('messages')
-      .insert(legacyMessageData)
-      .select(MESSAGE_WITH_USER_SELECT)
-      .single();
-
-    result = (await Promise.race([legacyInsertPromise, timeout])) as any;
+    result = await runInsert(legacyMessageData);
   }
 
-  if (
-    result.error &&
-    messageData.client_message_id &&
-    (result.error.code === '23505' || result.error.status === 409)
-  ) {
-    result = await workingClient
-      .from('messages')
-      .select(MESSAGE_WITH_USER_SELECT)
-      .eq('user_id', messageData.user_id)
-      .eq('client_message_id', messageData.client_message_id)
-      .maybeSingle();
+  if (result.error && messageData.client_message_id && isAmbiguousInsertFailure(result.error)) {
+    const reconciled = await reconcileCommittedMessage();
+    if (reconciled) return reconciled;
   }
 
   return result as { data: Message | null; error: any };
@@ -702,6 +746,10 @@ function useProvideMessages(): MessagesContextValue {
   }, []);
 
   const fetchMessageWindow = useCallback(async (request: GeneralChatMessageWindowRequest) => {
+    if (request.mode !== 'target') {
+      return fetchWindowDirect(request);
+    }
+
     if (windowRpcAvailableRef.current !== false) {
       try {
         const window = await fetchGeneralChatThreadedWindow({
@@ -1039,7 +1087,6 @@ function useProvideMessages(): MessagesContextValue {
           trimToLatest: false,
         }));
       });
-
       return targetMessage;
     } finally {
       if (requestId === fetchRequestIdRef.current) {
@@ -1498,31 +1545,11 @@ function useProvideMessages(): MessagesContextValue {
         }
       };
 
-      let lastError: any = null;
-      for (let i = 0; i < 3; i++) {
-        try {
-          await attemptSend();
-          lastError = null;
-          break;
-        } catch (err) {
-          lastError = err;
-          if (i < 2) {
-            await new Promise(res => setTimeout(res, 300));
-          }
-        }
-      }
-
-      if (lastError) {
-        throw lastError;
-      }
+      await attemptSend();
     };
 
     try {
-      await withTimeout(
-        executeSend(),
-        SEND_OPERATION_TIMEOUT_MS,
-        'Message send timed out while reconnecting. Please try again.'
-      );
+      await executeSend();
     } catch (error) {
       upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
         id: clientMessageId,
@@ -1550,7 +1577,7 @@ function useProvideMessages(): MessagesContextValue {
           },
         }))
       }
-      await runRealtimeRecovery('send-error').catch(() => undefined);
+      void runRealtimeRecovery('send-error').catch(() => undefined);
       if (error instanceof Error) {
         (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
         throw error;

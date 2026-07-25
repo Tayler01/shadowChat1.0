@@ -25,7 +25,7 @@ import {
 } from '../src/lib/supabase';
 import type { Message } from '../src/lib/supabase';
 import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
-import { triggerReactionPushNotification } from '../src/lib/push';
+import { triggerGroupPushNotification, triggerReactionPushNotification } from '../src/lib/push';
 
 jest.mock('../src/hooks/useAuth');
 jest.mock('../src/hooks/useRealtimeRecovery', () => ({
@@ -93,6 +93,7 @@ const createQuery = (overrides: Record<string, unknown> = {}) => {
     delete: jest.fn(() => query),
     eq: jest.fn(() => query),
     is: jest.fn(() => query),
+    retry: jest.fn(() => query),
     maybeSingle: jest.fn().mockResolvedValue({ data: { id: 'm1' }, error: null }),
     rpc: jest.fn(() => query),
   };
@@ -182,7 +183,9 @@ const configureWorkingClient = () => {
 };
 
 beforeEach(() => {
+  localStorage.clear();
   configureWorkingClient();
+  (triggerGroupPushNotification as jest.Mock).mockResolvedValue(undefined);
 });
 
 describe('helper functions', () => {
@@ -304,6 +307,33 @@ describe('helper functions', () => {
     expect(error).toBeNull();
   });
 
+  it('reconciles an ambiguous insert response by client message id', async () => {
+    const committed = makeDbMessage('committed', '2026-07-24T20:00:00.000Z')
+    const insertQuery = createQuery({
+      single: jest.fn().mockResolvedValue({
+        data: null,
+        error: { status: 503, message: 'Service unavailable' },
+      }),
+    })
+    const reconcileQuery = createQuery({
+      maybeSingle: jest.fn().mockResolvedValue({ data: committed, error: null }),
+    })
+    workingClient.from
+      .mockReturnValueOnce(insertQuery as any)
+      .mockReturnValueOnce(reconcileQuery as any)
+
+    const result = await insertMessage({
+      user_id: 'u1',
+      content: 'hi',
+      message_type: 'text',
+      client_message_id: 'client-ambiguous',
+    })
+
+    expect(result).toEqual({ data: committed, error: null })
+    expect(reconcileQuery.eq).toHaveBeenCalledWith('client_message_id', 'client-ambiguous')
+    expect(reconcileQuery.retry).toHaveBeenCalledWith(false)
+  })
+
   it('refreshSessionAndRetry refreshes and retries insert', async () => {
     const insertSpy = jest.spyOn(messagesModule, 'insertMessage').mockResolvedValueOnce({ data: { id: '1' } as any, error: null });
 
@@ -358,6 +388,7 @@ describe('message fetching windows', () => {
   it('requests the latest window with deterministic timestamp and id ordering', async () => {
     const { latestQuery } = await renderWithLatestWindow();
 
+    expect(fetchGeneralChatThreadedWindow).not.toHaveBeenCalled();
     expect(latestQuery.order).toHaveBeenCalledWith('created_at', { ascending: false });
     expect(latestQuery.order).toHaveBeenCalledWith('id', { ascending: false });
     expect(latestQuery.is).toHaveBeenCalledWith('reply_to', null);
@@ -526,6 +557,7 @@ describe('sendMessage', () => {
     jest.resetAllMocks();
     configureWorkingClient();
     (useAuth as jest.Mock).mockReturnValue({ user });
+    (triggerGroupPushNotification as jest.Mock).mockResolvedValue(undefined);
 
     const sb = supabase as SupabaseMock;
 
@@ -624,6 +656,38 @@ describe('sendMessage', () => {
     insertSpy.mockRestore();
     retrySpy.mockRestore();
   });
+
+  it('does not issue overlapping retries after an ambiguous send failure', async () => {
+    const insertSpy = jest
+      .spyOn(messagesModule, 'insertMessage')
+      .mockRejectedValueOnce(new Error('Database insert timeout after 10 seconds'))
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider })
+
+    await expect(act(async () => {
+      await result.current.sendMessage('hello')
+    })).rejects.toThrow('Database insert timeout after 10 seconds')
+
+    expect(insertSpy).toHaveBeenCalledTimes(1)
+    expect(result.current.sending).toBe(false)
+    insertSpy.mockRestore()
+  })
+
+  it('does not keep the composer locked while realtime recovery runs', async () => {
+    const insertSpy = jest
+      .spyOn(messagesModule, 'insertMessage')
+      .mockRejectedValueOnce(new Error('Network request failed'))
+    ;(runRealtimeRecovery as jest.Mock).mockReturnValueOnce(new Promise(() => undefined))
+
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider })
+
+    await expect(act(async () => {
+      await result.current.sendMessage('hello')
+    })).rejects.toThrow('Network request failed')
+
+    expect(result.current.sending).toBe(false)
+    insertSpy.mockRestore()
+  })
 });
 
 describe('realtime recovery', () => {

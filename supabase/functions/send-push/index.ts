@@ -112,6 +112,10 @@ type NotificationEventRow = {
   sent_at: string | null
 }
 
+type BatchedNotificationEventRow = NotificationEventRow & {
+  dedupe_key: string
+}
+
 type PushDeliveryResult = {
   deliveredCount: number
   removedSubscriptions: number
@@ -545,6 +549,32 @@ const upsertNotificationEvent = async (
   }
 
   return data as NotificationEventRow
+}
+
+const upsertNotificationEvents = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  events: Array<{ values: Record<string, unknown>; dedupeKey: string }>
+) => {
+  if (!events.length) return new Map<string, BatchedNotificationEventRow>()
+
+  const { data, error } = await supabase
+    .from('notification_events')
+    .upsert(
+      events.map(({ values, dedupeKey }) => ({
+        ...values,
+        dedupe_key: dedupeKey,
+      })),
+      { onConflict: 'dedupe_key' }
+    )
+    .select('id, sent_at, dedupe_key')
+
+  if (error) {
+    throw error
+  }
+
+  return new Map(
+    ((data ?? []) as BatchedNotificationEventRow[]).map(event => [event.dedupe_key, event])
+  )
 }
 
 const normalizePushEndpoint = async (value: string) => {
@@ -1271,34 +1301,56 @@ const sendGroupPush = async (
     ? `/?view=chat&thread=${threadId}&message=${groupMessage.id}`
     : `/?view=chat&message=${groupMessage.id}`
 
-  const perRecipientResults = await Promise.all(
-    eligibleRecipients.map(async ({ preferences: prefs, kind }) => {
-      const isBridgeSenderRecipient = origin === 'bridge' && prefs.user_id === authUserId
-      const dedupeKey = `group:${groupMessage.id}:${prefs.user_id}`
-      const copy = getGroupNotificationCopy(kind, senderLabel, preview)
-      const title = isBridgeSenderRecipient ? 'ShadowChat Bridge' : copy.title
-      const body = isBridgeSenderRecipient ? `Sent to General Chat: ${preview}` : copy.body
-      const eventRecord = await upsertNotificationEvent(
-        supabase,
-        {
-          user_id: prefs.user_id,
-          type: kind,
-          entity_id: groupMessage.id,
-          message_id: groupMessage.id,
-          payload: {
-            title,
-            body,
-            route,
-            sender_id: authUserId,
-            actor: sender,
-            notification_kind: kind,
-            thread_id: threadId,
-            origin: isBridgeSenderRecipient ? 'bridge' : undefined,
-            bridge_device_id: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
-          },
+  const recipientNotifications = eligibleRecipients.map(({ preferences: prefs, kind }) => {
+    const isBridgeSenderRecipient = origin === 'bridge' && prefs.user_id === authUserId
+    const dedupeKey = `group:${groupMessage.id}:${prefs.user_id}`
+    const copy = getGroupNotificationCopy(kind, senderLabel, preview)
+    const title = isBridgeSenderRecipient ? 'ShadowChat Bridge' : copy.title
+    const body = isBridgeSenderRecipient ? `Sent to General Chat: ${preview}` : copy.body
+    return {
+      prefs,
+      kind,
+      isBridgeSenderRecipient,
+      dedupeKey,
+      title,
+      body,
+      values: {
+        user_id: prefs.user_id,
+        type: kind,
+        entity_id: groupMessage.id,
+        message_id: groupMessage.id,
+        payload: {
+          title,
+          body,
+          route,
+          sender_id: authUserId,
+          actor: sender,
+          notification_kind: kind,
+          thread_id: threadId,
+          origin: isBridgeSenderRecipient ? 'bridge' : undefined,
+          bridge_device_id: isBridgeSenderRecipient ? bridgeDeviceId : undefined,
         },
-        dedupeKey
-      )
+      },
+    }
+  })
+  const eventRecords = await upsertNotificationEvents(
+    supabase,
+    recipientNotifications.map(({ values, dedupeKey }) => ({ values, dedupeKey }))
+  )
+
+  const perRecipientResults = await Promise.all(
+    recipientNotifications.map(async ({
+      prefs,
+      kind,
+      isBridgeSenderRecipient,
+      dedupeKey,
+      title,
+      body,
+    }) => {
+      const eventRecord = eventRecords.get(dedupeKey)
+      if (!eventRecord) {
+        throw new Error(`Notification event upsert did not return ${dedupeKey}`)
+      }
 
       if (eventRecord.sent_at) {
         return {
@@ -1456,26 +1508,38 @@ const sendShadowPinPostPush = async (
   const route = '/?view=pins'
   const thumbnailUrl = image.thumbnail_url || image.medium_url || image.image_url
 
-  const results = await Promise.all(recipients.map(async preferences => {
-    const eventRecord = await upsertNotificationEvent(
-      supabase,
-      {
-        user_id: preferences.user_id,
-        type: 'shadow_pin_post',
-        entity_id: image.id,
-        payload: {
-          image_id: image.id,
-          category_id: image.category_id,
-          image_title: image.title,
-          thumbnail_url: thumbnailUrl,
-          actor: image.creator,
-          title,
-          body,
-          url: route,
-        },
+  const recipientNotifications = recipients.map(preferences => ({
+    preferences,
+    dedupeKey: `shadow_pin_post:${image.id}:${preferences.user_id}`,
+    values: {
+      user_id: preferences.user_id,
+      type: 'shadow_pin_post',
+      entity_id: image.id,
+      payload: {
+        image_id: image.id,
+        category_id: image.category_id,
+        image_title: image.title,
+        thumbnail_url: thumbnailUrl,
+        actor: image.creator,
+        title,
+        body,
+        url: route,
       },
-      `shadow_pin_post:${image.id}:${preferences.user_id}`
-    )
+    },
+  }))
+  const eventRecords = await upsertNotificationEvents(
+    supabase,
+    recipientNotifications.map(({ values, dedupeKey }) => ({ values, dedupeKey }))
+  )
+
+  const results = await Promise.all(recipientNotifications.map(async ({
+    preferences,
+    dedupeKey,
+  }) => {
+    const eventRecord = eventRecords.get(dedupeKey)
+    if (!eventRecord) {
+      throw new Error(`Notification event upsert did not return ${dedupeKey}`)
+    }
 
     if (eventRecord.sent_at) {
       return {

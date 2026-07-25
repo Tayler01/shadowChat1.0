@@ -683,6 +683,22 @@ owned by iOS. The same pass must confirm actor-avatar fallback, private-preview
 redaction, selected sound, exact Pin route, badge clearing, and ordinary
 content-only fallback when media download is unavailable.
 
+## Posting Reliability Containment - July 24, 2026
+
+The named-account native v2 canary is temporarily disabled after live query
+statistics and Postgres logs tied the expanded notification pipeline to
+production contention affecting General Chat and ShadowPin posting. Worker
+invocation is disabled, receipt reconciliation remains enabled, and the v2
+outbox had no pending or accepted work when containment was applied.
+
+The canonical `notification_events` ledger, Web Push, Realtime inbox events,
+unread/read state, and launcher badges remain active. General Chat and
+ShadowPin new-post fan-out now batch their per-recipient event upserts into one
+database request while preserving recipient rows, preferences, dedupe keys,
+and delivery behavior. Do not reactivate native v2 delivery until production
+posting and load latency remain healthy after the patch and physical-device
+notification acceptance is rerun.
+
 ## Required Acceptance
 
 - every active event type maps deterministically
