@@ -14,6 +14,7 @@ import {
   createInitialShadowRunnerSimulation,
   damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
+  getShadowRunnerEncounterBarrierState,
   getShadowRunnerHudState,
   getShadowRunnerChronoTimeScale,
   getShadowRunnerSurgeSpeedMultiplier,
@@ -198,6 +199,36 @@ describe('Shadow Runner simulation', () => {
 
     expect(createInitialShadowRunnerSimulation(levelEight).enemies.every(enemy => !enemy.activated)).toBe(true)
     expect(createInitialShadowRunnerSimulation(levelSix).enemies.every(enemy => enemy.activated)).toBe(true)
+  })
+
+  it('keeps a cleared sealed encounter open across a checkpoint respawn', () => {
+    const levelEight = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const state = createInitialShadowRunnerSimulation(levelEight)
+    const encounter = levelEight.encounters!.find(current => current.id === 'catacomb-encounter-sanctum')!
+    const encounterEnemies = state.enemies.filter(enemy => encounter.enemyIds.includes(enemy.id))
+
+    encounterEnemies.forEach(enemy => {
+      enemy.activated = true
+    })
+    expect(getShadowRunnerEncounterBarrierState(state.enemies, encounter.enemyIds)).toEqual({
+      active: true,
+      cleared: false,
+    })
+
+    encounterEnemies.forEach(enemy => {
+      enemy.health = 0
+      enemy.alive = false
+    })
+    const cleared = getShadowRunnerEncounterBarrierState(state.enemies, encounter.enemyIds)
+    expect(cleared).toEqual({ active: false, cleared: true })
+
+    spendShadowRunnerLife(state)
+    encounterEnemies[0].alive = true
+    expect(getShadowRunnerEncounterBarrierState(
+      state.enemies,
+      encounter.enemyIds,
+      cleared.cleared,
+    )).toEqual({ active: false, cleared: true })
   })
 
   it('spends one HUD heart per lost life while keeping health separate', () => {

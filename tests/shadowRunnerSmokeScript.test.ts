@@ -81,6 +81,7 @@ describe('Shadow Runner phone smoke script', () => {
     expect(compactScript).toContain('defeat the rival courier')
     expect(compactScript).toContain('offscreen tomb lurker woke before its encounter')
     expect(compactScript).toContain('relay sanctum did not seal after activation')
+    expect(compactScript).toContain('relay sanctum relocked after checkpoint respawn')
     expect(compactScript).toContain('level 8 first crouch lane coins were not reachable')
     expect(compactScript).toContain('level-8 powers, encounters, route gates, and completion')
   })

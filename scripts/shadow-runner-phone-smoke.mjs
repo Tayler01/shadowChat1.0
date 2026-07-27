@@ -848,9 +848,29 @@ async function assertLevelEightGameplay(page, profile) {
   })
   await page.waitForFunction(
     () => window.__shadowRunnerDebug?.().encounters
-      ?.find(encounter => encounter.id === 'catacomb-encounter-sanctum')?.barrierActive === false,
+      ?.find(encounter => encounter.id === 'catacomb-encounter-sanctum')?.cleared === true,
     null,
     { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.damage(12))
+  await page.waitForFunction(
+    () => {
+      const debug = window.__shadowRunnerDebug?.()
+      const sanctum = debug?.encounters
+        ?.find(encounter => encounter.id === 'catacomb-encounter-sanctum')
+      return debug?.player?.lives === 2
+        && debug.player.health === 12
+        && (debug.player.x ?? 0) >= 15_700
+        && sanctum?.cleared === true
+        && sanctum.barrierActive === false
+    },
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  snapshot = await readShadowRunnerDebug(page)
+  assert(
+    snapshot?.encounters?.find(encounter => encounter.id === 'catacomb-encounter-sanctum')?.barrierActive === false,
+    `${profile.label}: Relay Sanctum relocked after checkpoint respawn`,
   )
 
   const dpadBox = await page.locator('.shadow-runner-dpad').boundingBox()

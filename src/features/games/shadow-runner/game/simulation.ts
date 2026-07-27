@@ -81,6 +81,11 @@ export interface ShadowRunnerEnemyState {
   activated: boolean
 }
 
+export interface ShadowRunnerEncounterBarrierState {
+  active: boolean
+  cleared: boolean
+}
+
 export interface ShadowRunnerSimulationState {
   player: {
     lives: number
@@ -129,6 +134,28 @@ export interface ShadowRunnerSimulationState {
 }
 
 export const SHADOW_RUNNER_MAX_HEALTH = 12
+
+export function getShadowRunnerEncounterBarrierState(
+  enemies: ShadowRunnerEnemyState[],
+  enemyIds: string[],
+  wasCleared = false,
+): ShadowRunnerEncounterBarrierState {
+  const encounterEnemies = enemyIds
+    .map(enemyId => enemies.find(enemy => enemy.id === enemyId))
+    .filter((enemy): enemy is ShadowRunnerEnemyState => Boolean(enemy))
+  const allEnemiesResolved = encounterEnemies.length === enemyIds.length
+  const activated = encounterEnemies.some(enemy => enemy.activated)
+  const cleared = wasCleared || (
+    allEnemiesResolved
+    && activated
+    && encounterEnemies.every(enemy => !enemy.alive)
+  )
+
+  return {
+    active: !cleared && encounterEnemies.some(enemy => enemy.activated && enemy.alive),
+    cleared,
+  }
+}
 
 function createEnemyState(enemy: ShadowRunnerEnemyConfig): ShadowRunnerEnemyState {
   return {

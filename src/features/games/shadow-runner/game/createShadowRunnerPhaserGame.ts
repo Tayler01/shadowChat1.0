@@ -44,6 +44,7 @@ import {
   createInitialShadowRunnerSimulation,
   damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
+  getShadowRunnerEncounterBarrierState,
   getShadowRunnerHudState,
   getShadowRunnerChronoTimeScale,
   getShadowRunnerSurgeSpeedMultiplier,
@@ -149,6 +150,7 @@ interface ShadowRunnerDebugSnapshot {
     id: string
     sealed: boolean
     barrierActive: boolean
+    cleared: boolean
     remainingEnemies: number
   }>
   pools: {
@@ -373,6 +375,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private tiltPlatforms: TiltPlatformRuntime[] = []
   private spectralPlatforms: SpectralPlatformRuntime[] = []
   private encounterBarrierRuntimes: EncounterBarrierRuntime[] = []
+  private clearedEncounterIds = new Set<string>()
   private arrowVolleys: ArrowVolleyRuntime[] = []
   private boostAura?: Phaser.GameObjects.Sprite
   private shieldAura?: Phaser.GameObjects.Graphics
@@ -584,6 +587,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.fallRespawnPending = false
     this.activeCheckpointIndex = -1
     this.checkpointToast = undefined
+    this.clearedEncounterIds.clear()
     this.respawnPoint = { ...this.level.playerStart }
     this.finishSparked = false
     this.physics.world.setBounds(0, 0, this.level.worldWidth, this.level.worldHeight)
@@ -1784,6 +1788,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
           barrierActive: this.encounterBarrierRuntimes.some(
             runtime => runtime.encounterId === encounter.id && runtime.active,
           ),
+          cleared: this.clearedEncounterIds.has(encounter.id),
           remainingEnemies: encounter.enemyIds.filter(enemyId => {
             const enemy = this.state.enemies.find(current => current.id === enemyId)
             return Boolean(enemy?.alive)
@@ -2165,10 +2170,15 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   private updateEncounterBarriers() {
     this.encounterBarrierRuntimes.forEach(runtime => {
-      const active = runtime.enemyIds.some(enemyId => {
-        const enemy = this.state.enemies.find(current => current.id === enemyId)
-        return Boolean(enemy?.activated && enemy.alive)
-      })
+      const barrierState = getShadowRunnerEncounterBarrierState(
+        this.state.enemies,
+        runtime.enemyIds,
+        this.clearedEncounterIds.has(runtime.encounterId),
+      )
+      if (barrierState.cleared) {
+        this.clearedEncounterIds.add(runtime.encounterId)
+      }
+      const active = barrierState.active
       if (active === runtime.active) return
 
       runtime.active = active
@@ -3046,6 +3056,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.jumpsUsed = 0
     this.fallRespawnPending = false
     this.player.setVelocity(0, 0)
+    this.updateEncounterBarriers()
     this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
     this.player.clearTint()
     this.playSound('respawn')
