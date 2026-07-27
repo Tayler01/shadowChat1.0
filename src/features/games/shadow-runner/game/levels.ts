@@ -1,4 +1,5 @@
 import { SHADOW_RUNNER_ASSETS } from '../assets/manifest'
+import { SHADOW_RUNNER_LEVEL_EIGHT } from './levelEight'
 
 export interface ShadowRunnerRect {
   id: string
@@ -7,7 +8,7 @@ export interface ShadowRunnerRect {
   width: number
   height: number
   visualId?: string
-  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock' | 'moon'
+  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock' | 'moon' | 'catacomb' | 'spectral'
   hidden?: boolean
   damage?: number
 }
@@ -29,6 +30,9 @@ export interface ShadowRunnerPoint {
 
 export interface ShadowRunnerCheckpoint extends ShadowRunnerPoint {
   label: string
+  triggerWidth?: number
+  minY?: number
+  maxY?: number
 }
 
 export interface ShadowRunnerBodyBounds {
@@ -69,6 +73,26 @@ export interface ShadowRunnerMoonShardPickup extends ShadowRunnerPoint {
   scoreValue?: number
 }
 
+export interface ShadowRunnerObjectivePickup extends ShadowRunnerPoint {
+  scoreValue?: number
+}
+
+export interface ShadowRunnerMasteryPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+}
+
+export interface ShadowRunnerWraithlightPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs?: number
+  healthRestore?: number
+}
+
+export interface ShadowRunnerMirrorWardPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs?: number
+  reflectionCharges?: number
+}
+
 export interface ShadowRunnerCrouchGate extends ShadowRunnerRect {
   visualFrame?: number
   visualWidth?: number
@@ -87,7 +111,17 @@ export interface ShadowRunnerArrowVolley extends ShadowRunnerRect {
   damage?: number
 }
 
-export type ShadowRunnerEnemyKind = 'clockwork-sentry' | 'lantern-bandit-scout' | 'barrel-roller' | 'scroll-thief' | 'tower-archer' | 'candle-jester' | 'moon-stalker'
+export type ShadowRunnerEnemyKind =
+  | 'clockwork-sentry'
+  | 'lantern-bandit-scout'
+  | 'barrel-roller'
+  | 'scroll-thief'
+  | 'tower-archer'
+  | 'candle-jester'
+  | 'moon-stalker'
+  | 'tomb-lurker'
+  | 'crypt-warden'
+  | 'rival-courier'
 
 export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   kind: ShadowRunnerEnemyKind
@@ -102,9 +136,25 @@ export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   projectileSpeed?: number
   contactDamage?: number
   projectileDamage?: number
+  guard?: number
+  encounterId?: string
 }
 
-export type ShadowRunnerPlayableLevelId = 'tutorial' | 'level-1' | 'level-2' | 'level-3' | 'level-4' | 'level-5' | 'level-6' | 'level-7'
+export interface ShadowRunnerEncounterConfig extends ShadowRunnerRect {
+  enemyIds: string[]
+  sealed?: boolean
+}
+
+export type ShadowRunnerPlayableLevelId =
+  | 'tutorial'
+  | 'level-1'
+  | 'level-2'
+  | 'level-3'
+  | 'level-4'
+  | 'level-5'
+  | 'level-6'
+  | 'level-7'
+  | 'level-8'
 
 export interface ShadowRunnerLevelConfig {
   id: ShadowRunnerPlayableLevelId
@@ -129,6 +179,15 @@ export interface ShadowRunnerLevelConfig {
   chronoPickups?: ShadowRunnerChronoPickup[]
   surgePickups?: ShadowRunnerSurgePickup[]
   moonShardPickups?: ShadowRunnerMoonShardPickup[]
+  objectiveLabel?: string
+  objectivePickups?: ShadowRunnerObjectivePickup[]
+  masteryLabel?: string
+  masteryPickups?: ShadowRunnerMasteryPickup[]
+  wraithlightPickups?: ShadowRunnerWraithlightPickup[]
+  mirrorWardPickups?: ShadowRunnerMirrorWardPickup[]
+  spectralPlatforms?: ShadowRunnerRect[]
+  requiredEnemyIds?: string[]
+  encounters?: ShadowRunnerEncounterConfig[]
   arrowVolleys?: ShadowRunnerArrowVolley[]
   enemy?: ShadowRunnerEnemyConfig
   enemies?: ShadowRunnerEnemyConfig[]
@@ -1373,6 +1432,9 @@ const DEFAULT_ENEMY_CONTACT_DAMAGE: Record<ShadowRunnerEnemyKind, number> = {
   'tower-archer': 1,
   'candle-jester': 2,
   'moon-stalker': 3,
+  'tomb-lurker': 2,
+  'crypt-warden': 3,
+  'rival-courier': 3,
 }
 
 const DEFAULT_ENEMY_PROJECTILE_DAMAGE: Partial<Record<ShadowRunnerEnemyKind, number>> = {
@@ -1412,6 +1474,7 @@ export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, Sh
   'level-5': SHADOW_RUNNER_LEVEL_FIVE,
   'level-6': SHADOW_RUNNER_LEVEL_SIX,
   'level-7': SHADOW_RUNNER_LEVEL_SEVEN,
+  'level-8': SHADOW_RUNNER_LEVEL_EIGHT,
 }
 
 export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
@@ -1521,10 +1584,11 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyTier: 8,
     difficultyLabel: 'Hidden Paths',
     routeType: 'Branching Route',
-    mechanicPreview: 'Secret chambers, optional shards, ambushes',
-    thumbnail: SHADOW_RUNNER_ASSETS.home.background,
+    mechanicPreview: 'Wraithlight paths, Mirror Ward reflections, Relay Seals, guarded ambushes',
+    thumbnail: SHADOW_RUNNER_ASSETS.levels.courierCatacombsThumbnail320,
     locationButton: SHADOW_RUNNER_ASSETS.levels.courierCatacombsLocationButton,
     mapPosition: { left: 38, top: 84 },
+    playableLevelId: 'level-8',
   },
   {
     id: 'level-9',

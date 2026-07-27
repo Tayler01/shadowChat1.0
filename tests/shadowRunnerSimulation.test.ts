@@ -4,15 +4,22 @@ import {
   collectShadowRunnerBoost,
   collectShadowRunnerChrono,
   collectShadowRunnerCoin,
+  collectShadowRunnerMastery,
+  collectShadowRunnerMirrorWard,
   collectShadowRunnerMoonShard,
+  collectShadowRunnerObjective,
   collectShadowRunnerShield,
   collectShadowRunnerSurge,
+  collectShadowRunnerWraithlight,
   createInitialShadowRunnerSimulation,
   damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
   getShadowRunnerHudState,
   getShadowRunnerChronoTimeScale,
   getShadowRunnerSurgeSpeedMultiplier,
+  isShadowRunnerMirrorWardActive,
+  isShadowRunnerWraithlightActive,
+  reflectShadowRunnerProjectileWithMirrorWard,
   spendShadowRunnerLife,
 } from '../src/features/games/shadow-runner/game/simulation'
 
@@ -116,6 +123,81 @@ describe('Shadow Runner simulation', () => {
     hud = getShadowRunnerHudState(state, levelSeven.coins.length)
     expect(hud.moonShardGateOpen).toBe(true)
     expect(state.objective).toBe('Moon relay open')
+  })
+
+  it('applies Wraithlight healing and Mirror Ward reflection charges', () => {
+    const levelEight = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const state = createInitialShadowRunnerSimulation(levelEight)
+    const wraithlight = levelEight.wraithlightPickups![0]
+    const mirrorWard = levelEight.mirrorWardPickups![0]
+    state.player.health = 7
+
+    collectShadowRunnerWraithlight(state, 1000, wraithlight)
+    expect(state.player.health).toBe(9)
+    expect(isShadowRunnerWraithlightActive(state, 1200)).toBe(true)
+    expect(isShadowRunnerWraithlightActive(state, 20_000)).toBe(false)
+
+    collectShadowRunnerMirrorWard(state, 2000, mirrorWard)
+    expect(isShadowRunnerMirrorWardActive(state, 2200)).toBe(true)
+    expect(reflectShadowRunnerProjectileWithMirrorWard(state, 2200)).toBe(true)
+    expect(state.player.mirrorWardCharges).toBe((mirrorWard.reflectionCharges ?? 5) - 1)
+
+    state.player.mirrorWardCharges = 0
+    expect(reflectShadowRunnerProjectileWithMirrorWard(state, 2300)).toBe(false)
+  })
+
+  it('tracks Relay Seals, Courier Caches, full clears, and perfect routes separately', () => {
+    const levelEight = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const state = createInitialShadowRunnerSimulation(levelEight)
+
+    levelEight.objectivePickups?.forEach(pickup => collectShadowRunnerObjective(state, pickup))
+    levelEight.masteryPickups?.forEach(pickup => collectShadowRunnerMastery(state, pickup))
+    levelEight.coins.forEach(() => collectShadowRunnerCoin(state))
+    state.enemies.forEach(enemy => {
+      enemy.health = 0
+      enemy.alive = false
+    })
+
+    let hud = getShadowRunnerHudState(state, levelEight.coins.length)
+    expect(hud.objectiveItems).toBe(3)
+    expect(hud.objectiveGateOpen).toBe(true)
+    expect(hud.masteryItems).toBe(5)
+    expect(hud.fullClear).toBe(true)
+    expect(hud.perfectRoute).toBe(true)
+
+    spendShadowRunnerLife(state)
+    hud = getShadowRunnerHudState(state, levelEight.coins.length)
+    expect(hud.fullClear).toBe(true)
+    expect(hud.perfectRoute).toBe(false)
+  })
+
+  it('breaks Crypt Warden guard before frontal damage and allows bypass attacks', () => {
+    const levelEight = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const state = createInitialShadowRunnerSimulation(levelEight)
+    const warden = state.enemies.find(enemy => enemy.kind === 'crypt-warden')!
+
+    expect(warden.guard).toBeGreaterThan(0)
+    const startingHealth = warden.health
+    expect(damageShadowRunnerEnemy(state, 1000, 1, warden.id)).toBe(true)
+    expect(warden.health).toBe(startingHealth)
+    expect(warden.guard).toBe(warden.maxGuard - 1)
+
+    expect(damageShadowRunnerEnemy(
+      state,
+      1240,
+      2,
+      warden.id,
+      { bypassGuard: true },
+    )).toBe(true)
+    expect(warden.health).toBe(startingHealth - 2)
+  })
+
+  it('starts encounter-owned Level 8 enemies asleep without changing older routes', () => {
+    const levelEight = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const levelSix = SHADOW_RUNNER_LEVEL_CONFIGS['level-6']
+
+    expect(createInitialShadowRunnerSimulation(levelEight).enemies.every(enemy => !enemy.activated)).toBe(true)
+    expect(createInitialShadowRunnerSimulation(levelSix).enemies.every(enemy => enemy.activated)).toBe(true)
   })
 
   it('spends one HUD heart per lost life while keeping health separate', () => {

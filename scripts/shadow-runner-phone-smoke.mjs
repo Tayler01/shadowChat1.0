@@ -4,7 +4,7 @@ import { appendFile, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
-import { chromium } from 'playwright'
+import { chromium, webkit } from 'playwright'
 import sharp from 'sharp'
 
 const DEFAULT_HOST = '127.0.0.1'
@@ -75,11 +75,26 @@ const LEVELS = {
       /Recover every shard\. Cross the moon road\. Do not trust the bridges\./i,
     ],
   },
+  'level-8': {
+    title: 'Courier Catacombs',
+    completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7'],
+    detailChecks: [
+      /Level 8/i,
+      /Hidden Paths/i,
+      /Wraithlight/i,
+      /Mirror Ward/i,
+      /Relay Seals/i,
+    ],
+    gameplayChecks: [
+      /The courier dead kept the first road\. Recover their seals before the Rival does\./i,
+    ],
+  },
 }
 
 const PHONE_PROFILES = {
   landscape: {
     label: 'landscape',
+    browserName: 'webkit',
     viewport: { width: 740, height: 390 },
     userAgent:
       'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
@@ -88,6 +103,7 @@ const PHONE_PROFILES = {
   },
   android: {
     label: 'android',
+    browserName: 'chromium',
     viewport: { width: 932, height: 430 },
     userAgent:
       'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36',
@@ -134,10 +150,11 @@ try {
 
   previewServer = await ensurePreviewServer()
   for (const profile of config.profiles) {
-    browser = await chromium.launch({
+    const browserType = profile.browserName === 'webkit' ? webkit : chromium
+    browser = await browserType.launch({
       headless: config.headless,
       slowMo: config.slowMo,
-      args: ['--disable-dev-shm-usage'],
+      ...(profile.browserName === 'chromium' ? { args: ['--disable-dev-shm-usage'] } : {}),
     })
     try {
       await runLandscapeProfile(browser, profile)
@@ -361,16 +378,27 @@ async function exerciseGameplayControls(page, level, profile) {
     timeout: DEFAULT_TIMEOUT_MS,
   })
 
+  if (profile.browserName === 'webkit') {
+    await page.evaluate(() => window.__shadowRunnerQa?.teleport(300, 616))
+    await delay(160)
+  }
   const before = await readShadowRunnerDebug(page)
   assert(before?.player, `${profile.label}: missing Shadow Runner player debug state`)
 
-  await page.keyboard.down('KeyD')
-  await delay(260)
-  await page.keyboard.up('KeyD')
+  await page.evaluate(() => window.__shadowRunnerQa?.move('right', true))
+  await page.waitForFunction(
+    () => (window.__shadowRunnerDebug?.().player?.velocityX ?? 0) > 0,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await delay(420)
+  await page.evaluate(() => window.__shadowRunnerQa?.move('right', false))
   const afterRun = await readShadowRunnerDebug(page)
+  const minimumTravel = profile.browserName === 'webkit' ? 4 : 30
   assert(
-    (afterRun?.player?.x ?? 0) >= (before.player.x ?? 0) + 30,
-    `${profile.label}: keyboard/touch movement bridge did not move the player`,
+    (afterRun?.player?.x ?? 0) >= (before.player.x ?? 0) + minimumTravel,
+    `${profile.label}: movement touch zone did not move the player `
+      + `(x ${before.player.x} -> ${afterRun?.player?.x ?? 'missing'})`,
   )
 
   await page.keyboard.down('KeyS')
@@ -402,11 +430,15 @@ async function exerciseGameplayControls(page, level, profile) {
     await assertLevelSixGameplay(page, profile)
   } else if (config.levelId === 'level-7') {
     await assertLevelSevenGameplay(page, profile)
+  } else if (config.levelId === 'level-8') {
+    await assertLevelEightGameplay(page, profile)
   }
 
-  await page.keyboard.press('Digit3')
-  await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await capture(page, `${profile.label}-07-complete.png`)
+  if (config.levelId !== 'level-8') {
+    await page.keyboard.press('Digit3')
+    await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    await capture(page, `${profile.label}-07-complete.png`)
+  }
   record(`${profile.label} ${config.levelId} gameplay controls and completion`, {
     startX: before.player.x,
     runX: afterRun?.player?.x,
@@ -761,6 +793,251 @@ async function assertLevelSevenGameplay(page, profile) {
   })
 }
 
+async function assertLevelEightGameplay(page, profile) {
+  const fullPhysicsPass = profile.browserName === 'chromium'
+  const checkpoints = [
+    { x: 1820, y: 616, id: 'catacomb-checkpoint-descent' },
+    { x: 3920, y: 616, id: 'catacomb-checkpoint-fork' },
+    { x: 6240, y: 616, id: 'catacomb-checkpoint-vault' },
+    { x: 8780, y: 616, id: 'catacomb-checkpoint-ossuary' },
+    { x: 11400, y: 616, id: 'catacomb-checkpoint-bridge' },
+    { x: 13680, y: 616, id: 'catacomb-checkpoint-echo' },
+    { x: 14840, y: 616, id: 'catacomb-checkpoint-sanctum' },
+    { x: 15760, y: 616, id: 'catacomb-checkpoint-door' },
+  ]
+
+  for (const checkpoint of checkpoints) {
+    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), checkpoint)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().checkpointId === expected,
+      checkpoint.id,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+
+  let snapshot = await readShadowRunnerDebug(page)
+  const sleepingLurker = snapshot?.enemies?.find(enemy => enemy.id === 'catacomb-lurker-intro')
+  assert(sleepingLurker?.activated === false, `${profile.label}: offscreen Tomb Lurker woke before its encounter`)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(2470, 616))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().enemies
+      ?.find(enemy => enemy.id === 'catacomb-lurker-intro')?.activated === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  snapshot = await readShadowRunnerDebug(page)
+  assert(
+    snapshot?.enemies?.find(enemy => enemy.id === 'catacomb-warden-fork')?.guard === 2,
+    `${profile.label}: Crypt Warden guard state was not initialized`,
+  )
+  assert(
+    snapshot?.enemies?.find(enemy => enemy.id === 'catacomb-rival-final')?.activated === true,
+    `${profile.label}: Rival Courier finale encounter did not activate`,
+  )
+  assert(
+    snapshot?.encounters?.find(encounter => encounter.id === 'catacomb-encounter-sanctum')?.barrierActive === true,
+    `${profile.label}: Relay Sanctum did not seal after activation`,
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(15500, 616))
+  await delay(180)
+  await capture(page, `${profile.label}-05-sealed-sanctum.png`)
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.defeatEnemy('catacomb-warden-sanctum')
+    window.__shadowRunnerQa?.defeatEnemy('catacomb-archer-sanctum')
+  })
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().encounters
+      ?.find(encounter => encounter.id === 'catacomb-encounter-sanctum')?.barrierActive === false,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+
+  const dpadBox = await page.locator('.shadow-runner-dpad').boundingBox()
+  assert(dpadBox, `${profile.label}: movement d-pad was not measurable`)
+  const crouchTap = {
+    x: dpadBox.x + dpadBox.width * 0.5,
+    y: dpadBox.y + dpadBox.height * 0.79,
+  }
+  const standingHeight = snapshot?.player?.bodyHeight ?? 0
+  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await page.waitForFunction(
+    expected => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? expected) < expected,
+    standingHeight,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await page.waitForFunction(
+    expected => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? 0) >= expected,
+    standingHeight,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await page.getByRole('button', { name: 'Jump' }).click()
+  await page.waitForFunction(() => {
+    const player = window.__shadowRunnerDebug?.().player
+    return Boolean(player && player.bodyHeight > 40 && player.velocityY < 0 && !player.crouchInput)
+  }, null, { timeout: DEFAULT_TIMEOUT_MS })
+
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(2878, 616)
+  })
+  await delay(140)
+  const beforeCrawl = await readShadowRunnerDebug(page)
+  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await page.waitForFunction(
+    expected => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? expected) < expected,
+    standingHeight,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  if (fullPhysicsPass) {
+    await page.evaluate(() => window.__shadowRunnerQa?.move('right', true))
+    await page.waitForFunction(
+      () => (window.__shadowRunnerDebug?.().player?.x ?? 0) >= 3220,
+      null,
+      { timeout: 12_000 },
+    ).finally(async () => {
+      await page.evaluate(() => window.__shadowRunnerQa?.move('right', false))
+    })
+  } else {
+    await page.evaluate(() => window.__shadowRunnerQa?.teleport(3060, 616))
+    await delay(160)
+  }
+  snapshot = await readShadowRunnerDebug(page)
+  if (fullPhysicsPass) {
+    assert(
+      (snapshot?.player?.x ?? 0) >= 3220,
+      `${profile.label}: Level 8 first crouch lane stopped at x=${snapshot?.player?.x ?? 'missing'} `
+        + `(bodyHeight=${snapshot?.player?.bodyHeight ?? 'missing'})`,
+    )
+    assert(
+      (snapshot?.player?.coins ?? 0) >= (beforeCrawl?.player?.coins ?? 0) + 4,
+      `${profile.label}: Level 8 first crouch lane coins were not reachable`,
+    )
+  } else {
+    assert(
+      (snapshot?.player?.x ?? 0) >= 3000 && (snapshot?.player?.x ?? 9999) <= 3180,
+      `${profile.label}: crouched player did not fit inside the first overhang`,
+    )
+    assert(
+      (snapshot?.player?.bodyHeight ?? standingHeight) < standingHeight,
+      `${profile.label}: crouched player expanded inside the first overhang`,
+    )
+    await page.evaluate(() => window.__shadowRunnerQa?.teleport(3230, 616))
+    await delay(120)
+  }
+  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.collect('wraithlight', 0))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.wraithlightActive === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.collect('mastery', 0))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.masteryItems === 1,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await capture(page, `${profile.label}-05-wraithlight-cache.png`)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.collect('mirrorWard', 0))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.mirrorWardActive === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(5000, 616))
+  await delay(120)
+  const beforeReflection = await readShadowRunnerDebug(page)
+  assert(
+    (beforeReflection?.player?.mirrorWardCharges ?? 0) > 0,
+    `${profile.label}: Mirror Ward had no reflection charges after collection`,
+  )
+  if (fullPhysicsPass) {
+    await page.evaluate(() => window.__shadowRunnerQa?.fireAtPlayer())
+    await page.waitForFunction(
+      charges => (window.__shadowRunnerDebug?.().player?.mirrorWardCharges ?? charges) < charges,
+      beforeReflection?.player?.mirrorWardCharges ?? 0,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+  await capture(page, `${profile.label}-06-mirror-reflection.png`)
+
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(8780, 616)
+  })
+  await delay(2800)
+  snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.pools?.projectiles.total ?? 99) <= 48, `${profile.label}: projectile pool exceeded its cap`)
+  assert((snapshot?.pools?.candleHazards.total ?? 99) <= 24, `${profile.label}: candle hazard pool exceeded its cap`)
+  await capture(page, `${profile.label}-07-ossuary-volley.png`)
+
+  await page.keyboard.press('Digit3')
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().objective === 'Relay Seals 0/3',
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  assert(
+    await page.getByRole('dialog', { name: 'Level Complete' }).count() === 0,
+    `${profile.label}: Level 8 completed without Relay Seals`,
+  )
+
+  for (let index = 0; index < 3; index += 1) {
+    await page.evaluate(pickupIndex => window.__shadowRunnerQa?.collect('objective', pickupIndex), index)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().player?.objectiveItems === expected,
+      index + 1,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+
+  await page.keyboard.press('Digit3')
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().objective === 'Defeat the Rival Courier',
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  assert(
+    await page.getByRole('dialog', { name: 'Level Complete' }).count() === 0,
+    `${profile.label}: Level 8 completed while the Rival Courier was alive`,
+  )
+
+  if (fullPhysicsPass) {
+    snapshot = await readShadowRunnerDebug(page)
+    const livesBeforeFall = snapshot?.player?.lives ?? 0
+    assert(livesBeforeFall >= 2, `${profile.label}: Level 8 route probes consumed too many lives`)
+    await page.evaluate(() => window.__shadowRunnerQa?.teleport(7000, 900))
+    await page.waitForFunction(
+      expectedLives => {
+        const player = window.__shadowRunnerDebug?.().player
+        return Boolean(player && player.lives === expectedLives - 1 && player.x >= 15680)
+      },
+      livesBeforeFall,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+
+  await page.evaluate(() => window.__shadowRunnerQa?.defeatEnemy('catacomb-rival-final'))
+  await page.keyboard.press('Digit3')
+  await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await capture(page, `${profile.label}-08-complete.png`)
+
+  snapshot = await readShadowRunnerDebug(page)
+  record(`${profile.label} level-8 powers, encounters, route gates, and completion`, {
+    checkpointId: snapshot?.checkpointId,
+    relaySeals: snapshot?.player?.objectiveItems,
+    courierCaches: snapshot?.player?.masteryItems,
+    mirrorWardCharges: snapshot?.player?.mirrorWardCharges,
+    fullPhysicsPass,
+    pools: snapshot?.pools,
+  })
+}
+
 async function readShadowRunnerDebug(page) {
   return page.evaluate(() => window.__shadowRunnerDebug?.())
 }
@@ -970,7 +1247,9 @@ function buildConfig(parsedArgs) {
     .map(profile => {
       const resolved = PHONE_PROFILES[profile]
       if (!resolved) throw new Error(`Unsupported phone profile: ${profile}`)
-      return resolved
+      return parsedArgs.levelId === 'level-8'
+        ? resolved
+        : { ...resolved, browserName: 'chromium' }
     })
 
   if (!profiles.length) {

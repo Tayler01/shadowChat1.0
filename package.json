@@ -37,6 +37,7 @@
     "qa:shadow-runner:level5": "node scripts/shadow-runner-phone-smoke.mjs --level=level-5 --profiles=landscape,android",
     "qa:shadow-runner:level6": "node scripts/shadow-runner-phone-smoke.mjs --level=level-6 --profiles=landscape,android",
     "qa:shadow-runner:level7": "node scripts/shadow-runner-phone-smoke.mjs --level=level-7 --profiles=landscape,android",
+    "qa:shadow-runner:level8": "node scripts/shadow-runner-phone-smoke.mjs --level=level-8 --profiles=landscape,android",
     "news:scrape:proof": "node services/news-scraper/src/index.mjs --proof",
     "news:scraper": "node services/news-scraper/src/index.mjs",
     "bridge:tui": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/bridge-tui/bridge-tui.ps1",

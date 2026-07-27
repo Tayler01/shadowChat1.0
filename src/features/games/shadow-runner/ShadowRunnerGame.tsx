@@ -26,6 +26,8 @@ export interface ShadowRunnerLevelCompletionSummary {
   totalCoins: number
   enemiesDefeated: number
   totalEnemies: number
+  fullClear: boolean
+  perfectRoute: boolean
 }
 
 interface ShadowRunnerGameProps {
@@ -70,11 +72,25 @@ function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHud
     surgeActive: false,
     surgeRemainingMs: 0,
     surgeGuardCharges: 0,
+    wraithlightActive: false,
+    wraithlightRemainingMs: 0,
+    mirrorWardActive: false,
+    mirrorWardRemainingMs: 0,
+    mirrorWardCharges: 0,
     moonShards: 0,
     totalMoonShards: level.moonShardPickups?.length ?? 0,
     moonShardGateOpen: (level.moonShardPickups?.length ?? 0) === 0,
+    objectiveLabel: level.objectiveLabel ?? 'Objectives',
+    objectiveItems: 0,
+    totalObjectiveItems: level.objectivePickups?.length ?? 0,
+    objectiveGateOpen: (level.objectivePickups?.length ?? 0) === 0,
+    masteryLabel: level.masteryLabel ?? 'Mastery',
+    masteryItems: 0,
+    totalMasteryItems: level.masteryPickups?.length ?? 0,
     enemiesDefeated: 0,
     totalEnemies: getShadowRunnerLevelEnemies(level).length,
+    fullClear: false,
+    perfectRoute: false,
     objective: level.objective,
     defeated: false,
     outOfLives: false,
@@ -501,9 +517,11 @@ export function ShadowRunnerGame({
 
   React.useEffect(() => {
     setRouteIntroVisible(true)
+    if (!ready) return
+
     const timer = window.setTimeout(() => setRouteIntroVisible(false), 2800)
     return () => window.clearTimeout(timer)
-  }, [levelId, restartToken])
+  }, [levelId, ready, restartToken])
 
   React.useEffect(() => {
     if (!hud.defeated || completionReportedRef.current) return
@@ -514,8 +532,10 @@ export function ShadowRunnerGame({
       totalCoins: hud.totalCoins,
       enemiesDefeated: hud.enemiesDefeated,
       totalEnemies: hud.totalEnemies,
+      fullClear: hud.fullClear,
+      perfectRoute: hud.perfectRoute,
     })
-  }, [hud.coins, hud.defeated, hud.enemiesDefeated, hud.score, hud.totalCoins, hud.totalEnemies, levelId, onLevelComplete])
+  }, [hud.coins, hud.defeated, hud.enemiesDefeated, hud.fullClear, hud.perfectRoute, hud.score, hud.totalCoins, hud.totalEnemies, levelId, onLevelComplete])
 
   React.useEffect(() => {
     const game = gameRef.current
@@ -835,6 +855,64 @@ export function ShadowRunnerGame({
           </div>
         )}
 
+        {hud.wraithlightActive && (
+          <div
+            aria-label={`Wraithlight ${Math.ceil(hud.wraithlightRemainingMs / 1000)} seconds remaining`}
+            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#75ffd2]/45 bg-[#061712]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#b9ffe8] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.wraithlightLanternStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Wraithlight</span>
+            <span>{Math.ceil(hud.wraithlightRemainingMs / 1000)}s</span>
+          </div>
+        )}
+
+        {hud.mirrorWardActive && (
+          <div
+            aria-label={`Mirror Ward ${hud.mirrorWardCharges} reflection charges`}
+            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#e7f8ff]/50 bg-[#07141a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#e7f8ff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.mirrorWardStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Mirror</span>
+            <span>{hud.mirrorWardCharges}</span>
+          </div>
+        )}
+
+        {hud.totalObjectiveItems > 0 && (
+          <div
+            aria-label={`${hud.objectiveLabel} ${hud.objectiveItems} of ${hud.totalObjectiveItems}; ${hud.masteryLabel} ${hud.masteryItems} of ${hud.totalMasteryItems}`}
+            className={`pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border px-2.5 text-[0.52rem] font-black uppercase tracking-[0.1em] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem] ${
+              hud.objectiveGateOpen
+                ? 'border-[#f0d381]/55 bg-[#191006]/82 text-[#f8e8ad]'
+                : 'border-[#75ffd2]/45 bg-[#061712]/82 text-[#b9ffe8]'
+            }`}
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.relaySealStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Seals {hud.objectiveItems}/{hud.totalObjectiveItems}</span>
+            <span className="text-[#7fe9d0]">Caches {hud.masteryItems}/{hud.totalMasteryItems}</span>
+          </div>
+        )}
+
         {hud.totalMoonShards > 0 && (
           <div
             aria-label={`Moon Shards ${hud.moonShards} of ${hud.totalMoonShards}`}
@@ -930,12 +1008,14 @@ export function ShadowRunnerGame({
               />
               <div className="absolute inset-x-[13%] top-[27%] text-center">
                 <p className="text-[0.54rem] font-black uppercase tracking-[0.16em] text-[#5a3818] min-[740px]:text-[0.66rem]">{hud.levelTitle}</p>
-                <p className="mt-0.5 text-sm font-black uppercase leading-none tracking-[0.16em] min-[740px]:text-xl">Level Complete</p>
+                <p className="mt-0.5 text-sm font-black uppercase leading-none tracking-[0.16em] min-[740px]:text-xl">
+                  {hud.perfectRoute ? 'Perfect Route' : hud.fullClear ? 'Full Clear' : 'Level Complete'}
+                </p>
                 <p className="mt-1 text-[0.56rem] font-black uppercase tracking-[0.1em] text-[#3a2611] min-[740px]:text-xs">
                   {hud.completionLine}
                 </p>
                 <p className="mt-0.5 text-[0.48rem] font-black uppercase tracking-[0.08em] text-[#3a2611] min-[740px]:text-[0.58rem]">
-                  Coins {hud.coins} of {hud.totalCoins} - Score {hud.score}
+                  Coins {hud.coins}/{hud.totalCoins} - Enemies {hud.enemiesDefeated}/{hud.totalEnemies} - Score {hud.score}
                 </p>
               </div>
             </div>

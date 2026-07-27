@@ -4,9 +4,13 @@ import type {
   ShadowRunnerEnemyConfig,
   ShadowRunnerEnemyKind,
   ShadowRunnerLevelConfig,
+  ShadowRunnerMasteryPickup,
+  ShadowRunnerMirrorWardPickup,
   ShadowRunnerMoonShardPickup,
+  ShadowRunnerObjectivePickup,
   ShadowRunnerShieldPickup,
   ShadowRunnerSurgePickup,
+  ShadowRunnerWraithlightPickup,
 } from './levels'
 
 export interface ShadowRunnerHudState {
@@ -35,11 +39,25 @@ export interface ShadowRunnerHudState {
   surgeActive: boolean
   surgeRemainingMs: number
   surgeGuardCharges: number
+  wraithlightActive: boolean
+  wraithlightRemainingMs: number
+  mirrorWardActive: boolean
+  mirrorWardRemainingMs: number
+  mirrorWardCharges: number
   moonShards: number
   totalMoonShards: number
   moonShardGateOpen: boolean
+  objectiveLabel: string
+  objectiveItems: number
+  totalObjectiveItems: number
+  objectiveGateOpen: boolean
+  masteryLabel: string
+  masteryItems: number
+  totalMasteryItems: number
   enemiesDefeated: number
   totalEnemies: number
+  fullClear: boolean
+  perfectRoute: boolean
   objective: string
   defeated: boolean
   outOfLives: boolean
@@ -58,6 +76,9 @@ export interface ShadowRunnerEnemyState {
   lastShotAt: number
   lastDamagedAt: number
   attackUntil: number
+  guard: number
+  maxGuard: number
+  activated: boolean
 }
 
 export interface ShadowRunnerSimulationState {
@@ -80,7 +101,13 @@ export interface ShadowRunnerSimulationState {
     surgeActiveUntil: number
     surgeGuardCharges: number
     surgeSpeedMultiplier: number
+    wraithlightActiveUntil: number
+    mirrorWardActiveUntil: number
+    mirrorWardCharges: number
     moonShards: number
+    objectiveItems: number
+    masteryItems: number
+    checkpointRespawns: number
     lastDamagedAt: number
   }
   enemy: ShadowRunnerEnemyState
@@ -91,6 +118,10 @@ export interface ShadowRunnerSimulationState {
     subtitle: string
     completionLine: string
     totalMoonShards: number
+    objectiveLabel: string
+    totalObjectiveItems: number
+    masteryLabel: string
+    totalMasteryItems: number
   }
   objective: string
   defeated: boolean
@@ -113,6 +144,9 @@ function createEnemyState(enemy: ShadowRunnerEnemyConfig): ShadowRunnerEnemyStat
     lastShotAt: 0,
     lastDamagedAt: Number.NEGATIVE_INFINITY,
     attackUntil: 0,
+    guard: enemy.guard ?? 0,
+    maxGuard: enemy.guard ?? 0,
+    activated: !enemy.encounterId,
   }
 }
 
@@ -129,6 +163,9 @@ function createEmptyEnemyState(): ShadowRunnerEnemyState {
     lastShotAt: 0,
     lastDamagedAt: Number.NEGATIVE_INFINITY,
     attackUntil: 0,
+    guard: 0,
+    maxGuard: 0,
+    activated: false,
   }
 }
 
@@ -159,7 +196,13 @@ export function createInitialShadowRunnerSimulation(
       surgeActiveUntil: 0,
       surgeGuardCharges: 0,
       surgeSpeedMultiplier: 1,
+      wraithlightActiveUntil: 0,
+      mirrorWardActiveUntil: 0,
+      mirrorWardCharges: 0,
       moonShards: 0,
+      objectiveItems: 0,
+      masteryItems: 0,
+      checkpointRespawns: 0,
       lastDamagedAt: Number.NEGATIVE_INFINITY,
     },
     enemy: primaryEnemy,
@@ -170,6 +213,10 @@ export function createInitialShadowRunnerSimulation(
       subtitle: level.subtitle,
       completionLine: level.completionLine,
       totalMoonShards: level.moonShardPickups?.length ?? 0,
+      objectiveLabel: level.objectiveLabel ?? 'Objectives',
+      totalObjectiveItems: level.objectivePickups?.length ?? 0,
+      masteryLabel: level.masteryLabel ?? 'Mastery',
+      totalMasteryItems: level.masteryPickups?.length ?? 0,
     },
     objective: level.objective,
     defeated: false,
@@ -202,6 +249,25 @@ export function getShadowRunnerHudState(
   const totalEnemies = state.enemies.length
   const enemiesDefeated = state.enemies.filter(enemy => !enemy.alive).length
   const totalMoonShards = state.level.totalMoonShards
+  const rawWraithlightRemainingMs = Math.max(0, state.player.wraithlightActiveUntil - time)
+  const wraithlightRemainingMs = rawWraithlightRemainingMs > 0
+    ? Math.ceil(rawWraithlightRemainingMs / 1000) * 1000
+    : 0
+  const rawMirrorWardRemainingMs = Math.max(0, state.player.mirrorWardActiveUntil - time)
+  const mirrorWardRemainingMs = rawMirrorWardRemainingMs > 0
+    ? Math.ceil(rawMirrorWardRemainingMs / 1000) * 1000
+    : 0
+  const objectiveGateOpen = state.level.totalObjectiveItems === 0
+    || state.player.objectiveItems >= state.level.totalObjectiveItems
+  const fullClear = (
+    state.player.coins >= totalCoins
+    && enemiesDefeated >= totalEnemies
+    && state.player.objectiveItems >= state.level.totalObjectiveItems
+    && state.player.masteryItems >= state.level.totalMasteryItems
+  )
+  const perfectRoute = fullClear
+    && state.player.lives >= state.player.maxLives
+    && state.player.checkpointRespawns === 0
 
   return {
     lives: state.player.lives,
@@ -229,11 +295,25 @@ export function getShadowRunnerHudState(
     surgeActive: surgeRemainingMs > 0,
     surgeRemainingMs,
     surgeGuardCharges: state.player.surgeGuardCharges,
+    wraithlightActive: wraithlightRemainingMs > 0,
+    wraithlightRemainingMs,
+    mirrorWardActive: mirrorWardRemainingMs > 0 && state.player.mirrorWardCharges > 0,
+    mirrorWardRemainingMs,
+    mirrorWardCharges: state.player.mirrorWardCharges,
     moonShards: state.player.moonShards,
     totalMoonShards,
     moonShardGateOpen: totalMoonShards === 0 || state.player.moonShards >= totalMoonShards,
+    objectiveLabel: state.level.objectiveLabel,
+    objectiveItems: state.player.objectiveItems,
+    totalObjectiveItems: state.level.totalObjectiveItems,
+    objectiveGateOpen,
+    masteryLabel: state.level.masteryLabel,
+    masteryItems: state.player.masteryItems,
+    totalMasteryItems: state.level.totalMasteryItems,
     enemiesDefeated,
     totalEnemies,
+    fullClear,
+    perfectRoute,
     objective: state.objective,
     defeated: state.defeated,
     outOfLives: state.outOfLives,
@@ -256,6 +336,14 @@ export function isShadowRunnerSurgeActive(state: ShadowRunnerSimulationState, ti
   return state.player.surgeActiveUntil > time
 }
 
+export function isShadowRunnerWraithlightActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.wraithlightActiveUntil > time
+}
+
+export function isShadowRunnerMirrorWardActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.mirrorWardActiveUntil > time && state.player.mirrorWardCharges > 0
+}
+
 export function getShadowRunnerChronoTimeScale(state: ShadowRunnerSimulationState, time: number) {
   return isShadowRunnerChronoActive(state, time)
     ? Math.min(1, Math.max(0.35, state.player.chronoTimeScale))
@@ -273,6 +361,17 @@ export function blockShadowRunnerProjectileWithShield(state: ShadowRunnerSimulat
 
   state.player.shieldGuardCharges -= 1
   state.player.score += 10
+  return true
+}
+
+export function reflectShadowRunnerProjectileWithMirrorWard(
+  state: ShadowRunnerSimulationState,
+  time: number,
+) {
+  if (!isShadowRunnerMirrorWardActive(state, time)) return false
+
+  state.player.mirrorWardCharges = Math.max(0, state.player.mirrorWardCharges - 1)
+  state.player.score += 35
   return true
 }
 
@@ -307,6 +406,7 @@ export function restoreShadowRunnerPlayer(state: ShadowRunnerSimulationState) {
 
 export function spendShadowRunnerLife(state: ShadowRunnerSimulationState) {
   state.player.lives = Math.max(0, state.player.lives - 1)
+  state.player.checkpointRespawns += 1
   state.player.score = Math.max(0, state.player.score - 50)
 
   if (state.player.lives <= 0) {
@@ -322,6 +422,7 @@ export function damageShadowRunnerEnemy(
   time: number,
   amount: number,
   enemyId?: string,
+  options: { bypassGuard?: boolean; guardDamage?: number } = {},
 ) {
   const enemy = enemyId
     ? state.enemies.find(current => current.id === enemyId)
@@ -330,6 +431,12 @@ export function damageShadowRunnerEnemy(
   if (!enemy?.alive || time - enemy.lastDamagedAt < 220) return false
 
   enemy.lastDamagedAt = time
+  if (enemy.guard > 0 && !options.bypassGuard) {
+    enemy.guard = Math.max(0, enemy.guard - (options.guardDamage ?? amount))
+    state.player.score += 25
+    return true
+  }
+
   enemy.health = Math.max(0, enemy.health - amount)
   state.player.score += amount === 1 ? 50 : 75
 
@@ -400,6 +507,63 @@ export function collectShadowRunnerSurge(
   state.player.surgeActiveUntil = Math.max(state.player.surgeActiveUntil, time) + (surge.durationMs ?? 9500)
   state.player.surgeGuardCharges = Math.max(state.player.surgeGuardCharges, surge.guardCharges ?? 3)
   state.player.surgeSpeedMultiplier = surge.speedMultiplier ?? 1.12
+}
+
+export function collectShadowRunnerWraithlight(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  pickup: ShadowRunnerWraithlightPickup,
+) {
+  state.player.score += pickup.scoreValue ?? 180
+  state.player.health = Math.min(
+    state.player.maxHealth,
+    state.player.health + (pickup.healthRestore ?? 2),
+  )
+  state.player.wraithlightActiveUntil = Math.max(
+    state.player.wraithlightActiveUntil,
+    time,
+  ) + (pickup.durationMs ?? 11000)
+}
+
+export function collectShadowRunnerMirrorWard(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  pickup: ShadowRunnerMirrorWardPickup,
+) {
+  state.player.score += pickup.scoreValue ?? 170
+  state.player.mirrorWardActiveUntil = Math.max(
+    state.player.mirrorWardActiveUntil,
+    time,
+  ) + (pickup.durationMs ?? 10000)
+  state.player.mirrorWardCharges = Math.max(
+    state.player.mirrorWardCharges,
+    pickup.reflectionCharges ?? 5,
+  )
+}
+
+export function collectShadowRunnerObjective(
+  state: ShadowRunnerSimulationState,
+  pickup: ShadowRunnerObjectivePickup,
+) {
+  state.player.objectiveItems = Math.min(
+    state.level.totalObjectiveItems,
+    state.player.objectiveItems + 1,
+  )
+  state.player.score += pickup.scoreValue ?? 325
+  state.objective = state.player.objectiveItems >= state.level.totalObjectiveItems
+    ? `${state.level.objectiveLabel} complete`
+    : `${state.level.objectiveLabel} ${state.player.objectiveItems}/${state.level.totalObjectiveItems}`
+}
+
+export function collectShadowRunnerMastery(
+  state: ShadowRunnerSimulationState,
+  pickup: ShadowRunnerMasteryPickup,
+) {
+  state.player.masteryItems = Math.min(
+    state.level.totalMasteryItems,
+    state.player.masteryItems + 1,
+  )
+  state.player.score += pickup.scoreValue ?? 425
 }
 
 export function collectShadowRunnerMoonShard(

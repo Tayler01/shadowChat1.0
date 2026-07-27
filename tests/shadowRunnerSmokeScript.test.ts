@@ -20,6 +20,9 @@ describe('Shadow Runner phone smoke script', () => {
     expect(packageJson.scripts?.['qa:shadow-runner:level7']).toBe(
       'node scripts/shadow-runner-phone-smoke.mjs --level=level-7 --profiles=landscape,android',
     )
+    expect(packageJson.scripts?.['qa:shadow-runner:level8']).toBe(
+      'node scripts/shadow-runner-phone-smoke.mjs --level=level-8 --profiles=landscape,android',
+    )
   })
 
   it('uses local preview, phone profiles, screenshots, and canvas nonblank checks', () => {
@@ -31,6 +34,8 @@ describe('Shadow Runner phone smoke script', () => {
     expect(compactScript).toContain('assertimagenonblank')
     expect(compactScript).toContain('output')
     expect(compactScript).toContain('playwright')
+    expect(compactScript).toContain('chromium, webkit')
+    expect(compactScript).toContain("browsername: 'webkit'")
   })
 
   it('asserts Level 5 detail copy and active gameplay route text before passing', () => {
@@ -66,6 +71,18 @@ describe('Shadow Runner phone smoke script', () => {
     expect(compactScript).toContain('shadow surge did not activate')
     expect(compactScript).toContain('moon shards did not reach 3/3')
     expect(compactScript).toContain('level-7 shards, surge, crouch, and route segments')
+  })
+
+  it('asserts Level 8 route powers, objectives, encounters, and completion gates before passing', () => {
+    expect(compactScript).toContain('courier catacombs')
+    expect(compactScript).toContain('wraithlight')
+    expect(compactScript).toContain('mirror ward')
+    expect(compactScript).toContain('relay seals 0/3')
+    expect(compactScript).toContain('defeat the rival courier')
+    expect(compactScript).toContain('offscreen tomb lurker woke before its encounter')
+    expect(compactScript).toContain('relay sanctum did not seal after activation')
+    expect(compactScript).toContain('level 8 first crouch lane coins were not reachable')
+    expect(compactScript).toContain('level-8 powers, encounters, route gates, and completion')
   })
 
   it('bounds browser and preview cleanup so passed runs can exit', () => {

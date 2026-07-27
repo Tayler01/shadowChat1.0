@@ -20,6 +20,7 @@ import {
   type ShadowRunnerCampaignLevel,
   type ShadowRunnerPlayableLevelId,
 } from './game/levels'
+import { getShadowRunnerRouteRuntimeAssets } from './game/runtimeCatalog'
 import { ShadowRunnerGame, type ShadowRunnerLevelCompletionSummary } from './ShadowRunnerGame'
 import { ShadowRunnerScrollMenu, type ShadowRunnerScrollMenuAction } from './ShadowRunnerScrollMenu'
 
@@ -450,22 +451,8 @@ function getShadowRunnerRouteImageSources(levelId: ShadowRunnerPlayableLevelId) 
   const level = getShadowRunnerLevelConfig(levelId)
   const routeSources = [
     ...SHADOW_RUNNER_SHARED_GAMEPLAY_IMAGE_SOURCES,
-    level.backgroundAsset,
-    level.id === 'level-2' ? SHADOW_RUNNER_ASSETS.levels.lanternMarketBackground : undefined,
-    level.id === 'level-3' ? SHADOW_RUNNER_ASSETS.levels.ivyViaductTerrainHazards : undefined,
-    level.id === 'level-4' ? SHADOW_RUNNER_ASSETS.levels.bellTowerPropsHazards : undefined,
-    level.id === 'level-5' ? SHADOW_RUNNER_ASSETS.levels.candleFairPropsHazards : undefined,
-    level.id === 'level-5' ? SHADOW_RUNNER_ASSETS.levels.candleFairTerrainReadable : undefined,
-    level.id === 'level-6' ? SHADOW_RUNNER_ASSETS.levels.clockmakerYardProps : undefined,
-    level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.moonlitCausewayProps : undefined,
-    level.id === 'level-6' || level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip : undefined,
-    level.id === 'level-6' || level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.enemies.lanternBanditScoutStrip : undefined,
-    level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.enemies.moonStalkerStrip : undefined,
-    level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.shadowSurgeSigilStrip : undefined,
-    level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip : undefined,
-    level.id === 'level-4' || level.id === 'level-5' || level.id === 'level-6' || level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip : undefined,
-    level.id === 'level-4' || level.id === 'level-5' || level.id === 'level-6' || level.id === 'level-7' ? SHADOW_RUNNER_ASSETS.levels.boostAuraStrip : undefined,
-  ].filter((source): source is string => Boolean(source))
+    ...getShadowRunnerRouteRuntimeAssets(level),
+  ]
 
   return Array.from(new Set(routeSources))
 }

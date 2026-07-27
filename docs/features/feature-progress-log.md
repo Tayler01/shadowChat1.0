@@ -9,6 +9,31 @@ in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_COD
 Use this log for long-running `/goal` work and feature implementations that span
 multiple checkpoints. Keep entries concise, factual, and tied to verification.
 
+## July 27 Shadow Runner Level 8 Production Candidate
+
+- Built Courier Catacombs as a 16,200-pixel campaign level with eight bounded
+  checkpoints, 72 coins, 22 enemies, six tilt bridges, five crouch gates, ten
+  arrow-volley lanes, six spectral platforms, and nine sleeping encounters.
+- Added Tomb Lurkers, Crypt Wardens, the Rival Courier, Wraithlight and Mirror
+  Ward powers, three required Relay Seals, five optional Courier Caches,
+  guarded enemies, reflected projectiles, sealed arenas, and full-clear versus
+  perfect-route completion goals.
+- Generated and processed an original Level 8 art suite for the environment,
+  terrain, enemies, powers, objectives, campaign button, and thumbnails. Runtime
+  assets are isolated behind the Shadow Runner asset catalog and load only for
+  Level 8.
+- Reworked the route after automated playtesting so crouch lanes, hard upper
+  paths, long jumps, under-platform rewards, bridge falls, recovery routes, and
+  the final sanctum remain challenging without becoming progression blockers.
+- Full design, asset inventory, tuning contract, and as-built release evidence:
+  [SHADOW_RUNNER_LEVEL_8_COURIER_CATACOMBS_PLAN.md](../SHADOW_RUNNER_LEVEL_8_COURIER_CATACOMBS_PLAN.md).
+- Verification passed: lint, TypeScript, production build, all 248 Jest suites
+  and 1,395 tests, runtime asset contract, WebKit and Android Chromium Level 8
+  phone smoke, Level 7 regression smoke, and linked Supabase migration dry run.
+- Status: local production candidate on `main`. No commit, push, deployment, or
+  remote migration has been performed. Physical iPhone and Android balance
+  playtesting remains the final launch gate.
+
 ## Current Release - Audit Hardening And Social Foundations
 
 Status: shipped through the backend-first `main` workflow. Release closeout is

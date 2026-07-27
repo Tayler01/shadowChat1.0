@@ -105,6 +105,147 @@ describe('Shadow Runner level configuration contract', () => {
     expect(SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip).toContain('moon-shard-relic-4f-64.png')
   })
 
+  it('ships Courier Catacombs as the longest playable route with a complete new mechanic set', () => {
+    const levelSeven = SHADOW_RUNNER_LEVEL_CONFIGS['level-7']
+    const levelEight = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const enemies = getShadowRunnerLevelEnemies(levelEight)
+    const enemyKinds = new Set(enemies.map(enemy => enemy.kind))
+    const campaignLevel = SHADOW_RUNNER_CAMPAIGN_LEVELS.find(level => level.id === 'level-8')
+
+    expect(levelEight.title).toBe('Courier Catacombs')
+    expect(levelEight.campaignLevel).toBe(8)
+    expect(levelEight.worldWidth).toBeGreaterThan(levelSeven.worldWidth * 1.27)
+    expect(levelEight.coins).toHaveLength(72)
+    expect(levelEight.checkpoints).toHaveLength(8)
+    expect(levelEight.tiltPlatforms).toHaveLength(6)
+    expect(levelEight.crouchGates).toHaveLength(5)
+    expect(levelEight.arrowVolleys).toHaveLength(10)
+    expect(levelEight.objectivePickups).toHaveLength(3)
+    expect(levelEight.masteryPickups).toHaveLength(5)
+    expect(levelEight.wraithlightPickups).toHaveLength(4)
+    expect(levelEight.mirrorWardPickups).toHaveLength(3)
+    expect(levelEight.spectralPlatforms).toHaveLength(6)
+    expect(enemies).toHaveLength(22)
+    expect([...enemyKinds]).toEqual(expect.arrayContaining([
+      'tomb-lurker',
+      'crypt-warden',
+      'rival-courier',
+      'tower-archer',
+      'candle-jester',
+      'moon-stalker',
+    ]))
+    expect(levelEight.requiredEnemyIds).toEqual(['catacomb-rival-final'])
+    expect(enemies.some(enemy => enemy.id === levelEight.requiredEnemyIds?.[0])).toBe(true)
+    expect(campaignLevel?.playableLevelId).toBe('level-8')
+    expect(campaignLevel?.mechanicPreview).toContain('Mirror Ward')
+    expect(SHADOW_RUNNER_ASSETS.levels.courierCatacombsBackground).toContain('courier-catacombs-background.webp')
+    expect(SHADOW_RUNNER_ASSETS.levels.courierCatacombsProps).toContain('courier-catacombs-terrain-props-v1-transparent.png')
+    expect(SHADOW_RUNNER_ASSETS.enemies.cryptWardenStrip).toContain('crypt-warden-v1-6f-128.png')
+  })
+
+  it('keeps every Courier Catacombs main-route gap recoverable and every branch checkpoint bounded', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const routeIds = [
+      'catacomb-start-floor',
+      'catacomb-descent-floor-a',
+      'catacomb-tilt-descent',
+      'catacomb-descent-floor-b',
+      'catacomb-names-floor',
+      'catacomb-crawl-floor-a',
+      'catacomb-first-seal-floor',
+      'catacomb-vault-floor-a',
+      'catacomb-vault-floor-b',
+      'catacomb-tilt-vault',
+      'catacomb-vault-exit',
+      'catacomb-ossuary-floor-a',
+      'catacomb-crawl-floor-b',
+      'catacomb-ossuary-floor-b',
+      'catacomb-second-seal-floor',
+      'catacomb-pursuit-floor-a',
+      'catacomb-tilt-pursuit-a',
+      'catacomb-pursuit-floor-b',
+      'catacomb-tilt-pursuit-b',
+      'catacomb-pursuit-exit',
+      'catacomb-crawl-floor-c',
+      'catacomb-tilt-echo',
+      'catacomb-crawl-floor-d',
+      'catacomb-echo-exit',
+      'catacomb-sanctum-floor-a',
+      'catacomb-sanctum-floor-b',
+      'catacomb-tilt-sanctum',
+      'catacomb-relay-floor',
+    ]
+    const routeRects = routeIds.map(id => (
+      level.platforms.find(platform => platform.id === id)
+      ?? level.tiltPlatforms.find(platform => platform.id === id)
+    )!)
+
+    routeRects.forEach((rect, index) => {
+      expect(rect?.id).toBe(routeIds[index])
+      if (index === 0) return
+
+      const previous = routeRects[index - 1]
+      const gap = rect.x - (previous.x + previous.width)
+      const hasRecovery = level.platforms.some(platform => (
+        platform.id.includes('recovery')
+        && platform.x < rect.x
+        && platform.x + platform.width > previous.x + previous.width
+      ))
+      expect(gap <= 260 || hasRecovery).toBe(true)
+    })
+
+    level.checkpoints?.forEach(checkpoint => {
+      expect(checkpoint.triggerWidth).toBeGreaterThan(0)
+      expect(checkpoint.minY).toBeLessThan(checkpoint.maxY ?? 0)
+      const support = level.platforms.find(platform => (
+        checkpoint.x >= platform.x + 20
+        && checkpoint.x <= platform.x + platform.width - 20
+        && Math.abs(checkpoint.y - platform.y) <= 2
+      ))
+      expect(support?.width).toBeGreaterThanOrEqual(320)
+    })
+  })
+
+  it('places reachable crouch coins and Wraithlight caches on authored support', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const supports = [...level.platforms, ...(level.spectralPlatforms ?? [])]
+    const toeStep = level.platforms.find(platform => platform.id === 'catacomb-fork-toe-step')
+
+    expect(toeStep).toMatchObject({ hidden: true, width: 42, height: 12, y: 548 })
+    level.crouchGates?.forEach(gate => {
+      expect(616 - (gate.y + gate.height)).toBe(54)
+      const crouchCoins = level.coins.filter(coin => (
+        coin.x >= gate.x + 16
+        && coin.x <= gate.x + gate.width - 16
+        && coin.y >= 592
+        && coin.y <= 604
+      ))
+      expect(crouchCoins.length).toBeGreaterThanOrEqual(2)
+    })
+
+    level.masteryPickups?.forEach(cache => {
+      const support = supports.find(platform => (
+        cache.x >= platform.x + 16
+        && cache.x <= platform.x + platform.width - 16
+        && cache.y <= platform.y
+        && platform.y - cache.y <= 64
+      ))
+      expect(support?.id).toBeTruthy()
+    })
+  })
+
+  it('assigns every Courier Catacombs enemy to exactly one sleeping encounter', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const enemies = getShadowRunnerLevelEnemies(level)
+    const assignedIds = level.encounters?.flatMap(encounter => encounter.enemyIds) ?? []
+
+    expect(new Set(assignedIds).size).toBe(assignedIds.length)
+    expect(new Set(assignedIds)).toEqual(new Set(enemies.map(enemy => enemy.id)))
+    enemies.forEach(enemy => {
+      expect(level.encounters?.some(encounter => encounter.id === enemy.encounterId)).toBe(true)
+    })
+  })
+
   it('keeps Moonlit Causeway crawl pickups and recovery chips reachable', () => {
     const levelSeven = SHADOW_RUNNER_LEVEL_CONFIGS['level-7']
     const platformById = new Map(levelSeven.platforms.map(platform => [platform.id, platform]))
@@ -157,6 +298,7 @@ describe('Shadow Runner level configuration contract', () => {
       ['level-5', 4],
       ['level-6', 5],
       ['level-7', 6],
+      ['level-8', 8],
     ])
 
     expectedMinimums.forEach((minimum, levelId) => {
@@ -173,8 +315,8 @@ describe('Shadow Runner level configuration contract', () => {
     })
   })
 
-  it('keeps Level 5 through Level 7 patrol routes on their supporting platforms', () => {
-    ;(['level-5', 'level-6', 'level-7'] as const).forEach(levelId => {
+  it('keeps Level 5 through Level 8 patrol routes on their supporting platforms', () => {
+    ;(['level-5', 'level-6', 'level-7', 'level-8'] as const).forEach(levelId => {
       const level = SHADOW_RUNNER_LEVEL_CONFIGS[levelId]
       const movingEnemies = getShadowRunnerLevelEnemies(level)
         .filter(enemy => (enemy.patrolSpeed ?? 1) > 0)
