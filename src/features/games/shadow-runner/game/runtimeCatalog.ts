@@ -81,6 +81,10 @@ export const SHADOW_RUNNER_TERRAIN_RUNTIME: Record<ShadowRunnerTerrainSet, Shado
     textureKey: 'shadow-runner-catacomb-terrain-atlas',
     asset: SHADOW_RUNNER_ASSETS.levels.courierCatacombsProps,
   },
+  captain: {
+    textureKey: 'shadow-runner-captain-terrain-atlas',
+    asset: SHADOW_RUNNER_ASSETS.levels.captainGateProps,
+  },
 }
 
 export const CATACOMB_TERRAIN_CROPS: Record<string, ShadowRunnerTextureCrop> = {
@@ -96,6 +100,27 @@ export const CATACOMB_TERRAIN_CROPS: Record<string, ShadowRunnerTextureCrop> = {
   'catacomb-seal-altar': { x: 674, y: 660, width: 266, height: 360 },
   'catacomb-cache-pedestal': { x: 994, y: 690, width: 154, height: 330 },
   'catacomb-chain-anchor': { x: 1190, y: 686, width: 312, height: 334 },
+}
+
+export const CAPTAIN_GATE_TERRAIN_CROPS: Record<string, ShadowRunnerTextureCrop> = {
+  'captain-wide-floor': { x: 38, y: 72, width: 830, height: 164 },
+  'captain-rubble-floor': { x: 922, y: 72, width: 580, height: 166 },
+  'captain-medium-ledge': { x: 40, y: 294, width: 435, height: 170 },
+  'captain-counterweight-bridge': { x: 545, y: 286, width: 960, height: 182 },
+  'captain-recovery-step': { x: 55, y: 526, width: 210, height: 145 },
+  'captain-overhang': { x: 332, y: 522, width: 558, height: 153 },
+  'captain-lift': { x: 940, y: 526, width: 494, height: 162 },
+  'captain-barricade': { x: 32, y: 738, width: 255, height: 225 },
+  'captain-gate': { x: 312, y: 704, width: 415, height: 275 },
+  'captain-beacon': { x: 758, y: 714, width: 135, height: 268 },
+  'captain-command-chest': { x: 940, y: 760, width: 250, height: 205 },
+  'captain-windbreak': { x: 1184, y: 718, width: 328, height: 260 },
+  'captain-arena-floor': { x: 38, y: 72, width: 830, height: 164 },
+  'captain-recovery-slab': { x: 922, y: 72, width: 580, height: 166 },
+  'captain-cover-plinth': { x: 32, y: 738, width: 255, height: 225 },
+  'captain-chain-bridge': { x: 545, y: 286, width: 960, height: 182 },
+  'captain-counterweight-lift': { x: 940, y: 526, width: 494, height: 162 },
+  'captain-low-overhang': { x: 332, y: 522, width: 558, height: 153 },
 }
 
 export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRunnerEnemyRuntime> = {
@@ -249,6 +274,51 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
       defeated: 'rival-defeated',
     },
   },
+  'gate-pikeman': {
+    textureKey: 'gate-pikeman',
+    asset: SHADOW_RUNNER_ASSETS.enemies.gatePikemanStrip,
+    scale: 0.86,
+    body: { width: 50, height: 80, offsetX: 39, offsetY: 48 },
+    maxVelocityX: 168,
+    defaultPatrolSpeed: 72,
+    flipWhenFacingLeft: true,
+    animations: {
+      walk: 'pikeman-march',
+      attack: 'pikeman-thrust',
+      hit: 'pikeman-hit',
+      defeated: 'pikeman-defeated',
+    },
+  },
+  'storm-grenadier': {
+    textureKey: 'storm-grenadier',
+    asset: SHADOW_RUNNER_ASSETS.enemies.stormGrenadierStrip,
+    scale: 0.78,
+    body: { width: 44, height: 70, offsetX: 42, offsetY: 58 },
+    maxVelocityX: 196,
+    defaultPatrolSpeed: 92,
+    flipWhenFacingLeft: true,
+    animations: {
+      walk: 'grenadier-walk',
+      attack: 'grenadier-throw',
+      hit: 'grenadier-hit',
+      defeated: 'grenadier-defeated',
+    },
+  },
+  'moonlit-captain': {
+    textureKey: 'watch-captain',
+    asset: SHADOW_RUNNER_ASSETS.enemies.watchCaptainStrip,
+    scale: 0.9,
+    body: { width: 48, height: 78, offsetX: 40, offsetY: 50 },
+    maxVelocityX: 336,
+    defaultPatrolSpeed: 152,
+    flipWhenFacingLeft: true,
+    animations: {
+      walk: 'captain-guard',
+      attack: 'captain-slash',
+      hit: 'captain-hit',
+      defeated: 'captain-defeated',
+    },
+  },
 }
 
 export function getShadowRunnerTerrainRuntime(terrainSet?: ShadowRunnerRect['terrainSet']) {
@@ -258,16 +328,20 @@ export function getShadowRunnerTerrainRuntime(terrainSet?: ShadowRunnerRect['ter
 export function getShadowRunnerRouteRuntimeAssets(level: ShadowRunnerLevelConfig) {
   const terrainSets = new Set<ShadowRunnerTerrainSet>()
   level.platforms.forEach(platform => terrainSets.add(platform.terrainSet ?? 'stone'))
+  level.tiltPlatforms?.forEach(platform => terrainSets.add(platform.terrainSet ?? 'stone'))
   level.crouchGates?.forEach(gate => terrainSets.add(gate.terrainSet ?? 'stone'))
   level.spectralPlatforms?.forEach(platform => terrainSets.add(platform.terrainSet ?? 'spectral'))
+  level.movingPlatforms?.forEach(platform => terrainSets.add(platform.terrainSet ?? 'stone'))
   terrainSets.add(level.finish.terrainSet ?? 'stone')
 
+  const isCaptainGate = (level.id as string) === 'level-9'
+  const enemyKinds = (level.enemies ?? (level.enemy ? [level.enemy] : []))
+    .map(enemy => enemy.kind)
   const assets = [
     level.backgroundAsset,
     ...Array.from(terrainSets, terrainSet => SHADOW_RUNNER_TERRAIN_RUNTIME[terrainSet].asset),
     ...new Set(
-      (level.enemies ?? (level.enemy ? [level.enemy] : []))
-        .map(enemy => SHADOW_RUNNER_ENEMY_RUNTIME[enemy.kind].asset),
+      enemyKinds.map(enemyKind => SHADOW_RUNNER_ENEMY_RUNTIME[enemyKind].asset),
     ),
     level.boosts?.length ? SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip : undefined,
     level.boosts?.length ? SHADOW_RUNNER_ASSETS.levels.boostAuraStrip : undefined,
@@ -276,8 +350,25 @@ export function getShadowRunnerRouteRuntimeAssets(level: ShadowRunnerLevelConfig
     level.moonShardPickups?.length ? SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip : undefined,
     level.wraithlightPickups?.length ? SHADOW_RUNNER_ASSETS.levels.wraithlightLanternStrip : undefined,
     level.mirrorWardPickups?.length ? SHADOW_RUNNER_ASSETS.levels.mirrorWardStrip : undefined,
-    level.objectivePickups?.length ? SHADOW_RUNNER_ASSETS.levels.relaySealStrip : undefined,
-    level.masteryPickups?.length ? SHADOW_RUNNER_ASSETS.levels.courierCacheStrip : undefined,
+    level.objectivePickups?.length
+      ? isCaptainGate
+        ? SHADOW_RUNNER_ASSETS.levels.watchfireCrestStrip
+        : SHADOW_RUNNER_ASSETS.levels.relaySealStrip
+      : undefined,
+    level.masteryPickups?.length
+      ? isCaptainGate
+        ? SHADOW_RUNNER_ASSETS.levels.captainsOrdersStrip
+        : SHADOW_RUNNER_ASSETS.levels.courierCacheStrip
+      : undefined,
+    level.galeMantlePickups?.length
+      ? SHADOW_RUNNER_ASSETS.levels.galeMantleStrip
+      : undefined,
+    level.sunsteelEdgePickups?.length
+      ? SHADOW_RUNNER_ASSETS.levels.sunsteelEdgeStrip
+      : undefined,
+    enemyKinds.includes('storm-grenadier')
+      ? SHADOW_RUNNER_ASSETS.levels.stormBombStrip
+      : undefined,
   ]
 
   return Array.from(new Set(assets.filter((asset): asset is string => Boolean(asset))))

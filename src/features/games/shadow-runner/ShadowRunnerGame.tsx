@@ -77,6 +77,19 @@ function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHud
     mirrorWardActive: false,
     mirrorWardRemainingMs: 0,
     mirrorWardCharges: 0,
+    galeMantleActive: false,
+    galeMantleRemainingMs: 0,
+    galeMantleSpeedMultiplier: 1,
+    galeMantleFallDamageCap: null,
+    sunsteelEdgeActive: false,
+    sunsteelEdgeRemainingMs: 0,
+    sunsteelEdgeCharges: 0,
+    sunsteelStrikeActive: false,
+    sunsteelStrike: {
+      attackDamageBonus: 0,
+      guardDamage: 0,
+      reachBonus: 0,
+    },
     moonShards: 0,
     totalMoonShards: level.moonShardPickups?.length ?? 0,
     moonShardGateOpen: (level.moonShardPickups?.length ?? 0) === 0,
@@ -790,10 +803,11 @@ export function ShadowRunnerGame({
           </div>
         </div>
 
+        <div className="pointer-events-none mx-auto mt-1 flex max-w-[min(94vw,52rem)] flex-wrap items-center justify-center gap-1">
         {hud.boostActive && (
           <div
             aria-label={`Moonheart boost ${Math.ceil(hud.boostRemainingMs / 1000)} seconds remaining`}
-            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#e8c46b]/45 bg-[#130912]/78 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#f0d381] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#e8c46b]/45 bg-[#130912]/78 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#f0d381] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
           >
             <img
               src={SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip}
@@ -810,7 +824,7 @@ export function ShadowRunnerGame({
         {hud.shieldActive && (
           <div
             aria-label={`Shield ward ${Math.ceil(hud.shieldRemainingMs / 1000)} seconds remaining`}
-            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#8ad7ff]/45 bg-[#07121c]/78 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#bdeaff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#8ad7ff]/45 bg-[#07121c]/78 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#bdeaff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
           >
             <span>Shield</span>
             <span>{Math.ceil(hud.shieldRemainingMs / 1000)}s</span>
@@ -821,7 +835,7 @@ export function ShadowRunnerGame({
         {hud.chronoActive && (
           <div
             aria-label={`Chrono Lantern ${Math.ceil(hud.chronoRemainingMs / 1000)} seconds remaining`}
-            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#70e8ff]/45 bg-[#06121a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#9fefff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#70e8ff]/45 bg-[#06121a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#9fefff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
           >
             <span
               aria-hidden="true"
@@ -839,7 +853,7 @@ export function ShadowRunnerGame({
         {hud.surgeActive && (
           <div
             aria-label={`Shadow Surge ${Math.ceil(hud.surgeRemainingMs / 1000)} seconds remaining`}
-            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#a9efff]/45 bg-[#06101a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#d7f7ff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#a9efff]/45 bg-[#06101a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#d7f7ff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
           >
             <span
               aria-hidden="true"
@@ -858,7 +872,7 @@ export function ShadowRunnerGame({
         {hud.wraithlightActive && (
           <div
             aria-label={`Wraithlight ${Math.ceil(hud.wraithlightRemainingMs / 1000)} seconds remaining`}
-            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#75ffd2]/45 bg-[#061712]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#b9ffe8] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#75ffd2]/45 bg-[#061712]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#b9ffe8] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
           >
             <span
               aria-hidden="true"
@@ -876,7 +890,7 @@ export function ShadowRunnerGame({
         {hud.mirrorWardActive && (
           <div
             aria-label={`Mirror Ward ${hud.mirrorWardCharges} reflection charges`}
-            className="pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border border-[#e7f8ff]/50 bg-[#07141a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#e7f8ff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#e7f8ff]/50 bg-[#07141a]/82 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] text-[#e7f8ff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
           >
             <span
               aria-hidden="true"
@@ -891,10 +905,46 @@ export function ShadowRunnerGame({
           </div>
         )}
 
+        {hud.galeMantleActive && (
+          <div
+            aria-label={`Gale Mantle ${Math.ceil(hud.galeMantleRemainingMs / 1000)} seconds remaining`}
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#9be8ff]/50 bg-[#07141a]/84 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.1em] text-[#d8f7ff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.galeMantleStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Gale</span>
+            <span>{Math.ceil(hud.galeMantleRemainingMs / 1000)}s</span>
+          </div>
+        )}
+
+        {hud.sunsteelEdgeActive && (
+          <div
+            aria-label={`Sunsteel Edge ${hud.sunsteelEdgeCharges} charged attacks`}
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#ffc84f]/55 bg-[#1a1005]/84 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.1em] text-[#ffe8a3] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.sunsteelEdgeStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Sunsteel</span>
+            <span>{hud.sunsteelEdgeCharges}</span>
+          </div>
+        )}
+
         {hud.totalObjectiveItems > 0 && (
           <div
             aria-label={`${hud.objectiveLabel} ${hud.objectiveItems} of ${hud.totalObjectiveItems}; ${hud.masteryLabel} ${hud.masteryItems} of ${hud.totalMasteryItems}`}
-            className={`pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border px-2.5 text-[0.52rem] font-black uppercase tracking-[0.1em] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem] ${
+            className={`pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border px-2.5 text-[0.52rem] font-black uppercase tracking-[0.1em] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem] ${
               hud.objectiveGateOpen
                 ? 'border-[#f0d381]/55 bg-[#191006]/82 text-[#f8e8ad]'
                 : 'border-[#75ffd2]/45 bg-[#061712]/82 text-[#b9ffe8]'
@@ -904,19 +954,23 @@ export function ShadowRunnerGame({
               aria-hidden="true"
               className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
               style={{
-                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.relaySealStrip})`,
+                backgroundImage: `url(${
+                  hud.levelId === 'level-9'
+                    ? SHADOW_RUNNER_ASSETS.levels.watchfireCrestStrip
+                    : SHADOW_RUNNER_ASSETS.levels.relaySealStrip
+                })`,
                 backgroundSize: '400% 100%',
               }}
             />
-            <span>Seals {hud.objectiveItems}/{hud.totalObjectiveItems}</span>
-            <span className="text-[#7fe9d0]">Caches {hud.masteryItems}/{hud.totalMasteryItems}</span>
+            <span>{hud.objectiveLabel} {hud.objectiveItems}/{hud.totalObjectiveItems}</span>
+            <span className="text-[#7fe9d0]">{hud.masteryLabel} {hud.masteryItems}/{hud.totalMasteryItems}</span>
           </div>
         )}
 
         {hud.totalMoonShards > 0 && (
           <div
             aria-label={`Moon Shards ${hud.moonShards} of ${hud.totalMoonShards}`}
-            className={`pointer-events-none mx-auto mt-1 flex h-7 w-fit items-center gap-1.5 rounded border px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem] ${
+            className={`pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border px-2.5 text-[0.52rem] font-black uppercase tracking-[0.12em] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem] ${
               hud.moonShardGateOpen
                 ? 'border-[#f0d381]/55 bg-[#191006]/82 text-[#f8e8ad]'
                 : 'border-[#9be6ff]/45 bg-[#06121a]/82 text-[#bdeaff]'
@@ -934,6 +988,7 @@ export function ShadowRunnerGame({
             <span>{hud.moonShards}/{hud.totalMoonShards}</span>
           </div>
         )}
+        </div>
 
         <button
           type="button"

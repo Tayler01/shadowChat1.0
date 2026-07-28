@@ -3,15 +3,23 @@ import type {
   ShadowRunnerChronoPickup,
   ShadowRunnerEnemyConfig,
   ShadowRunnerEnemyKind,
+  ShadowRunnerGaleMantlePickup,
   ShadowRunnerLevelConfig,
   ShadowRunnerMasteryPickup,
   ShadowRunnerMirrorWardPickup,
   ShadowRunnerMoonShardPickup,
   ShadowRunnerObjectivePickup,
   ShadowRunnerShieldPickup,
+  ShadowRunnerSunsteelEdgePickup,
   ShadowRunnerSurgePickup,
   ShadowRunnerWraithlightPickup,
 } from './levels'
+
+export interface ShadowRunnerSunsteelStrikeProperties {
+  attackDamageBonus: number
+  guardDamage: number
+  reachBonus: number
+}
 
 export interface ShadowRunnerHudState {
   lives: number
@@ -44,6 +52,15 @@ export interface ShadowRunnerHudState {
   mirrorWardActive: boolean
   mirrorWardRemainingMs: number
   mirrorWardCharges: number
+  galeMantleActive: boolean
+  galeMantleRemainingMs: number
+  galeMantleSpeedMultiplier: number
+  galeMantleFallDamageCap: number | null
+  sunsteelEdgeActive: boolean
+  sunsteelEdgeRemainingMs: number
+  sunsteelEdgeCharges: number
+  sunsteelStrikeActive: boolean
+  sunsteelStrike: ShadowRunnerSunsteelStrikeProperties
   moonShards: number
   totalMoonShards: number
   moonShardGateOpen: boolean
@@ -109,6 +126,15 @@ export interface ShadowRunnerSimulationState {
     wraithlightActiveUntil: number
     mirrorWardActiveUntil: number
     mirrorWardCharges: number
+    galeMantleActiveUntil: number
+    galeMantleSpeedMultiplier: number
+    galeMantleFallDamageCap: number
+    sunsteelEdgeActiveUntil: number
+    sunsteelEdgeCharges: number
+    sunsteelStrikeActiveUntil: number
+    sunsteelAttackDamageBonus: number
+    sunsteelGuardDamage: number
+    sunsteelReachBonus: number
     moonShards: number
     objectiveItems: number
     masteryItems: number
@@ -226,6 +252,15 @@ export function createInitialShadowRunnerSimulation(
       wraithlightActiveUntil: 0,
       mirrorWardActiveUntil: 0,
       mirrorWardCharges: 0,
+      galeMantleActiveUntil: 0,
+      galeMantleSpeedMultiplier: 1,
+      galeMantleFallDamageCap: Number.POSITIVE_INFINITY,
+      sunsteelEdgeActiveUntil: 0,
+      sunsteelEdgeCharges: 0,
+      sunsteelStrikeActiveUntil: 0,
+      sunsteelAttackDamageBonus: 0,
+      sunsteelGuardDamage: 0,
+      sunsteelReachBonus: 0,
       moonShards: 0,
       objectiveItems: 0,
       masteryItems: 0,
@@ -284,6 +319,15 @@ export function getShadowRunnerHudState(
   const mirrorWardRemainingMs = rawMirrorWardRemainingMs > 0
     ? Math.ceil(rawMirrorWardRemainingMs / 1000) * 1000
     : 0
+  const rawGaleMantleRemainingMs = Math.max(0, state.player.galeMantleActiveUntil - time)
+  const galeMantleRemainingMs = rawGaleMantleRemainingMs > 0
+    ? Math.ceil(rawGaleMantleRemainingMs / 1000) * 1000
+    : 0
+  const rawSunsteelEdgeRemainingMs = Math.max(0, state.player.sunsteelEdgeActiveUntil - time)
+  const sunsteelEdgeRemainingMs = rawSunsteelEdgeRemainingMs > 0
+    ? Math.ceil(rawSunsteelEdgeRemainingMs / 1000) * 1000
+    : 0
+  const sunsteelStrike = getShadowRunnerSunsteelStrikeProperties(state, time)
   const objectiveGateOpen = state.level.totalObjectiveItems === 0
     || state.player.objectiveItems >= state.level.totalObjectiveItems
   const fullClear = (
@@ -327,6 +371,15 @@ export function getShadowRunnerHudState(
     mirrorWardActive: mirrorWardRemainingMs > 0 && state.player.mirrorWardCharges > 0,
     mirrorWardRemainingMs,
     mirrorWardCharges: state.player.mirrorWardCharges,
+    galeMantleActive: galeMantleRemainingMs > 0,
+    galeMantleRemainingMs,
+    galeMantleSpeedMultiplier: getShadowRunnerGaleSpeedMultiplier(state, time),
+    galeMantleFallDamageCap: getShadowRunnerGaleFallDamageCap(state, time),
+    sunsteelEdgeActive: sunsteelEdgeRemainingMs > 0 && state.player.sunsteelEdgeCharges > 0,
+    sunsteelEdgeRemainingMs,
+    sunsteelEdgeCharges: state.player.sunsteelEdgeCharges,
+    sunsteelStrikeActive: isShadowRunnerSunsteelStrikeActive(state, time),
+    sunsteelStrike,
     moonShards: state.player.moonShards,
     totalMoonShards,
     moonShardGateOpen: totalMoonShards === 0 || state.player.moonShards >= totalMoonShards,
@@ -371,6 +424,18 @@ export function isShadowRunnerMirrorWardActive(state: ShadowRunnerSimulationStat
   return state.player.mirrorWardActiveUntil > time && state.player.mirrorWardCharges > 0
 }
 
+export function isShadowRunnerGaleMantleActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.galeMantleActiveUntil > time
+}
+
+export function isShadowRunnerSunsteelEdgeActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.sunsteelEdgeActiveUntil > time && state.player.sunsteelEdgeCharges > 0
+}
+
+export function isShadowRunnerSunsteelStrikeActive(state: ShadowRunnerSimulationState, time: number) {
+  return state.player.sunsteelStrikeActiveUntil > time
+}
+
 export function getShadowRunnerChronoTimeScale(state: ShadowRunnerSimulationState, time: number) {
   return isShadowRunnerChronoActive(state, time)
     ? Math.min(1, Math.max(0.35, state.player.chronoTimeScale))
@@ -381,6 +446,55 @@ export function getShadowRunnerSurgeSpeedMultiplier(state: ShadowRunnerSimulatio
   return isShadowRunnerSurgeActive(state, time)
     ? Math.min(1.25, Math.max(1, state.player.surgeSpeedMultiplier))
     : 1
+}
+
+export function getShadowRunnerGaleSpeedMultiplier(state: ShadowRunnerSimulationState, time: number) {
+  return isShadowRunnerGaleMantleActive(state, time)
+    ? Math.min(1.2, Math.max(1, state.player.galeMantleSpeedMultiplier))
+    : 1
+}
+
+export function getShadowRunnerGaleFallDamageCap(
+  state: ShadowRunnerSimulationState,
+  time: number,
+) {
+  return isShadowRunnerGaleMantleActive(state, time)
+    ? Math.max(0, Math.floor(state.player.galeMantleFallDamageCap))
+    : null
+}
+
+export function getShadowRunnerSunsteelStrikeProperties(
+  state: ShadowRunnerSimulationState,
+  time: number,
+): ShadowRunnerSunsteelStrikeProperties {
+  if (!isShadowRunnerSunsteelStrikeActive(state, time)) {
+    return {
+      attackDamageBonus: 0,
+      guardDamage: 0,
+      reachBonus: 0,
+    }
+  }
+
+  return {
+    attackDamageBonus: Math.max(0, Math.floor(state.player.sunsteelAttackDamageBonus)),
+    guardDamage: Math.max(0, Math.floor(state.player.sunsteelGuardDamage)),
+    reachBonus: Math.max(0, Math.floor(state.player.sunsteelReachBonus)),
+  }
+}
+
+export function consumeShadowRunnerSunsteelCharge(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  strikeDurationMs = 280,
+) {
+  if (!isShadowRunnerSunsteelEdgeActive(state, time)) return false
+
+  state.player.sunsteelEdgeCharges = Math.max(0, state.player.sunsteelEdgeCharges - 1)
+  state.player.sunsteelStrikeActiveUntil = Math.max(
+    state.player.sunsteelStrikeActiveUntil,
+    time + Math.max(1, strikeDurationMs),
+  )
+  return true
 }
 
 export function blockShadowRunnerProjectileWithShield(state: ShadowRunnerSimulationState, time: number) {
@@ -566,6 +680,47 @@ export function collectShadowRunnerMirrorWard(
     state.player.mirrorWardCharges,
     pickup.reflectionCharges ?? 5,
   )
+}
+
+export function collectShadowRunnerGaleMantle(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  pickup: ShadowRunnerGaleMantlePickup,
+) {
+  state.player.score += pickup.scoreValue ?? 210
+  state.player.health = Math.min(
+    state.player.maxHealth,
+    state.player.health + pickup.healthRestore,
+  )
+  state.player.galeMantleActiveUntil = Math.max(
+    state.player.galeMantleActiveUntil,
+    time,
+  ) + pickup.durationMs
+  state.player.galeMantleSpeedMultiplier = pickup.speedMultiplier
+  state.player.galeMantleFallDamageCap = pickup.fallDamageCap
+}
+
+export function collectShadowRunnerSunsteelEdge(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  pickup: ShadowRunnerSunsteelEdgePickup,
+) {
+  state.player.score += pickup.scoreValue ?? 230
+  state.player.health = Math.min(
+    state.player.maxHealth,
+    state.player.health + pickup.healthRestore,
+  )
+  state.player.sunsteelEdgeActiveUntil = Math.max(
+    state.player.sunsteelEdgeActiveUntil,
+    time,
+  ) + pickup.durationMs
+  state.player.sunsteelEdgeCharges = Math.max(
+    state.player.sunsteelEdgeCharges,
+    pickup.charges,
+  )
+  state.player.sunsteelAttackDamageBonus = pickup.attackDamageBonus
+  state.player.sunsteelGuardDamage = pickup.guardDamage
+  state.player.sunsteelReachBonus = pickup.reachBonus
 }
 
 export function collectShadowRunnerObjective(

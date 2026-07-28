@@ -143,6 +143,289 @@ describe('Shadow Runner level configuration contract', () => {
     expect(SHADOW_RUNNER_ASSETS.enemies.cryptWardenStrip).toContain('crypt-warden-v1-6f-128.png')
   })
 
+  it('ships Captain Gate as the longest playable Stormwatch Siege route', () => {
+    const levelEight = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
+    const levelNine = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const enemies = getShadowRunnerLevelEnemies(levelNine)
+    const enemyKinds = new Set(enemies.map(enemy => enemy.kind))
+    const campaignLevel = SHADOW_RUNNER_CAMPAIGN_LEVELS.find(level => level.id === 'level-9')
+
+    expect(levelNine.title).toBe('Captain Gate')
+    expect(levelNine.subtitle).toBe('The Stormwatch Siege')
+    expect(levelNine.campaignLevel).toBe(9)
+    expect(levelNine.worldWidth).toBe(20400)
+    expect(levelNine.worldWidth).toBeGreaterThan(levelEight.worldWidth * 1.25)
+    expect(levelNine.checkpoints).toHaveLength(9)
+    expect(levelNine.coins).toHaveLength(90)
+    expect(levelNine.tiltPlatforms).toHaveLength(7)
+    expect(levelNine.movingPlatforms).toHaveLength(5)
+    expect(levelNine.crouchGates).toHaveLength(6)
+    expect(levelNine.windZones).toHaveLength(6)
+    expect(levelNine.arrowVolleys).toHaveLength(12)
+    expect(levelNine.objectivePickups).toHaveLength(4)
+    expect(levelNine.masteryPickups).toHaveLength(6)
+    expect(levelNine.galeMantlePickups).toHaveLength(4)
+    expect(levelNine.sunsteelEdgePickups).toHaveLength(4)
+    expect(enemies).toHaveLength(28)
+    expect([...enemyKinds]).toEqual(expect.arrayContaining([
+      'gate-pikeman',
+      'storm-grenadier',
+      'moonlit-captain',
+      'tower-archer',
+      'candle-jester',
+      'moon-stalker',
+    ]))
+    expect(enemies.filter(enemy => enemy.kind === 'gate-pikeman')).toHaveLength(7)
+    expect(enemies.filter(enemy => enemy.kind === 'storm-grenadier')).toHaveLength(6)
+    expect(enemies.filter(enemy => enemy.kind === 'moonlit-captain')).toHaveLength(1)
+    expect(levelNine.requiredEnemyIds).toEqual(['captain-moonlit-final'])
+    expect(campaignLevel?.playableLevelId).toBe('level-9')
+    expect(campaignLevel?.difficultyLabel).toBe('Stormwatch Siege')
+    expect(campaignLevel?.mechanicPreview).toContain('Gale Mantle')
+    expect(campaignLevel?.thumbnail).toContain('captain-gate-thumbnail-320x180.webp')
+    expect(campaignLevel?.locationButton).toContain('level-9-captain-gate-location-button-v2.webp')
+  })
+
+  it('keeps the Captain Gate main route continuous and every checkpoint on stable support', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const routeIds = [
+      'captain-start-floor',
+      'captain-outer-floor',
+      'captain-tilt-outer',
+      'captain-outer-exit',
+      'captain-signal-floor-a',
+      'captain-tilt-signal',
+      'captain-signal-floor-b',
+      'captain-signal-crest-floor',
+      'captain-murder-entry',
+      'captain-murder-hall',
+      'captain-tilt-murder',
+      'captain-murder-exit',
+      'captain-banner-entry',
+      'captain-tilt-banner',
+      'captain-banner-mid',
+      'captain-banner-exit',
+      'captain-barracks-entry',
+      'captain-barracks-post',
+      'captain-barracks-exit',
+      'captain-moonwell-entry',
+      'captain-tilt-moonwell',
+      'captain-moonwell-mid',
+      'captain-moonwell-exit',
+      'captain-span-entry',
+      'captain-span-mid',
+      'captain-tilt-span',
+      'captain-span-exit',
+      'captain-inner-entry',
+      'captain-tilt-inner',
+      'captain-inner-watch',
+      'captain-inner-crest',
+      'captain-final-prep',
+      'captain-boss-floor',
+      'captain-finish-floor',
+    ]
+    const routeRects = routeIds.map(id => (
+      level.platforms.find(platform => platform.id === id)
+      ?? level.tiltPlatforms.find(platform => platform.id === id)
+    )!)
+
+    routeRects.forEach((rect, index) => {
+      expect(rect?.id).toBe(routeIds[index])
+      if (index === 0) return
+
+      const previous = routeRects[index - 1]
+      const gap = rect.x - (previous.x + previous.width)
+      expect(gap).toBeGreaterThanOrEqual(0)
+      expect(gap).toBeLessThanOrEqual(150)
+      expect(Math.abs(rect.y - previous.y)).toBeLessThanOrEqual(12)
+    })
+
+    level.checkpoints?.forEach((checkpoint, index) => {
+      const support = level.platforms.find(platform => (
+        checkpoint.x >= platform.x + 20
+        && checkpoint.x <= platform.x + platform.width - 20
+        && Math.abs(checkpoint.y - platform.y) <= 2
+      ))
+
+      expect(support?.width).toBeGreaterThanOrEqual(420)
+      expect(checkpoint.triggerWidth).toBeGreaterThan(0)
+      expect(checkpoint.minY).toBeLessThan(checkpoint.maxY ?? 0)
+      if (index > 0) {
+        expect(checkpoint.x).toBeGreaterThan(level.checkpoints?.[index - 1].x ?? 0)
+      }
+    })
+
+    const checkpointGaps = (level.checkpoints ?? [])
+      .slice(1, -1)
+      .map((checkpoint, index) => checkpoint.x - (level.checkpoints?.[index].x ?? 0))
+    checkpointGaps.forEach(gap => {
+      expect(gap).toBeGreaterThanOrEqual(2100)
+      expect(gap).toBeLessThanOrEqual(2400)
+    })
+    const checkpoints = level.checkpoints ?? []
+    expect((checkpoints[checkpoints.length - 1]?.x ?? 0) - (checkpoints[checkpoints.length - 2]?.x ?? 0))
+      .toBeLessThanOrEqual(700)
+  })
+
+  it('keeps Captain Gate IDs unique and authored geometry inside world bounds', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const rects = [
+      ...level.platforms,
+      ...level.tiltPlatforms,
+      ...(level.movingPlatforms ?? []),
+      ...(level.crouchGates ?? []),
+      ...(level.windZones ?? []),
+      ...level.spikes,
+      ...(level.arrowVolleys ?? []),
+      ...(level.encounters ?? []),
+      level.finish,
+    ]
+    const points = [
+      level.playerStart,
+      ...(level.checkpoints ?? []),
+      ...level.coins,
+      ...(level.boosts ?? []),
+      ...(level.shieldPickups ?? []),
+      ...(level.chronoPickups ?? []),
+      ...(level.surgePickups ?? []),
+      ...(level.wraithlightPickups ?? []),
+      ...(level.mirrorWardPickups ?? []),
+      ...(level.galeMantlePickups ?? []),
+      ...(level.sunsteelEdgePickups ?? []),
+      ...(level.objectivePickups ?? []),
+      ...(level.masteryPickups ?? []),
+      ...getShadowRunnerLevelEnemies(level),
+    ]
+    const ids = [...rects, ...points].map(item => item.id)
+
+    expect(new Set(ids).size).toBe(ids.length)
+    rects.forEach(rect => {
+      expect(rect.x).toBeGreaterThanOrEqual(0)
+      expect(rect.y).toBeGreaterThanOrEqual(0)
+      expect(rect.x + rect.width).toBeLessThanOrEqual(level.worldWidth)
+      expect(rect.y + rect.height).toBeLessThanOrEqual(level.worldHeight)
+    })
+    points.forEach(point => {
+      expect(point.x).toBeGreaterThanOrEqual(0)
+      expect(point.x).toBeLessThanOrEqual(level.worldWidth)
+      expect(point.y).toBeGreaterThanOrEqual(0)
+      expect(point.y).toBeLessThanOrEqual(level.worldHeight)
+    })
+  })
+
+  it('authors fair crouch, lift, wind, recovery, objective, and mastery geometry for Captain Gate', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const supports = [...level.platforms, ...(level.movingPlatforms ?? [])]
+
+    level.crouchGates?.forEach(gate => {
+      expect(616 - (gate.y + gate.height)).toBeGreaterThanOrEqual(60)
+      const lowCoins = level.coins.filter(coin => (
+        coin.x >= gate.x + 16
+        && coin.x <= gate.x + gate.width - 16
+        && coin.y >= 592
+        && coin.y <= 604
+      ))
+      expect(lowCoins).toHaveLength(3)
+    })
+
+    level.windZones?.forEach(zone => {
+      expect(zone.force).toBeGreaterThan(0)
+      expect(zone.tellDurationMs).toBeGreaterThanOrEqual(650)
+      expect(zone.tellDurationMs + zone.activeDurationMs).toBeLessThan(zone.cadenceMs)
+      expect(zone.crouchForceMultiplier).toBeLessThanOrEqual(0.25)
+      expect(level.checkpoints?.some(checkpoint => (
+        checkpoint.x >= zone.x
+        && checkpoint.x <= zone.x + zone.width
+      ))).toBe(false)
+    })
+
+    level.movingPlatforms?.forEach(lift => {
+      expect(lift.endY).toBeLessThan(lift.y)
+      expect(lift.speed).toBeGreaterThan(0)
+      expect(lift.pauseMs).toBeGreaterThanOrEqual(800)
+      expect(getShadowRunnerLevelEnemies(level).some(enemy => (
+        enemy.x >= lift.x
+        && enemy.x <= lift.x + lift.width
+      ))).toBe(false)
+    })
+
+    const recoveryBasins = level.platforms.filter(platform =>
+      /^captain-recovery-(banner|moonwell|span)$/.test(platform.id))
+    expect(recoveryBasins).toHaveLength(3)
+    recoveryBasins.forEach((basin, index) => {
+      expect(basin.y).toBe(700)
+      expect(basin.width).toBeLessThanOrEqual(950)
+      if (index > 0) {
+        expect(basin.x).toBeGreaterThan(
+          recoveryBasins[index - 1].x + recoveryBasins[index - 1].width,
+        )
+      }
+    })
+
+    level.objectivePickups?.forEach(crest => {
+      const support = level.platforms.find(platform => (
+        crest.x >= platform.x + 16
+        && crest.x <= platform.x + platform.width - 16
+        && crest.y <= platform.y
+        && platform.y - crest.y <= 80
+      ))
+      expect(support?.id).toBeTruthy()
+    })
+
+    level.masteryPickups?.forEach(order => {
+      const support = supports.find(platform => (
+        order.x >= platform.x + 16
+        && order.x <= platform.x + platform.width - 16
+        && order.y <= platform.y
+        && platform.y - order.y <= 64
+      ))
+      const enablingPickup = order.requiredPower === 'gale-mantle'
+        ? level.galeMantlePickups?.find(pickup => pickup.x < order.x)
+        : level.sunsteelEdgePickups?.find(pickup => pickup.x < order.x)
+
+      expect(order.requiredPower).toMatch(/^(gale-mantle|sunsteel-edge)$/)
+      expect(support?.id).toBeTruthy()
+      expect(enablingPickup?.id).toBeTruthy()
+    })
+  })
+
+  it('assigns Captain Gate enemies to bounded encounters and keeps normal completion optional-item free', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const enemies = getShadowRunnerLevelEnemies(level)
+    const assignedIds = level.encounters?.flatMap(encounter => encounter.enemyIds) ?? []
+    const captain = enemies.find(enemy => enemy.id === 'captain-moonlit-final')
+
+    expect(new Set(assignedIds).size).toBe(assignedIds.length)
+    expect(new Set(assignedIds)).toEqual(new Set(enemies.map(enemy => enemy.id)))
+    level.encounters?.forEach(encounter => {
+      expect(encounter.enemyIds.length).toBeLessThanOrEqual(3)
+    })
+    enemies.forEach(enemy => {
+      const support = level.platforms.find(platform => (
+        enemy.x >= platform.x + 20
+        && enemy.x <= platform.x + platform.width - 20
+        && Math.abs(enemy.y - platform.y) <= 80
+      ))
+      expect(level.encounters?.some(encounter => encounter.id === enemy.encounterId)).toBe(true)
+      expect(enemy.patrolLeft).toBeGreaterThanOrEqual((support?.x ?? 0) + 20)
+      expect(enemy.patrolRight).toBeLessThanOrEqual(
+        (support?.x ?? 0) + (support?.width ?? 0) - 20,
+      )
+    })
+
+    expect(level.encounters?.filter(encounter => encounter.sealed)).toHaveLength(3)
+    expect(captain?.kind).toBe('moonlit-captain')
+    expect(captain?.bossPhases?.map(phase => phase.healthAtOrBelow)).toEqual([15, 10, 5])
+    expect(captain?.bossPhases?.map(phase => phase.chargeCount)).toEqual([0, 1, 2])
+    expect(level.requiredEnemyIds).toEqual([captain?.id])
+    expect(level.finishRequirementText).toEqual({
+      missingObjectives: 'Recover all four Watchfire Crests',
+      missingRequiredEnemies: 'Defeat the Moonlit Captain',
+      missingObjectivesAndEnemies: 'Recover all four Watchfire Crests and defeat the Moonlit Captain',
+    })
+    expect(JSON.stringify(level.finishRequirementText)).not.toMatch(/coin|order/i)
+  })
+
   it('keeps every Courier Catacombs main-route gap recoverable and every branch checkpoint bounded', () => {
     const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-8']
     const routeIds = [
@@ -299,6 +582,7 @@ describe('Shadow Runner level configuration contract', () => {
       ['level-6', 5],
       ['level-7', 6],
       ['level-8', 8],
+      ['level-9', 9],
     ])
 
     expectedMinimums.forEach((minimum, levelId) => {
@@ -315,8 +599,8 @@ describe('Shadow Runner level configuration contract', () => {
     })
   })
 
-  it('keeps Level 5 through Level 8 patrol routes on their supporting platforms', () => {
-    ;(['level-5', 'level-6', 'level-7', 'level-8'] as const).forEach(levelId => {
+  it('keeps Level 5 through Level 9 patrol routes on their supporting platforms', () => {
+    ;(['level-5', 'level-6', 'level-7', 'level-8', 'level-9'] as const).forEach(levelId => {
       const level = SHADOW_RUNNER_LEVEL_CONFIGS[levelId]
       const movingEnemies = getShadowRunnerLevelEnemies(level)
         .filter(enemy => (enemy.patrolSpeed ?? 1) > 0)

@@ -21,12 +21,17 @@ const levelEightMigration = readFileSync(
   path.join(process.cwd(), 'supabase/migrations/20260727113413_shadow_runner_level8_available.sql'),
   'utf8'
 )
+const levelNineMigration = readFileSync(
+  path.join(process.cwd(), 'supabase/migrations/20260728025812_shadow_runner_level9_available.sql'),
+  'utf8'
+)
 
 const compactSql = migration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelFiveSql = levelFiveMigration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelSixSql = levelSixMigration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelSevenSql = levelSevenMigration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelEightSql = levelEightMigration.replace(/\s+/g, ' ').toLowerCase()
+const compactLevelNineSql = levelNineMigration.replace(/\s+/g, ' ').toLowerCase()
 
 describe('Shadow Runner medals migration contract', () => {
   it('adds public medal flags and a private completion source of truth', () => {
@@ -70,6 +75,14 @@ describe('Shadow Runner medals migration contract', () => {
     expect(compactLevelEightSql).not.toContain('required_level_count')
     expect(compactLevelEightSql).not.toContain('counts_for_knight_medal')
     expect(compactLevelEightSql).toContain('select private.refresh_shadow_runner_medals()')
+  })
+
+  it('launches Captain Gate and recalculates the current knight medal', () => {
+    expect(compactLevelNineSql).toContain("values ( 'level-9', 9, 'captain gate', 9, false, true, true )")
+    expect(compactLevelNineSql).toContain('medal_rank = excluded.medal_rank')
+    expect(compactLevelNineSql).toContain('is_available = excluded.is_available')
+    expect(compactLevelNineSql).toContain('is_medal_candidate = excluded.is_medal_candidate')
+    expect(compactLevelNineSql).toContain('select private.refresh_shadow_runner_medals()')
   })
 
   it('recalculates medals when completions or level availability change', () => {

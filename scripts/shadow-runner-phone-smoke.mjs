@@ -89,6 +89,20 @@ const LEVELS = {
       /The courier dead kept the first road\. Recover their seals before the Rival does\./i,
     ],
   },
+  'level-9': {
+    title: 'Captain Gate',
+    completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7', 'level-8'],
+    detailChecks: [
+      /Level 9/i,
+      /Stormwatch Siege/i,
+      /Gale Mantle/i,
+      /Sunsteel Edge/i,
+      /Watchfire Crests/i,
+    ],
+    gameplayChecks: [
+      /The Captain sealed the road against the false command\. Break the watch before dawn\./i,
+    ],
+  },
 }
 
 const PHONE_PROFILES = {
@@ -432,9 +446,11 @@ async function exerciseGameplayControls(page, level, profile) {
     await assertLevelSevenGameplay(page, profile)
   } else if (config.levelId === 'level-8') {
     await assertLevelEightGameplay(page, profile)
+  } else if (config.levelId === 'level-9') {
+    await assertLevelNineGameplay(page, profile)
   }
 
-  if (config.levelId !== 'level-8') {
+  if (config.levelId !== 'level-8' && config.levelId !== 'level-9') {
     await page.keyboard.press('Digit3')
     await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
     await capture(page, `${profile.label}-07-complete.png`)
@@ -794,7 +810,7 @@ async function assertLevelSevenGameplay(page, profile) {
 }
 
 async function assertLevelEightGameplay(page, profile) {
-  const fullPhysicsPass = profile.browserName === 'chromium'
+  const fullPhysicsPass = profile.browserName === 'chromium' && !config.skipPhysics
   const checkpoints = [
     { x: 1820, y: 616, id: 'catacomb-checkpoint-descent' },
     { x: 3920, y: 616, id: 'catacomb-checkpoint-fork' },
@@ -1058,6 +1074,394 @@ async function assertLevelEightGameplay(page, profile) {
   })
 }
 
+async function assertLevelNineGameplay(page, profile) {
+  const fullPhysicsPass = profile.browserName === 'chromium' && !config.skipPhysics
+  const checkpoints = [
+    { x: 1960, y: 616, id: 'captain-checkpoint-outer' },
+    { x: 4100, y: 616, id: 'captain-checkpoint-signal' },
+    { x: 6400, y: 616, id: 'captain-checkpoint-murder' },
+    { x: 8800, y: 616, id: 'captain-checkpoint-banner' },
+    { x: 11000, y: 616, id: 'captain-checkpoint-barracks' },
+    { x: 13320, y: 616, id: 'captain-checkpoint-moonwell' },
+    { x: 15600, y: 616, id: 'captain-checkpoint-span' },
+    { x: 17840, y: 616, id: 'captain-checkpoint-watch' },
+    { x: 18400, y: 616, id: 'captain-checkpoint-gate' },
+  ]
+
+  for (const checkpoint of checkpoints) {
+    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), checkpoint)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().checkpointId === expected,
+      checkpoint.id,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+
+  let snapshot = await readShadowRunnerDebug(page)
+  assert(snapshot?.movingPlatforms?.length === 5, `${profile.label}: Level 9 did not create five counterweight lifts`)
+  assert(snapshot?.windZones?.length === 6, `${profile.label}: Level 9 did not create six wind zones`)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(1300, 616))
+  await page.waitForFunction(
+    () => {
+      const debug = window.__shadowRunnerDebug?.()
+      return debug?.windZones?.find(zone => zone.id === 'captain-wind-outer')?.active === true
+        && (debug.player?.velocityX ?? 0) < -100
+    },
+    null,
+    { timeout: 5000 },
+  )
+  snapshot = await readShadowRunnerDebug(page)
+  assert(
+    (snapshot?.player?.velocityX ?? 0) < -100,
+    `${profile.label}: active storm wind did not push the player`,
+  )
+
+  await page.evaluate(() => window.__shadowRunnerQa?.collect('galeMantle', 0))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.galeMantleActive === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(1300, 616))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().windZones?.find(zone => zone.id === 'captain-wind-outer')?.active === true,
+    null,
+    { timeout: 5000 },
+  )
+  await delay(90)
+  snapshot = await readShadowRunnerDebug(page)
+  assert(
+    Math.abs(snapshot?.player?.velocityX ?? 0) < 12,
+    `${profile.label}: Gale Mantle did not cancel authored wind force`,
+  )
+
+  const signalLift = snapshot?.movingPlatforms?.find(platform => platform.id === 'captain-lift-signal')
+  assert(signalLift, `${profile.label}: signal lift debug state is missing`)
+  await page.evaluate(
+    ({ x, y }) => window.__shadowRunnerQa?.teleport(x + 75, y),
+    signalLift,
+  )
+  const liftStart = await readShadowRunnerDebug(page)
+  await page.waitForFunction(
+    initialY => {
+      const debug = window.__shadowRunnerDebug?.()
+      const lift = debug?.movingPlatforms?.find(platform => platform.id === 'captain-lift-signal')
+      return Boolean(lift && Math.abs(lift.y - initialY) > 28)
+    },
+    signalLift.y,
+    { timeout: 5000 },
+  )
+  snapshot = await readShadowRunnerDebug(page)
+  assert(
+    Math.abs((snapshot?.player?.y ?? 0) - (liftStart?.player?.y ?? 0)) > 18,
+    `${profile.label}: counterweight lift moved without carrying the player`,
+  )
+
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(3300, 616)
+    window.__shadowRunnerQa?.collect('sunsteelEdge', 0)
+  })
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.sunsteelEdgeActive === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  const beforeSunsteel = await readShadowRunnerDebug(page)
+  await page.getByRole('button', { name: 'Sword attack' }).click()
+  await page.waitForFunction(
+    charges => (window.__shadowRunnerDebug?.().player?.sunsteelEdgeCharges ?? charges) < charges,
+    beforeSunsteel?.player?.sunsteelEdgeCharges ?? 0,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(3300, 616))
+  const beforeStorm = await readShadowRunnerDebug(page)
+  record(`${profile.label} level-9 storm pool before launch`, beforeStorm?.pools)
+  await page.evaluate(() => window.__shadowRunnerQa?.stormAtPlayer())
+  await page.waitForFunction(
+    () => (window.__shadowRunnerDebug?.().pools?.projectiles?.stormBombs ?? 0) > 0,
+    null,
+    { timeout: 3000 },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(3160, 616))
+  await page.waitForFunction(
+    () => {
+      const pools = window.__shadowRunnerDebug?.().pools
+      return (pools?.projectiles?.stormBombs ?? 0) === 0
+        && (pools?.candleHazards?.stormHazards ?? 0) > 0
+    },
+    null,
+    { timeout: 5000 },
+  )
+  snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.pools?.projectiles?.total ?? 99) <= 48, `${profile.label}: Level 9 projectile pool exceeded its cap`)
+  assert((snapshot?.pools?.candleHazards?.total ?? 99) <= 24, `${profile.label}: Level 9 hazard pool exceeded its cap`)
+  await capture(page, `${profile.label}-05-level-9-storm-systems.png`)
+
+  if (fullPhysicsPass) {
+    const bridgeSegments = [
+      { startX: 1350, endX: 1810 },
+      { startX: 2730, endX: 3190 },
+      { startX: 5650, endX: 6130 },
+      { startX: 7230, endX: 7660, galeIndex: 1 },
+      { startX: 11830, endX: 12310, galeIndex: 2 },
+      { startX: 14850, endX: 15330 },
+      { startX: 16430, endX: 16910, galeIndex: 3 },
+    ]
+    for (const segment of bridgeSegments) {
+      record(`${profile.label} level-9 physics segment started`, segment)
+      await traverseLevelNineSegment(page, segment.startX, segment.endX, profile, segment.galeIndex)
+      const segmentSnapshot = await readShadowRunnerDebug(page)
+      record(`${profile.label} level-9 physics segment passed`, {
+        ...segment,
+        playerX: segmentSnapshot?.player?.x,
+        bodyBottom: segmentSnapshot?.player?.bodyBottom,
+      })
+    }
+  }
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(9300, 616))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().encounters
+      ?.find(encounter => encounter.id === 'captain-encounter-barracks-seal')?.barrierActive === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.defeatEnemy('captain-pikeman-barracks')
+    window.__shadowRunnerQa?.defeatEnemy('captain-grenadier-barracks')
+    window.__shadowRunnerQa?.defeatEnemy('captain-warden-barracks')
+  })
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().encounters
+      ?.find(encounter => encounter.id === 'captain-encounter-barracks-seal')?.cleared === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.damage(12))
+  await page.waitForFunction(
+    () => {
+      const debug = window.__shadowRunnerDebug?.()
+      const encounter = debug?.encounters
+        ?.find(candidate => candidate.id === 'captain-encounter-barracks-seal')
+      return debug?.player?.lives === 2
+        && debug.player.health === 12
+        && encounter?.cleared === true
+        && encounter.barrierActive === false
+    },
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+
+  const enemies = await page.evaluate(
+    () => window.__shadowRunnerDebug?.().enemies?.map(enemy => enemy.id) ?? [],
+  )
+  await page.evaluate(enemyIds => {
+    enemyIds
+      .filter(enemyId => enemyId !== 'captain-moonlit-final')
+      .forEach(enemyId => window.__shadowRunnerQa?.defeatEnemy(enemyId))
+  }, enemies)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(19020, 616))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().enemies
+      ?.find(enemy => enemy.id === 'captain-moonlit-final')?.bossPhaseId === 'captain-phase-brace',
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.damageEnemy('captain-moonlit-final', 6))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().enemies
+      ?.find(enemy => enemy.id === 'captain-moonlit-final')?.bossPhaseId === 'captain-phase-tempest',
+    null,
+    { timeout: 5000 },
+  )
+  snapshot = await readShadowRunnerDebug(page)
+  record(
+    `${profile.label} level-9 captain tempest state`,
+    snapshot?.enemies?.find(enemy => enemy.id === 'captain-moonlit-final'),
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.damageEnemy('captain-moonlit-final', 5))
+  try {
+    await page.waitForFunction(
+      () => window.__shadowRunnerDebug?.().enemies
+        ?.find(enemy => enemy.id === 'captain-moonlit-final')?.bossPhaseId === 'captain-phase-last-watch',
+      null,
+      { timeout: 5000 },
+    )
+  } catch {
+    snapshot = await readShadowRunnerDebug(page)
+    throw new Error(
+      `${profile.label}: captain did not enter Last Watch: `
+        + JSON.stringify(snapshot?.enemies?.find(enemy => enemy.id === 'captain-moonlit-final')),
+    )
+  }
+  if (!fullPhysicsPass) {
+    await delay(180)
+    await capture(page, `${profile.label}-06-captain-last-watch.png`)
+  }
+
+  const dpadBox = await page.locator('.shadow-runner-dpad').boundingBox()
+  assert(dpadBox, `${profile.label}: movement d-pad was not measurable`)
+  const crouchTap = {
+    x: dpadBox.x + dpadBox.width * 0.5,
+    y: dpadBox.y + dpadBox.height * 0.79,
+  }
+  const crouchLanes = [
+    { startX: 900, endX: 1250 },
+    { startX: 3900, endX: 4250 },
+    { startX: 6140, endX: 6490 },
+    { startX: 9880, endX: 10230 },
+    { startX: 13040, endX: 13390 },
+    { startX: 15340, endX: 15690 },
+  ]
+  for (const lane of crouchLanes) {
+    await page.evaluate(({ startX }) => {
+      window.__shadowRunnerQa?.restore()
+      window.__shadowRunnerQa?.teleport(startX, 616)
+    }, lane)
+    await delay(120)
+    const laneStart = await readShadowRunnerDebug(page)
+    if ((laneStart?.player?.bodyHeight ?? 70) >= 60) {
+      await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+    }
+    await page.waitForFunction(
+      () => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? 70) < 60,
+      null,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+    if (fullPhysicsPass) {
+      await page.evaluate(() => window.__shadowRunnerQa?.move('right', true))
+      try {
+        await page.waitForFunction(
+          targetX => (window.__shadowRunnerDebug?.().player?.x ?? 0) >= targetX,
+          lane.endX,
+          { timeout: 7000 },
+        )
+      } catch {
+        const blocked = await readShadowRunnerDebug(page)
+        throw new Error(
+          `${profile.label}: crouch lane ${lane.startX}-${lane.endX} stopped at `
+            + `${blocked?.player?.x ?? 'missing'} with body height ${blocked?.player?.bodyHeight ?? 'missing'}`,
+        )
+      } finally {
+        await page.evaluate(() => window.__shadowRunnerQa?.move('right', false))
+      }
+    } else {
+      await page.evaluate(({ startX, endX }) => window.__shadowRunnerQa?.teleport((startX + endX) / 2, 616), lane)
+      await delay(100)
+      const inside = await readShadowRunnerDebug(page)
+      assert(
+        (inside?.player?.bodyHeight ?? 70) < 60,
+        `${profile.label}: crouched player did not fit lane ${lane.startX}`,
+      )
+    }
+    const laneEnd = await readShadowRunnerDebug(page)
+    if ((laneEnd?.player?.bodyHeight ?? 70) < 60) {
+      await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+    }
+  }
+
+  snapshot = await readShadowRunnerDebug(page)
+  const livesBeforeBypass = snapshot?.player?.lives ?? 0
+  assert(livesBeforeBypass >= 2, `${profile.label}: Level 9 checks consumed too many lives before bypass proof`)
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(15000, 900))
+  await page.waitForFunction(
+    expectedLives => {
+      const player = window.__shadowRunnerDebug?.().player
+      return Boolean(player && player.lives === expectedLives - 1 && player.x >= 18350)
+    },
+    livesBeforeBypass,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+
+  await page.keyboard.press('Digit3')
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().objective
+      === 'Recover all four Watchfire Crests and defeat the Moonlit Captain',
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  for (let index = 0; index < 4; index += 1) {
+    await page.evaluate(pickupIndex => window.__shadowRunnerQa?.collect('objective', pickupIndex), index)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().player?.objectiveItems === expected,
+      index + 1,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+  await page.keyboard.press('Digit3')
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().objective === 'Defeat the Moonlit Captain',
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.defeatEnemy('captain-moonlit-final'))
+  await page.keyboard.press('Digit3')
+  await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  if (!fullPhysicsPass) {
+    await capture(page, `${profile.label}-07-level-9-complete.png`)
+  }
+
+  snapshot = await readShadowRunnerDebug(page)
+  record(`${profile.label} level-9 route, powers, storms, boss phases, and completion`, {
+    checkpointId: snapshot?.checkpointId,
+    watchfireCrests: snapshot?.player?.objectiveItems,
+    captainsOrders: snapshot?.player?.masteryItems,
+    galeMantleActive: snapshot?.player?.galeMantleActive,
+    sunsteelEdgeCharges: snapshot?.player?.sunsteelEdgeCharges,
+    fullPhysicsPass,
+    pools: snapshot?.pools,
+  })
+}
+
+async function traverseLevelNineSegment(page, startX, endX, profile, galeIndex) {
+  if (galeIndex !== undefined) {
+    await page.evaluate(index => window.__shadowRunnerQa?.collect('galeMantle', index), galeIndex)
+    await page.waitForFunction(
+      () => window.__shadowRunnerDebug?.().player?.galeMantleActive === true,
+      null,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+  await page.evaluate(x => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(x, 616)
+  }, startX)
+  await page.waitForFunction(
+    () => Math.abs(window.__shadowRunnerDebug?.().player?.velocityX ?? 0) < 24,
+    null,
+    { timeout: 5000 },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.move('right', true))
+
+  const deadline = Date.now() + 9000
+  try {
+    while (Date.now() < deadline) {
+      const snapshot = await readShadowRunnerDebug(page)
+      if ((snapshot?.player?.x ?? 0) >= endX) break
+      await page.getByRole('button', { name: 'Jump' }).click()
+      await delay(170)
+      await page.getByRole('button', { name: 'Jump' }).click()
+      await delay(430)
+    }
+  } finally {
+    await page.evaluate(() => window.__shadowRunnerQa?.move('right', false))
+  }
+
+  const snapshot = await readShadowRunnerDebug(page)
+  assert(
+    (snapshot?.player?.x ?? 0) >= endX,
+    `${profile.label}: Level 9 physics segment ${startX}-${endX} stopped at ${snapshot?.player?.x ?? 'missing'}`,
+  )
+  assert(
+    (snapshot?.player?.bodyBottom ?? 9999) <= 730,
+    `${profile.label}: Level 9 physics segment ${startX}-${endX} fell below its recovery route`,
+  )
+}
+
 async function readShadowRunnerDebug(page) {
   return page.evaluate(() => window.__shadowRunnerDebug?.())
 }
@@ -1227,6 +1631,7 @@ function parseArgs(argv) {
     baseUrl: process.env.npm_config_base_url || null,
     reuseServer: process.env.npm_config_reuse_server === 'false' ? false : true,
     skipBuild: process.env.npm_config_skip_build === 'true',
+    skipPhysics: process.env.npm_config_skip_physics === 'true',
     runName: process.env.npm_config_run_name || null,
     levelId: process.env.npm_config_level || 'tutorial',
     profiles: process.env.npm_config_profiles || 'landscape',
@@ -1237,6 +1642,7 @@ function parseArgs(argv) {
     if (current === '--headed') parsed.headed = true
     else if (current === '--headless') parsed.headed = false
     else if (current === '--skip-build') parsed.skipBuild = true
+    else if (current === '--skip-physics') parsed.skipPhysics = true
     else if (current === '--no-reuse-server') parsed.reuseServer = false
     else if (current.startsWith('--base-url=')) parsed.baseUrl = current.slice('--base-url='.length)
     else if (current === '--base-url' && argv[index + 1]) parsed.baseUrl = argv[++index]
@@ -1267,7 +1673,7 @@ function buildConfig(parsedArgs) {
     .map(profile => {
       const resolved = PHONE_PROFILES[profile]
       if (!resolved) throw new Error(`Unsupported phone profile: ${profile}`)
-      return parsedArgs.levelId === 'level-8'
+      return parsedArgs.levelId === 'level-8' || parsedArgs.levelId === 'level-9'
         ? resolved
         : { ...resolved, browserName: 'chromium' }
     })
@@ -1284,6 +1690,7 @@ function buildConfig(parsedArgs) {
     slowMo: parsedArgs.slowMo,
     reuseServer: parsedArgs.reuseServer,
     skipBuild: parsedArgs.skipBuild,
+    skipPhysics: parsedArgs.skipPhysics,
     levelId: parsedArgs.levelId,
     profiles,
     artifactDir: path.join('output', 'playwright', slugify(parsedArgs.runName || `shadow-runner-${parsedArgs.levelId}-${timestampToken()}`)),

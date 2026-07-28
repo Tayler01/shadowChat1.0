@@ -1,5 +1,9 @@
 import { SHADOW_RUNNER_ASSETS } from '../assets/manifest'
 import { SHADOW_RUNNER_LEVEL_EIGHT } from './levelEight'
+import {
+  SHADOW_RUNNER_LEVEL_NINE,
+  SHADOW_RUNNER_LEVEL_NINE_ASSETS,
+} from './levelNine'
 
 export interface ShadowRunnerRect {
   id: string
@@ -8,7 +12,7 @@ export interface ShadowRunnerRect {
   width: number
   height: number
   visualId?: string
-  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock' | 'moon' | 'catacomb' | 'spectral'
+  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock' | 'moon' | 'catacomb' | 'spectral' | 'captain'
   hidden?: boolean
   damage?: number
 }
@@ -79,6 +83,7 @@ export interface ShadowRunnerObjectivePickup extends ShadowRunnerPoint {
 
 export interface ShadowRunnerMasteryPickup extends ShadowRunnerPoint {
   scoreValue?: number
+  requiredPower?: ShadowRunnerMasteryPower
 }
 
 export interface ShadowRunnerWraithlightPickup extends ShadowRunnerPoint {
@@ -111,6 +116,58 @@ export interface ShadowRunnerArrowVolley extends ShadowRunnerRect {
   damage?: number
 }
 
+export type ShadowRunnerMasteryPower = 'gale-mantle' | 'sunsteel-edge'
+
+export interface ShadowRunnerWindZone extends ShadowRunnerRect {
+  direction: 1 | -1
+  force: number
+  cadenceMs: number
+  tellDurationMs: number
+  activeDurationMs: number
+  crouchForceMultiplier: number
+}
+
+export interface ShadowRunnerMovingPlatform extends ShadowRunnerRect {
+  endX?: number
+  endY: number
+  speed: number
+  pauseMs: number
+}
+
+export interface ShadowRunnerGaleMantlePickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs: number
+  healthRestore: number
+  speedMultiplier: number
+  fallDamageCap: number
+}
+
+export interface ShadowRunnerSunsteelEdgePickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs: number
+  healthRestore: number
+  charges: number
+  attackDamageBonus: number
+  guardDamage: number
+  reachBonus: number
+}
+
+export interface ShadowRunnerFinishRequirementText {
+  missingObjectives: string
+  missingRequiredEnemies: string
+  missingObjectivesAndEnemies: string
+}
+
+export interface ShadowRunnerBossPhaseConfig {
+  id: string
+  label: string
+  healthAtOrBelow: number
+  guard?: number
+  attackCooldownMs?: number
+  patrolSpeedMultiplier?: number
+  chargeCount?: number
+}
+
 export type ShadowRunnerEnemyKind =
   | 'clockwork-sentry'
   | 'lantern-bandit-scout'
@@ -122,6 +179,9 @@ export type ShadowRunnerEnemyKind =
   | 'tomb-lurker'
   | 'crypt-warden'
   | 'rival-courier'
+  | 'gate-pikeman'
+  | 'storm-grenadier'
+  | 'moonlit-captain'
 
 export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   kind: ShadowRunnerEnemyKind
@@ -138,6 +198,10 @@ export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   projectileDamage?: number
   guard?: number
   encounterId?: string
+  projectileArcHeight?: number
+  projectileWarningMs?: number
+  hazardDurationMs?: number
+  bossPhases?: ShadowRunnerBossPhaseConfig[]
 }
 
 export interface ShadowRunnerEncounterConfig extends ShadowRunnerRect {
@@ -155,6 +219,7 @@ export type ShadowRunnerPlayableLevelId =
   | 'level-6'
   | 'level-7'
   | 'level-8'
+  | 'level-9'
 
 export interface ShadowRunnerLevelConfig {
   id: ShadowRunnerPlayableLevelId
@@ -185,8 +250,13 @@ export interface ShadowRunnerLevelConfig {
   masteryPickups?: ShadowRunnerMasteryPickup[]
   wraithlightPickups?: ShadowRunnerWraithlightPickup[]
   mirrorWardPickups?: ShadowRunnerMirrorWardPickup[]
+  galeMantlePickups?: ShadowRunnerGaleMantlePickup[]
+  sunsteelEdgePickups?: ShadowRunnerSunsteelEdgePickup[]
   spectralPlatforms?: ShadowRunnerRect[]
+  windZones?: ShadowRunnerWindZone[]
+  movingPlatforms?: ShadowRunnerMovingPlatform[]
   requiredEnemyIds?: string[]
+  finishRequirementText?: ShadowRunnerFinishRequirementText
   encounters?: ShadowRunnerEncounterConfig[]
   arrowVolleys?: ShadowRunnerArrowVolley[]
   enemy?: ShadowRunnerEnemyConfig
@@ -1435,11 +1505,15 @@ const DEFAULT_ENEMY_CONTACT_DAMAGE: Record<ShadowRunnerEnemyKind, number> = {
   'tomb-lurker': 2,
   'crypt-warden': 3,
   'rival-courier': 3,
+  'gate-pikeman': 3,
+  'storm-grenadier': 2,
+  'moonlit-captain': 4,
 }
 
 const DEFAULT_ENEMY_PROJECTILE_DAMAGE: Partial<Record<ShadowRunnerEnemyKind, number>> = {
   'tower-archer': 3,
   'candle-jester': 2,
+  'storm-grenadier': 3,
 }
 
 export function getShadowRunnerEnemyContactDamage(enemy: ShadowRunnerEnemyConfig) {
@@ -1475,6 +1549,7 @@ export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, Sh
   'level-6': SHADOW_RUNNER_LEVEL_SIX,
   'level-7': SHADOW_RUNNER_LEVEL_SEVEN,
   'level-8': SHADOW_RUNNER_LEVEL_EIGHT,
+  'level-9': SHADOW_RUNNER_LEVEL_NINE,
 }
 
 export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
@@ -1594,14 +1669,15 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     id: 'level-9',
     levelNumber: 9,
     title: 'Captain Gate',
-    objective: 'Survive the watch',
+    objective: 'Recover four Watchfire Crests and defeat the Moonlit Captain',
     difficultyTier: 9,
-    difficultyLabel: 'Captain Watch',
-    routeType: 'Boss Gate',
-    mechanicPreview: 'Mixed patrols, ranged pressure, captain duel',
-    thumbnail: SHADOW_RUNNER_ASSETS.home.background,
-    locationButton: SHADOW_RUNNER_ASSETS.levels.captainGateLocationButton,
+    difficultyLabel: 'Stormwatch Siege',
+    routeType: 'Fortress Assault',
+    mechanicPreview: 'Storm winds, counterweight lifts, Gale Mantle, Sunsteel Edge, and the Moonlit Captain',
+    thumbnail: SHADOW_RUNNER_LEVEL_NINE_ASSETS.thumbnail320,
+    locationButton: SHADOW_RUNNER_LEVEL_NINE_ASSETS.locationButton,
     mapPosition: { left: 78, top: 78 },
+    playableLevelId: 'level-9',
   },
   {
     id: 'level-10',

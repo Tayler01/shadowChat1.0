@@ -4,21 +4,30 @@ import {
   collectShadowRunnerBoost,
   collectShadowRunnerChrono,
   collectShadowRunnerCoin,
+  collectShadowRunnerGaleMantle,
   collectShadowRunnerMastery,
   collectShadowRunnerMirrorWard,
   collectShadowRunnerMoonShard,
   collectShadowRunnerObjective,
   collectShadowRunnerShield,
+  collectShadowRunnerSunsteelEdge,
   collectShadowRunnerSurge,
   collectShadowRunnerWraithlight,
   createInitialShadowRunnerSimulation,
+  consumeShadowRunnerSunsteelCharge,
   damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
   getShadowRunnerEncounterBarrierState,
+  getShadowRunnerGaleFallDamageCap,
+  getShadowRunnerGaleSpeedMultiplier,
   getShadowRunnerHudState,
+  getShadowRunnerSunsteelStrikeProperties,
   getShadowRunnerChronoTimeScale,
   getShadowRunnerSurgeSpeedMultiplier,
+  isShadowRunnerGaleMantleActive,
   isShadowRunnerMirrorWardActive,
+  isShadowRunnerSunsteelEdgeActive,
+  isShadowRunnerSunsteelStrikeActive,
   isShadowRunnerWraithlightActive,
   reflectShadowRunnerProjectileWithMirrorWard,
   spendShadowRunnerLife,
@@ -145,6 +154,118 @@ describe('Shadow Runner simulation', () => {
 
     state.player.mirrorWardCharges = 0
     expect(reflectShadowRunnerProjectileWithMirrorWard(state, 2300)).toBe(false)
+  })
+
+  it('applies Gale Mantle healing, duration, speed, fall mitigation, and score', () => {
+    const levelNine = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const state = createInitialShadowRunnerSimulation(levelNine)
+    const galeMantle = levelNine.galeMantlePickups![0]
+    state.player.health = 7
+
+    collectShadowRunnerGaleMantle(state, 1000, galeMantle)
+
+    expect(state.player.health).toBe(7 + galeMantle.healthRestore)
+    expect(state.player.score).toBe(galeMantle.scoreValue)
+    expect(isShadowRunnerGaleMantleActive(state, 1200)).toBe(true)
+    expect(getShadowRunnerGaleSpeedMultiplier(state, 1200)).toBe(galeMantle.speedMultiplier)
+    expect(getShadowRunnerGaleFallDamageCap(state, 1200)).toBe(galeMantle.fallDamageCap)
+
+    const hud = getShadowRunnerHudState(state, levelNine.coins.length, 1200)
+    expect(hud.galeMantleActive).toBe(true)
+    expect(hud.galeMantleRemainingMs).toBeGreaterThan(0)
+    expect(hud.galeMantleSpeedMultiplier).toBe(galeMantle.speedMultiplier)
+    expect(hud.galeMantleFallDamageCap).toBe(galeMantle.fallDamageCap)
+
+    expect(isShadowRunnerGaleMantleActive(state, 20_000)).toBe(false)
+    expect(getShadowRunnerGaleSpeedMultiplier(state, 20_000)).toBe(1)
+    expect(getShadowRunnerGaleFallDamageCap(state, 20_000)).toBeNull()
+  })
+
+  it('uses Sunsteel Edge charges to expose one enhanced strike at a time', () => {
+    const levelNine = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const state = createInitialShadowRunnerSimulation(levelNine)
+    const sunsteelEdge = levelNine.sunsteelEdgePickups![0]
+    state.player.health = 8
+
+    collectShadowRunnerSunsteelEdge(state, 1000, sunsteelEdge)
+
+    expect(state.player.health).toBe(8 + sunsteelEdge.healthRestore)
+    expect(state.player.score).toBe(sunsteelEdge.scoreValue)
+    expect(state.player.sunsteelEdgeCharges).toBe(sunsteelEdge.charges)
+    expect(isShadowRunnerSunsteelEdgeActive(state, 1200)).toBe(true)
+    expect(consumeShadowRunnerSunsteelCharge(state, 1200, 300)).toBe(true)
+    expect(state.player.sunsteelEdgeCharges).toBe(sunsteelEdge.charges - 1)
+    expect(isShadowRunnerSunsteelStrikeActive(state, 1400)).toBe(true)
+    expect(getShadowRunnerSunsteelStrikeProperties(state, 1400)).toEqual({
+      attackDamageBonus: sunsteelEdge.attackDamageBonus,
+      guardDamage: sunsteelEdge.guardDamage,
+      reachBonus: sunsteelEdge.reachBonus,
+    })
+    expect(isShadowRunnerSunsteelStrikeActive(state, 1500)).toBe(false)
+    expect(getShadowRunnerSunsteelStrikeProperties(state, 1500)).toEqual({
+      attackDamageBonus: 0,
+      guardDamage: 0,
+      reachBonus: 0,
+    })
+
+    state.player.sunsteelEdgeCharges = 1
+    expect(consumeShadowRunnerSunsteelCharge(state, 1600)).toBe(true)
+    expect(state.player.sunsteelEdgeCharges).toBe(0)
+    expect(isShadowRunnerSunsteelEdgeActive(state, 1601)).toBe(false)
+    expect(isShadowRunnerSunsteelStrikeActive(state, 1601)).toBe(true)
+    expect(consumeShadowRunnerSunsteelCharge(state, 1900)).toBe(false)
+  })
+
+  it('reports Level 9 ordinary, full, and perfect completion independently', () => {
+    const levelNine = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const state = createInitialShadowRunnerSimulation(levelNine)
+
+    levelNine.objectivePickups?.forEach(pickup => collectShadowRunnerObjective(state, pickup))
+    const requiredEnemy = state.enemies.find(enemy => levelNine.requiredEnemyIds?.includes(enemy.id))
+    expect(requiredEnemy).toBeDefined()
+    requiredEnemy!.health = 0
+    requiredEnemy!.alive = false
+
+    let hud = getShadowRunnerHudState(state, levelNine.coins.length)
+    expect(hud.objectiveLabel).toBe('Watchfire Crests')
+    expect(hud.objectiveGateOpen).toBe(true)
+    expect(hud.fullClear).toBe(false)
+    expect(hud.perfectRoute).toBe(false)
+
+    levelNine.masteryPickups?.forEach(pickup => collectShadowRunnerMastery(state, pickup))
+    levelNine.coins.forEach(() => collectShadowRunnerCoin(state))
+    state.enemies.forEach(enemy => {
+      enemy.health = 0
+      enemy.alive = false
+    })
+
+    hud = getShadowRunnerHudState(state, levelNine.coins.length)
+    expect(hud.masteryLabel).toBe("Captain's Orders")
+    expect(hud.fullClear).toBe(true)
+    expect(hud.perfectRoute).toBe(true)
+
+    spendShadowRunnerLife(state)
+    hud = getShadowRunnerHudState(state, levelNine.coins.length)
+    expect(hud.fullClear).toBe(true)
+    expect(hud.perfectRoute).toBe(false)
+  })
+
+  it('keeps Level 9 objectives and defeated enemies sticky after a life loss', () => {
+    const levelNine = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const state = createInitialShadowRunnerSimulation(levelNine)
+    const crest = levelNine.objectivePickups![0]
+    const defeatedEnemy = state.enemies[0]
+
+    collectShadowRunnerObjective(state, crest)
+    defeatedEnemy.health = 0
+    defeatedEnemy.alive = false
+    const scoreBeforeRespawn = state.player.score
+
+    expect(spendShadowRunnerLife(state)).toBe(true)
+    expect(state.player.objectiveItems).toBe(1)
+    expect(defeatedEnemy.alive).toBe(false)
+    expect(defeatedEnemy.health).toBe(0)
+    expect(state.player.score).toBe(Math.max(0, scoreBeforeRespawn - 50))
   })
 
   it('tracks Relay Seals, Courier Caches, full clears, and perfect routes separately', () => {
