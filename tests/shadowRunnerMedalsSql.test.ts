@@ -25,6 +25,10 @@ const levelNineMigration = readFileSync(
   path.join(process.cwd(), 'supabase/migrations/20260728025812_shadow_runner_level9_available.sql'),
   'utf8'
 )
+const levelTenMigration = readFileSync(
+  path.join(process.cwd(), 'supabase/migrations/20260728190000_shadow_runner_level10_available.sql'),
+  'utf8'
+)
 
 const compactSql = migration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelFiveSql = levelFiveMigration.replace(/\s+/g, ' ').toLowerCase()
@@ -32,6 +36,7 @@ const compactLevelSixSql = levelSixMigration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelSevenSql = levelSevenMigration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelEightSql = levelEightMigration.replace(/\s+/g, ' ').toLowerCase()
 const compactLevelNineSql = levelNineMigration.replace(/\s+/g, ' ').toLowerCase()
+const compactLevelTenSql = levelTenMigration.replace(/\s+/g, ' ').toLowerCase()
 
 describe('Shadow Runner medals migration contract', () => {
   it('adds public medal flags and a private completion source of truth', () => {
@@ -83,6 +88,14 @@ describe('Shadow Runner medals migration contract', () => {
     expect(compactLevelNineSql).toContain('is_available = excluded.is_available')
     expect(compactLevelNineSql).toContain('is_medal_candidate = excluded.is_medal_candidate')
     expect(compactLevelNineSql).toContain('select private.refresh_shadow_runner_medals()')
+  })
+
+  it('launches Dawn Relay Spire and recalculates the current knight medal', () => {
+    expect(compactLevelTenSql).toContain("values ( 'level-10', 10, 'dawn relay spire', 10, false, true, true )")
+    expect(compactLevelTenSql).toContain('medal_rank = excluded.medal_rank')
+    expect(compactLevelTenSql).toContain('is_available = excluded.is_available')
+    expect(compactLevelTenSql).toContain('is_medal_candidate = excluded.is_medal_candidate')
+    expect(compactLevelTenSql).toContain('select private.refresh_shadow_runner_medals()')
   })
 
   it('recalculates medals when completions or level availability change', () => {

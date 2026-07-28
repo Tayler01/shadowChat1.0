@@ -103,6 +103,20 @@ const LEVELS = {
       /The Captain sealed the road against the false command\. Break the watch before dawn\./i,
     ],
   },
+  'level-10': {
+    title: 'Dawn Relay Spire',
+    completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7', 'level-8', 'level-9'],
+    detailChecks: [
+      /Level 10/i,
+      /Sovereign Trial/i,
+      /Relay beams/i,
+      /Dawnfire Aegis/i,
+      /Aether Step/i,
+    ],
+    gameplayChecks: [
+      /The false command began here\. Carry the true order to the crown before dawn\./i,
+    ],
+  },
 }
 
 const PHONE_PROFILES = {
@@ -212,7 +226,7 @@ async function runLandscapeProfile(browserInstance, profile) {
     userAgent: profile.userAgent,
     isMobile: profile.isMobile,
     hasTouch: profile.hasTouch,
-    serviceWorkers: 'allow',
+    serviceWorkers: 'block',
   })
 
   const page = await context.newPage()
@@ -416,9 +430,17 @@ async function exerciseGameplayControls(page, level, profile) {
   )
 
   await page.keyboard.down('KeyS')
-  await delay(120)
-  const crouching = await readShadowRunnerDebug(page)
-  await page.keyboard.up('KeyS')
+  let crouching
+  try {
+    await page.waitForFunction(
+      standingHeight => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? standingHeight) < standingHeight,
+      afterRun?.player?.bodyHeight ?? 70,
+      { timeout: 3000 },
+    )
+    crouching = await readShadowRunnerDebug(page)
+  } finally {
+    await page.keyboard.up('KeyS')
+  }
   assert(
     (crouching?.player?.bodyHeight ?? 99) < (afterRun?.player?.bodyHeight ?? 0),
     `${profile.label}: crouch did not reduce the player hitbox`,
@@ -448,9 +470,11 @@ async function exerciseGameplayControls(page, level, profile) {
     await assertLevelEightGameplay(page, profile)
   } else if (config.levelId === 'level-9') {
     await assertLevelNineGameplay(page, profile)
+  } else if (config.levelId === 'level-10') {
+    await assertLevelTenGameplay(page, profile)
   }
 
-  if (config.levelId !== 'level-8' && config.levelId !== 'level-9') {
+  if (config.levelId !== 'level-8' && config.levelId !== 'level-9' && config.levelId !== 'level-10') {
     await page.keyboard.press('Digit3')
     await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
     await capture(page, `${profile.label}-07-complete.png`)
@@ -1462,6 +1486,322 @@ async function traverseLevelNineSegment(page, startX, endX, profile, galeIndex) 
   )
 }
 
+async function assertLevelTenGameplay(page, profile) {
+  const fullPhysicsPass = profile.browserName === 'chromium' && !config.skipPhysics
+  const checkpoints = [
+    { x: 2360, y: 616, id: 'relay-checkpoint-approach' },
+    { x: 5000, y: 616, id: 'relay-checkpoint-prism' },
+    { x: 7440, y: 616, id: 'relay-checkpoint-gears' },
+    { x: 10020, y: 616, id: 'relay-checkpoint-beam' },
+    { x: 12620, y: 616, id: 'relay-checkpoint-choir' },
+    { x: 15520, y: 196, id: 'relay-checkpoint-glass' },
+    { x: 18040, y: 616, id: 'relay-checkpoint-crown' },
+    { x: 20420, y: 616, id: 'relay-checkpoint-lock' },
+    { x: 23340, y: 184, id: 'relay-checkpoint-last' },
+    { x: 23960, y: 616, id: 'relay-checkpoint-sovereign' },
+  ]
+
+  for (const [checkpointIndex, checkpoint] of checkpoints.entries()) {
+    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), checkpoint)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().checkpointId === expected,
+      checkpoint.id,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+    if (fullPhysicsPass && checkpointIndex % 2 === 1) {
+      await delay(160)
+      await capture(
+        page,
+        `${profile.label}-route-${String(checkpointIndex + 1).padStart(2, '0')}-${checkpoint.id}.png`,
+      )
+    }
+  }
+
+  let snapshot = await readShadowRunnerDebug(page)
+  assert(snapshot?.movingPlatforms?.length === 8, `${profile.label}: Level 10 did not create eight relay lifts`)
+  assert(snapshot?.phasePlatforms?.length === 7, `${profile.label}: Level 10 did not create seven phase platforms`)
+  assert(snapshot?.relayBeamZones?.length === 7, `${profile.label}: Level 10 did not create seven relay beam zones`)
+  assert(
+    snapshot?.phasePlatforms?.some(platform => platform.state !== null),
+    `${profile.label}: Level 10 phase platforms did not enter a runtime state`,
+  )
+  assert(
+    snapshot?.relayBeamZones?.some(zone => zone.state !== null),
+    `${profile.label}: Level 10 relay beams did not enter a runtime state`,
+  )
+
+  const beforeSoundToggle = await readShadowRunnerDebug(page)
+  await page.getByRole('button', { name: 'Pause' }).click()
+  await page.getByRole('button', { name: /Sound (?:On|Off)/i }).click()
+  await delay(180)
+  const afterSoundToggle = await readShadowRunnerDebug(page)
+  assert(
+    afterSoundToggle?.checkpointId === beforeSoundToggle?.checkpointId
+      && Math.abs((afterSoundToggle?.player?.x ?? 0) - (beforeSoundToggle?.player?.x ?? 0)) < 12,
+    `${profile.label}: sound toggle recreated the Level 10 scene`,
+  )
+  await page.getByRole('button', { name: 'Resume' }).click()
+
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.defeatEnemy('relay-caster-02')
+    window.__shadowRunnerQa?.defeatEnemy('relay-pikeman-01')
+    window.__shadowRunnerQa?.defeatEnemy('relay-drone-02')
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.collect('shield', 0)
+  })
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.shieldActive === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(9960, 616)
+  })
+  await page.waitForFunction(
+    () => (window.__shadowRunnerDebug?.().player?.shieldGuardCharges ?? 0) < 6,
+    null,
+    { timeout: 6000 },
+  )
+  snapshot = await readShadowRunnerDebug(page)
+  assert(snapshot?.player?.health === 12, `${profile.label}: Relay beam bypassed an active shield`)
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().relayBeamZones
+      ?.some(zone => zone.id.startsWith('relay-beam-cloister') && zone.state !== 'active'),
+    null,
+    { timeout: 5000 },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(10170, 616))
+  const beforeCover = await readShadowRunnerDebug(page)
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().relayBeamZones
+      ?.some(zone => zone.id.startsWith('relay-beam-cloister') && zone.state === 'active'),
+    null,
+    { timeout: 5000 },
+  )
+  await delay(320)
+  snapshot = await readShadowRunnerDebug(page)
+  assert(
+    snapshot?.player?.health === beforeCover?.player?.health
+      && snapshot?.player?.shieldGuardCharges === beforeCover?.player?.shieldGuardCharges,
+    `${profile.label}: Relay cover did not create a safe beam pocket`,
+  )
+
+  await page.evaluate(() => window.__shadowRunnerQa?.collect('dawnfireAegis', 0))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.dawnfireAegisActive === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.collect('mastery', 1))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.masteryItems === 1,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+
+  await page.evaluate(() => window.__shadowRunnerQa?.collect('aetherStep', 0))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.aetherStepActive === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.collect('mastery', 0))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().player?.masteryItems === 2,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await capture(page, `${profile.label}-05-level-10-powers.png`)
+
+  const dpadBox = await page.locator('.shadow-runner-dpad').boundingBox()
+  assert(dpadBox, `${profile.label}: Level 10 movement d-pad was not measurable`)
+  const crouchTap = {
+    x: dpadBox.x + dpadBox.width * 0.5,
+    y: dpadBox.y + dpadBox.height * 0.79,
+  }
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.restore()
+    window.__shadowRunnerQa?.teleport(1010, 616)
+  })
+  await delay(120)
+  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await page.waitForFunction(
+    () => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? 70) < 60,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  const beforeCrouch = await readShadowRunnerDebug(page)
+  if (fullPhysicsPass) {
+    await page.evaluate(() => window.__shadowRunnerQa?.move('right', true))
+    await page.waitForFunction(
+      () => (window.__shadowRunnerDebug?.().player?.x ?? 0) >= 1350,
+      null,
+      { timeout: 8000 },
+    ).finally(async () => {
+      await page.evaluate(() => window.__shadowRunnerQa?.move('right', false))
+    })
+  } else {
+    await page.evaluate(() => window.__shadowRunnerQa?.teleport(1280, 616))
+    await delay(120)
+  }
+  snapshot = await readShadowRunnerDebug(page)
+  assert((snapshot?.player?.bodyHeight ?? 70) < 60, `${profile.label}: Level 10 first crouch lane cannot be traversed crouched`)
+  if (fullPhysicsPass) {
+    assert(
+      (snapshot?.player?.coins ?? 0) >= (beforeCrouch?.player?.coins ?? 0) + 2,
+      `${profile.label}: Level 10 first crouch lane coins were not reachable`,
+    )
+  }
+  await capture(page, `${profile.label}-05a-crouch-machinery.png`)
+  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(3000, 616))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().encounters
+      ?.find(encounter => encounter.id === 'relay-encounter-prism')?.barrierActive === false,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.defeatEnemy('relay-lancer-02')
+    window.__shadowRunnerQa?.defeatEnemy('relay-caster-01')
+  })
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().encounters
+      ?.find(encounter => encounter.id === 'relay-encounter-prism')?.cleared === true,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(25520, 616))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().enemies
+      ?.find(enemy => enemy.id === 'sentry-sovereign')?.bossPhaseId === 'iron-decree',
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.damageEnemy('sentry-sovereign', 6))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().enemies
+      ?.find(enemy => enemy.id === 'sentry-sovereign')?.bossPhaseId === 'lockstorm',
+    null,
+    { timeout: 5000 },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.damageEnemy('sentry-sovereign', 6))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().enemies
+      ?.find(enemy => enemy.id === 'sentry-sovereign')?.bossPhaseId === 'crownfall',
+    null,
+    { timeout: 5000 },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.damageEnemy('sentry-sovereign', 6))
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().enemies
+      ?.find(enemy => enemy.id === 'sentry-sovereign')?.bossPhaseId === 'last-light',
+    null,
+    { timeout: 5000 },
+  )
+  await delay(180)
+  await capture(page, `${profile.label}-06-sovereign-last-light.png`)
+
+  await page.keyboard.press('Digit3')
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().objective
+      === 'Restore the Relay Flames and break the Sentry Sovereign.',
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  for (let index = 0; index < 5; index += 1) {
+    await page.evaluate(pickupIndex => window.__shadowRunnerQa?.collect('objective', pickupIndex), index)
+    await page.waitForFunction(
+      expected => window.__shadowRunnerDebug?.().player?.objectiveItems === expected,
+      index + 1,
+      { timeout: DEFAULT_TIMEOUT_MS },
+    )
+  }
+  await page.keyboard.press('Digit3')
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().objective
+      === 'The Sentry Sovereign still holds the Master Lock.',
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  await page.evaluate(() => window.__shadowRunnerQa?.teleport(25520, 616))
+  await delay(120)
+  await page.evaluate(() => {
+    window.__shadowRunnerQa?.defeatEnemy('relay-pikeman-02')
+    window.__shadowRunnerQa?.defeatEnemy('relay-caster-07')
+    window.__shadowRunnerQa?.defeatEnemy('relay-drone-06')
+    window.__shadowRunnerQa?.defeatEnemy('sentry-sovereign')
+  })
+  await page.waitForFunction(
+    () => {
+      const encounter = window.__shadowRunnerDebug?.().encounters
+        ?.find(candidate => candidate.id === 'relay-encounter-crown')
+      return encounter?.cleared === true && encounter.barrierActive === false
+    },
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  const beforeLethalRespawn = await readShadowRunnerDebug(page)
+  // Keep the respawn proof lethal even while Dawnfire's damage resistance is active.
+  await page.evaluate(() => window.__shadowRunnerQa?.damage(99))
+  const pendingRespawn = await readShadowRunnerDebug(page)
+  assert(
+    pendingRespawn?.respawnPending === true,
+    `${profile.label}: lethal damage left a postmortem interaction window`,
+  )
+  await page.waitForFunction(
+    () => window.__shadowRunnerDebug?.().respawnPending === false,
+    null,
+    { timeout: DEFAULT_TIMEOUT_MS },
+  )
+  const afterLethalRespawn = await readShadowRunnerDebug(page)
+  const crownEncounterAfterRespawn = afterLethalRespawn?.encounters
+    ?.find(candidate => candidate.id === 'relay-encounter-crown')
+  const expectedLivesAfterRespawn = Math.max(0, (beforeLethalRespawn?.player?.lives ?? 3) - 1)
+  assert(
+    afterLethalRespawn?.respawnPending === false
+      && afterLethalRespawn?.player?.lives === expectedLivesAfterRespawn
+      && afterLethalRespawn.player.health === 12
+      && crownEncounterAfterRespawn?.cleared === true
+      && crownEncounterAfterRespawn.barrierActive === false,
+    `${profile.label}: boss gate respawn contract failed: ${JSON.stringify({
+      respawnPending: afterLethalRespawn?.respawnPending,
+      lives: afterLethalRespawn?.player?.lives,
+      expectedLives: expectedLivesAfterRespawn,
+      health: afterLethalRespawn?.player?.health,
+      cleared: crownEncounterAfterRespawn?.cleared,
+      barrierActive: crownEncounterAfterRespawn?.barrierActive,
+    })}`,
+  )
+  await page.keyboard.press('Digit3')
+  await page.getByRole('dialog', { name: 'Dawn Relay Spire finale' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await capture(page, `${profile.label}-07-dawn-restored-finale.png`)
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    if (await page.getByRole('dialog', { name: 'Level Complete' }).count()) break
+    const advance = page.getByRole('button', { name: /Continue|View Results/i })
+    if (await advance.count()) {
+      await advance.click()
+      await delay(120)
+    }
+  }
+  await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await capture(page, `${profile.label}-08-level-10-complete.png`)
+
+  snapshot = await readShadowRunnerDebug(page)
+  record(`${profile.label} level-10 powers, phase bridges, relay beams, boss phases, finale, and completion`, {
+    checkpointId: snapshot?.checkpointId,
+    relayFlames: snapshot?.player?.objectiveItems,
+    lastDispatches: snapshot?.player?.masteryItems,
+    dawnfireAegisActive: snapshot?.player?.dawnfireAegisActive,
+    aetherStepActive: snapshot?.player?.aetherStepActive,
+    fullPhysicsPass,
+    pools: snapshot?.pools,
+  })
+}
+
 async function readShadowRunnerDebug(page) {
   return page.evaluate(() => window.__shadowRunnerDebug?.())
 }
@@ -1673,7 +2013,9 @@ function buildConfig(parsedArgs) {
     .map(profile => {
       const resolved = PHONE_PROFILES[profile]
       if (!resolved) throw new Error(`Unsupported phone profile: ${profile}`)
-      return parsedArgs.levelId === 'level-8' || parsedArgs.levelId === 'level-9'
+      return parsedArgs.levelId === 'level-8'
+        || parsedArgs.levelId === 'level-9'
+        || parsedArgs.levelId === 'level-10'
         ? resolved
         : { ...resolved, browserName: 'chromium' }
     })

@@ -85,6 +85,10 @@ export const SHADOW_RUNNER_TERRAIN_RUNTIME: Record<ShadowRunnerTerrainSet, Shado
     textureKey: 'shadow-runner-captain-terrain-atlas',
     asset: SHADOW_RUNNER_ASSETS.levels.captainGateProps,
   },
+  relay: {
+    textureKey: 'shadow-runner-relay-terrain-atlas',
+    asset: SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireProps,
+  },
 }
 
 export const CATACOMB_TERRAIN_CROPS: Record<string, ShadowRunnerTextureCrop> = {
@@ -121,6 +125,21 @@ export const CAPTAIN_GATE_TERRAIN_CROPS: Record<string, ShadowRunnerTextureCrop>
   'captain-chain-bridge': { x: 545, y: 286, width: 960, height: 182 },
   'captain-counterweight-lift': { x: 940, y: 526, width: 494, height: 162 },
   'captain-low-overhang': { x: 332, y: 522, width: 558, height: 153 },
+}
+
+export const DAWN_RELAY_TERRAIN_CROPS: Record<string, ShadowRunnerTextureCrop> = {
+  'relay-wide-floor': { x: 52, y: 68, width: 710, height: 174 },
+  'relay-cracked-floor': { x: 818, y: 68, width: 675, height: 174 },
+  'relay-moon-glass-ledge': { x: 66, y: 278, width: 392, height: 118 },
+  'relay-phase-bridge': { x: 506, y: 276, width: 984, height: 122 },
+  'relay-recovery-stair': { x: 76, y: 454, width: 310, height: 174 },
+  'relay-conduit-overhang': { x: 446, y: 454, width: 382, height: 174 },
+  'relay-lift': { x: 874, y: 410, width: 606, height: 230 },
+  'relay-cover-pylon': { x: 48, y: 652, width: 150, height: 330 },
+  'relay-master-gate': { x: 242, y: 646, width: 440, height: 342 },
+  'relay-brazier': { x: 704, y: 648, width: 226, height: 340 },
+  'relay-ignition-pedestal': { x: 962, y: 674, width: 190, height: 316 },
+  'relay-beam-emitter': { x: 1188, y: 730, width: 328, height: 250 },
 }
 
 export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRunnerEnemyRuntime> = {
@@ -319,6 +338,66 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
       defeated: 'captain-defeated',
     },
   },
+  'relay-lancer': {
+    textureKey: 'relay-lancer',
+    asset: SHADOW_RUNNER_ASSETS.enemies.relayLancerStrip,
+    scale: 0.86,
+    body: { width: 50, height: 80, offsetX: 39, offsetY: 48 },
+    maxVelocityX: 228,
+    defaultPatrolSpeed: 96,
+    flipWhenFacingLeft: true,
+    animations: {
+      walk: 'relay-lancer-march',
+      attack: 'relay-lancer-strike',
+      hit: 'relay-lancer-hit',
+      defeated: 'relay-lancer-defeated',
+    },
+  },
+  'prism-caster': {
+    textureKey: 'prism-caster',
+    asset: SHADOW_RUNNER_ASSETS.enemies.prismCasterStrip,
+    scale: 0.8,
+    body: { width: 44, height: 72, offsetX: 42, offsetY: 56 },
+    maxVelocityX: 154,
+    defaultPatrolSpeed: 58,
+    flipWhenFacingLeft: true,
+    animations: {
+      walk: 'prism-caster-hover',
+      attack: 'prism-caster-cast',
+      hit: 'prism-caster-hit',
+      defeated: 'prism-caster-defeated',
+    },
+  },
+  'gearwing-drone': {
+    textureKey: 'gearwing-drone',
+    asset: SHADOW_RUNNER_ASSETS.enemies.gearwingDroneStrip,
+    scale: 0.76,
+    body: { width: 56, height: 44, offsetX: 36, offsetY: 44 },
+    maxVelocityX: 340,
+    defaultPatrolSpeed: 124,
+    flipWhenFacingLeft: true,
+    animations: {
+      walk: 'gearwing-drone-flight',
+      attack: 'gearwing-drone-dive',
+      hit: 'gearwing-drone-hit',
+      defeated: 'gearwing-drone-defeated',
+    },
+  },
+  'sentry-sovereign': {
+    textureKey: 'sentry-sovereign',
+    asset: SHADOW_RUNNER_ASSETS.enemies.sentrySovereignStrip,
+    scale: 0.82,
+    body: { width: 84, height: 118, offsetX: 54, offsetY: 68 },
+    maxVelocityX: 390,
+    defaultPatrolSpeed: 146,
+    flipWhenFacingLeft: true,
+    animations: {
+      walk: 'sovereign-guard',
+      attack: 'sovereign-attack',
+      hit: 'sovereign-hit',
+      defeated: 'sovereign-defeated',
+    },
+  },
 }
 
 export function getShadowRunnerTerrainRuntime(terrainSet?: ShadowRunnerRect['terrainSet']) {
@@ -335,6 +414,7 @@ export function getShadowRunnerRouteRuntimeAssets(level: ShadowRunnerLevelConfig
   terrainSets.add(level.finish.terrainSet ?? 'stone')
 
   const isCaptainGate = (level.id as string) === 'level-9'
+  const isDawnRelay = (level.id as string) === 'level-10'
   const enemyKinds = (level.enemies ?? (level.enemy ? [level.enemy] : []))
     .map(enemy => enemy.kind)
   const assets = [
@@ -351,12 +431,16 @@ export function getShadowRunnerRouteRuntimeAssets(level: ShadowRunnerLevelConfig
     level.wraithlightPickups?.length ? SHADOW_RUNNER_ASSETS.levels.wraithlightLanternStrip : undefined,
     level.mirrorWardPickups?.length ? SHADOW_RUNNER_ASSETS.levels.mirrorWardStrip : undefined,
     level.objectivePickups?.length
-      ? isCaptainGate
+      ? isDawnRelay
+        ? SHADOW_RUNNER_ASSETS.levels.relayFlameStrip
+        : isCaptainGate
         ? SHADOW_RUNNER_ASSETS.levels.watchfireCrestStrip
         : SHADOW_RUNNER_ASSETS.levels.relaySealStrip
       : undefined,
     level.masteryPickups?.length
-      ? isCaptainGate
+      ? isDawnRelay
+        ? SHADOW_RUNNER_ASSETS.levels.lastDispatchStrip
+        : isCaptainGate
         ? SHADOW_RUNNER_ASSETS.levels.captainsOrdersStrip
         : SHADOW_RUNNER_ASSETS.levels.courierCacheStrip
       : undefined,
@@ -366,9 +450,19 @@ export function getShadowRunnerRouteRuntimeAssets(level: ShadowRunnerLevelConfig
     level.sunsteelEdgePickups?.length
       ? SHADOW_RUNNER_ASSETS.levels.sunsteelEdgeStrip
       : undefined,
+    level.dawnfireAegisPickups?.length
+      ? SHADOW_RUNNER_ASSETS.levels.dawnfireAegisStrip
+      : undefined,
+    level.aetherStepPickups?.length
+      ? SHADOW_RUNNER_ASSETS.levels.aetherStepStrip
+      : undefined,
     enemyKinds.includes('storm-grenadier')
       ? SHADOW_RUNNER_ASSETS.levels.stormBombStrip
       : undefined,
+    enemyKinds.some(kind => kind === 'prism-caster' || kind === 'sentry-sovereign')
+      ? SHADOW_RUNNER_ASSETS.levels.relayOrbStrip
+      : undefined,
+    level.finale?.asset,
   ]
 
   return Array.from(new Set(assets.filter((asset): asset is string => Boolean(asset))))

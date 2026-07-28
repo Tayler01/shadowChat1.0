@@ -4,6 +4,10 @@ import {
   SHADOW_RUNNER_LEVEL_NINE,
   SHADOW_RUNNER_LEVEL_NINE_ASSETS,
 } from './levelNine'
+import {
+  SHADOW_RUNNER_LEVEL_TEN,
+  SHADOW_RUNNER_LEVEL_TEN_ASSETS,
+} from './levelTen'
 
 export interface ShadowRunnerRect {
   id: string
@@ -12,7 +16,7 @@ export interface ShadowRunnerRect {
   width: number
   height: number
   visualId?: string
-  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock' | 'moon' | 'catacomb' | 'spectral' | 'captain'
+  terrainSet?: 'stone' | 'ivy' | 'bell' | 'candle' | 'candleBright' | 'candleShelf' | 'clock' | 'moon' | 'catacomb' | 'spectral' | 'captain' | 'relay'
   hidden?: boolean
   damage?: number
 }
@@ -116,7 +120,11 @@ export interface ShadowRunnerArrowVolley extends ShadowRunnerRect {
   damage?: number
 }
 
-export type ShadowRunnerMasteryPower = 'gale-mantle' | 'sunsteel-edge'
+export type ShadowRunnerMasteryPower =
+  | 'gale-mantle'
+  | 'sunsteel-edge'
+  | 'dawnfire-aegis'
+  | 'aether-step'
 
 export interface ShadowRunnerWindZone extends ShadowRunnerRect {
   direction: 1 | -1
@@ -152,6 +160,53 @@ export interface ShadowRunnerSunsteelEdgePickup extends ShadowRunnerPoint {
   reachBonus: number
 }
 
+export interface ShadowRunnerDawnfireAegisPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs: number
+  healthRestore: number
+  damageResistanceMultiplier: number
+  attackDamageBonus: number
+  guardDamage: number
+}
+
+export interface ShadowRunnerAetherStepPickup extends ShadowRunnerPoint {
+  scoreValue?: number
+  durationMs: number
+  healthRestore: number
+  speedMultiplier: number
+  extraAirJumps: number
+  preventFallDamage: boolean
+}
+
+export interface ShadowRunnerPhasePlatform extends ShadowRunnerRect {
+  solidDurationMs: number
+  warningDurationMs: number
+  intangibleDurationMs: number
+  phaseOffsetMs?: number
+}
+
+export interface ShadowRunnerRelayBeamZone extends ShadowRunnerRect {
+  lanes: number[]
+  cadenceMs: number
+  tellDurationMs: number
+  activeDurationMs: number
+  delayMs?: number
+  damage: number
+}
+
+export interface ShadowRunnerFinaleBeat {
+  eyebrow: string
+  title: string
+  body: string
+  durationMs: number
+}
+
+export interface ShadowRunnerFinaleConfig {
+  asset: string
+  finalLine: string
+  beats: ShadowRunnerFinaleBeat[]
+}
+
 export interface ShadowRunnerFinishRequirementText {
   missingObjectives: string
   missingRequiredEnemies: string
@@ -166,6 +221,9 @@ export interface ShadowRunnerBossPhaseConfig {
   attackCooldownMs?: number
   patrolSpeedMultiplier?: number
   chargeCount?: number
+  attackStyle?: 'sweep' | 'orbs' | 'shockwave' | 'finale'
+  orbCount?: number
+  shockwaveCount?: number
 }
 
 export type ShadowRunnerEnemyKind =
@@ -182,6 +240,10 @@ export type ShadowRunnerEnemyKind =
   | 'gate-pikeman'
   | 'storm-grenadier'
   | 'moonlit-captain'
+  | 'relay-lancer'
+  | 'prism-caster'
+  | 'gearwing-drone'
+  | 'sentry-sovereign'
 
 export interface ShadowRunnerEnemyConfig extends ShadowRunnerPoint {
   kind: ShadowRunnerEnemyKind
@@ -220,6 +282,7 @@ export type ShadowRunnerPlayableLevelId =
   | 'level-7'
   | 'level-8'
   | 'level-9'
+  | 'level-10'
 
 export interface ShadowRunnerLevelConfig {
   id: ShadowRunnerPlayableLevelId
@@ -252,8 +315,12 @@ export interface ShadowRunnerLevelConfig {
   mirrorWardPickups?: ShadowRunnerMirrorWardPickup[]
   galeMantlePickups?: ShadowRunnerGaleMantlePickup[]
   sunsteelEdgePickups?: ShadowRunnerSunsteelEdgePickup[]
+  dawnfireAegisPickups?: ShadowRunnerDawnfireAegisPickup[]
+  aetherStepPickups?: ShadowRunnerAetherStepPickup[]
   spectralPlatforms?: ShadowRunnerRect[]
+  phasePlatforms?: ShadowRunnerPhasePlatform[]
   windZones?: ShadowRunnerWindZone[]
+  relayBeamZones?: ShadowRunnerRelayBeamZone[]
   movingPlatforms?: ShadowRunnerMovingPlatform[]
   requiredEnemyIds?: string[]
   finishRequirementText?: ShadowRunnerFinishRequirementText
@@ -262,6 +329,7 @@ export interface ShadowRunnerLevelConfig {
   enemy?: ShadowRunnerEnemyConfig
   enemies?: ShadowRunnerEnemyConfig[]
   finish: ShadowRunnerRect
+  finale?: ShadowRunnerFinaleConfig
 }
 
 export interface ShadowRunnerCampaignLevel {
@@ -1508,12 +1576,18 @@ const DEFAULT_ENEMY_CONTACT_DAMAGE: Record<ShadowRunnerEnemyKind, number> = {
   'gate-pikeman': 3,
   'storm-grenadier': 2,
   'moonlit-captain': 4,
+  'relay-lancer': 3,
+  'prism-caster': 2,
+  'gearwing-drone': 3,
+  'sentry-sovereign': 4,
 }
 
 const DEFAULT_ENEMY_PROJECTILE_DAMAGE: Partial<Record<ShadowRunnerEnemyKind, number>> = {
   'tower-archer': 3,
   'candle-jester': 2,
   'storm-grenadier': 3,
+  'prism-caster': 3,
+  'sentry-sovereign': 4,
 }
 
 export function getShadowRunnerEnemyContactDamage(enemy: ShadowRunnerEnemyConfig) {
@@ -1550,6 +1624,7 @@ export const SHADOW_RUNNER_LEVEL_CONFIGS: Record<ShadowRunnerPlayableLevelId, Sh
   'level-7': SHADOW_RUNNER_LEVEL_SEVEN,
   'level-8': SHADOW_RUNNER_LEVEL_EIGHT,
   'level-9': SHADOW_RUNNER_LEVEL_NINE,
+  'level-10': SHADOW_RUNNER_LEVEL_TEN,
 }
 
 export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
@@ -1683,14 +1758,15 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     id: 'level-10',
     levelNumber: 10,
     title: 'Dawn Relay Spire',
-    objective: 'Light the relay',
+    objective: 'Restore five Relay Flames and defeat the Sentry Sovereign',
     difficultyTier: 10,
-    difficultyLabel: 'Final Relay',
-    routeType: 'Finale Route',
-    mechanicPreview: 'All mechanics mixed with relay timing',
-    thumbnail: SHADOW_RUNNER_ASSETS.home.background,
-    locationButton: SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireLocationButton,
+    difficultyLabel: 'Sovereign Trial',
+    routeType: 'Campaign Finale',
+    mechanicPreview: 'Relay beams, phase bridges, Dawnfire Aegis, Aether Step, and the Sentry Sovereign',
+    thumbnail: SHADOW_RUNNER_LEVEL_TEN_ASSETS.thumbnail320,
+    locationButton: SHADOW_RUNNER_LEVEL_TEN_ASSETS.locationButton,
     mapPosition: { left: 88, top: 47 },
+    playableLevelId: 'level-10',
   },
 ]
 

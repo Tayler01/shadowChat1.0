@@ -58,6 +58,24 @@ const LEVEL_NINE_DIMENSIONS = new Map([
   [SHADOW_RUNNER_ASSETS.levels.captainGateLocationButton, [256, 256]],
 ])
 
+const LEVEL_TEN_DIMENSIONS = new Map([
+  [SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireBackground, [1920, 1080]],
+  [SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireProps, [1536, 1024]],
+  [SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireThumbnail160, [160, 90]],
+  [SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireThumbnail320, [320, 180]],
+  [SHADOW_RUNNER_ASSETS.enemies.relayLancerStrip, [768, 128]],
+  [SHADOW_RUNNER_ASSETS.enemies.prismCasterStrip, [768, 128]],
+  [SHADOW_RUNNER_ASSETS.enemies.gearwingDroneStrip, [768, 128]],
+  [SHADOW_RUNNER_ASSETS.enemies.sentrySovereignStrip, [1920, 192]],
+  [SHADOW_RUNNER_ASSETS.levels.dawnfireAegisStrip, [256, 64]],
+  [SHADOW_RUNNER_ASSETS.levels.aetherStepStrip, [256, 64]],
+  [SHADOW_RUNNER_ASSETS.levels.relayFlameStrip, [256, 64]],
+  [SHADOW_RUNNER_ASSETS.levels.lastDispatchStrip, [256, 64]],
+  [SHADOW_RUNNER_ASSETS.levels.relayOrbStrip, [256, 64]],
+  [SHADOW_RUNNER_ASSETS.levels.dawnRestoredEnding, [1920, 1080]],
+  [SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireLocationButtonV2, [256, 256]],
+])
+
 function fromPublicUrl(url) {
   return path.join(publicRoot, url.slice(1))
 }
@@ -151,6 +169,14 @@ test('Shadow Runner Level 9 assets have their authored runtime dimensions', asyn
   }
 })
 
+test('Shadow Runner Level 10 assets have their authored runtime dimensions', async () => {
+  for (const [url, [expectedWidth, expectedHeight]] of LEVEL_TEN_DIMENSIONS) {
+    const metadata = await sharp(fromPublicUrl(url)).metadata()
+    assert.equal(metadata.width, expectedWidth, `${url} has an unexpected width`)
+    assert.equal(metadata.height, expectedHeight, `${url} has an unexpected height`)
+  }
+})
+
 test('Shadow Runner animation strips have transparent, nonempty frames', async () => {
   const stripPattern = /-(\d+)f-(\d+)(?:x(\d+))?\.(?:png|webp)$/i
   const stripUrls = flattenAssetUrls(SHADOW_RUNNER_ASSETS)
@@ -202,5 +228,9 @@ test('Shadow Runner terrain crops stay inside their runtime atlases', async () =
   await assertCropBounds(
     SHADOW_RUNNER_ASSETS.levels.captainGateProps,
     readCropTable('CAPTAIN_GATE_TERRAIN_CROPS'),
+  )
+  await assertCropBounds(
+    SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireProps,
+    readCropTable('DAWN_RELAY_TERRAIN_CROPS'),
   )
 })

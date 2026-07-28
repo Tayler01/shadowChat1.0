@@ -186,6 +186,262 @@ describe('Shadow Runner level configuration contract', () => {
     expect(campaignLevel?.locationButton).toContain('level-9-captain-gate-location-button-v2.webp')
   })
 
+  it('ships Dawn Relay Spire as the complete playable campaign finale', () => {
+    const levelNine = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
+    const levelTen = SHADOW_RUNNER_LEVEL_CONFIGS['level-10']
+    const enemies = getShadowRunnerLevelEnemies(levelTen)
+    const enemyKinds = new Set(enemies.map(enemy => enemy.kind))
+    const campaignLevel = SHADOW_RUNNER_CAMPAIGN_LEVELS.find(level => level.id === 'level-10')
+    const sovereign = enemies.find(enemy => enemy.id === 'sentry-sovereign')
+
+    expect(levelTen.title).toBe('Dawn Relay Spire')
+    expect(levelTen.subtitle).toBe('The Last Light')
+    expect(levelTen.campaignLevel).toBe(10)
+    expect(levelTen.worldWidth).toBe(26400)
+    expect(levelTen.worldWidth).toBeGreaterThan(levelNine.worldWidth * 1.28)
+    expect(levelTen.checkpoints).toHaveLength(10)
+    expect(levelTen.coins).toHaveLength(122)
+    expect(levelTen.tiltPlatforms).toHaveLength(4)
+    expect(levelTen.movingPlatforms).toHaveLength(8)
+    expect(levelTen.phasePlatforms).toHaveLength(7)
+    expect(levelTen.crouchGates).toHaveLength(6)
+    expect(levelTen.relayBeamZones).toHaveLength(7)
+    expect(levelTen.objectivePickups).toHaveLength(5)
+    expect(levelTen.masteryPickups).toHaveLength(8)
+    expect(levelTen.dawnfireAegisPickups).toHaveLength(5)
+    expect(levelTen.aetherStepPickups).toHaveLength(6)
+    expect(enemies).toHaveLength(36)
+    expect([...enemyKinds]).toEqual(expect.arrayContaining([
+      'relay-lancer',
+      'prism-caster',
+      'gearwing-drone',
+      'sentry-sovereign',
+      'tower-archer',
+      'storm-grenadier',
+    ]))
+    expect(sovereign?.health).toBe(24)
+    expect(sovereign?.guard).toBe(6)
+    expect(sovereign?.bossPhases?.map(phase => phase.id)).toEqual([
+      'iron-decree',
+      'lockstorm',
+      'crownfall',
+      'last-light',
+    ])
+    expect(levelTen.requiredEnemyIds).toEqual(['sentry-sovereign'])
+    expect(levelTen.encounters?.filter(encounter => encounter.sealed).map(encounter => encounter.id))
+      .toEqual(['relay-encounter-crown'])
+    expect(levelTen.encounters?.find(encounter => encounter.id === 'relay-encounter-crown')?.enemyIds)
+      .toEqual(['sentry-sovereign'])
+    expect(levelTen.finale?.beats).toHaveLength(4)
+    expect(levelTen.finale?.finalLine).toBe('The Last Runner delivered the dawn.')
+    expect(campaignLevel?.playableLevelId).toBe('level-10')
+    expect(campaignLevel?.difficultyLabel).toBe('Sovereign Trial')
+    expect(campaignLevel?.mechanicPreview).toContain('Dawnfire Aegis')
+    expect(campaignLevel?.thumbnail).toContain('dawn-relay-spire-thumbnail-320x180.webp')
+    expect(campaignLevel?.locationButton).toContain('level-10-dawn-relay-spire-location-button-v2.webp')
+  })
+
+  it('keeps Dawn Relay Spire geometry bounded, unique, supported, and fair', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-10']
+    const enemies = getShadowRunnerLevelEnemies(level)
+    const rects = [
+      ...level.platforms,
+      ...level.tiltPlatforms,
+      ...(level.movingPlatforms ?? []),
+      ...(level.phasePlatforms ?? []),
+      ...(level.crouchGates ?? []),
+      ...(level.windZones ?? []),
+      ...(level.relayBeamZones ?? []),
+      ...level.spikes,
+      ...(level.arrowVolleys ?? []),
+      ...(level.encounters ?? []),
+      level.finish,
+    ]
+    const points = [
+      level.playerStart,
+      ...(level.checkpoints ?? []),
+      ...level.coins,
+      ...(level.boosts ?? []),
+      ...(level.shieldPickups ?? []),
+      ...(level.chronoPickups ?? []),
+      ...(level.surgePickups ?? []),
+      ...(level.mirrorWardPickups ?? []),
+      ...(level.galeMantlePickups ?? []),
+      ...(level.sunsteelEdgePickups ?? []),
+      ...(level.dawnfireAegisPickups ?? []),
+      ...(level.aetherStepPickups ?? []),
+      ...(level.objectivePickups ?? []),
+      ...(level.masteryPickups ?? []),
+      ...enemies,
+    ]
+    const ids = [...rects, ...points].map(item => item.id)
+
+    expect(new Set(ids).size).toBe(ids.length)
+    rects.forEach(rect => {
+      expect(rect.x).toBeGreaterThanOrEqual(0)
+      expect(rect.y).toBeGreaterThanOrEqual(0)
+      expect(rect.x + rect.width).toBeLessThanOrEqual(level.worldWidth)
+      expect(rect.y + rect.height).toBeLessThanOrEqual(level.worldHeight)
+    })
+    points.forEach(point => {
+      expect(point.x).toBeGreaterThanOrEqual(0)
+      expect(point.x).toBeLessThanOrEqual(level.worldWidth)
+      expect(point.y).toBeGreaterThanOrEqual(0)
+      expect(point.y).toBeLessThanOrEqual(level.worldHeight)
+    })
+
+    const floorPlatforms = level.platforms
+      .filter(platform => /^relay-(floor-\d+|boss-floor|finish-floor)$/.test(platform.id))
+      .sort((left, right) => left.x - right.x)
+    floorPlatforms.forEach((platform, index) => {
+      if (index === 0) return
+      const previous = floorPlatforms[index - 1]
+      const gap = platform.x - (previous.x + previous.width)
+      expect(gap).toBeGreaterThanOrEqual(0)
+      expect(gap).toBeLessThanOrEqual(220)
+    })
+
+    level.checkpoints?.forEach(checkpoint => {
+      const support = floorPlatforms.find(platform => (
+        checkpoint.x >= platform.x + 20
+        && checkpoint.x <= platform.x + platform.width - 20
+        && Math.abs(checkpoint.y - platform.y) <= 2
+      ))
+      expect(support?.id).toBeTruthy()
+    })
+
+    level.crouchGates?.forEach(gate => {
+      expect(616 - (gate.y + gate.height)).toBeGreaterThanOrEqual(60)
+      const lowCoins = level.coins.filter(coin => (
+        coin.x >= gate.x + 10
+        && coin.x <= gate.x + gate.width - 10
+        && coin.y >= 580
+        && coin.y <= 602
+      ))
+      expect(lowCoins.length).toBeGreaterThanOrEqual(2)
+
+      const suffix = gate.id.replace('relay-crouch-', '')
+      const index = ['approach', 'prism', 'foundry', 'choir', 'crown', 'last'].indexOf(suffix) + 1
+      const cap = level.platforms.find(platform => platform.id === `relay-crouch-cap-${String(index).padStart(2, '0')}`)
+      const step = level.platforms.find(platform => platform.id === `relay-crouch-step-${String(index).padStart(2, '0')}`)
+      const topCoins = level.coins.filter(coin => (
+        cap
+        && coin.x >= cap.x
+        && coin.x <= cap.x + cap.width
+        && coin.y < cap.y
+        && cap.y - coin.y <= 120
+      ))
+
+      expect(cap?.y).toBeLessThanOrEqual(240)
+      expect((cap?.y ?? 0) + (cap?.height ?? 0)).toBe(gate.y)
+      expect(cap?.x).toBeLessThanOrEqual(gate.x)
+      expect((cap?.x ?? 0) + (cap?.width ?? 0)).toBeGreaterThanOrEqual(gate.x + gate.width)
+      expect(step?.x).toBeGreaterThan(gate.x + gate.width)
+      expect(step?.y).toBeLessThan(616)
+      expect(topCoins.length).toBeGreaterThanOrEqual(1)
+    })
+
+    const solidRects = [
+      ...level.platforms,
+      ...(level.crouchGates ?? []),
+    ]
+    const collectibles = [
+      ...level.coins,
+      ...(level.boosts ?? []),
+      ...(level.shieldPickups ?? []),
+      ...(level.chronoPickups ?? []),
+      ...(level.surgePickups ?? []),
+      ...(level.mirrorWardPickups ?? []),
+      ...(level.galeMantlePickups ?? []),
+      ...(level.sunsteelEdgePickups ?? []),
+      ...(level.dawnfireAegisPickups ?? []),
+      ...(level.aetherStepPickups ?? []),
+      ...(level.objectivePickups ?? []),
+      ...(level.masteryPickups ?? []),
+    ]
+    collectibles.forEach(collectible => {
+      const containingRect = solidRects.find(rect => (
+        collectible.x > rect.x
+        && collectible.x < rect.x + rect.width
+        && collectible.y > rect.y
+        && collectible.y < rect.y + rect.height
+      ))
+      expect(containingRect?.id).toBeUndefined()
+    })
+
+    level.phasePlatforms?.forEach(platform => {
+      expect(platform.solidDurationMs).toBeGreaterThanOrEqual(1400)
+      expect(platform.warningDurationMs).toBeGreaterThanOrEqual(600)
+      expect(platform.intangibleDurationMs).toBeLessThan(platform.solidDurationMs)
+    })
+
+    level.relayBeamZones?.forEach(zone => {
+      expect(zone.lanes.length).toBeGreaterThan(0)
+      expect(zone.tellDurationMs).toBeGreaterThanOrEqual(700)
+      expect(zone.tellDurationMs + zone.activeDurationMs).toBeLessThan(zone.cadenceMs)
+      expect(zone.lanes.every(lane => lane >= zone.y && lane <= zone.y + zone.height)).toBe(true)
+    })
+  })
+
+  it('places every Last Dispatch on support after a fresh matching power opportunity', () => {
+    const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-10']
+    const supports = [
+      ...level.platforms,
+      ...(level.movingPlatforms ?? []),
+      ...(level.phasePlatforms ?? []),
+    ]
+
+    level.masteryPickups?.forEach(dispatch => {
+      const support = supports.find(platform => (
+        dispatch.x >= platform.x + 16
+        && dispatch.x <= platform.x + platform.width - 16
+        && dispatch.y <= platform.y
+        && platform.y - dispatch.y <= 64
+      ))
+      const enablingPickup = dispatch.requiredPower === 'dawnfire-aegis'
+        ? level.dawnfireAegisPickups?.find(pickup => (
+            pickup.x < dispatch.x
+            && dispatch.x - pickup.x <= 1400
+          ))
+        : level.aetherStepPickups?.find(pickup => (
+            pickup.x < dispatch.x
+            && dispatch.x - pickup.x <= 1400
+          ))
+
+      expect(dispatch.requiredPower).toMatch(/^(dawnfire-aegis|aether-step)$/)
+      expect(support?.id).toBeTruthy()
+      expect(enablingPickup?.id).toBeTruthy()
+    })
+
+    const dispatchRoutes = [
+      ['last-dispatch-2', 'relay-crouch-step-02', 'relay-crouch-cap-02'],
+      ['last-dispatch-4', 'relay-dispatch-step-04a', 'relay-dispatch-step-04b', 'relay-high-beam-b'],
+      ['last-dispatch-6', 'relay-dispatch-step-06', 'relay-high-crown-a'],
+      ['last-dispatch-8', 'relay-crouch-step-06', 'relay-crouch-cap-06', 'relay-high-ascent-b'],
+    ]
+    dispatchRoutes.forEach(([dispatchId, ...routeIds]) => {
+      const dispatch = level.masteryPickups?.find(candidate => candidate.id === dispatchId)
+      const route = routeIds.map(routeId => level.platforms.find(platform => platform.id === routeId))
+      expect(dispatch).toBeTruthy()
+      expect(route.every(platform => Boolean(platform))).toBe(true)
+      expect(route[0]?.y).toBeGreaterThanOrEqual(420)
+
+      route.forEach((platform, index) => {
+        if (!platform || index === route.length - 1) return
+        const next = route[index + 1]!
+        const horizontalGap = Math.max(
+          0,
+          next.x - (platform.x + platform.width),
+          platform.x - (next.x + next.width),
+        )
+        expect(platform.y - next.y).toBeLessThanOrEqual(200)
+        expect(horizontalGap).toBeLessThanOrEqual(220)
+      })
+      const finalSupport = route[route.length - 1]!
+      expect(finalSupport.y - (dispatch?.y ?? 0)).toBeLessThanOrEqual(64)
+    })
+  })
+
   it('keeps the Captain Gate main route continuous and every checkpoint on stable support', () => {
     const level = SHADOW_RUNNER_LEVEL_CONFIGS['level-9']
     const routeIds = [

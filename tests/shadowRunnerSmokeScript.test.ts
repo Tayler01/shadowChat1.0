@@ -23,6 +23,9 @@ describe('Shadow Runner phone smoke script', () => {
     expect(packageJson.scripts?.['qa:shadow-runner:level8']).toBe(
       'node scripts/shadow-runner-phone-smoke.mjs --level=level-8 --profiles=landscape,android',
     )
+    expect(packageJson.scripts?.['qa:shadow-runner:level10']).toBe(
+      'node scripts/shadow-runner-phone-smoke.mjs --level=level-10 --profiles=landscape,android',
+    )
   })
 
   it('uses local preview, phone profiles, screenshots, and canvas nonblank checks', () => {
@@ -84,6 +87,26 @@ describe('Shadow Runner phone smoke script', () => {
     expect(compactScript).toContain('relay sanctum relocked after checkpoint respawn')
     expect(compactScript).toContain('level 8 first crouch lane coins were not reachable')
     expect(compactScript).toContain('level-8 powers, encounters, route gates, and completion')
+  })
+
+  it('asserts Level 10 powers, dynamic platforms, boss phases, finale, and completion gates', () => {
+    expect(compactScript).toContain('dawn relay spire')
+    expect(compactScript).toContain('dawnfire aegis')
+    expect(compactScript).toContain('aether step')
+    expect(compactScript).toContain('seven phase platforms')
+    expect(compactScript).toContain('seven relay beam zones')
+    expect(compactScript).toContain('sound toggle recreated the level 10 scene')
+    expect(compactScript).toContain('relay beam bypassed an active shield')
+    expect(compactScript).toContain('relay cover did not create a safe beam pocket')
+    expect(compactScript).toContain('first crouch lane coins were not reachable')
+    expect(compactScript).toContain('relay-encounter-prism')
+    expect(compactScript).toContain('iron-decree')
+    expect(compactScript).toContain('lockstorm')
+    expect(compactScript).toContain('crownfall')
+    expect(compactScript).toContain('last-light')
+    expect(compactScript).toContain('lethal damage left a postmortem interaction window')
+    expect(compactScript).toContain('dawn relay spire finale')
+    expect(compactScript).toContain('level-10 powers, phase bridges, relay beams, boss phases, finale, and completion')
   })
 
   it('bounds browser and preview cleanup so passed runs can exit', () => {

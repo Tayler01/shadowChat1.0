@@ -4,6 +4,7 @@ import {
   collectShadowRunnerBoost,
   collectShadowRunnerChrono,
   collectShadowRunnerCoin,
+  collectShadowRunnerDawnfireAegis,
   collectShadowRunnerGaleMantle,
   collectShadowRunnerMastery,
   collectShadowRunnerMirrorWard,
@@ -12,22 +13,29 @@ import {
   collectShadowRunnerShield,
   collectShadowRunnerSunsteelEdge,
   collectShadowRunnerSurge,
+  collectShadowRunnerAetherStep,
   collectShadowRunnerWraithlight,
   createInitialShadowRunnerSimulation,
   consumeShadowRunnerSunsteelCharge,
   damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
+  doesShadowRunnerAetherPreventFallDamage,
   getShadowRunnerEncounterBarrierState,
   getShadowRunnerGaleFallDamageCap,
   getShadowRunnerGaleSpeedMultiplier,
+  getShadowRunnerAetherExtraAirJumps,
+  getShadowRunnerAetherSpeedMultiplier,
+  getShadowRunnerDawnfireProperties,
   getShadowRunnerHudState,
   getShadowRunnerSunsteelStrikeProperties,
   getShadowRunnerChronoTimeScale,
   getShadowRunnerSurgeSpeedMultiplier,
   isShadowRunnerGaleMantleActive,
+  isShadowRunnerDawnfireAegisActive,
   isShadowRunnerMirrorWardActive,
   isShadowRunnerSunsteelEdgeActive,
   isShadowRunnerSunsteelStrikeActive,
+  isShadowRunnerAetherStepActive,
   isShadowRunnerWraithlightActive,
   reflectShadowRunnerProjectileWithMirrorWard,
   spendShadowRunnerLife,
@@ -382,5 +390,87 @@ describe('Shadow Runner simulation', () => {
     expect(spendShadowRunnerLife(state)).toBe(false)
     expect(state.outOfLives).toBe(true)
     expect(state.objective).toBe('Route failed')
+  })
+
+  it('applies Dawnfire Aegis offense, resistance, healing, and expiry', () => {
+    const levelTen = SHADOW_RUNNER_LEVEL_CONFIGS['level-10']
+    const state = createInitialShadowRunnerSimulation(levelTen)
+    const pickup = levelTen.dawnfireAegisPickups![0]
+    state.player.health = 5
+
+    collectShadowRunnerDawnfireAegis(state, 1000, pickup)
+
+    expect(state.player.health).toBe(5 + pickup.healthRestore)
+    expect(state.player.score).toBe(pickup.scoreValue)
+    expect(isShadowRunnerDawnfireAegisActive(state, 1200)).toBe(true)
+    expect(getShadowRunnerDawnfireProperties(state, 1200)).toEqual({
+      attackDamageBonus: pickup.attackDamageBonus,
+      guardDamage: pickup.guardDamage,
+      damageResistanceMultiplier: pickup.damageResistanceMultiplier,
+    })
+    expect(getShadowRunnerHudState(state, levelTen.coins.length, 1200).dawnfireAegisActive)
+      .toBe(true)
+    expect(isShadowRunnerDawnfireAegisActive(state, 1001 + pickup.durationMs)).toBe(false)
+    expect(getShadowRunnerDawnfireProperties(state, 1001 + pickup.durationMs).damageResistanceMultiplier)
+      .toBe(1)
+  })
+
+  it('applies Aether Step movement, extra jump, fall protection, healing, and expiry', () => {
+    const levelTen = SHADOW_RUNNER_LEVEL_CONFIGS['level-10']
+    const state = createInitialShadowRunnerSimulation(levelTen)
+    const pickup = levelTen.aetherStepPickups![0]
+    state.player.health = 7
+
+    collectShadowRunnerAetherStep(state, 2000, pickup)
+
+    expect(state.player.health).toBe(7 + pickup.healthRestore)
+    expect(isShadowRunnerAetherStepActive(state, 2200)).toBe(true)
+    expect(getShadowRunnerAetherSpeedMultiplier(state, 2200)).toBe(pickup.speedMultiplier)
+    expect(getShadowRunnerAetherExtraAirJumps(state, 2200)).toBe(pickup.extraAirJumps)
+    expect(doesShadowRunnerAetherPreventFallDamage(state, 2200)).toBe(true)
+    const hud = getShadowRunnerHudState(state, levelTen.coins.length, 2200)
+    expect(hud.aetherStepActive).toBe(true)
+    expect(hud.aetherStepExtraAirJumps).toBe(1)
+    expect(hud.aetherStepPreventsFallDamage).toBe(true)
+
+    const expiredAt = 2001 + pickup.durationMs
+    expect(isShadowRunnerAetherStepActive(state, expiredAt)).toBe(false)
+    expect(getShadowRunnerAetherSpeedMultiplier(state, expiredAt)).toBe(1)
+    expect(getShadowRunnerAetherExtraAirJumps(state, expiredAt)).toBe(0)
+    expect(doesShadowRunnerAetherPreventFallDamage(state, expiredAt)).toBe(false)
+  })
+
+  it('reports Level 10 ordinary, full, and perfect completion independently', () => {
+    const levelTen = SHADOW_RUNNER_LEVEL_CONFIGS['level-10']
+    const state = createInitialShadowRunnerSimulation(levelTen)
+
+    levelTen.objectivePickups?.forEach(pickup => collectShadowRunnerObjective(state, pickup))
+    const requiredEnemy = state.enemies.find(enemy => levelTen.requiredEnemyIds?.includes(enemy.id))
+    expect(requiredEnemy).toBeDefined()
+    requiredEnemy!.health = 0
+    requiredEnemy!.alive = false
+
+    let hud = getShadowRunnerHudState(state, levelTen.coins.length)
+    expect(hud.objectiveLabel).toBe('Relay Flames')
+    expect(hud.objectiveGateOpen).toBe(true)
+    expect(hud.fullClear).toBe(false)
+    expect(hud.perfectRoute).toBe(false)
+
+    levelTen.masteryPickups?.forEach(pickup => collectShadowRunnerMastery(state, pickup))
+    levelTen.coins.forEach(() => collectShadowRunnerCoin(state))
+    state.enemies.forEach(enemy => {
+      enemy.health = 0
+      enemy.alive = false
+    })
+
+    hud = getShadowRunnerHudState(state, levelTen.coins.length)
+    expect(hud.masteryLabel).toBe('Last Dispatches')
+    expect(hud.fullClear).toBe(true)
+    expect(hud.perfectRoute).toBe(true)
+
+    spendShadowRunnerLife(state)
+    hud = getShadowRunnerHudState(state, levelTen.coins.length)
+    expect(hud.fullClear).toBe(true)
+    expect(hud.perfectRoute).toBe(false)
   })
 })

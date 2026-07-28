@@ -9,6 +9,7 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react'
+import { useComfortPreferences } from '../../../hooks/useComfortPreferences'
 import { SHADOW_RUNNER_ASSETS } from './assets/manifest'
 import type { ShadowRunnerSoundEvent } from './audio'
 import { createShadowRunnerInputState, type ShadowRunnerAction } from './game/input'
@@ -90,6 +91,18 @@ function createDefaultHud(levelId: ShadowRunnerPlayableLevelId): ShadowRunnerHud
       guardDamage: 0,
       reachBonus: 0,
     },
+    dawnfireAegisActive: false,
+    dawnfireAegisRemainingMs: 0,
+    dawnfireAegis: {
+      attackDamageBonus: 0,
+      guardDamage: 0,
+      damageResistanceMultiplier: 1,
+    },
+    aetherStepActive: false,
+    aetherStepRemainingMs: 0,
+    aetherStepSpeedMultiplier: 1,
+    aetherStepExtraAirJumps: 0,
+    aetherStepPreventsFallDamage: false,
     moonShards: 0,
     totalMoonShards: level.moonShardPickups?.length ?? 0,
     moonShardGateOpen: (level.moonShardPickups?.length ?? 0) === 0,
@@ -473,7 +486,12 @@ export function ShadowRunnerGame({
   const gameMountRef = React.useRef<HTMLDivElement | null>(null)
   const gameRef = React.useRef<ShadowRunnerPhaserGameHandle | null>(null)
   const inputRef = React.useRef(createShadowRunnerInputState())
+  const onSoundEventRef = React.useRef(onSoundEvent)
+  onSoundEventRef.current = onSoundEvent
   const levelConfig = React.useMemo(() => getShadowRunnerLevelConfig(levelId), [levelId])
+  const { isReducedMotion } = useComfortPreferences()
+  const reducedMotionRef = React.useRef(isReducedMotion)
+  reducedMotionRef.current = isReducedMotion
   const [hud, setHud] = React.useState<ShadowRunnerHudState>(() => createDefaultHud(levelId))
   const [ready, setReady] = React.useState(false)
   const [loadError, setLoadError] = React.useState<string | null>(null)
@@ -481,6 +499,8 @@ export function ShadowRunnerGame({
   const [confirmExit, setConfirmExit] = React.useState<null | 'title'>(null)
   const [restartToken, setRestartToken] = React.useState(0)
   const [routeIntroVisible, setRouteIntroVisible] = React.useState(true)
+  const [finaleBeatIndex, setFinaleBeatIndex] = React.useState(0)
+  const [finaleComplete, setFinaleComplete] = React.useState(false)
   const completionReportedRef = React.useRef(false)
   const menuOpen = pauseOpen || confirmExit !== null
   const overlayOpen = menuOpen || hud.defeated || hud.outOfLives
@@ -497,6 +517,8 @@ export function ShadowRunnerGame({
     setReady(false)
     setLoadError(null)
     setHud(createDefaultHud(levelId))
+    setFinaleBeatIndex(0)
+    setFinaleComplete(false)
     completionReportedRef.current = false
 
     void import('./game/createShadowRunnerPhaserGame')
@@ -511,7 +533,8 @@ export function ShadowRunnerGame({
           onReady: () => {
             if (!disposed) setReady(true)
           },
-          onSoundEvent,
+          onSoundEvent: event => onSoundEventRef.current?.(event),
+          reducedMotion: reducedMotionRef.current,
         }) as ShadowRunnerPhaserGameHandle
         gameRef.current = game
       })
@@ -526,7 +549,7 @@ export function ShadowRunnerGame({
       game?.destroy(true)
       gameRef.current = null
     }
-  }, [levelId, onSoundEvent, restartToken])
+  }, [levelId, restartToken])
 
   React.useEffect(() => {
     setRouteIntroVisible(true)
@@ -535,6 +558,29 @@ export function ShadowRunnerGame({
     const timer = window.setTimeout(() => setRouteIntroVisible(false), 2800)
     return () => window.clearTimeout(timer)
   }, [levelId, ready, restartToken])
+
+  React.useEffect(() => {
+    const finale = levelConfig.finale
+    if (!hud.defeated || !finale || finaleComplete) return
+
+    const beat = finale.beats[finaleBeatIndex]
+    if (!beat) {
+      setFinaleComplete(true)
+      return
+    }
+    if (isReducedMotion) return
+    const timer = window.setTimeout(
+      () => {
+        if (finaleBeatIndex >= finale.beats.length - 1) {
+          setFinaleComplete(true)
+        } else {
+          setFinaleBeatIndex(current => current + 1)
+        }
+      },
+      beat.durationMs,
+    )
+    return () => window.clearTimeout(timer)
+  }, [finaleBeatIndex, finaleComplete, hud.defeated, isReducedMotion, levelConfig.finale])
 
   React.useEffect(() => {
     if (!hud.defeated || completionReportedRef.current) return
@@ -613,6 +659,17 @@ export function ShadowRunnerGame({
     onSoundEvent?.('level-select')
     setRestartToken(current => current + 1)
   }, [clearPressedActions, onSoundEvent])
+
+  const advanceFinale = React.useCallback(() => {
+    const finale = levelConfig.finale
+    if (!finale) return
+    onSoundEvent?.('menu-click')
+    if (finaleBeatIndex >= finale.beats.length - 1) {
+      setFinaleComplete(true)
+    } else {
+      setFinaleBeatIndex(current => current + 1)
+    }
+  }, [finaleBeatIndex, levelConfig.finale, onSoundEvent])
 
   const pauseActions = React.useMemo<ShadowRunnerScrollMenuAction[]>(() => [
     {
@@ -941,6 +998,42 @@ export function ShadowRunnerGame({
           </div>
         )}
 
+        {hud.dawnfireAegisActive && (
+          <div
+            aria-label={`Dawnfire Aegis ${Math.ceil(hud.dawnfireAegisRemainingMs / 1000)} seconds remaining`}
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#ffbd52]/55 bg-[#1b0c05]/86 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.1em] text-[#ffe4a0] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.dawnfireAegisStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Dawnfire</span>
+            <span>{Math.ceil(hud.dawnfireAegisRemainingMs / 1000)}s</span>
+          </div>
+        )}
+
+        {hud.aetherStepActive && (
+          <div
+            aria-label={`Aether Step ${Math.ceil(hud.aetherStepRemainingMs / 1000)} seconds remaining`}
+            className="pointer-events-none flex h-7 w-fit items-center gap-1.5 rounded border border-[#8ff8ff]/55 bg-[#04151b]/86 px-2.5 text-[0.52rem] font-black uppercase tracking-[0.1em] text-[#d5fbff] shadow-[0_10px_24px_rgba(0,0,0,0.42)] backdrop-blur-sm min-[740px]:h-8 min-[740px]:text-[0.6rem]"
+          >
+            <span
+              aria-hidden="true"
+              className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
+              style={{
+                backgroundImage: `url(${SHADOW_RUNNER_ASSETS.levels.aetherStepStrip})`,
+                backgroundSize: '400% 100%',
+              }}
+            />
+            <span>Aether</span>
+            <span>{Math.ceil(hud.aetherStepRemainingMs / 1000)}s</span>
+          </div>
+        )}
+
         {hud.totalObjectiveItems > 0 && (
           <div
             aria-label={`${hud.objectiveLabel} ${hud.objectiveItems} of ${hud.totalObjectiveItems}; ${hud.masteryLabel} ${hud.masteryItems} of ${hud.totalMasteryItems}`}
@@ -955,7 +1048,9 @@ export function ShadowRunnerGame({
               className="h-5 w-5 bg-contain bg-left bg-no-repeat [image-rendering:pixelated]"
               style={{
                 backgroundImage: `url(${
-                  hud.levelId === 'level-9'
+                  hud.levelId === 'level-10'
+                    ? SHADOW_RUNNER_ASSETS.levels.relayFlameStrip
+                    : hud.levelId === 'level-9'
                     ? SHADOW_RUNNER_ASSETS.levels.watchfireCrestStrip
                     : SHADOW_RUNNER_ASSETS.levels.relaySealStrip
                 })`,
@@ -1046,7 +1141,53 @@ export function ShadowRunnerGame({
         />
       )}
 
-      {hud.defeated && !menuOpen && (
+      {hud.defeated && levelConfig.finale && !finaleComplete && !menuOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Dawn Relay Spire finale"
+          className="shadow-runner-no-select absolute inset-0 z-50 overflow-hidden bg-black text-white"
+        >
+          <img
+            src={levelConfig.finale.asset}
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover"
+            draggable={false}
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(1,4,8,0.08),rgba(1,4,8,0.25)_42%,rgba(1,4,8,0.94)_100%)]" />
+          <div className="absolute inset-x-0 bottom-0 px-[max(1.25rem,env(safe-area-inset-left))] pb-[max(1.1rem,env(safe-area-inset-bottom))] pt-24 text-center drop-shadow-[0_4px_18px_rgba(0,0,0,0.9)]">
+            <p className="text-[0.58rem] font-black uppercase tracking-[0.2em] text-[#ffd76d] min-[740px]:text-xs">
+              {levelConfig.finale.beats[finaleBeatIndex]?.eyebrow}
+            </p>
+            <h2 className="mt-1 text-xl font-black uppercase leading-tight tracking-[0.08em] text-[#fff5cf] min-[740px]:text-3xl">
+              {levelConfig.finale.beats[finaleBeatIndex]?.title}
+            </h2>
+            <p className="mx-auto mt-2 max-w-xl text-xs font-semibold leading-relaxed text-[#f6e6bb] min-[740px]:text-sm">
+              {levelConfig.finale.beats[finaleBeatIndex]?.body}
+            </p>
+            <div className="mt-3 flex items-center justify-center gap-1.5" aria-hidden="true">
+              {levelConfig.finale.beats.map((beat, index) => (
+                <span
+                  key={beat.title}
+                  className={`h-1.5 w-6 rounded-full ${
+                    index <= finaleBeatIndex ? 'bg-[#ffd76d]' : 'bg-white/30'
+                  }`}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={advanceFinale}
+              className="mt-4 inline-flex h-11 items-center justify-center gap-2 rounded border border-[#ffd76d]/70 bg-black/58 px-5 text-[0.65rem] font-black uppercase tracking-[0.14em] text-[#fff1bd] backdrop-blur-sm transition hover:bg-black/76 focus:outline-none focus:ring-2 focus:ring-[#ffd76d]/70"
+            >
+              {finaleBeatIndex >= levelConfig.finale.beats.length - 1 ? 'View Results' : 'Continue'}
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {hud.defeated && (!levelConfig.finale || finaleComplete) && !menuOpen && (
         <div
           role="dialog"
           aria-modal="true"

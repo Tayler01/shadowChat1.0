@@ -11,6 +11,7 @@ import {
   type ShadowRunnerArrowVolley,
   type ShadowRunnerBoostPickup,
   type ShadowRunnerChronoPickup,
+  type ShadowRunnerDawnfireAegisPickup,
   type ShadowRunnerEnemyConfig,
   type ShadowRunnerEnemyKind,
   type ShadowRunnerEncounterConfig,
@@ -19,12 +20,15 @@ import {
   type ShadowRunnerMasteryPickup,
   type ShadowRunnerMirrorWardPickup,
   type ShadowRunnerMovingPlatform,
+  type ShadowRunnerPhasePlatform,
+  type ShadowRunnerRelayBeamZone,
   type ShadowRunnerMoonShardPickup,
   type ShadowRunnerObjectivePickup,
   type ShadowRunnerPlayableLevelId,
   type ShadowRunnerShieldPickup,
   type ShadowRunnerSunsteelEdgePickup,
   type ShadowRunnerSurgePickup,
+  type ShadowRunnerAetherStepPickup,
   type ShadowRunnerTiltPlatform,
   type ShadowRunnerWindZone,
   type ShadowRunnerWraithlightPickup,
@@ -32,6 +36,7 @@ import {
 import {
   CAPTAIN_GATE_TERRAIN_CROPS,
   CATACOMB_TERRAIN_CROPS,
+  DAWN_RELAY_TERRAIN_CROPS,
   SHADOW_RUNNER_ENEMY_RUNTIME,
   getShadowRunnerTerrainRuntime,
 } from './runtimeCatalog'
@@ -40,6 +45,7 @@ import {
   collectShadowRunnerBoost,
   collectShadowRunnerChrono,
   collectShadowRunnerCoin,
+  collectShadowRunnerDawnfireAegis,
   collectShadowRunnerGaleMantle,
   collectShadowRunnerMastery,
   collectShadowRunnerMirrorWard,
@@ -48,25 +54,32 @@ import {
   collectShadowRunnerShield,
   collectShadowRunnerSunsteelEdge,
   collectShadowRunnerSurge,
+  collectShadowRunnerAetherStep,
   collectShadowRunnerWraithlight,
   createInitialShadowRunnerSimulation,
   consumeShadowRunnerSunsteelCharge,
   damageShadowRunnerEnemy,
   damageShadowRunnerPlayer,
+  doesShadowRunnerAetherPreventFallDamage,
   getShadowRunnerEncounterBarrierState,
   getShadowRunnerGaleFallDamageCap,
   getShadowRunnerGaleSpeedMultiplier,
+  getShadowRunnerAetherExtraAirJumps,
+  getShadowRunnerAetherSpeedMultiplier,
+  getShadowRunnerDawnfireProperties,
   getShadowRunnerHudState,
   getShadowRunnerChronoTimeScale,
   getShadowRunnerSurgeSpeedMultiplier,
   getShadowRunnerSunsteelStrikeProperties,
   isShadowRunnerBoostActive,
   isShadowRunnerChronoActive,
+  isShadowRunnerDawnfireAegisActive,
   isShadowRunnerGaleMantleActive,
   isShadowRunnerMirrorWardActive,
   isShadowRunnerShieldActive,
   isShadowRunnerSurgeActive,
   isShadowRunnerSunsteelEdgeActive,
+  isShadowRunnerAetherStepActive,
   isShadowRunnerWraithlightActive,
   reflectShadowRunnerProjectileWithMirrorWard,
   restoreShadowRunnerPlayer,
@@ -83,6 +96,7 @@ interface CreateShadowRunnerGameOptions {
   onHudChange: (state: ShadowRunnerHudState) => void
   onReady?: () => void
   onSoundEvent?: (event: ShadowRunnerSoundEvent) => void
+  reducedMotion?: boolean
 }
 
 type CursorKeys = Phaser.Types.Input.Keyboard.CursorKeys
@@ -116,6 +130,7 @@ interface ShadowRunnerDebugSnapshot {
   levelId: ShadowRunnerPlayableLevelId
   checkpointId?: string
   objective: string
+  respawnPending: boolean
   player?: {
     x: number
     y: number
@@ -129,6 +144,9 @@ interface ShadowRunnerDebugSnapshot {
     lives: number
     coins: number
     score: number
+    shieldActive: boolean
+    shieldRemainingMs: number
+    shieldGuardCharges: number
     chronoActive: boolean
     chronoRemainingMs: number
     surgeActive: boolean
@@ -143,6 +161,10 @@ interface ShadowRunnerDebugSnapshot {
     sunsteelEdgeActive: boolean
     sunsteelEdgeRemainingMs: number
     sunsteelEdgeCharges: number
+    dawnfireAegisActive: boolean
+    dawnfireAegisRemainingMs: number
+    aetherStepActive: boolean
+    aetherStepRemainingMs: number
     moonShards: number
     totalMoonShards: number
     objectiveItems: number
@@ -193,6 +215,15 @@ interface ShadowRunnerDebugSnapshot {
     direction: 1 | -1
     paused: boolean
   }>
+  phasePlatforms: Array<{
+    id: string
+    state: 'solid' | 'warning' | 'intangible' | null
+  }>
+  relayBeamZones: Array<{
+    id: string
+    state: 'idle' | 'telling' | 'active' | null
+    lanes: number[]
+  }>
 }
 
 type ShadowRunnerDebugWindow = Window & typeof globalThis & {
@@ -202,7 +233,7 @@ type ShadowRunnerDebugWindow = Window & typeof globalThis & {
     restore: () => void
     damage: (amount: number) => void
     collect: (
-      kind: 'wraithlight' | 'mirrorWard' | 'galeMantle' | 'sunsteelEdge' | 'objective' | 'mastery',
+      kind: 'shield' | 'wraithlight' | 'mirrorWard' | 'galeMantle' | 'sunsteelEdge' | 'dawnfireAegis' | 'aetherStep' | 'objective' | 'mastery',
       index?: number,
     ) => void
     defeatEnemy: (enemyId: string) => void
@@ -245,6 +276,13 @@ interface SpectralPlatformRuntime {
   collider?: Phaser.GameObjects.Rectangle
 }
 
+interface PhasePlatformRuntime {
+  config: ShadowRunnerPhasePlatform
+  visual: PlatformVisual
+  collider?: Phaser.GameObjects.Rectangle
+  state: 'solid' | 'warning' | 'intangible' | null
+}
+
 interface MovingPlatformRuntime {
   config: ShadowRunnerMovingPlatform
   visual: PlatformVisual
@@ -265,6 +303,14 @@ interface WindZoneRuntime {
   active: boolean
   telling: boolean
   renderState: 'idle' | 'telling' | 'active' | null
+}
+
+interface RelayBeamZoneRuntime {
+  config: ShadowRunnerRelayBeamZone
+  visual: Phaser.GameObjects.Graphics
+  state: 'idle' | 'telling' | 'active' | null
+  activatedAt: number | null
+  lastGuardedCycle: number
 }
 
 interface EncounterBarrierRuntime {
@@ -410,6 +456,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private readonly onHudChange: (state: ShadowRunnerHudState) => void
   private readonly onReady?: () => void
   private readonly onSoundEvent?: (event: ShadowRunnerSoundEvent) => void
+  private readonly reducedMotion: boolean
 
   private state: ShadowRunnerSimulationState
   private cursors?: CursorKeys
@@ -426,6 +473,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private mirrorWardPickups?: Phaser.Physics.Arcade.StaticGroup
   private galeMantlePickups?: Phaser.Physics.Arcade.StaticGroup
   private sunsteelEdgePickups?: Phaser.Physics.Arcade.StaticGroup
+  private dawnfireAegisPickups?: Phaser.Physics.Arcade.StaticGroup
+  private aetherStepPickups?: Phaser.Physics.Arcade.StaticGroup
   private objectivePickups?: Phaser.Physics.Arcade.StaticGroup
   private masteryPickups?: Phaser.Physics.Arcade.StaticGroup
   private candleHazards?: Phaser.Physics.Arcade.StaticGroup
@@ -436,8 +485,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private enemies: Phaser.Physics.Arcade.Sprite[] = []
   private tiltPlatforms: TiltPlatformRuntime[] = []
   private spectralPlatforms: SpectralPlatformRuntime[] = []
+  private phasePlatforms: PhasePlatformRuntime[] = []
   private movingPlatforms: MovingPlatformRuntime[] = []
   private windZones: WindZoneRuntime[] = []
+  private relayBeamZones: RelayBeamZoneRuntime[] = []
   private encounterBarrierRuntimes: EncounterBarrierRuntime[] = []
   private clearedEncounterIds = new Set<string>()
   private arrowVolleys: ArrowVolleyRuntime[] = []
@@ -449,6 +500,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private mirrorWardAura?: Phaser.GameObjects.Graphics
   private galeMantleAura?: Phaser.GameObjects.Graphics
   private sunsteelEdgeAura?: Phaser.GameObjects.Graphics
+  private dawnfireAegisAura?: Phaser.GameObjects.Graphics
+  private aetherStepAura?: Phaser.GameObjects.Graphics
   private playerHealthBar?: Phaser.GameObjects.Graphics
   private enemyHealthBars: Phaser.GameObjects.Graphics[] = []
   private playerHealthFrame?: Phaser.GameObjects.Image
@@ -461,7 +514,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   private jumpsUsed = 0
   private wasOnFloor = false
   private finishSparked = false
-  private fallRespawnPending = false
+  private respawnPending = false
   private activeCheckpointIndex = -1
   private checkpointToast?: Phaser.GameObjects.Text
   private respawnPoint: { x: number; y: number }
@@ -481,6 +534,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.onHudChange = options.onHudChange
     this.onReady = options.onReady
     this.onSoundEvent = options.onSoundEvent
+    this.reducedMotion = options.reducedMotion ?? false
   }
 
   preload() {
@@ -681,6 +735,85 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         frameHeight: 64,
       })
     }
+    if (this.level.id === 'level-10') {
+      this.load.spritesheet('moon-stalker', SHADOW_RUNNER_ASSETS.enemies.moonStalkerStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.spritesheet('crypt-warden', SHADOW_RUNNER_ASSETS.enemies.cryptWardenStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.spritesheet('rival-courier', SHADOW_RUNNER_ASSETS.enemies.rivalCourierStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.spritesheet('gate-pikeman', SHADOW_RUNNER_ASSETS.enemies.gatePikemanStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.spritesheet('storm-grenadier', SHADOW_RUNNER_ASSETS.enemies.stormGrenadierStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.spritesheet('relay-lancer', SHADOW_RUNNER_ASSETS.enemies.relayLancerStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.spritesheet('prism-caster', SHADOW_RUNNER_ASSETS.enemies.prismCasterStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.spritesheet('gearwing-drone', SHADOW_RUNNER_ASSETS.enemies.gearwingDroneStrip, {
+        frameWidth: 128,
+        frameHeight: 128,
+      })
+      this.load.spritesheet('sentry-sovereign', SHADOW_RUNNER_ASSETS.enemies.sentrySovereignStrip, {
+        frameWidth: 192,
+        frameHeight: 192,
+      })
+      this.load.image('shadow-runner-relay-terrain-atlas', SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireProps)
+      this.load.spritesheet('shadow-runner-chrono-lantern', SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-shadow-surge', SHADOW_RUNNER_ASSETS.levels.shadowSurgeSigilStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-mirror-ward', SHADOW_RUNNER_ASSETS.levels.mirrorWardStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-gale-mantle', SHADOW_RUNNER_ASSETS.levels.galeMantleStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-sunsteel-edge', SHADOW_RUNNER_ASSETS.levels.sunsteelEdgeStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-dawnfire-aegis', SHADOW_RUNNER_ASSETS.levels.dawnfireAegisStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-aether-step', SHADOW_RUNNER_ASSETS.levels.aetherStepStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-relay-flame', SHADOW_RUNNER_ASSETS.levels.relayFlameStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-last-dispatch', SHADOW_RUNNER_ASSETS.levels.lastDispatchStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+      this.load.spritesheet('shadow-runner-relay-orb', SHADOW_RUNNER_ASSETS.levels.relayOrbStrip, {
+        frameWidth: 64,
+        frameHeight: 64,
+      })
+    }
     this.load.image('shadow-runner-spike-row', SHADOW_RUNNER_ASSETS.level.spikeRow64)
     this.load.image('shadow-runner-east-gate', SHADOW_RUNNER_ASSETS.level.eastGate96)
     this.load.spritesheet('shadow-runner-landing-dust', SHADOW_RUNNER_ASSETS.level.landingDustStrip, {
@@ -706,8 +839,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.enemyHealthFrames = []
     this.tiltPlatforms = []
     this.spectralPlatforms = []
+    this.phasePlatforms = []
     this.movingPlatforms = []
     this.windZones = []
+    this.relayBeamZones = []
     this.arrowVolleys = []
     this.boostAura = undefined
     this.shieldAura = undefined
@@ -717,11 +852,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.mirrorWardAura = undefined
     this.galeMantleAura = undefined
     this.sunsteelEdgeAura = undefined
+    this.dawnfireAegisAura = undefined
+    this.aetherStepAura = undefined
     this.wasOnFloor = false
     this.airborneStartY = null
     this.airbornePeakY = 0
     this.lastAirborneVelocityY = 0
-    this.fallRespawnPending = false
+    this.respawnPending = false
     this.activeCheckpointIndex = -1
     this.checkpointToast = undefined
     this.clearedEncounterIds.clear()
@@ -749,9 +886,14 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   update(time: number) {
     if (!this.player) return
+    if (this.respawnPending) {
+      this.emitHud()
+      return
+    }
 
     this.updatePlayer(time)
     this.updateMovingPlatforms(time)
+    this.updatePhasePlatforms(time)
     this.updateCheckpointProgress()
     this.updateEncounterActivations(time)
     this.updateEnemies(time)
@@ -760,6 +902,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.updateArcherProjectiles(time)
     this.updateCandleHazards(time)
     this.updateWindZones(time)
+    this.updateRelayBeamZones(time)
     this.updateBoostAura(time)
     this.updateShieldAura(time)
     this.updateChronoAura(time)
@@ -768,6 +911,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.updateMirrorWardAura(time)
     this.updateGaleMantleAura(time)
     this.updateSunsteelEdgeAura(time)
+    this.updateDawnfireAegisAura(time)
+    this.updateAetherStepAura(time)
     this.updateHealthBars()
     this.checkFinish()
     this.emitHud()
@@ -1133,6 +1278,37 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       this.anims.create({ key: 'captain-hit', frames: [{ key: 'watch-captain', frame: 6 }], frameRate: 1 })
       this.anims.create({ key: 'captain-defeated', frames: [{ key: 'watch-captain', frame: 7 }], frameRate: 1 })
     }
+    if (this.textures.exists('relay-lancer')) {
+      this.anims.create({ key: 'relay-lancer-march', frames: this.anims.generateFrameNumbers('relay-lancer', { start: 0, end: 1 }), frameRate: 7, repeat: -1 })
+      this.anims.create({ key: 'relay-lancer-ready', frames: [{ key: 'relay-lancer', frame: 2 }], frameRate: 1 })
+      this.anims.create({ key: 'relay-lancer-strike', frames: [{ key: 'relay-lancer', frame: 3 }], frameRate: 1 })
+      this.anims.create({ key: 'relay-lancer-hit', frames: [{ key: 'relay-lancer', frame: 4 }], frameRate: 1 })
+      this.anims.create({ key: 'relay-lancer-defeated', frames: [{ key: 'relay-lancer', frame: 5 }], frameRate: 1 })
+    }
+    if (this.textures.exists('prism-caster')) {
+      this.anims.create({ key: 'prism-caster-hover', frames: this.anims.generateFrameNumbers('prism-caster', { start: 0, end: 1 }), frameRate: 6, repeat: -1 })
+      this.anims.create({ key: 'prism-caster-windup', frames: [{ key: 'prism-caster', frame: 2 }], frameRate: 1 })
+      this.anims.create({ key: 'prism-caster-cast', frames: [{ key: 'prism-caster', frame: 3 }], frameRate: 1 })
+      this.anims.create({ key: 'prism-caster-hit', frames: [{ key: 'prism-caster', frame: 4 }], frameRate: 1 })
+      this.anims.create({ key: 'prism-caster-defeated', frames: [{ key: 'prism-caster', frame: 5 }], frameRate: 1 })
+    }
+    if (this.textures.exists('gearwing-drone')) {
+      this.anims.create({ key: 'gearwing-drone-flight', frames: this.anims.generateFrameNumbers('gearwing-drone', { start: 0, end: 1 }), frameRate: 10, repeat: -1 })
+      this.anims.create({ key: 'gearwing-drone-tell', frames: [{ key: 'gearwing-drone', frame: 2 }], frameRate: 1 })
+      this.anims.create({ key: 'gearwing-drone-dive', frames: [{ key: 'gearwing-drone', frame: 3 }], frameRate: 1 })
+      this.anims.create({ key: 'gearwing-drone-hit', frames: [{ key: 'gearwing-drone', frame: 4 }], frameRate: 1 })
+      this.anims.create({ key: 'gearwing-drone-defeated', frames: [{ key: 'gearwing-drone', frame: 5 }], frameRate: 1 })
+    }
+    if (this.textures.exists('sentry-sovereign')) {
+      this.anims.create({ key: 'sovereign-guard', frames: this.anims.generateFrameNumbers('sentry-sovereign', { start: 0, end: 2 }), frameRate: 6, repeat: -1 })
+      this.anims.create({ key: 'sovereign-sweep', frames: [{ key: 'sentry-sovereign', frame: 3 }], frameRate: 1 })
+      this.anims.create({ key: 'sovereign-orbs', frames: [{ key: 'sentry-sovereign', frame: 4 }], frameRate: 1 })
+      this.anims.create({ key: 'sovereign-charge', frames: [{ key: 'sentry-sovereign', frame: 5 }], frameRate: 1 })
+      this.anims.create({ key: 'sovereign-shockwave', frames: [{ key: 'sentry-sovereign', frame: 6 }], frameRate: 1 })
+      this.anims.create({ key: 'sovereign-attack', frames: [{ key: 'sentry-sovereign', frame: 7 }], frameRate: 1 })
+      this.anims.create({ key: 'sovereign-hit', frames: [{ key: 'sentry-sovereign', frame: 8 }], frameRate: 1 })
+      this.anims.create({ key: 'sovereign-defeated', frames: [{ key: 'sentry-sovereign', frame: 9 }], frameRate: 1 })
+    }
     const levelNinePickupAnimations = [
       ['gale-mantle-pulse', 'shadow-runner-gale-mantle'],
       ['sunsteel-edge-pulse', 'shadow-runner-sunsteel-edge'],
@@ -1146,6 +1322,22 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         key,
         frames: this.anims.generateFrameNumbers(texture, { start: 0, end: 3 }),
         frameRate: texture === 'shadow-runner-storm-bomb' ? 10 : 7,
+        repeat: -1,
+      })
+    })
+    const levelTenAnimations = [
+      ['dawnfire-aegis-pulse', 'shadow-runner-dawnfire-aegis'],
+      ['aether-step-pulse', 'shadow-runner-aether-step'],
+      ['relay-flame-spin', 'shadow-runner-relay-flame'],
+      ['last-dispatch-reveal', 'shadow-runner-last-dispatch'],
+      ['relay-orb-spin', 'shadow-runner-relay-orb'],
+    ] as const
+    levelTenAnimations.forEach(([key, texture]) => {
+      if (!this.textures.exists(texture)) return
+      this.anims.create({
+        key,
+        frames: this.anims.generateFrameNumbers(texture, { start: 0, end: 3 }),
+        frameRate: texture === 'shadow-runner-relay-orb' ? 11 : 7,
         repeat: -1,
       })
     })
@@ -1182,6 +1374,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.mirrorWardPickups = this.physics.add.staticGroup()
     this.galeMantlePickups = this.physics.add.staticGroup()
     this.sunsteelEdgePickups = this.physics.add.staticGroup()
+    this.dawnfireAegisPickups = this.physics.add.staticGroup()
+    this.aetherStepPickups = this.physics.add.staticGroup()
     this.objectivePickups = this.physics.add.staticGroup()
     this.masteryPickups = this.physics.add.staticGroup()
     this.candleHazards = this.physics.add.staticGroup({ maxSize: 24 })
@@ -1227,6 +1421,30 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       visual.setAlpha(0.2)
       if (body) body.enable = false
       this.spectralPlatforms.push({ config: platform, visual, collider })
+    })
+
+    this.level.phasePlatforms?.forEach(platform => {
+      const terrain = getShadowRunnerTerrainRuntime(platform.terrainSet)
+      const frame = getTerrainFrameKey(platform.visualId ?? platform.id)
+      const hasFrame = this.textures.exists(terrain.textureKey)
+        && this.textures.get(terrain.textureKey).has(frame)
+      const visual = addStaticPlatform(this, this.platforms!, platform, hasFrame
+        ? {
+            texture: terrain.textureKey,
+            frame,
+            useImage: true,
+            displayWidth: platform.width + 22,
+            displayHeight: Math.max(62, platform.height + 30),
+            visualOffsetY: -10,
+            depth: 8,
+          }
+        : { texture: 'shadow-runner-stone', depth: 8 })
+      this.phasePlatforms.push({
+        config: platform,
+        visual,
+        collider: visual.getData('platformCollider') as Phaser.GameObjects.Rectangle | undefined,
+        state: null,
+      })
     })
 
     this.level.encounters
@@ -1321,6 +1539,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       const visual = this.add.graphics()
       visual.setDepth(2)
       return { config: zone, visual, active: false, telling: false, renderState: null }
+    })
+
+    this.relayBeamZones = (this.level.relayBeamZones ?? []).map(config => {
+      const visual = this.add.graphics()
+      visual.setDepth(21)
+      return { config, visual, state: null, activatedAt: null, lastGuardedCycle: -1 }
     })
 
     this.arrowVolleys = (this.level.arrowVolleys ?? []).map(config => ({
@@ -1541,11 +1765,63 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       })
     })
 
+    this.level.dawnfireAegisPickups?.forEach((pickup, index) => {
+      const sprite = this.dawnfireAegisPickups!.create(
+        pickup.x,
+        pickup.y,
+        'shadow-runner-dawnfire-aegis',
+      ) as Phaser.Physics.Arcade.Sprite
+      sprite.setName(pickup.id)
+      sprite.setScale(1.02)
+      sprite.setCircle(19, 13, 13)
+      sprite.setImmovable(true)
+      sprite.setDepth(21)
+      sprite.setData('collected', false)
+      sprite.play('dawnfire-aegis-pulse')
+      this.tweens.add({
+        targets: sprite,
+        y: pickup.y - 12,
+        duration: 620,
+        yoyo: true,
+        repeat: -1,
+        delay: index * 170,
+        ease: 'Sine.inOut',
+      })
+    })
+
+    this.level.aetherStepPickups?.forEach((pickup, index) => {
+      const sprite = this.aetherStepPickups!.create(
+        pickup.x,
+        pickup.y,
+        'shadow-runner-aether-step',
+      ) as Phaser.Physics.Arcade.Sprite
+      sprite.setName(pickup.id)
+      sprite.setScale(1.02)
+      sprite.setCircle(19, 13, 13)
+      sprite.setImmovable(true)
+      sprite.setDepth(21)
+      sprite.setData('collected', false)
+      sprite.play('aether-step-pulse')
+      this.tweens.add({
+        targets: sprite,
+        y: pickup.y - 13,
+        duration: 670,
+        yoyo: true,
+        repeat: -1,
+        delay: index * 180,
+        ease: 'Sine.inOut',
+      })
+    })
+
     this.level.objectivePickups?.forEach((pickup, index) => {
       const sprite = this.objectivePickups!.create(
         pickup.x,
         pickup.y,
-        this.level.id === 'level-9' ? 'shadow-runner-watchfire-crest' : 'shadow-runner-relay-seal',
+        this.level.id === 'level-10'
+          ? 'shadow-runner-relay-flame'
+          : this.level.id === 'level-9'
+            ? 'shadow-runner-watchfire-crest'
+            : 'shadow-runner-relay-seal',
       ) as Phaser.Physics.Arcade.Sprite
       sprite.setName(pickup.id)
       sprite.setScale(1.04)
@@ -1553,7 +1829,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       sprite.setImmovable(true)
       sprite.setDepth(19)
       sprite.setData('collected', false)
-      sprite.play(this.level.id === 'level-9' ? 'watchfire-crest-spin' : 'relay-seal-spin')
+      sprite.play(
+        this.level.id === 'level-10'
+          ? 'relay-flame-spin'
+          : this.level.id === 'level-9'
+            ? 'watchfire-crest-spin'
+            : 'relay-seal-spin',
+      )
       this.tweens.add({
         targets: sprite,
         y: pickup.y - 12,
@@ -1569,7 +1851,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       const sprite = this.masteryPickups!.create(
         pickup.x,
         pickup.y,
-        this.level.id === 'level-9' ? 'shadow-runner-captains-orders' : 'shadow-runner-courier-cache',
+        this.level.id === 'level-10'
+          ? 'shadow-runner-last-dispatch'
+          : this.level.id === 'level-9'
+            ? 'shadow-runner-captains-orders'
+            : 'shadow-runner-courier-cache',
       ) as Phaser.Physics.Arcade.Sprite
       sprite.setName(pickup.id)
       sprite.setScale(1.02)
@@ -1579,7 +1865,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       sprite.setData('collected', false)
       sprite.setData('requiredPower', pickup.requiredPower ?? 'wraithlight')
       sprite.setAlpha(0.16)
-      sprite.play(this.level.id === 'level-9' ? 'captains-orders-reveal' : 'courier-cache-reveal')
+      sprite.play(
+        this.level.id === 'level-10'
+          ? 'last-dispatch-reveal'
+          : this.level.id === 'level-9'
+            ? 'captains-orders-reveal'
+            : 'courier-cache-reveal',
+      )
       const body = sprite.body as Phaser.Physics.Arcade.StaticBody
       body.enable = false
     })
@@ -1625,8 +1917,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       )
       gate.setOrigin(0.5, 1)
       gate.setDisplaySize(
-        finish.terrainSet === 'captain' ? 230 : finish.terrainSet === 'catacomb' ? 210 : finish.terrainSet === 'moon' ? 156 : 116,
-        finish.terrainSet === 'captain' ? 250 : finish.terrainSet === 'catacomb' ? 232 : finish.terrainSet === 'moon' ? 170 : 164,
+        finish.terrainSet === 'relay' ? 176 : finish.terrainSet === 'captain' ? 230 : finish.terrainSet === 'catacomb' ? 210 : finish.terrainSet === 'moon' ? 156 : 116,
+        finish.terrainSet === 'relay' ? 286 : finish.terrainSet === 'captain' ? 250 : finish.terrainSet === 'catacomb' ? 232 : finish.terrainSet === 'moon' ? 170 : 164,
       )
       gate.setDepth(5)
     } else if (this.textures.exists('shadow-runner-east-gate')) {
@@ -1645,8 +1937,17 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!this.encounterBarriers) return
 
     const captainBarrier = this.level.id === 'level-9'
-    const terrain = getShadowRunnerTerrainRuntime(captainBarrier ? 'captain' : 'spectral')
-    const frame = getTerrainFrameKey(captainBarrier ? 'captain-counterweight-bridge' : 'catacomb-spectral-bridge')
+    const relayBarrier = this.level.id === 'level-10'
+    const terrain = getShadowRunnerTerrainRuntime(
+      relayBarrier ? 'relay' : captainBarrier ? 'captain' : 'spectral',
+    )
+    const frame = getTerrainFrameKey(
+      relayBarrier
+        ? 'relay-phase-bridge'
+        : captainBarrier
+          ? 'captain-counterweight-bridge'
+          : 'catacomb-spectral-bridge',
+    )
     const hasFrame = this.textures.exists(terrain.textureKey)
       && this.textures.get(terrain.textureKey).has(frame)
     const barrierTop = Math.max(90, encounter.y)
@@ -1690,9 +1991,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const clockGate = gate.terrainSet === 'clock'
     const catacombGate = gate.terrainSet === 'catacomb'
     const captainGate = gate.terrainSet === 'captain'
+    const relayGate = gate.terrainSet === 'relay'
     const candleGate = isCandleTerrainSet(gate.terrainSet)
     const readableCandleGate = gate.terrainSet === 'candleBright' || gate.terrainSet === 'candleShelf'
-    const terrainTexture = captainGate
+    const terrainTexture = relayGate
+      ? 'shadow-runner-relay-terrain-atlas'
+      : captainGate
       ? 'shadow-runner-captain-terrain-atlas'
       : moonGate
       ? 'shadow-runner-moon-terrain-atlas'
@@ -1708,6 +2012,8 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const slabFrame = getTerrainFrameKey(
       moonGate
         ? 'moon-tall-overhang'
+        : relayGate
+          ? 'relay-conduit-overhang'
         : captainGate
           ? 'captain-overhang'
         : clockGate
@@ -1722,7 +2028,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const shelfFrame = getTerrainFrameKey(candleGate ? 'candle-high-shelf' : 'bell-scroll-shelf')
     const hasGateTerrain = this.textures.exists(terrainTexture)
       && this.textures.get(terrainTexture).has(slabFrame)
-      && (captainGate || clockGate || moonGate || catacombGate || (
+      && (relayGate || captainGate || clockGate || moonGate || catacombGate || (
         this.textures.get(terrainTexture).has(blockFrame)
         && this.textures.get(terrainTexture).has(shelfFrame)
       ))
@@ -1730,11 +2036,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const supportY = gate.y + gate.height - 92
     const archiveStackY = gate.y + 46
 
-    if ((captainGate || clockGate || moonGate || catacombGate) && hasGateTerrain) {
+    if ((relayGate || captainGate || clockGate || moonGate || catacombGate) && hasGateTerrain) {
       const overhang = this.add.image(visualX, gate.y + gate.height / 2 - 16, terrainTexture, slabFrame)
       overhang.setDisplaySize(
-        gate.width + (moonGate ? 58 : captainGate ? 52 : catacombGate ? 46 : 40),
-        gate.height + (moonGate ? 128 : captainGate ? 92 : catacombGate ? 78 : 92),
+        gate.width + (moonGate ? 58 : relayGate ? 54 : captainGate ? 52 : catacombGate ? 46 : 40),
+        gate.height + (moonGate ? 128 : relayGate ? 96 : captainGate ? 92 : catacombGate ? 78 : 92),
       )
       overhang.setDepth(7)
     } else if (hasGateTerrain) {
@@ -1824,6 +2130,14 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.sunsteelEdgeAura.setDepth(28)
     this.sunsteelEdgeAura.setVisible(false)
 
+    this.dawnfireAegisAura = this.add.graphics()
+    this.dawnfireAegisAura.setDepth(29)
+    this.dawnfireAegisAura.setVisible(false)
+
+    this.aetherStepAura = this.add.graphics()
+    this.aetherStepAura.setDepth(24)
+    this.aetherStepAura.setVisible(false)
+
     getShadowRunnerLevelEnemies(this.level).forEach(enemyStart => {
       const enemy = this.createEnemySprite(enemyStart)
       this.enemies.push(enemy)
@@ -1848,7 +2162,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.crouchGates!)
     this.physics.add.collider(this.player, this.encounterBarriers!)
     this.enemies.forEach(enemy => {
-      this.physics.add.collider(enemy, this.platforms!)
+      if (this.getEnemyKind(enemy) !== 'gearwing-drone') {
+        this.physics.add.collider(enemy, this.platforms!)
+      }
       this.physics.add.overlap(this.player!, enemy, () => this.handlePlayerEnemyOverlap(this.time.now, enemy))
       this.physics.add.overlap(enemy, this.archerProjectiles!, (_enemy, projectile) => {
         this.handleReflectedProjectileEnemyHit(enemy, projectile as Phaser.Physics.Arcade.Image)
@@ -1921,6 +2237,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.physics.add.overlap(this.player, this.sunsteelEdgePickups!, (_player, pickup) => {
       this.collectSunsteelEdge(pickup as Phaser.Physics.Arcade.Sprite)
     })
+    this.physics.add.overlap(this.player, this.dawnfireAegisPickups!, (_player, pickup) => {
+      this.collectDawnfireAegis(pickup as Phaser.Physics.Arcade.Sprite)
+    })
+    this.physics.add.overlap(this.player, this.aetherStepPickups!, (_player, pickup) => {
+      this.collectAetherStep(pickup as Phaser.Physics.Arcade.Sprite)
+    })
     this.physics.add.overlap(this.player, this.objectivePickups!, (_player, pickup) => {
       this.collectObjective(pickup as Phaser.Physics.Arcade.Sprite)
     })
@@ -1945,6 +2267,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     enemy.setMaxVelocity(runtime.maxVelocityX, 920)
     enemy.play(enemyStart.kind === 'tomb-lurker' ? 'lurker-dormant' : runtime.animations.walk)
     this.setEnemyFacing(enemy, enemyStart.direction)
+
+    if (enemyStart.kind === 'gearwing-drone') {
+      const body = enemy.body as Phaser.Physics.Arcade.Body
+      body.setAllowGravity(false)
+      enemy.setData('hoverPhase', (enemyStart.x % 500) / 500 * Math.PI * 2)
+      enemy.setData('diveState', 'hover')
+    }
 
     const enemyState = this.state.enemies.find(current => current.id === enemyStart.id)
     if (enemyState && !enemyState.activated) {
@@ -2024,6 +2353,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         levelId: this.level.id,
         checkpointId: this.level.checkpoints?.[this.activeCheckpointIndex]?.id,
         objective: this.state.objective,
+        respawnPending: this.respawnPending,
         player: this.player
           ? {
               x: Math.round(this.player.x),
@@ -2038,6 +2368,9 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
               lives: this.state.player.lives,
               coins: this.state.player.coins,
               score: this.state.player.score,
+              shieldActive: isShadowRunnerShieldActive(this.state, this.time.now),
+              shieldRemainingMs: Math.max(0, this.state.player.shieldActiveUntil - this.time.now),
+              shieldGuardCharges: this.state.player.shieldGuardCharges,
               chronoActive: isShadowRunnerChronoActive(this.state, this.time.now),
               chronoRemainingMs: Math.max(0, this.state.player.chronoActiveUntil - this.time.now),
               surgeActive: isShadowRunnerSurgeActive(this.state, this.time.now),
@@ -2052,6 +2385,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
               sunsteelEdgeActive: isShadowRunnerSunsteelEdgeActive(this.state, this.time.now),
               sunsteelEdgeRemainingMs: Math.max(0, this.state.player.sunsteelEdgeActiveUntil - this.time.now),
               sunsteelEdgeCharges: this.state.player.sunsteelEdgeCharges,
+              dawnfireAegisActive: isShadowRunnerDawnfireAegisActive(this.state, this.time.now),
+              dawnfireAegisRemainingMs: Math.max(0, this.state.player.dawnfireAegisActiveUntil - this.time.now),
+              aetherStepActive: isShadowRunnerAetherStepActive(this.state, this.time.now),
+              aetherStepRemainingMs: Math.max(0, this.state.player.aetherStepActiveUntil - this.time.now),
               moonShards: this.state.player.moonShards,
               totalMoonShards: this.level.moonShardPickups?.length ?? 0,
               objectiveItems: this.state.player.objectiveItems,
@@ -2090,7 +2427,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
           barrierActive: this.encounterBarrierRuntimes.some(
             runtime => runtime.encounterId === encounter.id && runtime.active,
           ),
-          cleared: this.clearedEncounterIds.has(encounter.id),
+          cleared: this.clearedEncounterIds.has(encounter.id) || encounter.enemyIds.every(enemyId => {
+            const enemy = this.state.enemies.find(current => current.id === enemyId)
+            return !enemy?.alive
+          }),
           remainingEnemies: encounter.enemyIds.filter(enemyId => {
             const enemy = this.state.enemies.find(current => current.id === enemyId)
             return Boolean(enemy?.alive)
@@ -2127,6 +2467,15 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
           direction: runtime.direction,
           paused: this.time.now < runtime.pauseUntil,
         })),
+        phasePlatforms: this.phasePlatforms.map(runtime => ({
+          id: runtime.config.id,
+          state: runtime.state,
+        })),
+        relayBeamZones: this.relayBeamZones.map(runtime => ({
+          id: runtime.config.id,
+          state: runtime.state,
+          lanes: runtime.config.lanes,
+        })),
       }
     }
     debugWindow.__shadowRunnerQa = {
@@ -2141,17 +2490,23 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         this.damagePlayerFromHazard(this.time.now, undefined, amount)
       },
       collect: (kind, index = 0) => {
-        const pickup = kind === 'wraithlight'
-          ? this.level.wraithlightPickups?.[index]
-          : kind === 'mirrorWard'
-            ? this.level.mirrorWardPickups?.[index]
+        const pickup = kind === 'shield'
+          ? this.level.shieldPickups?.[index]
+          : kind === 'wraithlight'
+            ? this.level.wraithlightPickups?.[index]
+            : kind === 'mirrorWard'
+              ? this.level.mirrorWardPickups?.[index]
             : kind === 'galeMantle'
               ? this.level.galeMantlePickups?.[index]
               : kind === 'sunsteelEdge'
                 ? this.level.sunsteelEdgePickups?.[index]
-            : kind === 'objective'
-              ? this.level.objectivePickups?.[index]
-              : this.level.masteryPickups?.[index]
+                : kind === 'dawnfireAegis'
+                  ? this.level.dawnfireAegisPickups?.[index]
+                  : kind === 'aetherStep'
+                    ? this.level.aetherStepPickups?.[index]
+                    : kind === 'objective'
+                      ? this.level.objectivePickups?.[index]
+                      : this.level.masteryPickups?.[index]
         if (pickup) {
           this.teleportPlayerForQa(pickup.x, pickup.y + 24)
         }
@@ -2270,6 +2625,16 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.onSoundEvent?.(event)
   }
 
+  private flashCamera(duration: number, red: number, green: number, blue: number) {
+    if (this.reducedMotion) return
+    this.cameras.main.flash(duration, red, green, blue, false)
+  }
+
+  private shakeCamera(duration: number, intensity: number) {
+    if (this.reducedMotion) return
+    this.cameras.main.shake(duration, intensity)
+  }
+
   private damageEnemyForQa() {
     const enemy = this.getFirstAliveEnemy()
     if (!enemy) return
@@ -2333,6 +2698,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       const direction = right ? 1 : -1
       const speedMultiplier = getShadowRunnerSurgeSpeedMultiplier(this.state, time)
         * getShadowRunnerGaleSpeedMultiplier(this.state, time)
+        * getShadowRunnerAetherSpeedMultiplier(this.state, time)
       this.state.player.facing = direction
       player.setFlipX(direction < 0)
       player.setVelocityX((crouching ? CRAWL_SPEED : PLAYER_SPEED * speedMultiplier) * direction)
@@ -2423,6 +2789,37 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
   }
 
+  private updatePhasePlatforms(time: number) {
+    this.phasePlatforms.forEach(runtime => {
+      const { config } = runtime
+      const cycleDuration = config.solidDurationMs
+        + config.warningDurationMs
+        + config.intangibleDurationMs
+      const cycle = (time + (config.phaseOffsetMs ?? 0)) % cycleDuration
+      const state = cycle < config.solidDurationMs
+        ? 'solid'
+        : cycle < config.solidDurationMs + config.warningDurationMs
+          ? 'warning'
+          : 'intangible'
+      if (runtime.state === state) return
+
+      runtime.state = state
+      const body = runtime.collider?.body as Phaser.Physics.Arcade.StaticBody | undefined
+      if (body) {
+        body.enable = state !== 'intangible'
+      }
+      runtime.visual.setAlpha(state === 'solid' ? 0.96 : state === 'warning' ? 0.58 : 0.16)
+      if (
+        runtime.visual instanceof Phaser.GameObjects.Image
+        || runtime.visual instanceof Phaser.GameObjects.TileSprite
+      ) {
+        runtime.visual.setTint(
+          state === 'solid' ? 0xffffff : state === 'warning' ? 0xffd56a : 0x72dfff,
+        )
+      }
+    })
+  }
+
   private updateWindZones(time: number) {
     if (!this.player) return
 
@@ -2481,6 +2878,127 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     })
   }
 
+  private updateRelayBeamZones(time: number) {
+    if (!this.player) return
+
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    this.relayBeamZones.forEach(runtime => {
+      const zone = runtime.config
+      const sovereign = this.enemies.find(enemy => this.getEnemyKind(enemy) === 'sentry-sovereign')
+      const sovereignState = sovereign ? this.getEnemyState(sovereign) : undefined
+      const sovereignPhase = String(sovereign?.getData('bossPhaseId') ?? '')
+      const sovereignSweeping = sovereignState
+        ? time < sovereignState.attackUntil && sovereign?.getData('sovereignAttackType') === 'sweep'
+        : false
+      const arenaBeamEnabled = zone.id !== 'relay-beam-arena'
+        || (sovereignPhase !== '' && sovereignPhase !== 'iron-decree' && !sovereignSweeping)
+
+      if (!arenaBeamEnabled) {
+        runtime.activatedAt = null
+        if (runtime.state !== 'idle') {
+          runtime.state = 'idle'
+          runtime.visual.clear()
+        }
+        return
+      }
+
+      if (runtime.activatedAt === null) {
+        runtime.activatedAt = time
+      }
+      const elapsed = zone.id === 'relay-beam-arena'
+        ? time - runtime.activatedAt
+        : time
+      const cycleIndex = Math.floor((elapsed + (zone.delayMs ?? 0)) / zone.cadenceMs)
+      const cycle = (elapsed + (zone.delayMs ?? 0)) % zone.cadenceMs
+      const state = cycle < zone.tellDurationMs
+        ? 'telling'
+        : cycle < zone.tellDurationMs + zone.activeDurationMs
+          ? 'active'
+          : 'idle'
+
+      if (runtime.state !== state) {
+        runtime.state = state
+        runtime.visual.clear()
+        zone.lanes.forEach(laneY => {
+          if (state === 'idle') {
+            runtime.visual.lineStyle(1, 0x8ddcea, 0.16)
+          } else if (state === 'telling') {
+            runtime.visual.lineStyle(3, 0xffdf79, 0.7)
+          } else {
+            runtime.visual.lineStyle(8, 0xfff1a6, 0.94)
+          }
+          this.drawRelayBeamLane(runtime.visual, zone, laneY)
+          if (state === 'active') {
+            runtime.visual.lineStyle(2, 0xff7a45, 0.9)
+            this.drawRelayBeamLane(runtime.visual, zone, laneY - 8)
+            this.drawRelayBeamLane(runtime.visual, zone, laneY + 8)
+          }
+        })
+      }
+
+      if (state !== 'active') return
+      const horizontallyInside = body.right >= zone.x && body.left <= zone.x + zone.width
+      const hitLane = zone.lanes.find(laneY => laneY >= body.top - 8 && laneY <= body.bottom + 8)
+      const laneHit = hitLane !== undefined
+      if (!horizontallyInside || !laneHit) return
+      if (this.isPlayerInRelayBeamCover(body, zone)) return
+      if (runtime.lastGuardedCycle === cycleIndex) return
+
+      const guarded = blockShadowRunnerProjectileWithShield(this.state, time)
+        || reflectShadowRunnerProjectileWithMirrorWard(this.state, time)
+      if (guarded) {
+        runtime.lastGuardedCycle = cycleIndex
+        this.addHitFlash(this.player!.x, this.player!.y - 42)
+        this.playSound('enemy-hit')
+        this.emitHud(true)
+        return
+      }
+      this.damagePlayerFromHazard(time, undefined, zone.damage)
+    })
+  }
+
+  private drawRelayBeamLane(
+    graphics: Phaser.GameObjects.Graphics,
+    zone: ShadowRunnerRelayBeamZone,
+    laneY: number,
+  ) {
+    const covers = this.getRelayBeamCoverIntervals(zone)
+    let cursorX = zone.x
+
+    covers.forEach(cover => {
+      if (cover.start > cursorX) {
+        graphics.lineBetween(cursorX, laneY, cover.start, laneY)
+      }
+      cursorX = Math.max(cursorX, cover.end)
+    })
+    if (cursorX < zone.x + zone.width) {
+      graphics.lineBetween(cursorX, laneY, zone.x + zone.width, laneY)
+    }
+  }
+
+  private getRelayBeamCoverIntervals(zone: ShadowRunnerRelayBeamZone) {
+    const zoneEnd = zone.x + zone.width
+    return this.level.platforms
+      .filter(platform => (
+        (platform.id.startsWith('relay-cover-') || platform.id.startsWith('relay-arena-cover-'))
+        && platform.x < zoneEnd
+        && platform.x + platform.width > zone.x
+      ))
+      .map(platform => ({
+        start: Math.max(zone.x, platform.x - 48),
+        end: Math.min(zoneEnd, platform.x + platform.width + 48),
+      }))
+      .sort((left, right) => left.start - right.start)
+  }
+
+  private isPlayerInRelayBeamCover(
+    body: Phaser.Physics.Arcade.Body,
+    zone: ShadowRunnerRelayBeamZone,
+  ) {
+    return this.getRelayBeamCoverIntervals(zone)
+      .some(cover => body.center.x >= cover.start && body.center.x <= cover.end)
+  }
+
   private applyTiltPlatformInfluence(time: number, left: boolean, right: boolean, onFloor: boolean) {
     this.updateTiltPlatformFallThrough(time)
 
@@ -2532,6 +3050,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   private applyFallDamageOnLanding(time: number) {
     if (!this.player || this.airborneStartY === null) return
+    if (doesShadowRunnerAetherPreventFallDamage(this.state, time)) return
 
     const fallDistance = this.player.y - Math.min(this.airborneStartY, this.airbornePeakY)
     const impactVelocity = this.lastAirborneVelocityY
@@ -2547,7 +3066,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     )
     if (damaged) {
       this.addDustPuff(this.player.x, this.player.y - 18)
-      this.cameras.main.shake(heavyFall ? 120 : 76, heavyFall ? 0.0028 : 0.0018)
+      this.shakeCamera(heavyFall ? 120 : 76, heavyFall ? 0.0028 : 0.0018)
     }
   }
 
@@ -2697,11 +3216,28 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         return
       }
 
+      if (enemyKind === 'gearwing-drone') {
+        this.updateGearwingDrone(time, enemy, enemyState)
+        return
+      }
+
+      if (enemyKind === 'sentry-sovereign' && !recentlyHit && this.trySentrySovereignAttack(time, enemy, enemyState)) {
+        return
+      }
+
       if (enemyKind === 'moonlit-captain' && !recentlyHit && this.tryMoonlitCaptainAttack(time, enemy, enemyState)) {
         return
       }
 
+      if (enemyKind === 'relay-lancer' && !recentlyHit && this.tryRelayLancerAttack(time, enemy, enemyState)) {
+        return
+      }
+
       if (enemyKind === 'gate-pikeman' && !recentlyHit && this.tryGatePikemanThrust(time, enemy, enemyState)) {
+        return
+      }
+
+      if (enemyKind === 'prism-caster' && !recentlyHit && this.tryPrismCasterCast(time, enemy, enemyState)) {
         return
       }
 
@@ -2735,7 +3271,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         enemy.setVelocityX(0)
       } else {
         const direction = enemyState.direction
-        const patrolSpeed = this.getEnemyPatrolSpeed(enemyState) * chronoScale
+        const phaseSpeedMultiplier = enemyKind === 'sentry-sovereign'
+          ? Number(enemy.getData('bossPatrolSpeedMultiplier') ?? 1)
+          : 1
+        const patrolSpeed = this.getEnemyPatrolSpeed(enemyState) * phaseSpeedMultiplier * chronoScale
         enemy.setVelocityX(direction * patrolSpeed)
         this.setEnemyFacing(enemy, direction)
 
@@ -2769,6 +3308,269 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         }
       }
     })
+  }
+
+  private tryRelayLancerAttack(
+    time: number,
+    enemy: Phaser.Physics.Arcade.Sprite,
+    enemyState: ShadowRunnerEnemyState,
+  ) {
+    if (!this.player) return false
+
+    const config = getShadowRunnerLevelEnemies(this.level).find(current => current.id === enemyState.id)
+    const range = config?.attackRange ?? 360
+    const cooldown = config?.attackCooldownMs ?? 1320
+    const dx = Math.abs(this.player.x - enemy.x)
+    const dy = Math.abs(this.player.y - enemy.y)
+    const chronoScale = getShadowRunnerChronoTimeScale(this.state, time)
+
+    if (time < enemyState.attackUntil) {
+      const elapsed = time - enemyState.lastShotAt
+      const striking = elapsed >= 320
+      const attackIndex = Number(enemy.getData('lancerAttackIndex') ?? 0)
+      const highSweep = attackIndex % 2 === 0
+      enemy.setData('highThrust', striking && highSweep)
+      enemy.setVelocityX(striking ? enemyState.direction * (highSweep ? 285 : 235) * chronoScale : 0)
+      enemy.play(striking ? 'relay-lancer-strike' : 'relay-lancer-ready', true)
+      enemy.setTint(striking ? 0xffffff : highSweep ? 0xffd56a : 0x88f5ff)
+      this.setEnemyFacing(enemy, enemyState.direction)
+      return true
+    }
+
+    enemy.setData('highThrust', false)
+    enemy.clearTint()
+    if (dx > range || dy > 100 || time - enemyState.lastShotAt < cooldown / chronoScale) {
+      return false
+    }
+
+    enemyState.direction = this.player.x >= enemy.x ? 1 : -1
+    enemyState.lastShotAt = time
+    enemyState.attackUntil = time + 780
+    enemy.setData('lancerAttackIndex', Number(enemy.getData('lancerAttackIndex') ?? -1) + 1)
+    enemy.setVelocityX(0)
+    enemy.play('relay-lancer-ready', true)
+    enemy.setTint(0xffd56a)
+    this.setEnemyFacing(enemy, enemyState.direction)
+    return true
+  }
+
+  private tryPrismCasterCast(
+    time: number,
+    enemy: Phaser.Physics.Arcade.Sprite,
+    enemyState: ShadowRunnerEnemyState,
+  ) {
+    if (!this.player) return false
+
+    const config = getShadowRunnerLevelEnemies(this.level).find(current => current.id === enemyState.id)
+    const range = config?.attackRange ?? 720
+    const cooldown = config?.attackCooldownMs ?? 1680
+    const dx = Math.abs(this.player.x - enemy.x)
+    const dy = Math.abs(this.player.y - enemy.y)
+    const chronoScale = getShadowRunnerChronoTimeScale(this.state, time)
+
+    if (time < enemyState.attackUntil) {
+      const releaseAt = Number(enemy.getData('orbReleaseAt') ?? Number.POSITIVE_INFINITY)
+      const released = Boolean(enemy.getData('orbReleased'))
+      enemy.setVelocityX(0)
+      if (!released && time >= releaseAt) {
+        enemy.setData('orbReleased', true)
+        enemy.play('prism-caster-cast', true)
+        enemy.clearTint()
+        this.createRelayOrbs(enemy, 1, config, {
+          x: Number(enemy.getData('orbTargetX') ?? this.player.x),
+          y: Number(enemy.getData('orbTargetY') ?? this.player.y),
+        })
+      } else if (!released) {
+        enemy.play('prism-caster-windup', true)
+        enemy.setTint(0x89f7ff)
+      }
+      return true
+    }
+
+    enemy.clearTint()
+    if (dx > range || dy > 220 || time - enemyState.lastShotAt < cooldown / chronoScale) {
+      return false
+    }
+
+    enemyState.direction = this.player.x >= enemy.x ? 1 : -1
+    enemyState.lastShotAt = time
+    enemyState.attackUntil = time + 720
+    enemy.setData('orbReleaseAt', time + 420)
+    enemy.setData('orbReleased', false)
+    const targetBody = this.player.body as Phaser.Physics.Arcade.Body
+    enemy.setData('orbTargetX', targetBody.center.x + targetBody.velocity.x * 0.18)
+    enemy.setData('orbTargetY', targetBody.center.y)
+    enemy.setVelocityX(0)
+    enemy.play('prism-caster-windup', true)
+    enemy.setTint(0x89f7ff)
+    this.setEnemyFacing(enemy, enemyState.direction)
+    return true
+  }
+
+  private updateGearwingDrone(
+    time: number,
+    enemy: Phaser.Physics.Arcade.Sprite,
+    enemyState: ShadowRunnerEnemyState,
+  ) {
+    if (!this.player) return
+
+    const config = getShadowRunnerLevelEnemies(this.level).find(current => current.id === enemyState.id)
+    const startY = Number(enemy.getData('startY') ?? enemy.y)
+    const phase = Number(enemy.getData('hoverPhase') ?? 0)
+    const cooldown = config?.attackCooldownMs ?? 1550
+    const range = config?.attackRange ?? 500
+    const chronoScale = getShadowRunnerChronoTimeScale(this.state, time)
+    const dx = Math.abs(this.player.x - enemy.x)
+
+    if (time < enemyState.attackUntil) {
+      const elapsed = time - enemyState.lastShotAt
+      if (elapsed < 300) {
+        enemy.setVelocity(0, 0)
+        enemy.play('gearwing-drone-tell', true)
+        enemy.setTint(0xffd56a)
+      } else {
+        enemy.clearTint()
+        enemy.setVelocity(
+          enemyState.direction * 225 * chronoScale,
+          310 * chronoScale,
+        )
+        enemy.play('gearwing-drone-dive', true)
+      }
+      return
+    }
+
+    enemy.clearTint()
+    enemy.setData('highThrust', false)
+    const targetY = startY + Math.sin(time / 340 + phase) * 22
+    const verticalVelocity = Phaser.Math.Clamp((targetY - enemy.y) * 4.5, -230, 230)
+    const patrolSpeed = this.getEnemyPatrolSpeed(enemyState) * chronoScale
+    enemy.setVelocity(enemyState.direction * patrolSpeed, verticalVelocity)
+    enemy.play('gearwing-drone-flight', true)
+
+    if (enemy.x <= enemyState.patrolLeft) {
+      enemyState.direction = 1
+    } else if (enemy.x >= enemyState.patrolRight) {
+      enemyState.direction = -1
+    }
+    this.setEnemyFacing(enemy, enemyState.direction)
+
+    if (
+      dx <= range
+      && this.player.y > enemy.y + 70
+      && time - enemyState.lastShotAt >= cooldown / chronoScale
+    ) {
+      enemyState.direction = this.player.x >= enemy.x ? 1 : -1
+      enemyState.lastShotAt = time
+      enemyState.attackUntil = time + 880
+      enemy.setVelocity(0, 0)
+      enemy.play('gearwing-drone-tell', true)
+      enemy.setTint(0xffd56a)
+    }
+  }
+
+  private trySentrySovereignAttack(
+    time: number,
+    enemy: Phaser.Physics.Arcade.Sprite,
+    enemyState: ShadowRunnerEnemyState,
+  ) {
+    if (!this.player) return false
+
+    const config = getShadowRunnerLevelEnemies(this.level).find(current => current.id === enemyState.id)
+    const phases = config?.bossPhases ?? []
+    const phase = [...phases]
+      .reverse()
+      .find(candidate => enemyState.health <= candidate.healthAtOrBelow)
+      ?? phases[0]
+    if (!phase) return false
+
+    if (enemy.getData('bossPhaseId') !== phase.id) {
+      enemy.setData('bossPhaseId', phase.id)
+      enemy.setData('bossPhaseLabel', phase.label)
+      enemy.setData('bossAttackIndex', 0)
+      enemy.setData('bossPatrolSpeedMultiplier', phase.patrolSpeedMultiplier ?? 1)
+      enemyState.guard = Math.max(enemyState.guard, phase.guard ?? 0)
+      enemyState.maxGuard = Math.max(enemyState.maxGuard, phase.guard ?? 0)
+      enemy.setTint(0xffd56a)
+      this.showCheckpointToast(phase.label)
+      this.flashCamera(110, 255, 206, 92)
+    }
+
+    const range = config?.attackRange ?? 520
+    const cooldown = phase.attackCooldownMs ?? config?.attackCooldownMs ?? 1500
+    const chronoScale = getShadowRunnerChronoTimeScale(this.state, time)
+    const dx = Math.abs(this.player.x - enemy.x)
+    const dy = Math.abs(this.player.y - enemy.y)
+
+    if (time < enemyState.attackUntil) {
+      const elapsed = time - enemyState.lastShotAt
+      const attackType = String(enemy.getData('sovereignAttackType') ?? phase.attackStyle ?? 'sweep')
+      const released = Boolean(enemy.getData('sovereignAttackReleased'))
+      const telling = elapsed < (attackType === 'sweep' ? 380 : 500)
+
+      if (telling) {
+        enemy.setVelocityX(0)
+        enemy.setTint(attackType === 'orbs' ? 0x89f7ff : 0xffd56a)
+        enemy.play(
+          attackType === 'orbs'
+            ? 'sovereign-orbs'
+            : attackType === 'shockwave'
+              ? 'sovereign-shockwave'
+              : 'sovereign-sweep',
+          true,
+        )
+      } else if (attackType === 'sweep') {
+        enemy.clearTint()
+        enemy.setData('highThrust', true)
+        const chargeCount = Math.max(1, Number(enemy.getData('sovereignChargeCount') ?? 1))
+        const chargeDirection = Number(enemy.getData('sovereignChargeDirection') ?? enemyState.direction) >= 0 ? 1 : -1
+        const chargeIndex = Math.min(chargeCount - 1, Math.floor(Math.max(0, elapsed - 380) / 360))
+        const direction = (chargeDirection * (chargeIndex % 2 === 0 ? 1 : -1)) as 1 | -1
+        enemyState.direction = direction
+        this.setEnemyFacing(enemy, direction)
+        enemy.setVelocityX(direction * 315 * (phase.patrolSpeedMultiplier ?? 1) * chronoScale)
+        enemy.play('sovereign-sweep', true)
+      } else {
+        enemy.setVelocityX(0)
+        enemy.clearTint()
+        if (!released) {
+          enemy.setData('sovereignAttackReleased', true)
+          if (attackType === 'orbs') {
+            this.createRelayOrbs(enemy, phase.orbCount ?? 2, config)
+          } else {
+            this.createSovereignShockwaves(enemy, phase.shockwaveCount ?? 2, config)
+          }
+          this.shakeCamera(85, 0.002)
+        }
+      }
+      this.setEnemyFacing(enemy, enemyState.direction)
+      return true
+    }
+
+    enemy.setData('highThrust', false)
+    enemy.clearTint()
+    if (dx > range || dy > 150 || time - enemyState.lastShotAt < cooldown / chronoScale) {
+      return false
+    }
+
+    const attackIndex = Number(enemy.getData('bossAttackIndex') ?? 0)
+    const baseStyle = phase.attackStyle ?? 'sweep'
+    const attackType = baseStyle === 'finale'
+      ? (['sweep', 'orbs', 'shockwave'] as const)[attackIndex % 3]
+      : phase.id === 'crownfall'
+        ? (['sweep', 'shockwave'] as const)[attackIndex % 2]
+        : baseStyle
+    const chargeCount = attackType === 'sweep' ? Math.max(1, phase.chargeCount ?? 1) : 1
+    enemyState.direction = this.player.x >= enemy.x ? 1 : -1
+    enemyState.lastShotAt = time
+    enemyState.attackUntil = time + (attackType === 'sweep' ? 580 + chargeCount * 360 : 1050)
+    enemy.setData('bossAttackIndex', attackIndex + 1)
+    enemy.setData('sovereignAttackType', attackType)
+    enemy.setData('sovereignAttackReleased', false)
+    enemy.setData('sovereignChargeCount', chargeCount)
+    enemy.setData('sovereignChargeDirection', enemyState.direction)
+    enemy.setVelocityX(0)
+    this.setEnemyFacing(enemy, enemyState.direction)
+    return true
   }
 
   private tryTombLurkerLunge(
@@ -3003,7 +3805,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       enemyState.maxGuard = Math.max(enemyState.maxGuard, phase.guard ?? 0)
       enemy.setTint(0xf0d381)
       this.showCheckpointToast(phase.label)
-      this.cameras.main.flash(90, 196, 221, 255, false)
+      this.flashCamera(90, 196, 221, 255)
     }
 
     const range = config?.attackRange ?? 430
@@ -3261,6 +4063,93 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     body.setOffset(4, 2)
   }
 
+  private createRelayOrbs(
+    enemy: Phaser.Physics.Arcade.Sprite,
+    count: number,
+    enemyConfig?: ShadowRunnerEnemyConfig,
+    telegraphedTarget?: { x: number; y: number },
+  ) {
+    if (!this.player) return
+
+    const safeCount = Phaser.Math.Clamp(Math.floor(count), 1, 3)
+    const speed = enemyConfig?.projectileSpeed ?? 480
+    const damage = enemyConfig ? getShadowRunnerEnemyProjectileDamage(enemyConfig) : 3
+    const facing: 1 | -1 = this.player.x >= enemy.x ? 1 : -1
+    const startX = enemy.x + facing * 48
+    const startY = enemy.y - (this.getEnemyKind(enemy) === 'sentry-sovereign' ? 92 : 64)
+    const targetBody = this.player.body as Phaser.Physics.Arcade.Body
+    const targetX = telegraphedTarget?.x ?? targetBody.center.x + targetBody.velocity.x * 0.18
+    const targetY = telegraphedTarget?.y ?? targetBody.center.y
+
+    for (let index = 0; index < safeCount; index += 1) {
+      const spread = (index - (safeCount - 1) / 2) * 72
+      const angle = Phaser.Math.Angle.Between(startX, startY, targetX, targetY + spread)
+      const orb = this.acquireProjectile(startX, startY, 'shadow-runner-relay-orb', 0)
+      if (!orb) continue
+
+      const velocityX = Math.cos(angle) * speed
+      const velocityY = Math.sin(angle) * speed
+      orb.setDepth(22)
+      orb.setDisplaySize(46, 46)
+      orb.setData('spawnedAt', this.time.now)
+      orb.setData('lifetimeMs', 3600)
+      orb.setData('projectileKind', 'relay-orb')
+      orb.setData('damage', damage)
+      orb.setData('baseSpeedX', velocityX)
+      orb.setData('baseSpeedY', velocityY)
+      orb.setVelocity(velocityX, velocityY)
+      orb.setAngularVelocity(180)
+
+      const body = orb.body as Phaser.Physics.Arcade.Body
+      body.allowGravity = false
+      body.setSize(28, 28)
+      body.setOffset(18, 18)
+    }
+  }
+
+  private createSovereignShockwaves(
+    enemy: Phaser.Physics.Arcade.Sprite,
+    count: number,
+    enemyConfig?: ShadowRunnerEnemyConfig,
+  ) {
+    const safeCount = Phaser.Math.Clamp(Math.floor(count), 1, 3)
+    const damage = enemyConfig ? getShadowRunnerEnemyProjectileDamage(enemyConfig) : 3
+    const directions: Array<1 | -1> = safeCount === 1
+      ? [this.state.player.facing]
+      : safeCount > 2
+        ? [-1, 1, this.state.player.facing]
+        : [-1, 1]
+
+    directions.forEach((direction, index) => {
+      this.time.delayedCall(index * 160, () => {
+        const wave = this.acquireProjectile(
+          enemy.x + direction * 62,
+          enemy.y - 22,
+          'shadow-runner-relay-orb',
+          2,
+        )
+        if (!wave) return
+
+        const speed = 430 + index * 45
+        wave.setDepth(22)
+        wave.setDisplaySize(76, 28)
+        wave.setTint(0xffd56a)
+        wave.setData('spawnedAt', this.time.now)
+        wave.setData('lifetimeMs', 2800)
+        wave.setData('projectileKind', 'relay-shockwave')
+        wave.setData('damage', damage)
+        wave.setData('baseSpeedX', direction * speed)
+        wave.setData('baseSpeedY', 0)
+        wave.setVelocity(direction * speed, 0)
+
+        const body = wave.body as Phaser.Physics.Arcade.Body
+        body.allowGravity = false
+        body.setSize(58, 18)
+        body.setOffset(3, 5)
+      })
+    })
+  }
+
   private createStormBomb(
     enemy: Phaser.Physics.Arcade.Sprite,
     direction: 1 | -1,
@@ -3389,6 +4278,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       projectile.setVelocityX(baseSpeedX * chronoScale)
       if (projectile.getData('projectileKind') === 'storm-bomb') {
         projectile.setFrame(Math.floor((time - spawnedAt) / 90) % 2)
+      } else if (projectile.getData('projectileKind') === 'relay-orb') {
+        const baseSpeedY = Number(projectile.getData('baseSpeedY') ?? projectile.body?.velocity.y ?? 0)
+        projectile.setVelocityY(baseSpeedY * chronoScale)
+        projectile.setFrame(Math.floor((time - spawnedAt) / 80) % 4)
       }
       const expired = time - spawnedAt > lifetimeMs
       const outsideWorld = projectile.x < -80
@@ -3444,7 +4337,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     }
     this.playSound('enemy-hit')
     this.addHitFlash(projectile.x, projectile.y)
-    this.cameras.main.shake(42, 0.0012)
+    this.shakeCamera(42, 0.0012)
     this.emitHud(true)
     return true
   }
@@ -3579,7 +4472,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       repeat: -1,
       ease: 'Sine.inOut',
     })
-    this.cameras.main.shake(55, 0.0015)
+    this.shakeCamera(55, 0.0015)
   }
 
   private updateCandleHazards(time: number) {
@@ -3606,9 +4499,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       return
     }
 
-    if (this.jumpsUsed < 2) {
+    const maxJumps = 2 + getShadowRunnerAetherExtraAirJumps(this.state, this.time.now)
+    if (this.jumpsUsed < maxJumps) {
       this.player.setVelocityY(DOUBLE_JUMP_VELOCITY)
-      this.jumpsUsed = 2
+      this.jumpsUsed += 1
       this.playSound('double-jump')
       this.addDustPuff(this.player.x, this.player.y - 52)
     }
@@ -3634,6 +4528,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     const facing = this.state.player.facing
     const sunsteelStrike = getShadowRunnerSunsteelStrikeProperties(this.state, time)
+    const dawnfire = getShadowRunnerDawnfireProperties(this.state, time)
     const slashX = player.x + facing * 48
     const slashY = player.y - 46
 
@@ -3646,13 +4541,14 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     const bomb = this.archerProjectiles?.getChildren().find(child => {
       const projectile = child as Phaser.Physics.Arcade.Image
-      if (!projectile.active || projectile.getData('projectileKind') !== 'storm-bomb') return false
+      const projectileKind = projectile.getData('projectileKind')
+      if (!projectile.active || (projectileKind !== 'storm-bomb' && projectileKind !== 'relay-orb')) return false
       const reachX = facing === 1 ? projectile.x - player.x : player.x - projectile.x
       return reachX > -14
         && reachX < 106 + sunsteelStrike.reachBonus
         && Math.abs(projectile.y - slashY) < 76
     }) as Phaser.Physics.Arcade.Image | undefined
-    if (bomb && sunsteelStrike.attackDamageBonus > 0) {
+    if (bomb && (sunsteelStrike.attackDamageBonus > 0 || dawnfire.attackDamageBonus > 0)) {
       this.disableProjectile(bomb)
       this.playSound('enemy-hit')
       this.addHitFlash(bomb.x, bomb.y)
@@ -3680,11 +4576,17 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const damaged = damageShadowRunnerEnemy(
       this.state,
       time,
-       (boostActive || surgeActive ? 2 : 1) + sunsteelStrike.attackDamageBonus,
+      (boostActive || surgeActive ? 2 : 1)
+        + sunsteelStrike.attackDamageBonus
+        + dawnfire.attackDamageBonus,
       this.getEnemyId(enemy),
       {
         bypassGuard: rearAttack,
-        guardDamage: Math.max(boostActive || surgeActive ? 2 : 1, sunsteelStrike.guardDamage),
+        guardDamage: Math.max(
+          boostActive || surgeActive ? 2 : 1,
+          sunsteelStrike.guardDamage,
+          dawnfire.guardDamage,
+        ),
       },
     )
     if (damaged) {
@@ -3692,7 +4594,16 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
         enemyState.attackUntil = time + 160
       }
       this.playSound('enemy-hit')
-      enemy.setVelocityX(facing * (boostActive || surgeActive || sunsteelStrike.attackDamageBonus > 0 ? 245 : 190))
+      enemy.setVelocityX(
+        facing * (
+          boostActive
+          || surgeActive
+          || sunsteelStrike.attackDamageBonus > 0
+          || dawnfire.attackDamageBonus > 0
+            ? 245
+            : 190
+        ),
+      )
       this.addHitFlash(enemy.x, enemy.y - 42)
       if (!enemyState?.alive) {
         this.defeatEnemy(enemy)
@@ -3708,7 +4619,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
     const body = player.body as Phaser.Physics.Arcade.Body
     const enemyKind = this.getEnemyKind(enemy)
-    if (enemyKind === 'gate-pikeman' && enemy.getData('highThrust') && body.height <= 50) {
+    if (
+      (enemyKind === 'gate-pikeman'
+        || enemyKind === 'relay-lancer'
+        || enemyKind === 'sentry-sovereign')
+      && enemy.getData('highThrust')
+      && body.height <= 50
+    ) {
       return
     }
     const isStomp = body.velocity.y > 130 && player.y < enemy.y - 24
@@ -3756,17 +4673,30 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     const resistedHit = (
       isShadowRunnerBoostActive(this.state, time) && this.state.player.boostGuardCharges > 0
     ) || isShadowRunnerSurgeActive(this.state, time)
-    const damaged = damageShadowRunnerPlayer(this.state, time, amount)
+    const dawnfire = getShadowRunnerDawnfireProperties(this.state, time)
+    const mitigatedAmount = Math.max(1, Math.ceil(amount * dawnfire.damageResistanceMultiplier))
+    const damaged = damageShadowRunnerPlayer(this.state, time, mitigatedAmount)
     if (!damaged || !this.player) return false
 
     this.playSound('player-hurt')
     const knockback = sourceX === undefined
       ? (this.state.player.facing === 1 ? -1 : 1)
       : (this.player.x < sourceX ? -1 : 1)
-    const knockbackStrength = resistedHit ? 145 : 220 + Math.max(0, amount - 1) * 62
-    this.player.setVelocity(knockback * knockbackStrength, resistedHit ? -210 : -290 - Math.max(0, amount - 1) * 28)
-    this.player.setTint(resistedHit ? 0xf0d381 : 0xffd0b3)
-    this.cameras.main.shake(resistedHit ? 56 : 90, resistedHit ? 0.0014 : 0.0022)
+    const dawnfireActive = dawnfire.damageResistanceMultiplier < 1
+    const knockbackStrength = resistedHit
+      ? 145
+      : dawnfireActive
+        ? 168
+        : 220 + Math.max(0, mitigatedAmount - 1) * 62
+    this.player.setVelocity(
+      knockback * knockbackStrength,
+      resistedHit || dawnfireActive ? -210 : -290 - Math.max(0, mitigatedAmount - 1) * 28,
+    )
+    this.player.setTint(resistedHit ? 0xf0d381 : dawnfireActive ? 0xffd56a : 0xffd0b3)
+    this.shakeCamera(
+      resistedHit || dawnfireActive ? 56 : 90,
+      resistedHit || dawnfireActive ? 0.0014 : 0.0022,
+    )
 
     this.time.delayedCall(190, () => {
       this.player?.clearTint()
@@ -3781,11 +4711,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
 
   private handlePlayerHealthDepleted() {
     const hasLivesLeft = spendShadowRunnerLife(this.state)
+    this.suspendPlayerForRespawn()
     this.emitHud(true)
 
     if (!hasLivesLeft) {
       this.playSound('route-failed')
-      this.player?.setVelocity(0, 0)
       this.player?.setTint(0x6d7380)
       this.addDustPuff(this.player?.x ?? 0, (this.player?.y ?? 0) - 28)
       return
@@ -3798,23 +4728,30 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private handlePlayerFellOut() {
-    if (!this.player || this.fallRespawnPending || this.state.outOfLives) return
+    if (!this.player || this.respawnPending || this.state.outOfLives) return
 
-    this.fallRespawnPending = true
     const hasLivesLeft = spendShadowRunnerLife(this.state)
+    this.suspendPlayerForRespawn()
     this.emitHud(true)
 
     this.playSound(hasLivesLeft ? 'life-lost' : 'route-failed')
-    this.player.setVelocity(0, 0)
     this.player.setTint(0x6d7380)
     this.addDustPuff(this.player.x, this.level.worldHeight - 20)
 
     if (!hasLivesLeft) return
 
     this.time.delayedCall(260, () => {
-      this.fallRespawnPending = false
       this.respawnPlayer()
     })
+  }
+
+  private suspendPlayerForRespawn() {
+    if (!this.player) return
+
+    this.respawnPending = true
+    this.player.setVelocity(0, 0)
+    const body = this.player.body as Phaser.Physics.Arcade.Body
+    body.enable = false
   }
 
   private clampPlayerHorizontalBounds(body: Phaser.Physics.Arcade.Body) {
@@ -3841,10 +4778,10 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     restoreShadowRunnerPlayer(this.state)
     this.state.player.lastDamagedAt = this.time.now
     this.jumpsUsed = 0
-    this.fallRespawnPending = false
+    this.respawnPending = false
+    this.player.enableBody(true, this.respawnPoint.x, this.respawnPoint.y, true, true)
     this.player.setVelocity(0, 0)
     this.updateEncounterBarriers()
-    this.player.setPosition(this.respawnPoint.x, this.respawnPoint.y)
     this.player.clearTint()
     this.playSound('respawn')
     this.addDustPuff(this.player.x, this.player.y - 28)
@@ -3855,6 +4792,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (coin.getData('collected')) return
 
     coin.setData('collected', true)
+    this.tweens.killTweensOf(coin)
     collectShadowRunnerCoin(this.state)
     this.playSound('coin')
     this.addCoinSparkle(coin.x, coin.y)
@@ -3876,6 +4814,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!boost) return
 
     boostSprite.setData('collected', true)
+    this.tweens.killTweensOf(boostSprite)
     collectShadowRunnerBoost(this.state, this.time.now, boost)
     this.playSound('coin')
     this.addCoinSparkle(boostSprite.x, boostSprite.y)
@@ -3893,18 +4832,29 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private updateCheckpointProgress() {
-    if (!this.player || this.fallRespawnPending || this.state.outOfLives) return
+    if (!this.player || this.respawnPending || this.state.outOfLives) return
 
     const checkpoints = this.level.checkpoints ?? []
-    const nextCheckpointIndex = this.activeCheckpointIndex + 1
-    const checkpoint = checkpoints[nextCheckpointIndex]
-    if (!checkpoint || this.player.x < checkpoint.x) return
     const playerBody = this.player.body as Phaser.Physics.Arcade.Body
-    if (checkpoint.triggerWidth !== undefined && this.player.x > checkpoint.x + checkpoint.triggerWidth) return
-    if (checkpoint.minY !== undefined && playerBody.center.y < checkpoint.minY) return
-    if (checkpoint.maxY !== undefined && playerBody.center.y > checkpoint.maxY) return
+    let activatedIndex = this.activeCheckpointIndex
 
-    this.activeCheckpointIndex = nextCheckpointIndex
+    for (let index = this.activeCheckpointIndex + 1; index < checkpoints.length; index += 1) {
+      const checkpoint = checkpoints[index]
+      if (this.player.x < checkpoint.x) break
+
+      const withinTriggerWindow = checkpoint.triggerWidth === undefined
+        || this.player.x <= checkpoint.x + checkpoint.triggerWidth
+      const withinVerticalWindow = (
+        (checkpoint.minY === undefined || playerBody.center.y >= checkpoint.minY)
+        && (checkpoint.maxY === undefined || playerBody.center.y <= checkpoint.maxY)
+      )
+      if (withinTriggerWindow && !withinVerticalWindow) break
+      activatedIndex = index
+    }
+
+    if (activatedIndex === this.activeCheckpointIndex) return
+    const checkpoint = checkpoints[activatedIndex]
+    this.activeCheckpointIndex = activatedIndex
     this.respawnPoint = { x: checkpoint.x, y: checkpoint.y }
     restoreShadowRunnerPlayer(this.state)
     this.state.player.lastDamagedAt = this.time.now
@@ -3955,6 +4905,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!shield) return
 
     shieldSprite.setData('collected', true)
+    this.tweens.killTweensOf(shieldSprite)
     collectShadowRunnerShield(this.state, this.time.now, shield)
     this.playSound('coin')
     this.addCoinSparkle(shieldSprite.x, shieldSprite.y)
@@ -3979,11 +4930,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!chrono) return
 
     chronoSprite.setData('collected', true)
+    this.tweens.killTweensOf(chronoSprite)
     collectShadowRunnerChrono(this.state, this.time.now, chrono)
     this.playSound('coin')
     this.addCoinSparkle(chronoSprite.x, chronoSprite.y)
     this.addDustPuff(chronoSprite.x, chronoSprite.y + 18)
-    this.cameras.main.flash(110, 70, 225, 255, false)
+    this.flashCamera(110, 70, 225, 255)
     this.tweens.add({
       targets: chronoSprite,
       scale: 1.5,
@@ -4004,11 +4956,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!surge) return
 
     surgeSprite.setData('collected', true)
+    this.tweens.killTweensOf(surgeSprite)
     collectShadowRunnerSurge(this.state, this.time.now, surge)
     this.playSound('coin')
     this.addCoinSparkle(surgeSprite.x, surgeSprite.y)
     this.addDustPuff(surgeSprite.x, surgeSprite.y + 18)
-    this.cameras.main.flash(100, 150, 232, 255, false)
+    this.flashCamera(100, 150, 232, 255)
     this.tweens.add({
       targets: surgeSprite,
       scale: 1.58,
@@ -4030,12 +4983,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!shard || totalMoonShards <= 0) return
 
     shardSprite.setData('collected', true)
+    this.tweens.killTweensOf(shardSprite)
     collectShadowRunnerMoonShard(this.state, shard, totalMoonShards)
     this.finishSparked = false
     this.playSound('coin')
     this.addCoinSparkle(shardSprite.x, shardSprite.y)
     this.addDustPuff(shardSprite.x, shardSprite.y + 18)
-    this.cameras.main.flash(120, 210, 245, 255, false)
+    this.flashCamera(120, 210, 245, 255)
     this.tweens.add({
       targets: shardSprite,
       scale: 1.64,
@@ -4056,6 +5010,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!pickup) return
 
     sprite.setData('collected', true)
+    this.tweens.killTweensOf(sprite)
     collectShadowRunnerWraithlight(this.state, this.time.now, pickup)
     this.playSound('coin')
     this.addCoinSparkle(sprite.x, sprite.y)
@@ -4081,6 +5036,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!pickup) return
 
     sprite.setData('collected', true)
+    this.tweens.killTweensOf(sprite)
     collectShadowRunnerMirrorWard(this.state, this.time.now, pickup)
     this.playSound('coin')
     this.addCoinSparkle(sprite.x, sprite.y)
@@ -4105,11 +5061,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!pickup) return
 
     sprite.setData('collected', true)
+    this.tweens.killTweensOf(sprite)
     collectShadowRunnerGaleMantle(this.state, this.time.now, pickup)
     this.playSound('coin')
     this.addCoinSparkle(sprite.x, sprite.y)
     this.addDustPuff(sprite.x, sprite.y + 18)
-    this.cameras.main.flash(110, 148, 225, 255, false)
+    this.flashCamera(110, 148, 225, 255)
     this.tweens.add({
       targets: sprite,
       scale: 1.62,
@@ -4131,11 +5088,12 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!pickup) return
 
     sprite.setData('collected', true)
+    this.tweens.killTweensOf(sprite)
     collectShadowRunnerSunsteelEdge(this.state, this.time.now, pickup)
     this.playSound('coin')
     this.addCoinSparkle(sprite.x, sprite.y)
     this.addDustPuff(sprite.x, sprite.y + 18)
-    this.cameras.main.flash(110, 255, 196, 72, false)
+    this.flashCamera(110, 255, 196, 72)
     this.tweens.add({
       targets: sprite,
       scale: 1.62,
@@ -4149,6 +5107,60 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.emitHud(true)
   }
 
+  private collectDawnfireAegis(sprite: Phaser.Physics.Arcade.Sprite) {
+    if (sprite.getData('collected')) return
+
+    const pickup: ShadowRunnerDawnfireAegisPickup | undefined = this.level.dawnfireAegisPickups
+      ?.find(current => current.id === sprite.name)
+    if (!pickup) return
+
+    sprite.setData('collected', true)
+    this.tweens.killTweensOf(sprite)
+    collectShadowRunnerDawnfireAegis(this.state, this.time.now, pickup)
+    this.playSound('coin')
+    this.addCoinSparkle(sprite.x, sprite.y)
+    this.addDustPuff(sprite.x, sprite.y + 18)
+    this.flashCamera(125, 255, 148, 70)
+    this.tweens.add({
+      targets: sprite,
+      scale: 1.7,
+      alpha: 0,
+      y: sprite.y - 32,
+      duration: 245,
+      ease: 'Quad.easeOut',
+      onComplete: () => sprite.disableBody(true, true),
+    })
+    this.updateDawnfireAegisAura(this.time.now)
+    this.emitHud(true)
+  }
+
+  private collectAetherStep(sprite: Phaser.Physics.Arcade.Sprite) {
+    if (sprite.getData('collected')) return
+
+    const pickup: ShadowRunnerAetherStepPickup | undefined = this.level.aetherStepPickups
+      ?.find(current => current.id === sprite.name)
+    if (!pickup) return
+
+    sprite.setData('collected', true)
+    this.tweens.killTweensOf(sprite)
+    collectShadowRunnerAetherStep(this.state, this.time.now, pickup)
+    this.playSound('coin')
+    this.addCoinSparkle(sprite.x, sprite.y)
+    this.addDustPuff(sprite.x, sprite.y + 18)
+    this.flashCamera(115, 126, 239, 255)
+    this.tweens.add({
+      targets: sprite,
+      scale: 1.7,
+      alpha: 0,
+      y: sprite.y - 34,
+      duration: 245,
+      ease: 'Quad.easeOut',
+      onComplete: () => sprite.disableBody(true, true),
+    })
+    this.updateAetherStepAura(this.time.now)
+    this.emitHud(true)
+  }
+
   private collectObjective(sprite: Phaser.Physics.Arcade.Sprite) {
     if (sprite.getData('collected')) return
 
@@ -4157,12 +5169,13 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     if (!pickup) return
 
     sprite.setData('collected', true)
+    this.tweens.killTweensOf(sprite)
     collectShadowRunnerObjective(this.state, pickup)
     this.finishSparked = false
     this.playSound('coin')
     this.addCoinSparkle(sprite.x, sprite.y)
     this.addDustPuff(sprite.x, sprite.y + 18)
-    this.cameras.main.flash(125, 246, 204, 92, false)
+    this.flashCamera(125, 246, 204, 92)
     this.tweens.add({
       targets: sprite,
       scale: 1.72,
@@ -4186,10 +5199,15 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
       ? isShadowRunnerGaleMantleActive(this.state, this.time.now)
       : pickup.requiredPower === 'sunsteel-edge'
         ? isShadowRunnerSunsteelEdgeActive(this.state, this.time.now)
+        : pickup.requiredPower === 'dawnfire-aegis'
+          ? isShadowRunnerDawnfireAegisActive(this.state, this.time.now)
+          : pickup.requiredPower === 'aether-step'
+            ? isShadowRunnerAetherStepActive(this.state, this.time.now)
         : isShadowRunnerWraithlightActive(this.state, this.time.now)
     if (sprite.getData('collected') || !powerActive) return
 
     sprite.setData('collected', true)
+    this.tweens.killTweensOf(sprite)
     collectShadowRunnerMastery(this.state, pickup)
     this.playSound('coin')
     this.addCoinSparkle(sprite.x, sprite.y)
@@ -4417,7 +5435,42 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.sunsteelEdgeAura.strokeCircle(this.player.x, this.player.y - 44, 42 * pulse)
   }
 
-  private updatePowerGatedMastery(requiredPower: 'gale-mantle' | 'sunsteel-edge', active: boolean) {
+  private updateDawnfireAegisAura(time: number) {
+    if (!this.player || !this.dawnfireAegisAura) return
+
+    const active = isShadowRunnerDawnfireAegisActive(this.state, time)
+    this.updatePowerGatedMastery('dawnfire-aegis', active)
+    this.dawnfireAegisAura.setVisible(active)
+    this.dawnfireAegisAura.clear()
+    if (!active) return
+
+    const pulse = 1 + Math.sin(time / 92) * 0.045
+    this.dawnfireAegisAura.lineStyle(4, 0xffd56a, 0.86)
+    this.dawnfireAegisAura.strokeEllipse(this.player.x, this.player.y - 44, 82 * pulse, 108 * pulse)
+    this.dawnfireAegisAura.lineStyle(2, 0xff7a36, 0.7)
+    this.dawnfireAegisAura.strokeCircle(this.player.x, this.player.y - 44, 48 * pulse)
+  }
+
+  private updateAetherStepAura(time: number) {
+    if (!this.player || !this.aetherStepAura) return
+
+    const active = isShadowRunnerAetherStepActive(this.state, time)
+    this.updatePowerGatedMastery('aether-step', active)
+    this.aetherStepAura.setVisible(active)
+    this.aetherStepAura.clear()
+    if (!active) return
+
+    const pulse = 1 + Math.sin(time / 82) * 0.05
+    this.aetherStepAura.lineStyle(3, 0x8ff8ff, 0.76)
+    this.aetherStepAura.strokeEllipse(this.player.x, this.player.y - 28, 76 * pulse, 36 * pulse)
+    this.aetherStepAura.lineStyle(2, 0xd6ffff, 0.54)
+    this.aetherStepAura.strokeEllipse(this.player.x, this.player.y - 18, 98 * pulse, 28 * pulse)
+  }
+
+  private updatePowerGatedMastery(
+    requiredPower: 'gale-mantle' | 'sunsteel-edge' | 'dawnfire-aegis' | 'aether-step',
+    active: boolean,
+  ) {
     this.masteryPickups?.getChildren().forEach(child => {
       const pickup = child as Phaser.Physics.Arcade.Sprite
       if (pickup.getData('collected') || pickup.getData('requiredPower') !== requiredPower) return
@@ -4477,11 +5530,11 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
   }
 
   private checkFinish() {
-    if (!this.player || this.state.defeated || this.state.outOfLives || this.fallRespawnPending) return
+    if (!this.player || this.state.defeated || this.state.outOfLives || this.respawnPending) return
 
     const finish = this.level.finish
     const body = this.player.body as Phaser.Physics.Arcade.Body
-    const overlapsFinish = isShadowRunnerFinishOverlap(body, finish, { fallRespawnPending: this.fallRespawnPending })
+    const overlapsFinish = isShadowRunnerFinishOverlap(body, finish, { fallRespawnPending: this.respawnPending })
 
     if (overlapsFinish) {
       const totalObjectiveItems = this.level.objectivePickups?.length ?? 0
@@ -4764,6 +5817,7 @@ class ShadowRunnerLevelScene extends Phaser.Scene {
     this.registerTerrainFrameSet('shadow-runner-moon-terrain-atlas', MOON_TERRAIN_CROPS)
     this.registerTerrainFrameSet('shadow-runner-catacomb-terrain-atlas', CATACOMB_TERRAIN_CROPS)
     this.registerTerrainFrameSet('shadow-runner-captain-terrain-atlas', CAPTAIN_GATE_TERRAIN_CROPS)
+    this.registerTerrainFrameSet('shadow-runner-relay-terrain-atlas', DAWN_RELAY_TERRAIN_CROPS)
   }
 
   private registerTerrainFrameSet(textureKey: string, crops: Record<string, TextureCrop>) {
@@ -4810,6 +5864,7 @@ export function createShadowRunnerPhaserGame(options: CreateShadowRunnerGameOpti
         onHudChange: options.onHudChange,
         onReady: options.onReady,
         onSoundEvent: options.onSoundEvent,
+        reducedMotion: options.reducedMotion,
       }),
     ],
   })

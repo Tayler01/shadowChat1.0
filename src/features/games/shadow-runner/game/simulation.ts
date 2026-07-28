@@ -1,6 +1,7 @@
 import type {
   ShadowRunnerBoostPickup,
   ShadowRunnerChronoPickup,
+  ShadowRunnerDawnfireAegisPickup,
   ShadowRunnerEnemyConfig,
   ShadowRunnerEnemyKind,
   ShadowRunnerGaleMantlePickup,
@@ -12,6 +13,7 @@ import type {
   ShadowRunnerShieldPickup,
   ShadowRunnerSunsteelEdgePickup,
   ShadowRunnerSurgePickup,
+  ShadowRunnerAetherStepPickup,
   ShadowRunnerWraithlightPickup,
 } from './levels'
 
@@ -19,6 +21,12 @@ export interface ShadowRunnerSunsteelStrikeProperties {
   attackDamageBonus: number
   guardDamage: number
   reachBonus: number
+}
+
+export interface ShadowRunnerDawnfireProperties {
+  attackDamageBonus: number
+  guardDamage: number
+  damageResistanceMultiplier: number
 }
 
 export interface ShadowRunnerHudState {
@@ -61,6 +69,14 @@ export interface ShadowRunnerHudState {
   sunsteelEdgeCharges: number
   sunsteelStrikeActive: boolean
   sunsteelStrike: ShadowRunnerSunsteelStrikeProperties
+  dawnfireAegisActive: boolean
+  dawnfireAegisRemainingMs: number
+  dawnfireAegis: ShadowRunnerDawnfireProperties
+  aetherStepActive: boolean
+  aetherStepRemainingMs: number
+  aetherStepSpeedMultiplier: number
+  aetherStepExtraAirJumps: number
+  aetherStepPreventsFallDamage: boolean
   moonShards: number
   totalMoonShards: number
   moonShardGateOpen: boolean
@@ -135,6 +151,14 @@ export interface ShadowRunnerSimulationState {
     sunsteelAttackDamageBonus: number
     sunsteelGuardDamage: number
     sunsteelReachBonus: number
+    dawnfireAegisActiveUntil: number
+    dawnfireDamageResistanceMultiplier: number
+    dawnfireAttackDamageBonus: number
+    dawnfireGuardDamage: number
+    aetherStepActiveUntil: number
+    aetherStepSpeedMultiplier: number
+    aetherStepExtraAirJumps: number
+    aetherStepPreventsFallDamage: boolean
     moonShards: number
     objectiveItems: number
     masteryItems: number
@@ -261,6 +285,14 @@ export function createInitialShadowRunnerSimulation(
       sunsteelAttackDamageBonus: 0,
       sunsteelGuardDamage: 0,
       sunsteelReachBonus: 0,
+      dawnfireAegisActiveUntil: 0,
+      dawnfireDamageResistanceMultiplier: 1,
+      dawnfireAttackDamageBonus: 0,
+      dawnfireGuardDamage: 0,
+      aetherStepActiveUntil: 0,
+      aetherStepSpeedMultiplier: 1,
+      aetherStepExtraAirJumps: 0,
+      aetherStepPreventsFallDamage: false,
       moonShards: 0,
       objectiveItems: 0,
       masteryItems: 0,
@@ -328,6 +360,14 @@ export function getShadowRunnerHudState(
     ? Math.ceil(rawSunsteelEdgeRemainingMs / 1000) * 1000
     : 0
   const sunsteelStrike = getShadowRunnerSunsteelStrikeProperties(state, time)
+  const rawDawnfireAegisRemainingMs = Math.max(0, state.player.dawnfireAegisActiveUntil - time)
+  const dawnfireAegisRemainingMs = rawDawnfireAegisRemainingMs > 0
+    ? Math.ceil(rawDawnfireAegisRemainingMs / 1000) * 1000
+    : 0
+  const rawAetherStepRemainingMs = Math.max(0, state.player.aetherStepActiveUntil - time)
+  const aetherStepRemainingMs = rawAetherStepRemainingMs > 0
+    ? Math.ceil(rawAetherStepRemainingMs / 1000) * 1000
+    : 0
   const objectiveGateOpen = state.level.totalObjectiveItems === 0
     || state.player.objectiveItems >= state.level.totalObjectiveItems
   const fullClear = (
@@ -380,6 +420,14 @@ export function getShadowRunnerHudState(
     sunsteelEdgeCharges: state.player.sunsteelEdgeCharges,
     sunsteelStrikeActive: isShadowRunnerSunsteelStrikeActive(state, time),
     sunsteelStrike,
+    dawnfireAegisActive: dawnfireAegisRemainingMs > 0,
+    dawnfireAegisRemainingMs,
+    dawnfireAegis: getShadowRunnerDawnfireProperties(state, time),
+    aetherStepActive: aetherStepRemainingMs > 0,
+    aetherStepRemainingMs,
+    aetherStepSpeedMultiplier: getShadowRunnerAetherSpeedMultiplier(state, time),
+    aetherStepExtraAirJumps: getShadowRunnerAetherExtraAirJumps(state, time),
+    aetherStepPreventsFallDamage: doesShadowRunnerAetherPreventFallDamage(state, time),
     moonShards: state.player.moonShards,
     totalMoonShards,
     moonShardGateOpen: totalMoonShards === 0 || state.player.moonShards >= totalMoonShards,
@@ -436,6 +484,20 @@ export function isShadowRunnerSunsteelStrikeActive(state: ShadowRunnerSimulation
   return state.player.sunsteelStrikeActiveUntil > time
 }
 
+export function isShadowRunnerDawnfireAegisActive(
+  state: ShadowRunnerSimulationState,
+  time: number,
+) {
+  return state.player.dawnfireAegisActiveUntil > time
+}
+
+export function isShadowRunnerAetherStepActive(
+  state: ShadowRunnerSimulationState,
+  time: number,
+) {
+  return state.player.aetherStepActiveUntil > time
+}
+
 export function getShadowRunnerChronoTimeScale(state: ShadowRunnerSimulationState, time: number) {
   return isShadowRunnerChronoActive(state, time)
     ? Math.min(1, Math.max(0.35, state.player.chronoTimeScale))
@@ -452,6 +514,32 @@ export function getShadowRunnerGaleSpeedMultiplier(state: ShadowRunnerSimulation
   return isShadowRunnerGaleMantleActive(state, time)
     ? Math.min(1.2, Math.max(1, state.player.galeMantleSpeedMultiplier))
     : 1
+}
+
+export function getShadowRunnerAetherSpeedMultiplier(
+  state: ShadowRunnerSimulationState,
+  time: number,
+) {
+  return isShadowRunnerAetherStepActive(state, time)
+    ? Math.min(1.2, Math.max(1, state.player.aetherStepSpeedMultiplier))
+    : 1
+}
+
+export function getShadowRunnerAetherExtraAirJumps(
+  state: ShadowRunnerSimulationState,
+  time: number,
+) {
+  return isShadowRunnerAetherStepActive(state, time)
+    ? Math.max(0, Math.min(2, Math.floor(state.player.aetherStepExtraAirJumps)))
+    : 0
+}
+
+export function doesShadowRunnerAetherPreventFallDamage(
+  state: ShadowRunnerSimulationState,
+  time: number,
+) {
+  return isShadowRunnerAetherStepActive(state, time)
+    && state.player.aetherStepPreventsFallDamage
 }
 
 export function getShadowRunnerGaleFallDamageCap(
@@ -479,6 +567,28 @@ export function getShadowRunnerSunsteelStrikeProperties(
     attackDamageBonus: Math.max(0, Math.floor(state.player.sunsteelAttackDamageBonus)),
     guardDamage: Math.max(0, Math.floor(state.player.sunsteelGuardDamage)),
     reachBonus: Math.max(0, Math.floor(state.player.sunsteelReachBonus)),
+  }
+}
+
+export function getShadowRunnerDawnfireProperties(
+  state: ShadowRunnerSimulationState,
+  time: number,
+): ShadowRunnerDawnfireProperties {
+  if (!isShadowRunnerDawnfireAegisActive(state, time)) {
+    return {
+      attackDamageBonus: 0,
+      guardDamage: 0,
+      damageResistanceMultiplier: 1,
+    }
+  }
+
+  return {
+    attackDamageBonus: Math.max(0, Math.floor(state.player.dawnfireAttackDamageBonus)),
+    guardDamage: Math.max(0, Math.floor(state.player.dawnfireGuardDamage)),
+    damageResistanceMultiplier: Math.min(
+      1,
+      Math.max(0.35, state.player.dawnfireDamageResistanceMultiplier),
+    ),
   }
 }
 
@@ -721,6 +831,44 @@ export function collectShadowRunnerSunsteelEdge(
   state.player.sunsteelAttackDamageBonus = pickup.attackDamageBonus
   state.player.sunsteelGuardDamage = pickup.guardDamage
   state.player.sunsteelReachBonus = pickup.reachBonus
+}
+
+export function collectShadowRunnerDawnfireAegis(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  pickup: ShadowRunnerDawnfireAegisPickup,
+) {
+  state.player.score += pickup.scoreValue ?? 290
+  state.player.health = Math.min(
+    state.player.maxHealth,
+    state.player.health + pickup.healthRestore,
+  )
+  state.player.dawnfireAegisActiveUntil = Math.max(
+    state.player.dawnfireAegisActiveUntil,
+    time,
+  ) + pickup.durationMs
+  state.player.dawnfireDamageResistanceMultiplier = pickup.damageResistanceMultiplier
+  state.player.dawnfireAttackDamageBonus = pickup.attackDamageBonus
+  state.player.dawnfireGuardDamage = pickup.guardDamage
+}
+
+export function collectShadowRunnerAetherStep(
+  state: ShadowRunnerSimulationState,
+  time: number,
+  pickup: ShadowRunnerAetherStepPickup,
+) {
+  state.player.score += pickup.scoreValue ?? 290
+  state.player.health = Math.min(
+    state.player.maxHealth,
+    state.player.health + pickup.healthRestore,
+  )
+  state.player.aetherStepActiveUntil = Math.max(
+    state.player.aetherStepActiveUntil,
+    time,
+  ) + pickup.durationMs
+  state.player.aetherStepSpeedMultiplier = pickup.speedMultiplier
+  state.player.aetherStepExtraAirJumps = pickup.extraAirJumps
+  state.player.aetherStepPreventsFallDamage = pickup.preventFallDamage
 }
 
 export function collectShadowRunnerObjective(
