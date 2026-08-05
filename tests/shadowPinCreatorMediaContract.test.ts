@@ -4,11 +4,13 @@ import path from 'node:path'
 const handlerPath = path.resolve(process.cwd(), 'netlify/functions/shadow-pin-media.mjs')
 const sharedPath = path.resolve(process.cwd(), 'netlify/functions/_shared/shadow-pin-media.mjs')
 const janitorPath = path.resolve(process.cwd(), 'netlify/functions/shadow-pin-publish-janitor.mjs')
+const netlifyConfigPath = path.resolve(process.cwd(), 'netlify.toml')
 const videoFunctionPath = path.resolve(process.cwd(), 'supabase/functions/shadow-pin-video/index.ts')
 
 const handlerSource = fs.readFileSync(handlerPath, 'utf8')
 const sharedSource = fs.readFileSync(sharedPath, 'utf8')
 const janitorSource = fs.readFileSync(janitorPath, 'utf8')
+const netlifyConfig = fs.readFileSync(netlifyConfigPath, 'utf8')
 const videoFunctionSource = fs.readFileSync(videoFunctionPath, 'utf8')
 
 describe('ShadowPin Creator Studio image media contract', () => {
@@ -50,6 +52,9 @@ describe('ShadowPin Creator Studio image media contract', () => {
     expect(mediaServerSource).toMatch(/publish-draft-image[\s\S]*?rollback/i)
     expect(janitorSource).toContain('recoverExpiredShadowPinImagePromotions')
     expect(janitorSource).toMatch(/schedule:\s*['"]\*\/10 \* \* \* \*['"]/)
+    expect(netlifyConfig).toMatch(
+      /\[functions\."shadow-pin-publish-janitor"\]\s*schedule\s*=\s*"\*\/10 \* \* \* \*"/,
+    )
   })
 
   test('keeps native Bunny draft playback private until transactional publication', () => {

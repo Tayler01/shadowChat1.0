@@ -9,9 +9,14 @@ const source = fs.readFileSync(
   path.join(root, 'netlify', 'functions', 'notification-recovery.mjs'),
   'utf8'
 )
+const netlifyConfig = fs.readFileSync(path.join(root, 'netlify.toml'), 'utf8')
 
 test('production Web Push recovery is scheduled, bounded, secret-authenticated, and kill-switchable', () => {
   assert.match(source, /schedule:\s*'\* \* \* \* \*'/)
+  assert.match(
+    netlifyConfig,
+    /\[functions\."notification-recovery"\]\s*schedule\s*=\s*"\* \* \* \* \*"/,
+  )
   assert.match(source, /WEB_PUSH_RECOVERY_ENABLED/)
   assert.match(source, /WEB_PUSH_RECOVERY_SECRET/)
   assert.match(source, /x-shadowchat-recovery-secret/)
