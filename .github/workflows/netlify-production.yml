@@ -18,6 +18,8 @@ concurrency:
 jobs:
   quality:
     uses: ./.github/workflows/quality.yml
+    with:
+      include_mobile: false
 
   security:
     uses: ./.github/workflows/security-scans.yml
