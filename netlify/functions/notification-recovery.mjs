@@ -12,16 +12,21 @@ export default async () => {
   }
 
   const supabaseUrl = getEnvironmentValue('SUPABASE_URL', 'VITE_SUPABASE_URL')
-  const recoverySecret = getEnvironmentValue('WEB_PUSH_RECOVERY_SECRET')
-  if (!supabaseUrl || recoverySecret.length < 32) {
-    throw new Error('Web Push recovery environment is incomplete.')
+  const serviceRoleKey = getEnvironmentValue('SUPABASE_SERVICE_ROLE_KEY')
+  const missingEnvironment = [
+    !supabaseUrl ? 'SUPABASE_URL' : null,
+    !serviceRoleKey ? 'SUPABASE_SERVICE_ROLE_KEY' : null,
+  ].filter(Boolean)
+  if (missingEnvironment.length > 0) {
+    throw new Error(`Web Push recovery environment is incomplete: ${missingEnvironment.join(', ')}`)
   }
 
   const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/send-push`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-shadowchat-recovery-secret': recoverySecret,
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
     },
     body: JSON.stringify({ type: 'notification_delivery_recovery' }),
     signal: AbortSignal.timeout(25_000),

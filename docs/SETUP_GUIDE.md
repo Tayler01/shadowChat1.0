@@ -193,7 +193,9 @@ Legacy fallback, only if using OpenAI directly:
 - `WEB_PUSH_PUBLIC_KEY`
 - `WEB_PUSH_PRIVATE_KEY`
 - `WEB_PUSH_SUBJECT`
-- `WEB_PUSH_RECOVERY_SECRET`
+- `WEB_PUSH_RECOVERY_SECRET` (optional dedicated credential for alternate
+  recovery callers; the production Netlify schedule uses its existing
+  Functions-only service-role credential)
 
 Example:
 

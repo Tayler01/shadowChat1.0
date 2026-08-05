@@ -11,15 +11,17 @@ const source = fs.readFileSync(
 )
 const netlifyConfig = fs.readFileSync(path.join(root, 'netlify.toml'), 'utf8')
 
-test('production Web Push recovery is scheduled, bounded, secret-authenticated, and kill-switchable', () => {
+test('production Web Push recovery is scheduled, bounded, server-authenticated, and kill-switchable', () => {
   assert.match(source, /schedule:\s*'\* \* \* \* \*'/)
   assert.match(
     netlifyConfig,
     /\[functions\."notification-recovery"\]\s*schedule\s*=\s*"\* \* \* \* \*"/,
   )
   assert.match(source, /WEB_PUSH_RECOVERY_ENABLED/)
-  assert.match(source, /WEB_PUSH_RECOVERY_SECRET/)
-  assert.match(source, /x-shadowchat-recovery-secret/)
+  assert.match(source, /SUPABASE_SERVICE_ROLE_KEY/)
+  assert.match(source, /Authorization:\s*`Bearer \$\{serviceRoleKey\}`/)
+  assert.match(source, /apikey:\s*serviceRoleKey/)
+  assert.match(source, /missingEnvironment\.join/)
   assert.match(source, /AbortSignal\.timeout\(25_000\)/)
-  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY/)
+  assert.doesNotMatch(source, /WEB_PUSH_RECOVERY_SECRET/)
 })

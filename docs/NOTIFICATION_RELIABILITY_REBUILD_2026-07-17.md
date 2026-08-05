@@ -155,10 +155,12 @@ that match clears the turn event.
 The existing client delivery kick remains the immediate path. The bounded
 asynchronous recovery worker is implemented in `send-push` and is invoked once
 per minute by the production-only Netlify `notification-recovery` scheduled
-function using `WEB_PUSH_RECOVERY_SECRET`. It does not expose the Supabase
-service-role key to Netlify. The four former database notification cron jobs
-and all native/TestFlight delivery stay paused. The browser compatibility kick
-must not be treated as the source of truth for turn ownership.
+function using the existing Functions-only Supabase service-role credential.
+That credential was already required by the site's server-only Netlify media
+functions and is never exposed through `VITE_*` or the browser bundle. The four
+former database notification cron jobs and all native/TestFlight delivery stay
+paused. The browser compatibility kick must not be treated as the source of
+truth for turn ownership.
 
 ## Local Acceptance Evidence
 
