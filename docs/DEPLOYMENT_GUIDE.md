@@ -398,6 +398,7 @@ Keep these configured in Supabase:
 - `WEB_PUSH_PUBLIC_KEY`
 - `WEB_PUSH_PRIVATE_KEY`
 - `WEB_PUSH_SUBJECT`
+- `WEB_PUSH_RECOVERY_SECRET` (same random 32-byte-or-longer value as Netlify)
 
 `mistralai/mistral-nemo` is the current cheap paid OpenRouter test model. As of April 26, 2026, OpenRouter lists it around $0.01 per million input tokens and $0.03 per million output tokens. Recheck the [OpenRouter model catalog](https://openrouter.ai/models) and [pricing page](https://openrouter.ai/pricing) before changing this default.
 
@@ -464,6 +465,11 @@ Netlify needs the frontend equivalents of:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_WEB_PUSH_PUBLIC_KEY` when push subscriptions are enabled in the UI
+- `WEB_PUSH_RECOVERY_SECRET` as a server-only runtime value for the scheduled
+  recovery function; never prefix it with `VITE_`
+- `WEB_PUSH_RECOVERY_ENABLED=true` in production; set it to `false` for the
+  fastest Web Push fallback rollback without affecting events, counts, or
+  immediate delivery
 - `VITE_MESSAGE_FETCH_LIMIT` only when deliberately changing chat/DM fetch windows
 - `VITE_FEATURE_BOARDS=false` while Boards/News/Art Board remain paused
 - `VITE_FEATURE_ESP_ADMIN=false` while ESP Bridge remains on hold
@@ -698,11 +704,13 @@ The frontend deploy can be healthy while push still fails if:
 
 - VAPID keys are missing
 - `send-push` is not deployed
+- the Netlify and Supabase `WEB_PUSH_RECOVERY_SECRET` values do not match
+- `WEB_PUSH_RECOVERY_ENABLED` is not `true` in the production Netlify context
 - devices are not actually subscribed
 
 Settings > Admin > Operations Health distinguishes release-time push
 configuration readiness from device-specific subscription problems. A ready
-status proves the frontend public key, the three server-side Web Push secret
+status proves the frontend public key, the four server-side Web Push secret
 names, and the deployed `send-push` Function were present; it does not prove a
 particular phone granted permission or retained a valid subscription.
 

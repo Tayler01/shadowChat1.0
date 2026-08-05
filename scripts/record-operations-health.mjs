@@ -114,6 +114,7 @@ export const buildReleaseHealthSnapshot = ({
     'WEB_PUSH_PUBLIC_KEY',
     'WEB_PUSH_PRIVATE_KEY',
     'WEB_PUSH_SUBJECT',
+    'WEB_PUSH_RECOVERY_SECRET',
   ]) {
     if (!configuredSecretNames.has(secretName)) pushMissingRequirements.push(secretName)
   }

@@ -251,6 +251,7 @@ Supabase Edge Function secrets are separate from `.env`. The project uses:
 - `WEB_PUSH_PUBLIC_KEY`
 - `WEB_PUSH_PRIVATE_KEY`
 - `WEB_PUSH_SUBJECT`
+- `WEB_PUSH_RECOVERY_SECRET` (server-only, shared with the Netlify scheduled recovery function)
 - `META_OEMBED_ACCESS_TOKEN`, or `META_APP_ID` plus `META_APP_SECRET`, when Meta/Facebook/Instagram oEmbed previews are needed
 
 Render News scraper secrets are also separate from frontend `.env`:

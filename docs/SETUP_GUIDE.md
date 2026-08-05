@@ -193,6 +193,7 @@ Legacy fallback, only if using OpenAI directly:
 - `WEB_PUSH_PUBLIC_KEY`
 - `WEB_PUSH_PRIVATE_KEY`
 - `WEB_PUSH_SUBJECT`
+- `WEB_PUSH_RECOVERY_SECRET`
 
 Example:
 
@@ -206,6 +207,7 @@ supabase secrets set OPENROUTER_APP_NAME=ShadowChat
 supabase secrets set WEB_PUSH_PUBLIC_KEY=YOUR_PUBLIC_KEY
 supabase secrets set WEB_PUSH_PRIVATE_KEY=YOUR_PRIVATE_KEY
 supabase secrets set WEB_PUSH_SUBJECT=https://your-app.example.com
+supabase secrets set WEB_PUSH_RECOVERY_SECRET=YOUR_RANDOM_32_BYTE_OR_LONGER_SECRET
 ```
 
 ## 5. Deploy Edge Functions

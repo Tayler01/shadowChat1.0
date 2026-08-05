@@ -40,7 +40,9 @@ describe('SEC-001 safe-fetch integration contracts', () => {
     expect(source).toContain("from '../_shared/safe-fetch.ts'")
     expect(source).toContain('normalizePushEndpoint')
     expect(source).toContain('toPushRequestInit')
-    expect(source).toContain('safeFetch(endpoint, toPushRequestInit(payload)')
+    expect(source).toMatch(
+      /safeFetch\(\s*endpoint,\s*\{\s*\.\.\.toPushRequestInit\(payload\),[\s\S]*?AbortSignal\.timeout\(PUSH_PROVIDER_TIMEOUT_MS\)/
+    )
     expect(source).toContain('Only https push endpoints are supported.')
     expect(source).not.toContain('fetch(subscription.endpoint')
   })

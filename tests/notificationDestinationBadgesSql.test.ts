@@ -1,13 +1,21 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-const sql = readFileSync(
+const originalSql = readFileSync(
   path.resolve(
     process.cwd(),
     'supabase/migrations/20260717233421_notification_destination_badges.sql'
   ),
   'utf8'
-).replace(/\s+/g, ' ').toLowerCase()
+)
+const hardeningSql = readFileSync(
+  path.resolve(
+    process.cwd(),
+    'supabase/migrations/20260805112141_harden_web_notification_recovery.sql'
+  ),
+  'utf8'
+)
+const sql = `${originalSql}\n${hardeningSql}`.replace(/\s+/g, ' ').toLowerCase()
 
 describe('notification destination badge database contract', () => {
   test('derives Play from unread canonical events instead of active source rows alone', () => {
@@ -36,5 +44,16 @@ describe('notification destination badge database contract', () => {
       'grant execute on function public.get_app_badge_state_v2(uuid) to authenticated, service_role'
     )
     expect(sql).toContain('on conflict (dedupe_key) do nothing')
+  })
+
+  test('loads reciprocal block ids once instead of calling the block RPC per unread row', () => {
+    const latestDefinition = sql.slice(sql.lastIndexOf(
+      'create or replace function public.get_app_badge_state_v2('
+    ))
+    expect(latestDefinition).toContain("blocked_user_ids uuid[] := '{}'::uuid[]")
+    expect(latestDefinition).toContain('select blocks.blocked_id as user_id')
+    expect(latestDefinition).toContain('select blocks.blocker_id as user_id')
+    expect(latestDefinition).toContain('not (events.actor_id = any(blocked_user_ids))')
+    expect(latestDefinition).not.toContain('private.users_have_block')
   })
 })

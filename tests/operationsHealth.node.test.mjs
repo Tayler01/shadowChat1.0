@@ -70,6 +70,7 @@ test('release evidence requires exact function parity and reports sanitized push
       { name: 'WEB_PUSH_PUBLIC_KEY' },
       { name: 'WEB_PUSH_PRIVATE_KEY' },
       { name: 'WEB_PUSH_SUBJECT' },
+      { name: 'WEB_PUSH_RECOVERY_SECRET' },
     ],
     workflowUrl: 'https://github.com/example/shadowchat/actions/runs/1',
     now: new Date('2026-07-10T04:10:00.000Z'),
@@ -96,6 +97,7 @@ test('release evidence requires exact function parity and reports sanitized push
     'VITE_WEB_PUSH_PUBLIC_KEY',
     'WEB_PUSH_PRIVATE_KEY',
     'WEB_PUSH_SUBJECT',
+    'WEB_PUSH_RECOVERY_SECRET',
   ])
 
   assert.throws(

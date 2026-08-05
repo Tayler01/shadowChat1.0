@@ -16,6 +16,10 @@ const backlogBaselineSql = read(
   'supabase/migrations/20260718135109_notification_backlog_baseline.sql'
 )
 const backlogBaselineCompact = backlogBaselineSql.replace(/\s+/g, ' ').toLowerCase()
+const webPushHardeningSql = read(
+  'supabase/migrations/20260805112141_harden_web_notification_recovery.sql'
+)
+const webPushHardeningCompact = webPushHardeningSql.replace(/\s+/g, ' ').toLowerCase()
 const allowlist = JSON.parse(read('supabase/security-definer-allowlist.json')) as {
   expected_total_security_definers: number
   private_security_definers: string[]
@@ -162,6 +166,29 @@ describe('notification reliability database contract', () => {
     expect(backlogBaselineCompact).not.toMatch(/\bdelete\s+from\b/)
     expect(backlogBaselineCompact).not.toMatch(
       /update public\.(messages|dm_messages|shadow_pin_images|shadow_checkers_matches|live_rooms)/
+    )
+  })
+
+  test('keeps database notification workers paused and bounds Web Push recovery', () => {
+    expect(webPushHardeningCompact).toContain("perform cron.alter_job(job_id := target_job_id, active := false)")
+    expect(webPushHardeningCompact).toContain("now() + interval '20 seconds'")
+    expect(webPushHardeningCompact).toContain("new.created_at + interval '5 minutes'")
+    expect(webPushHardeningCompact).toContain('jobs.attempt_count < 3')
+    expect(webPushHardeningCompact).toContain('for update of jobs skip locked')
+    expect(webPushHardeningCompact).toContain('limit 200')
+    expect(webPushHardeningCompact).toContain('lease_until')
+    expect(webPushHardeningCompact).not.toContain("jobs.status in ('pending', 'failed')")
+  })
+
+  test('queues only enabled background Web Push recipients and pauses native-only RPCs', () => {
+    expect(webPushHardeningCompact).toContain('preferences.notifications_enabled')
+    expect(webPushHardeningCompact).toContain('subscriptions.enabled')
+    expect(webPushHardeningCompact).toContain('subscriptions.foreground_until <= now()')
+    expect(webPushHardeningCompact).toContain(
+      'revoke all on function public.register_my_native_notification_token_v2('
+    )
+    expect(webPushHardeningCompact).not.toMatch(
+      /revoke all on function public\.register_my_notification_installation_v2/
     )
   })
 })

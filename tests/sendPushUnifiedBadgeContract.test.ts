@@ -22,9 +22,9 @@ const expectEventBeforeSubscriptionLookup = (block: string) => {
   const noSubscriptions = block.indexOf('no active push subscriptions', event)
 
   expect(event).toBeGreaterThan(-1)
-  expect(badge).toBeGreaterThan(event)
-  expect(subscriptions).toBeGreaterThan(badge)
+  expect(subscriptions).toBeGreaterThan(event)
   expect(noSubscriptions).toBeGreaterThan(subscriptions)
+  expect(badge).toBeGreaterThan(noSubscriptions)
 }
 
 const expectUnifiedBadgePayload = (block: string) => {
@@ -61,11 +61,11 @@ describe('send-push unified badge and presence contracts', () => {
     expectUnifiedBadgePayload(dmBlock)
 
     const bridgeEvent = dmBlock.indexOf('const bridgesenderevent = await upsertnotificationevent')
-    const bridgeBadge = dmBlock.indexOf('const senderbadgecount = await getunreadbadgecount', bridgeEvent)
     const bridgeSubscriptions = dmBlock.indexOf('const sendersubscriptions = await getactivesubscriptions', bridgeEvent)
+    const bridgeBadge = dmBlock.indexOf('const senderbadgecount = await getunreadbadgecount', bridgeEvent)
     expect(bridgeEvent).toBeGreaterThan(-1)
-    expect(bridgeBadge).toBeGreaterThan(bridgeEvent)
-    expect(bridgeSubscriptions).toBeGreaterThan(bridgeBadge)
+    expect(bridgeSubscriptions).toBeGreaterThan(bridgeEvent)
+    expect(bridgeBadge).toBeGreaterThan(bridgeSubscriptions)
   })
 
   test('stores public actor profiles on tray-visible event payloads', () => {
@@ -161,6 +161,9 @@ describe('send-push unified badge and presence contracts', () => {
     expect(handler).toContain(
       "unauthorized('notification delivery recovery requires service role')"
     )
+    expect(compact).toContain("deno.env.get('web_push_recovery_secret')")
+    expect(compact).toContain("req.headers.get('x-shadowchat-recovery-secret')")
+    expect(compact).toContain('constanttimeequal')
     expect(recovery).toContain("supabase.rpc('claim_notification_delivery_jobs'")
     expect(recovery).toContain('remainingseconds <= 0')
     expect(recovery).toContain("job.event_type === 'shadow_checkers_turn'")
@@ -168,7 +171,18 @@ describe('send-push unified badge and presence contracts', () => {
     expect(recovery).toContain("match.current_turn_user_id !== job.user_id")
     expect(recovery).toContain('match.move_count !== eventmovecount')
     expect(recovery).toContain('await getactivesubscriptions(supabase, job.user_id)')
-    expect(recovery).toContain('math.max(1, math.min(90, remainingseconds))')
-    expect(recovery).toContain('retryafterseconds: canretry ? 15 : undefined')
+    expect(recovery).toContain('math.max(1, math.min(300, remainingseconds))')
+    expect(recovery).toContain('retryafterseconds: canretry ? 20 : undefined')
+    expect(recovery).toContain('push_recovery_batch_size')
+    expect(recovery).toContain('push_recovery_concurrency')
+  })
+
+  test('bounds provider/fanout work and skips already-successful subscription attempts', () => {
+    const delivery = functionBlock('const deliverpushtosubscriptions', 'const getretryablefailurecount')
+    expect(delivery).toContain('push_provider_concurrency')
+    expect(delivery).toContain('abortsignal.timeout(push_provider_timeout_ms)')
+    expect(delivery).toContain(".eq('delivered', true)")
+    expect(delivery).toContain('deliveredsubscriptionids')
+    expect(compact).toContain('push_fanout_concurrency')
   })
 })

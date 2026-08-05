@@ -143,6 +143,7 @@ type NotificationDeliveryJobClaim = {
   route: string | null
   payload: Record<string, unknown> | null
   expires_at: string
+  attempt_count: number
 }
 
 type PublicActorProfile = {
@@ -153,11 +154,53 @@ type PublicActorProfile = {
 }
 const DEFAULT_PUSH_REQUESTS_PER_MINUTE = 120
 const PUSH_CLAIM_SCOPE = 'send-push'
+const PUSH_PROVIDER_CONCURRENCY = 3
+const PUSH_PROVIDER_TIMEOUT_MS = 8_000
+const PUSH_FANOUT_CONCURRENCY = 3
+const PUSH_RECOVERY_CONCURRENCY = 2
+const PUSH_RECOVERY_BATCH_SIZE = 5
 const SAFE_PUSH_ENDPOINT_OPTIONS = {
   credentialMessage: 'Push endpoint credentials are not allowed.',
   invalidSchemeMessage: 'Only https push endpoints are supported.',
   tooLongMessage: 'A valid push endpoint is required.',
   unsafeHostMessage: 'Private or local push endpoints cannot be used.',
+}
+
+const mapWithConcurrency = async <T, TResult>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T, index: number) => Promise<TResult>
+) => {
+  const results = new Array<TResult>(values.length)
+  let nextIndex = 0
+
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, concurrency), values.length) },
+    async () => {
+      while (nextIndex < values.length) {
+        const index = nextIndex
+        nextIndex += 1
+        results[index] = await mapper(values[index], index)
+      }
+    }
+  )
+
+  await Promise.all(workers)
+  return results
+}
+
+const constantTimeEqual = (left: string, right: string) => {
+  const encoder = new TextEncoder()
+  const leftBytes = encoder.encode(left)
+  const rightBytes = encoder.encode(right)
+  const length = Math.max(leftBytes.length, rightBytes.length)
+  let mismatch = leftBytes.length ^ rightBytes.length
+
+  for (let index = 0; index < length; index += 1) {
+    mismatch |= (leftBytes[index] ?? 0) ^ (rightBytes[index] ?? 0)
+  }
+
+  return mismatch === 0
 }
 
 type DmMessageRecord = {
@@ -312,6 +355,17 @@ const authenticateRequest = async (req: Request, body: SendPushRequestBody) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Supabase environment variables are not configured')
+  }
+
+  if (body?.type === 'notification_delivery_recovery') {
+    const configuredRecoverySecret = Deno.env.get('WEB_PUSH_RECOVERY_SECRET') ?? ''
+    const suppliedRecoverySecret = req.headers.get('x-shadowchat-recovery-secret') ?? ''
+    if (
+      configuredRecoverySecret.length >= 32
+      && constantTimeEqual(suppliedRecoverySecret, configuredRecoverySecret)
+    ) {
+      return { userId: 'web_push_recovery', isServiceRole: true }
+    }
   }
 
   let token: string
@@ -577,6 +631,26 @@ const upsertNotificationEvents = async (
   )
 }
 
+const cancelNotificationDeliveryJob = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  notificationEventId: string,
+  reason: string
+) => {
+  const now = new Date().toISOString()
+  const { error } = await supabase
+    .from('notification_delivery_jobs')
+    .update({
+      status: 'cancelled',
+      completed_at: now,
+      last_error: truncate(reason, 500),
+      updated_at: now,
+    })
+    .eq('notification_event_id', notificationEventId)
+    .in('status', ['pending', 'processing'])
+
+  if (error) console.error('Failed to cancel notification delivery job', error)
+}
+
 const normalizePushEndpoint = async (value: string) => {
   const endpoint = normalizePublicHttpUrl(value, SAFE_PUSH_ENDPOINT_OPTIONS)
   if (endpoint.protocol !== 'https:') {
@@ -603,8 +677,30 @@ const deliverPushToSubscriptions = async (
   message: PushMessage,
   options: { retryAttempts?: number; notificationEventId?: string } = {}
 ): Promise<PushDeliveryResult> => {
-  const results = await Promise.all(
-    subscriptions.map(async (subscriptionRow) => {
+  let deliveredSubscriptionIds = new Set<string>()
+  if (options.notificationEventId && subscriptions.length > 0) {
+    const { data: priorDeliveries, error: priorDeliveriesError } = await supabase
+      .from('notification_delivery_attempts')
+      .select('subscription_id')
+      .eq('notification_event_id', options.notificationEventId)
+      .eq('delivered', true)
+      .in('subscription_id', subscriptions.map(subscription => subscription.id))
+
+    if (priorDeliveriesError) throw priorDeliveriesError
+    deliveredSubscriptionIds = new Set(
+      (priorDeliveries ?? [])
+        .map(row => row.subscription_id)
+        .filter((value): value is string => typeof value === 'string')
+    )
+  }
+
+  const pendingSubscriptions = subscriptions.filter(
+    subscription => !deliveredSubscriptionIds.has(subscription.id)
+  )
+  const results = await mapWithConcurrency(
+    pendingSubscriptions,
+    PUSH_PROVIDER_CONCURRENCY,
+    async (subscriptionRow) => {
       const subscription: PushSubscription = {
         endpoint: subscriptionRow.endpoint,
         expirationTime: null,
@@ -643,7 +739,14 @@ const deliverPushToSubscriptions = async (
       }
 
       try {
-        const response = await safeFetch(endpoint, toPushRequestInit(payload), SAFE_PUSH_ENDPOINT_OPTIONS)
+        const response = await safeFetch(
+          endpoint,
+          {
+            ...toPushRequestInit(payload),
+            signal: AbortSignal.timeout(PUSH_PROVIDER_TIMEOUT_MS),
+          },
+          SAFE_PUSH_ENDPOINT_OPTIONS
+        )
         return {
           id: subscriptionRow.id,
           status: response.status,
@@ -661,8 +764,16 @@ const deliverPushToSubscriptions = async (
           error: error instanceof Error ? error.message : 'Push provider request failed',
         }
       }
-    })
+    }
   )
+
+  if (options.notificationEventId && deliveredSubscriptionIds.size > 0) {
+    await supabase
+      .from('notification_events')
+      .update({ sent_at: new Date().toISOString() })
+      .eq('id', options.notificationEventId)
+      .is('sent_at', null)
+  }
 
   const invalidSubscriptionIds = results
     .filter((result) => result.invalid)
@@ -684,16 +795,34 @@ const deliverPushToSubscriptions = async (
       console.error('Failed to record push delivery attempts', attemptError)
     }
 
+    const delivered = results.some(result => result.ok)
+    const retryable = results.some(result => result.retryable)
+    const jobUpdate: Record<string, unknown> = {
+      last_attempt_at: new Date().toISOString(),
+      last_error: delivered
+        ? null
+        : results.find(result => 'error' in result)?.error || 'Push provider rejected delivery',
+      updated_at: new Date().toISOString(),
+    }
+    if (!delivered && !retryable) {
+      jobUpdate.status = 'failed'
+      jobUpdate.completed_at = new Date().toISOString()
+    }
+
     await supabase
       .from('notification_delivery_jobs')
-      .update({
-        last_attempt_at: new Date().toISOString(),
-        last_error: results.some(result => result.ok)
-          ? null
-          : results.find(result => 'error' in result)?.error || 'Push provider rejected delivery',
-        updated_at: new Date().toISOString(),
-      })
+      .update(jobUpdate)
       .eq('notification_event_id', options.notificationEventId)
+
+    if (delivered) {
+      const { error: sentAtError } = await supabase
+        .from('notification_events')
+        .update({ sent_at: new Date().toISOString() })
+        .eq('id', options.notificationEventId)
+        .is('sent_at', null)
+
+      if (sentAtError) throw sentAtError
+    }
   }
 
   if (invalidSubscriptionIds.length) {
@@ -722,7 +851,10 @@ const deliverPushToSubscriptions = async (
     )
 
     return {
-      deliveredCount: results.filter((result) => result.ok).length + retryDelivery.deliveredCount,
+      deliveredCount:
+        deliveredSubscriptionIds.size
+        + results.filter((result) => result.ok).length
+        + retryDelivery.deliveredCount,
       removedSubscriptions: invalidSubscriptionIds.length + retryDelivery.removedSubscriptions,
       attemptedCount: results.length + retryDelivery.attemptedCount,
       retryableFailures: retryDelivery.retryableFailures,
@@ -730,7 +862,7 @@ const deliverPushToSubscriptions = async (
   }
 
   return {
-    deliveredCount: results.filter((result) => result.ok).length,
+    deliveredCount: deliveredSubscriptionIds.size + results.filter((result) => result.ok).length,
     removedSubscriptions: invalidSubscriptionIds.length,
     attemptedCount: results.length,
     retryableFailures: results.filter((result) => result.retryable).length,
@@ -840,11 +972,16 @@ const sendDmPush = async (
     if (eventRecord.sent_at) {
       delivery = { skipped: true, reason: 'Notification already sent' }
     } else {
-      const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
       const subscriptions = await getActiveSubscriptions(supabase, recipientId)
       if (!subscriptions.length) {
+        await cancelNotificationDeliveryJob(
+          supabase,
+          eventRecord.id,
+          'Recipient has no active push subscriptions'
+        )
         delivery = { skipped: true, reason: 'Recipient has no active push subscriptions' }
       } else {
+        const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
         const pushMessage: PushMessage = {
           data: JSON.stringify({
             title: senderLabel,
@@ -934,14 +1071,20 @@ const sendDmPush = async (
     })
   }
 
-  const senderBadgeCount = await getUnreadBadgeCount(supabase, authUserId)
   const senderSubscriptions = await getActiveSubscriptions(supabase, authUserId)
   if (!senderSubscriptions.length) {
+    await cancelNotificationDeliveryJob(
+      supabase,
+      bridgeSenderEvent.id,
+      'Sender has no active push subscriptions'
+    )
     return deliveryResponse({
       ...delivery,
       bridgeSender: { skipped: true, reason: 'Sender has no active push subscriptions' },
     })
   }
+
+  const senderBadgeCount = await getUnreadBadgeCount(supabase, authUserId)
 
   const bridgeSenderPushMessage: PushMessage = {
     data: JSON.stringify({
@@ -1159,11 +1302,17 @@ const sendReactionPush = async (
     return json({ skipped: true, reason: 'Notification already sent' })
   }
 
-  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
   const subscriptions = await getActiveSubscriptions(supabase, recipientId)
   if (!subscriptions.length) {
+    await cancelNotificationDeliveryJob(
+      supabase,
+      eventRecord.id,
+      'Recipient has no active push subscriptions'
+    )
     return json({ skipped: true, reason: 'Recipient has no active push subscriptions' })
   }
+
+  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
 
   const pushMessage: PushMessage = {
     data: JSON.stringify({
@@ -1338,8 +1487,10 @@ const sendGroupPush = async (
     recipientNotifications.map(({ values, dedupeKey }) => ({ values, dedupeKey }))
   )
 
-  const perRecipientResults = await Promise.all(
-    recipientNotifications.map(async ({
+  const perRecipientResults = await mapWithConcurrency(
+    recipientNotifications,
+    PUSH_FANOUT_CONCURRENCY,
+    async ({
       prefs,
       kind,
       isBridgeSenderRecipient,
@@ -1364,9 +1515,13 @@ const sendGroupPush = async (
         }
       }
 
-      const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
       const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
       if (!subscriptions.length) {
+        await cancelNotificationDeliveryJob(
+          supabase,
+          eventRecord.id,
+          'No active push subscriptions'
+        )
         return {
           userId: prefs.user_id,
           skipped: true,
@@ -1377,6 +1532,8 @@ const sendGroupPush = async (
           retryableFailures: 0,
         }
       }
+
+      const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
 
       const pushMessage: PushMessage = {
         data: JSON.stringify({
@@ -1425,7 +1582,7 @@ const sendGroupPush = async (
         skipped: false,
         ...delivery,
       }
-    })
+    }
   )
 
   const getDeliveredCount = (result: Record<string, unknown>) =>
@@ -1532,10 +1689,10 @@ const sendShadowPinPostPush = async (
     recipientNotifications.map(({ values, dedupeKey }) => ({ values, dedupeKey }))
   )
 
-  const results = await Promise.all(recipientNotifications.map(async ({
-    preferences,
-    dedupeKey,
-  }) => {
+  const results = await mapWithConcurrency(
+    recipientNotifications,
+    PUSH_FANOUT_CONCURRENCY,
+    async ({ preferences, dedupeKey }) => {
     const eventRecord = eventRecords.get(dedupeKey)
     if (!eventRecord) {
       throw new Error(`Notification event upsert did not return ${dedupeKey}`)
@@ -1553,9 +1710,13 @@ const sendShadowPinPostPush = async (
       }
     }
 
-    const badgeCount = await getUnreadBadgeCount(supabase, preferences.user_id)
     const subscriptions = await getActiveSubscriptions(supabase, preferences.user_id)
     if (!subscriptions.length) {
+      await cancelNotificationDeliveryJob(
+        supabase,
+        eventRecord.id,
+        'No active push subscriptions'
+      )
       return {
         userId: preferences.user_id,
         skipped: true,
@@ -1566,6 +1727,8 @@ const sendShadowPinPostPush = async (
         retryableFailures: 0,
       }
     }
+
+    const badgeCount = await getUnreadBadgeCount(supabase, preferences.user_id)
 
     const pushMessage: PushMessage = {
       data: JSON.stringify({
@@ -1607,8 +1770,9 @@ const sendShadowPinPostPush = async (
         .eq('id', eventRecord.id)
     }
 
-    return { userId: preferences.user_id, skipped: false, ...delivery }
-  }))
+      return { userId: preferences.user_id, skipped: false, ...delivery }
+    }
+  )
 
   const retryableFailures = results.reduce(
     (sum, result) => sum + Number(result.retryableFailures ?? 0),
@@ -1718,11 +1882,17 @@ const sendShadowPinCommentPush = async (
     return json({ skipped: true, reason: 'Notification already sent' })
   }
 
-  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
   const subscriptions = await getActiveSubscriptions(supabase, recipientId)
   if (!subscriptions.length) {
+    await cancelNotificationDeliveryJob(
+      supabase,
+      eventRecord.id,
+      'No active push subscriptions'
+    )
     return json({ skipped: true, reason: 'No active push subscriptions' })
   }
+
+  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
 
   const delivery = await deliverPushToSubscriptions(
     supabase,
@@ -1838,8 +2008,10 @@ const sendHypePush = async (
     ? Math.floor(eventTime / 60000)
     : Math.floor(Date.now() / 60000)
 
-  const perRecipientResults = await Promise.all(
-    eligibleRecipients.map(async (prefs) => {
+  const perRecipientResults = await mapWithConcurrency(
+    eligibleRecipients,
+    PUSH_FANOUT_CONCURRENCY,
+    async (prefs) => {
       const dedupeKey = `hype:${stackBucket}:${prefs.user_id}`
       const eventRecord = await upsertNotificationEvent(
         supabase,
@@ -1874,9 +2046,13 @@ const sendHypePush = async (
         }
       }
 
-      const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
       const subscriptions = await getActiveSubscriptions(supabase, prefs.user_id)
       if (!subscriptions.length) {
+        await cancelNotificationDeliveryJob(
+          supabase,
+          eventRecord.id,
+          'No active push subscriptions'
+        )
         return {
           userId: prefs.user_id,
           skipped: true,
@@ -1887,6 +2063,8 @@ const sendHypePush = async (
           retryableFailures: 0,
         }
       }
+
+      const badgeCount = await getUnreadBadgeCount(supabase, prefs.user_id)
 
       const pushMessage: PushMessage = {
         data: JSON.stringify({
@@ -1934,7 +2112,7 @@ const sendHypePush = async (
         skipped: false,
         ...delivery,
       }
-    })
+    }
   )
 
   const getDeliveredCount = (result: Record<string, unknown>) =>
@@ -2030,14 +2208,20 @@ const sendShadowCheckersTurnPush = async (
   const title = 'Your turn in Shadow Checkers'
   const body = 'It is your turn. Open the match to make your play.'
   const route = `/?view=games&experience=shadow-checkers&item=${encodeURIComponent(match.id)}`
-  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
   const subscriptions = await getActiveSubscriptions(supabase, recipientId)
   if (!subscriptions.length) {
+    await cancelNotificationDeliveryJob(
+      supabase,
+      eventRecord.id,
+      'Recipient has no background push subscriptions'
+    )
     return json({
       skipped: true,
       reason: 'Recipient has no background push subscriptions',
     })
   }
+
+  const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
 
   const delivery = await deliverPushToSubscriptions(
     supabase,
@@ -2133,12 +2317,15 @@ const sendNotificationDeliveryRecovery = async (
   vapid: VapidKeys
 ) => {
   const { data, error } = await supabase.rpc('claim_notification_delivery_jobs', {
-    batch_size: 20,
+    batch_size: PUSH_RECOVERY_BATCH_SIZE,
   })
   if (error) throw error
 
   const jobs = (data ?? []) as unknown as NotificationDeliveryJobClaim[]
-  const results = await Promise.all(jobs.map(async job => {
+  const results = await mapWithConcurrency(
+    jobs,
+    PUSH_RECOVERY_CONCURRENCY,
+    async job => {
     try {
       const expiresAt = new Date(job.expires_at).getTime()
       const remainingSeconds = Math.floor((expiresAt - Date.now()) / 1000)
@@ -2249,7 +2436,7 @@ const sendNotificationDeliveryRecovery = async (
             data: eventData,
           }),
           options: {
-            ttl: Math.max(1, Math.min(90, remainingSeconds)),
+            ttl: Math.max(1, Math.min(300, remainingSeconds)),
             urgency: job.event_type === 'dm_message' ? 'high' : 'normal',
           },
         },
@@ -2266,21 +2453,27 @@ const sendNotificationDeliveryRecovery = async (
         return { delivered: true, retryable: false }
       }
 
-      const canRetry = delivery.retryableFailures > 0 && remainingSeconds > 20
+      const canRetry =
+        delivery.retryableFailures > 0
+        && job.attempt_count < 3
+        && remainingSeconds > 20
       await updateNotificationDeliveryJob(supabase, job.job_id, {
         status: canRetry ? 'pending' : 'failed',
         last_error: 'Push provider delivery failed',
-        retryAfterSeconds: canRetry ? 15 : undefined,
+        retryAfterSeconds: canRetry ? 20 : undefined,
       })
       return { delivered: false, retryable: canRetry }
     } catch (jobError) {
+      const canRetry = job.attempt_count < 3
       await updateNotificationDeliveryJob(supabase, job.job_id, {
-        status: 'failed',
+        status: canRetry ? 'pending' : 'failed',
         last_error: jobError instanceof Error ? jobError.message : 'Recovery delivery failed',
+        retryAfterSeconds: canRetry ? 20 : undefined,
       }).catch(() => undefined)
-      return { delivered: false, retryable: false }
+      return { delivered: false, retryable: canRetry }
     }
-  }))
+    }
+  )
 
   return json({
     claimed: jobs.length,
@@ -2341,7 +2534,10 @@ const sendPresenceActivePush = async (
   let dispatchResponse: Response | undefined
   let dispatchError: unknown
   try {
-    const results = await Promise.all(claims.map(async claim => {
+    const results = await mapWithConcurrency(
+      claims,
+      PUSH_FANOUT_CONCURRENCY,
+      async claim => {
       if (!claim.push_enabled) {
         return {
           userId: claim.recipient_id,
@@ -2415,8 +2611,9 @@ const sendPresenceActivePush = async (
           .eq('id', claim.event_id)
       }
 
-      return { userId: claim.recipient_id, skipped: false, ...delivery }
-    }))
+        return { userId: claim.recipient_id, skipped: false, ...delivery }
+      }
+    )
 
     dispatchResponse = json({
       claimedRecipients: claims.length,

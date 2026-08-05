@@ -1,17 +1,18 @@
 # Realtime Push Notifications Plan
 
-## Documentation Status - August 4, 2026
+## Documentation Status - August 5, 2026
 
-Production containment on August 4 parks every background notification
-delivery worker, including Web Push recovery and Notification Presentation v2.
-The v2 response collector continued running every minute while delivery was
-disabled and accumulated enough database work to starve app boot, auth profile
-checks, Realtime, and message inserts. Web/PWA chat, DMs, auth, recipient-owned
-notification events, unread/read state, and badges remain active; background
-push delivery is temporarily unavailable. Migration
-`20260805004601_pause_notification_delivery_workers.sql` makes the containment
-durable. Re-enable delivery only after the collector and recovery workers pass
-a production-scale load and rollback review.
+The August 4 containment remains the permanent boundary for the old database
+workers. The v2 response collector had continued scanning `pg_net` responses
+every minute while delivery was disabled and accumulated enough database work
+to starve app boot, auth profile checks, Realtime, and message inserts.
+Migration `20260805112141_harden_web_notification_recovery.sql` restores only
+the production Web Push fallback through a once-per-minute Netlify scheduler,
+a dedicated shared secret, a singleton lease, batch size five, three-attempt
+ceiling, bounded concurrency, and eight-second provider timeouts. The old
+`pg_cron`/`pg_net` recovery and all native/TestFlight delivery remain paused.
+Recipient-owned events, foreground alerts, unread/read state, exact counts,
+launcher badges, routes, and immediate Web Push remain independent and active.
 
 This file documents the notification architecture shipped in Release A rather
 than only the original plan. The deployed release includes targeted
@@ -642,10 +643,9 @@ The public key is also exposed to the client as:
 ## Remaining Recommendation
 
 Keep Web Push and recipient-owned Supabase events as the web/PWA contract.
-Before the July 17 candidate is released, deploy the migration and compatible
-`send-push` worker, activate a secure server-owned
-`notification_delivery_recovery` schedule, then ship the service worker and
-frontend. Run the full preference/block/mute and foreground/background matrix
-on one installed iPhone Home Screen app and one Android PWA. A later native
-APNs/FCM layer should reuse the same server-side event eligibility and
-preference contract rather than creating an independent notification policy.
+Monitor the bounded Netlify `notification-recovery` schedule without
+reactivating any database notification cron. Run the full
+preference/block/mute and foreground/background matrix on one installed iPhone
+Home Screen app and one Android PWA. A later native APNs/FCM layer should reuse
+the same server-side event eligibility and preference contract rather than
+creating an independent notification policy.

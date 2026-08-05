@@ -152,12 +152,13 @@ recipient. Older turn events for the match are resolved when the turn advances
 or the match ends. The notification route opens the exact match, and opening
 that match clears the turn event.
 
-The existing client delivery kick remains a compatibility path. The
-server-owned asynchronous recovery worker is implemented in `send-push`, but a
-secure server-side scheduler or Database Webhook must invoke
-`notification_delivery_recovery` with service-role authorization after the
-Edge Function and migration are deployed. The browser compatibility kick must
-not be treated as the source of truth for turn ownership.
+The existing client delivery kick remains the immediate path. The bounded
+asynchronous recovery worker is implemented in `send-push` and is invoked once
+per minute by the production-only Netlify `notification-recovery` scheduled
+function using `WEB_PUSH_RECOVERY_SECRET`. It does not expose the Supabase
+service-role key to Netlify. The four former database notification cron jobs
+and all native/TestFlight delivery stay paused. The browser compatibility kick
+must not be treated as the source of truth for turn ownership.
 
 ## Local Acceptance Evidence
 
