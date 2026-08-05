@@ -212,6 +212,10 @@ supabase secrets set WEB_PUSH_SUBJECT=https://your-app.example.com
 supabase secrets set WEB_PUSH_RECOVERY_SECRET=YOUR_RANDOM_32_BYTE_OR_LONGER_SECRET
 ```
 
+Store that same recovery value as the protected GitHub Actions repository
+secret `WEB_PUSH_RECOVERY_SECRET`. The production workflow writes it into the
+Netlify production Functions scope as a write-only secret before deployment.
+
 ## 5. Deploy Edge Functions
 
 ```powershell

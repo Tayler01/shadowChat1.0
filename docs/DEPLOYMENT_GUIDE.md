@@ -470,6 +470,9 @@ Netlify needs the frontend equivalents of:
 - `SUPABASE_URL` and `WEB_PUSH_RECOVERY_SECRET` as server-only Functions
   values for the scheduled recovery function; mark the recovery credential
   secret and scope it to production Functions
+- the same `WEB_PUSH_RECOVERY_SECRET` as a protected GitHub Actions repository
+  secret so the production workflow can align the write-only Netlify runtime
+  value before each deploy
 - `WEB_PUSH_RECOVERY_ENABLED=true` in production; set it to `false` for the
   fastest Web Push fallback rollback without affecting events, counts, or
   immediate delivery

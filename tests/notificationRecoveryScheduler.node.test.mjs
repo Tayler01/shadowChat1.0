@@ -10,6 +10,10 @@ const source = fs.readFileSync(
   'utf8'
 )
 const netlifyConfig = fs.readFileSync(path.join(root, 'netlify.toml'), 'utf8')
+const productionWorkflow = fs.readFileSync(
+  path.join(root, '.github', 'workflows', 'netlify-production.yml'),
+  'utf8'
+)
 
 test('production Web Push recovery is scheduled, bounded, server-authenticated, and kill-switchable', () => {
   assert.match(source, /schedule:\s*'\* \* \* \* \*'/)
@@ -24,4 +28,11 @@ test('production Web Push recovery is scheduled, bounded, server-authenticated, 
   assert.match(source, /missingEnvironment\.join/)
   assert.match(source, /AbortSignal\.timeout\(25_000\)/)
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY/)
+  assert.match(
+    productionWorkflow,
+    /WEB_PUSH_RECOVERY_SECRET:\s*\$\{\{ secrets\.WEB_PUSH_RECOVERY_SECRET \}\}/,
+  )
+  assert.match(productionWorkflow, /Align Netlify scheduled recovery secret/)
+  assert.match(productionWorkflow, /--scope functions/)
+  assert.match(productionWorkflow, /--secret/)
 })
