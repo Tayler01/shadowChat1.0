@@ -12,10 +12,10 @@ export default async () => {
   }
 
   const supabaseUrl = getEnvironmentValue('SUPABASE_URL', 'VITE_SUPABASE_URL')
-  const serviceRoleKey = getEnvironmentValue('SUPABASE_SERVICE_ROLE_KEY')
+  const recoverySecret = getEnvironmentValue('WEB_PUSH_RECOVERY_SECRET')
   const missingEnvironment = [
     !supabaseUrl ? 'SUPABASE_URL' : null,
-    !serviceRoleKey ? 'SUPABASE_SERVICE_ROLE_KEY' : null,
+    recoverySecret.length < 32 ? 'WEB_PUSH_RECOVERY_SECRET' : null,
   ].filter(Boolean)
   if (missingEnvironment.length > 0) {
     throw new Error(`Web Push recovery environment is incomplete: ${missingEnvironment.join(', ')}`)
@@ -25,8 +25,7 @@ export default async () => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${serviceRoleKey}`,
-      apikey: serviceRoleKey,
+      'x-shadowchat-recovery-secret': recoverySecret,
     },
     body: JSON.stringify({ type: 'notification_delivery_recovery' }),
     signal: AbortSignal.timeout(25_000),

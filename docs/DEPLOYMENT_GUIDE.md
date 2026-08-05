@@ -398,9 +398,9 @@ Keep these configured in Supabase:
 - `WEB_PUSH_PUBLIC_KEY`
 - `WEB_PUSH_PRIVATE_KEY`
 - `WEB_PUSH_SUBJECT`
-- `WEB_PUSH_RECOVERY_SECRET` (optional dedicated credential for alternate
-  recovery callers; the production Netlify scheduler uses its existing
-  Functions-only Supabase service-role credential)
+- `WEB_PUSH_RECOVERY_SECRET` (dedicated 32-byte-or-longer credential shared
+  only by the `send-push` Edge Function and production Netlify recovery
+  schedule)
 
 `mistralai/mistral-nemo` is the current cheap paid OpenRouter test model. As of April 26, 2026, OpenRouter lists it around $0.01 per million input tokens and $0.03 per million output tokens. Recheck the [OpenRouter model catalog](https://openrouter.ai/models) and [pricing page](https://openrouter.ai/pricing) before changing this default.
 
@@ -467,9 +467,9 @@ Netlify needs the frontend equivalents of:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_WEB_PUSH_PUBLIC_KEY` when push subscriptions are enabled in the UI
-- `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as server-only Functions
-  values for the scheduled recovery function; never prefix the service-role
-  key with `VITE_`
+- `SUPABASE_URL` and `WEB_PUSH_RECOVERY_SECRET` as server-only Functions
+  values for the scheduled recovery function; mark the recovery credential
+  secret and scope it to production Functions
 - `WEB_PUSH_RECOVERY_ENABLED=true` in production; set it to `false` for the
   fastest Web Push fallback rollback without affecting events, counts, or
   immediate delivery
@@ -708,7 +708,7 @@ The frontend deploy can be healthy while push still fails if:
 - VAPID keys are missing
 - `send-push` is not deployed
 - the Netlify scheduled function cannot access its Functions-only
-  `SUPABASE_URL` or `SUPABASE_SERVICE_ROLE_KEY`
+  `SUPABASE_URL` or `WEB_PUSH_RECOVERY_SECRET`
 - `WEB_PUSH_RECOVERY_ENABLED` is not `true` in the production Netlify context
 - devices are not actually subscribed
 
