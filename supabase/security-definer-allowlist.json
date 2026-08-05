@@ -1,5 +1,5 @@
 {
-  "reviewed_on": "2026-07-20",
+  "reviewed_on": "2026-08-05",
   "expected_total_security_definers": 149,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
@@ -111,11 +111,7 @@
     "shadow_pin_private.set_my_feed_mode_impl(text)"
   ],
   "anon_signatures": [
-    "is_username_available(text)",
-    "redeem_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,text,text,text,text,integer,text)",
-    "register_native_notification_token_by_credential_v2(uuid,text,text)",
-    "revoke_notification_installation_by_credential_v2(uuid,text)",
-    "set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)"
+    "is_username_available(text)"
   ],
   "internal_signatures": [
     "block_hype_message_reactions()",
@@ -129,6 +125,7 @@
     "configure_notification_v2_runtime(text,text[],uuid[],boolean,boolean,boolean,text,timestamp with time zone)",
     "consume_edge_request_bucket(uuid,text,integer,integer,integer)",
     "consume_hype_bonus(uuid)",
+    "create_my_native_notification_enrollment_ticket_v2(text,uuid,text,text)",
     "create_art_board_link(uuid,uuid,text)",
     "delete_art_board_item(uuid)",
     "delete_art_board_link(uuid)",
@@ -143,8 +140,12 @@
     "log_user_role_change()",
     "probe_notification_v2_worker(text)",
     "read_edge_request_claim(uuid,text,text)",
+    "redeem_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,text,text,text,text,integer,text)",
     "refresh_message_hype_summary(uuid)",
     "refresh_shado_tv_channel_latest_video(uuid)",
+    "register_my_native_notification_token_v2(uuid,text,text,text)",
+    "register_native_notification_token_by_credential_v2(uuid,text,text)",
+    "revoke_notification_installation_by_credential_v2(uuid,text)",
     "shadow_checkers_update_stats_and_crown(uuid,uuid,integer,integer,integer,integer)",
     "shadow_war_create_active_rematch(uuid,uuid,uuid)",
     "shadow_war_record_completed_session()",
@@ -154,6 +155,7 @@
     "sync_shado_tv_channel_latest_video()",
     "sync_user_admin_role()",
     "sync_user_presence_visibility()",
+    "set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)",
     "toggle_art_board_reaction(uuid,text)",
     "toggle_board_chat_pin(uuid)",
     "toggle_board_chat_reaction(uuid,text)",
@@ -313,11 +315,9 @@
     },
     {
       "domain": "notification_presentation_v2",
-      "justification": "Owner-scoped installation, native token, foreground lease, and presentation claims cross service-only credential and receipt tables without exposing raw device tokens.",
+      "justification": "Owner-scoped web installation, foreground lease, and presentation claims cross service-only credential and receipt tables without exposing raw device data.",
       "signatures": [
         "claim_my_notification_presentation_v2(uuid,uuid,text)",
-        "create_my_native_notification_enrollment_ticket_v2(text,uuid,text,text)",
-        "register_my_native_notification_token_v2(uuid,text,text,text)",
         "register_my_notification_installation_v2(uuid,text,text,text,text,text,text,text,text,integer)",
         "revoke_my_notification_installation_v2(uuid)",
         "set_my_notification_installation_foreground_v2(uuid,timestamp with time zone)"
