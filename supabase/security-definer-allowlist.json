@@ -45,6 +45,7 @@
     "private.reject_shado_live_append_only_mutation()",
     "private.request_notification_delivery_v2(text)",
     "private.request_notification_delivery_v2_after_insert()",
+    "private.request_web_push_recovery()",
     "private.revoke_signup_invite(uuid,uuid,text)",
     "private.resolve_notification_installation_credential_v2(uuid,text)",
     "private.sync_shadow_pin_category_latest_image()",
