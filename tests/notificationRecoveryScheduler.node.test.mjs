@@ -5,34 +5,27 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const source = fs.readFileSync(
-  path.join(root, 'netlify', 'functions', 'notification-recovery.mjs'),
+const migration = fs.readFileSync(
+  path.join(
+    root,
+    'supabase',
+    'migrations',
+    '20260805135200_enable_bounded_web_push_recovery_cron.sql'
+  ),
   'utf8'
 )
 const netlifyConfig = fs.readFileSync(path.join(root, 'netlify.toml'), 'utf8')
-const productionWorkflow = fs.readFileSync(
-  path.join(root, '.github', 'workflows', 'netlify-production.yml'),
-  'utf8'
-)
 
-test('production Web Push recovery is scheduled, bounded, server-authenticated, and kill-switchable', () => {
-  assert.match(source, /schedule:\s*'\* \* \* \* \*'/)
-  assert.match(
-    netlifyConfig,
-    /\[functions\."notification-recovery"\]\s*schedule\s*=\s*"\* \* \* \* \*"/,
-  )
-  assert.match(source, /WEB_PUSH_RECOVERY_ENABLED/)
-  assert.match(source, /WEB_PUSH_RECOVERY_SECRET/)
-  assert.match(source, /recoverySecret\.length < 32/)
-  assert.match(source, /'x-shadowchat-recovery-secret': recoverySecret/)
-  assert.match(source, /missingEnvironment\.join/)
-  assert.match(source, /AbortSignal\.timeout\(25_000\)/)
-  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY/)
-  assert.match(
-    productionWorkflow,
-    /WEB_PUSH_RECOVERY_SECRET:\s*\$\{\{ secrets\.WEB_PUSH_RECOVERY_SECRET \}\}/,
-  )
-  assert.match(productionWorkflow, /Align Netlify scheduled recovery secret/)
-  assert.match(productionWorkflow, /--scope functions/)
-  assert.match(productionWorkflow, /--secret/)
+test('production Web Push recovery uses one bounded Vault-authenticated Supabase cron', () => {
+  assert.doesNotMatch(netlifyConfig, /notification-recovery/)
+  assert.match(migration, /create or replace function private\.request_web_push_recovery\(\)/)
+  assert.match(migration, /shadowchat_web_push_recovery_url/)
+  assert.match(migration, /shadowchat_web_push_recovery_secret/)
+  assert.match(migration, /'x-shadowchat-recovery-secret', recovery_secret/)
+  assert.match(migration, /'type', 'notification_delivery_recovery'/)
+  assert.match(migration, /timeout_milliseconds := 25000/)
+  assert.match(migration, /'shadowchat-web-push-recovery'/)
+  assert.match(migration, /'\* \* \* \* \*'/)
+  assert.doesNotMatch(migration, /(from|join)\s+net\._http_response/i)
+  assert.doesNotMatch(migration, /collect_notification/)
 })

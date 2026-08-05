@@ -10,9 +10,6 @@ directory = "netlify/functions"
 node_bundler = "esbuild"
 external_node_modules = ["semver", "sharp"]
 
-[functions."notification-recovery"]
-schedule = "* * * * *"
-
 [functions."shadow-pin-publish-janitor"]
 schedule = "*/10 * * * *"
 

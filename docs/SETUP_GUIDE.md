@@ -194,8 +194,8 @@ Legacy fallback, only if using OpenAI directly:
 - `WEB_PUSH_PRIVATE_KEY`
 - `WEB_PUSH_SUBJECT`
 - `WEB_PUSH_RECOVERY_SECRET` (dedicated 32-byte-or-longer credential shared
-  only by the `send-push` Edge Function and production Netlify recovery
-  schedule)
+  only by the `send-push` Edge Function and encrypted Supabase Vault recovery
+  configuration)
 
 Example:
 
@@ -212,9 +212,11 @@ supabase secrets set WEB_PUSH_SUBJECT=https://your-app.example.com
 supabase secrets set WEB_PUSH_RECOVERY_SECRET=YOUR_RANDOM_32_BYTE_OR_LONGER_SECRET
 ```
 
-Store that same recovery value as the protected GitHub Actions repository
-secret `WEB_PUSH_RECOVERY_SECRET`. The production workflow writes it into the
-Netlify production Functions scope as a write-only secret before deployment.
+Store that same recovery value in Supabase Vault under
+`shadowchat_web_push_recovery_secret`, and store the production `send-push`
+URL under `shadowchat_web_push_recovery_url`. The bounded
+`shadowchat-web-push-recovery` Supabase Cron job reads both encrypted values;
+do not hardcode either value in a migration.
 
 ## 5. Deploy Edge Functions
 

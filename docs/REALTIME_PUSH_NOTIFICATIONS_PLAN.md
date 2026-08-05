@@ -643,8 +643,9 @@ The public key is also exposed to the client as:
 ## Remaining Recommendation
 
 Keep Web Push and recipient-owned Supabase events as the web/PWA contract.
-Monitor the bounded Netlify `notification-recovery` schedule without
-reactivating any database notification cron. Run the full
+Monitor the bounded `shadowchat-web-push-recovery` Supabase Cron job without
+reactivating the former recovery, native delivery, receipt, or response-
+collector jobs. Run the full
 preference/block/mute and foreground/background matrix on one installed iPhone
 Home Screen app and one Android PWA. A later native APNs/FCM layer should reuse
 the same server-side event eligibility and preference contract rather than

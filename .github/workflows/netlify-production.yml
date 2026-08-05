@@ -33,7 +33,6 @@ jobs:
       NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
       NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
       NETLIFY_CLI_VERSION: 26.0.0
-      WEB_PUSH_RECOVERY_SECRET: ${{ secrets.WEB_PUSH_RECOVERY_SECRET }}
       SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -66,7 +65,6 @@ jobs:
         run: |
           test -n "$NETLIFY_AUTH_TOKEN" || { echo "NETLIFY_AUTH_TOKEN is not configured."; exit 1; }
           test -n "$NETLIFY_SITE_ID" || { echo "NETLIFY_SITE_ID is not configured."; exit 1; }
-          test -n "$WEB_PUSH_RECOVERY_SECRET" || { echo "WEB_PUSH_RECOVERY_SECRET is not configured."; exit 1; }
           test -n "$SUPABASE_URL" || { echo "SUPABASE_URL is not configured."; exit 1; }
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || { echo "SUPABASE_SERVICE_ROLE_KEY is not configured."; exit 1; }
           test -n "$SUPABASE_ACCESS_TOKEN" || { echo "SUPABASE_ACCESS_TOKEN is not configured."; exit 1; }
@@ -85,31 +83,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Align Netlify scheduled recovery secret
-        run: |
-          echo "::add-mask::$WEB_PUSH_RECOVERY_SECRET"
-          npx --yes "netlify@$NETLIFY_CLI_VERSION" env:set \
-            WEB_PUSH_RECOVERY_SECRET "$WEB_PUSH_RECOVERY_SECRET" \
-            --auth "$NETLIFY_AUTH_TOKEN" \
-            --site "$NETLIFY_SITE_ID" \
-            --context production \
-            --scope functions \
-            --secret \
-            --force > /dev/null
-          account_id="$(curl --fail --silent --show-error \
-            --header "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
-            "https://api.netlify.com/api/v1/sites/$NETLIFY_SITE_ID" | jq --raw-output '.account_id')"
-          test -n "$account_id" && test "$account_id" != "null"
-          curl --fail --silent --show-error \
-            --header "Authorization: Bearer $NETLIFY_AUTH_TOKEN" \
-            "https://api.netlify.com/api/v1/accounts/$account_id/env/WEB_PUSH_RECOVERY_SECRET?site_id=$NETLIFY_SITE_ID" \
-            | jq --exit-status '
-                .key == "WEB_PUSH_RECOVERY_SECRET"
-                and .is_secret == true
-                and (.scopes | index("functions")) != null
-                and ([.values[] | select(.context == "production")] | length) == 1
-              ' > /dev/null
 
       - name: Write app build metadata
         run: |

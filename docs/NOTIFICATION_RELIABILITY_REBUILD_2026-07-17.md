@@ -154,13 +154,13 @@ that match clears the turn event.
 
 The existing client delivery kick remains the immediate path. The bounded
 asynchronous recovery worker is implemented in `send-push` and is invoked once
-per minute by the production-only Netlify `notification-recovery` scheduled
-function using the existing Functions-only Supabase service-role credential.
-That credential was already required by the site's server-only Netlify media
-functions and is never exposed through `VITE_*` or the browser bundle. The four
-former database notification cron jobs and all native/TestFlight delivery stay
-paused. The browser compatibility kick must not be treated as the source of
-truth for turn ownership.
+per minute by the dedicated `shadowchat-web-push-recovery` Supabase Cron job.
+It makes one bounded `pg_net` request using a dedicated encrypted Vault secret;
+it never scans or joins the response table, whose rows retain pg_net's bounded
+TTL cleanup. The four former notification jobs, the expensive response
+collector, and all native/TestFlight delivery stay paused. The browser
+compatibility kick must not be treated as the source of truth for turn
+ownership.
 
 ## Local Acceptance Evidence
 
