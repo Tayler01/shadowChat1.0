@@ -2,12 +2,6 @@ name: Quality
 
 on:
   workflow_call:
-    inputs:
-      include_mobile:
-        description: Run Expo/TestFlight quality checks
-        required: false
-        type: boolean
-        default: true
   pull_request:
     branches: [main]
 
@@ -38,7 +32,9 @@ jobs:
         run: npm audit --prefix services/news-scraper --audit-level=low
 
   mobile:
-    if: ${{ github.event_name != 'workflow_call' || inputs.include_mobile }}
+    # TestFlight/native delivery is intentionally paused. Restore this job only
+    # when the native release track resumes.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     defaults:
       run:
