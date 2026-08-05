@@ -1,6 +1,17 @@
 # Realtime Push Notifications Plan
 
-## Documentation Status - July 24, 2026
+## Documentation Status - August 4, 2026
+
+Production containment on August 4 parks every background notification
+delivery worker, including Web Push recovery and Notification Presentation v2.
+The v2 response collector continued running every minute while delivery was
+disabled and accumulated enough database work to starve app boot, auth profile
+checks, Realtime, and message inserts. Web/PWA chat, DMs, auth, recipient-owned
+notification events, unread/read state, and badges remain active; background
+push delivery is temporarily unavailable. Migration
+`20260805004601_pause_notification_delivery_workers.sql` makes the containment
+durable. Re-enable delivery only after the collector and recovery workers pass
+a production-scale load and rollback review.
 
 This file documents the notification architecture shipped in Release A rather
 than only the original plan. The deployed release includes targeted

@@ -237,6 +237,11 @@ function useProvideAuth() {
           applyUser(profile);
           setError(null);
           setLoading(false);
+        } else if (getStoredRefreshToken()) {
+          await recoverDeferredAuthChange(
+            'Still reconnecting your saved profile. Keep the app open and we will keep trying.'
+          );
+          return;
         } else {
           applyUser(null);
           setLoading(false);
