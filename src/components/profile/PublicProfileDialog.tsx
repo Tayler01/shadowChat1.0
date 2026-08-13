@@ -33,6 +33,7 @@ import { useBlockedUsers } from '../../hooks/useBlockedUsers'
 import { useModerationReport } from '../../features/moderation/useModerationReport'
 import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../config/featureFlags'
 import { ConnectionControl } from '../../features/connections/ConnectionControl'
+import { getSupabasePublicObjectUrl } from '../../lib/storageImageTransforms'
 
 interface PublicProfileDialogProps {
   user: User | null
@@ -327,6 +328,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
     livePresence?.presence_state ||
     (user.presence_visibility === 'invisible' ? 'invisible' : 'offline')
   const presenceLabel = getPresenceStateLabel(presenceState)
+  const bannerSrc = getSupabasePublicObjectUrl(user.banner_thumbnail_url || user.banner_url)
 
   const profilePage = (
     <AnimatePresence>
@@ -354,9 +356,9 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
             className="popup-surface relative flex h-full max-h-[var(--shadowchat-visual-viewport-height,100dvh)] w-full max-w-none flex-col overflow-y-auto overflow-x-hidden rounded-none pb-[env(safe-area-inset-bottom)] sm:h-auto sm:max-h-[min(86dvh,760px)] sm:max-w-lg sm:rounded-[var(--radius-xl)] sm:pb-0"
           >
             <div className="relative h-36 shrink-0 overflow-hidden border-b border-[var(--border-panel)]">
-              {user.banner_thumbnail_url || user.banner_url ? (
+              {bannerSrc ? (
                 <img
-                  src={user.banner_thumbnail_url || user.banner_url}
+                  src={bannerSrc}
                   alt=""
                   loading="eager"
                   decoding="async"

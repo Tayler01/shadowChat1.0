@@ -16,6 +16,7 @@ import toast from 'react-hot-toast'
 import type { PresenceVisibility } from '../../types'
 import { getUploadErrorMessage } from '../../lib/uploadLimits'
 import { openConnectionsHub } from '../../lib/connectionsNavigation'
+import { getSupabasePublicObjectUrl } from '../../lib/storageImageTransforms'
 
 interface ProfileViewProps {
   onToggleSidebar: () => void
@@ -421,6 +422,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
     myPresence?.presence_state ||
     (profile.presence_visibility === 'invisible' ? 'invisible' : 'offline')
   const presenceLabel = getPresenceStateLabel(presenceState)
+  const bannerSrc = getSupabasePublicObjectUrl(profile.banner_thumbnail_url || profile.banner_url)
 
   const content = (
     <div className="mx-auto w-full max-w-5xl min-w-0 p-3 sm:p-6">
@@ -437,8 +439,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
       <div className="glass-panel-strong overflow-hidden rounded-[var(--radius-xl)]">
         {/* Banner */}
         <div className="h-32 relative">
-          {profile.banner_thumbnail_url || profile.banner_url ? (
-            <img src={profile.banner_thumbnail_url || profile.banner_url} alt="Banner" loading="eager" decoding="async" className="w-full h-full object-cover" />
+          {bannerSrc ? (
+            <img src={bannerSrc} alt="Banner" loading="eager" decoding="async" className="w-full h-full object-cover" />
           ) : (
             <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,rgba(255,240,184,0.18),transparent_26%),linear-gradient(135deg,#17191c,#0f1112_58%,#34250c)]" />
           )}

@@ -21,6 +21,9 @@ const profile = {
   updated_at: '2026-04-28T00:00:00.000Z',
 } as User
 
+const renderBannerUrl = 'https://example.supabase.co/storage/v1/render/image/public/banners/u1/banner.jpg?width=960&quality=78'
+const publicBannerUrl = 'https://example.supabase.co/storage/v1/object/public/banners/u1/banner.jpg'
+
 jest.mock('../src/hooks/useIsDesktop', () => ({
   useIsDesktop: () => true,
 }))
@@ -77,6 +80,18 @@ test('keeps profile image controls visually anchored and visible', () => {
   expect(screen.getByRole('button', { name: /change avatar/i })).toHaveClass('-bottom-2')
   expect(screen.getByRole('button', { name: /change avatar/i })).toHaveClass('right-1')
   expect(screen.getByRole('button', { name: /change banner image/i }).className).toContain('rgba(255,240,184,0.46)')
+})
+
+test('recovers a durable public object URL for the profile banner', () => {
+  profile.banner_thumbnail_url = renderBannerUrl
+  profile.banner_url = publicBannerUrl
+
+  render(<ProfileView onToggleSidebar={jest.fn()} />)
+
+  expect(screen.getByRole('img', { name: 'Banner' })).toHaveAttribute('src', publicBannerUrl)
+
+  profile.banner_thumbnail_url = null
+  profile.banner_url = ''
 })
 
 test('opens avatar adjustment before uploading a selected profile image', () => {

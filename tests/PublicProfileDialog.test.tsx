@@ -118,6 +118,26 @@ test('renders public profile details in a dialog', () => {
   expect(screen.queryByText(user.email)).toBeNull()
 })
 
+test('recovers a durable public object URL for another user banner', () => {
+  const publicBannerUrl = 'https://example.supabase.co/storage/v1/object/public/banners/u2/banner.jpg'
+  const renderBannerUrl = 'https://example.supabase.co/storage/v1/render/image/public/banners/u2/banner.jpg?width=960&quality=78'
+
+  render(
+    <PublicProfileDialog
+      user={{
+        ...user,
+        banner_url: publicBannerUrl,
+        banner_thumbnail_url: renderBannerUrl,
+      } as User}
+      open
+      onClose={jest.fn()}
+    />
+  )
+
+  const banner = document.querySelector(`img[src="${publicBannerUrl}"]`)
+  expect(banner).not.toBeNull()
+})
+
 test('renders earned medals with names and how-earned details in public info', () => {
   render(
     <PublicProfileDialog
