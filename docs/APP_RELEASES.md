@@ -34,9 +34,12 @@ different policy is chosen explicitly. The supported restart policies are:
   was intentionally ruled out.
 - `optional_restart`: ask users on an older build if they want to restart now,
   but allow the popup to be dismissed.
-- `required_restart`: block users on an older build until they restart.
+- `required_restart`: block users on an older build until one restart attempt is
+  recorded. A recorded restart is never allowed to become a blocking reload
+  loop if release publication or service-worker activation is delayed.
 - `critical_force_restart`: block users on an older build and auto-restart after
-  a short countdown.
+  a short countdown. After that restart is recorded, the same release cannot
+  auto-restart or block that user again.
 
 Use `critical_force_restart` only for changes that can break active old clients,
 such as incompatible schema/API behavior or security-sensitive fixes.

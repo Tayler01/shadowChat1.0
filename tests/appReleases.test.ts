@@ -100,6 +100,24 @@ describe('app release presentation', () => {
     expect(presentation.autoRestart).toBe(false)
   })
 
+  it.each(['required_restart', 'critical_force_restart'] as const)(
+    'does not loop a %s release after a restart was recorded',
+    restartPolicy => {
+      const presentation = getAppReleasePresentation(
+        release({
+          restart_policy: restartPolicy,
+          severity: restartPolicy === 'critical_force_restart' ? 'critical' : 'feature',
+          restarted_at: '2026-05-26T12:01:00.000Z',
+        }),
+        'still-different-build'
+      )
+
+      expect(presentation.shouldShow).toBe(false)
+      expect(presentation.blocksDismiss).toBe(false)
+      expect(presentation.autoRestart).toBe(false)
+    }
+  )
+
   it('marks critical old-build releases for auto restart', () => {
     const presentation = getAppReleasePresentation(
       release({ restart_policy: 'critical_force_restart', severity: 'critical' }),

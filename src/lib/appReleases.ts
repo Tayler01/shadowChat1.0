@@ -50,9 +50,13 @@ export const getAppReleasePresentation = (
   const requiresCurrentBuild =
     release.restart_policy === 'required_restart' ||
     release.restart_policy === 'critical_force_restart'
-  const autoRestart = !isCurrentBuild && release.restart_policy === 'critical_force_restart'
+  const hasRestartReceipt = Boolean(release.restarted_at)
+  const autoRestart =
+    !isCurrentBuild &&
+    !hasRestartReceipt &&
+    release.restart_policy === 'critical_force_restart'
   const wantsRestart = release.restart_policy !== 'notice_only'
-  const blocksDismiss = !isCurrentBuild && requiresCurrentBuild
+  const blocksDismiss = !isCurrentBuild && !hasRestartReceipt && requiresCurrentBuild
   const hasReadReceipt = Boolean(
     release.acknowledged_at ||
     release.dismissed_at ||
