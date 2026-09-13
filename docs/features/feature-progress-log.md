@@ -1,5 +1,12 @@
 # Feature Progress Log
 
+## September 13 Shadow Checkers Unity rebuild
+
+- Active user-requested goal: a true 3D Unity game integrated into ShadowChat, preserving the original feature set.
+- Checkpoints: modeled scene and visible preview; host/game integration and parity; rules, multiplayer, mobile and build verification.
+- Contract and evidence: [SHADOW_CHECKERS_UNITY.md](SHADOW_CHECKERS_UNITY.md).
+- Existing unrelated AGENT.md, AGENTS.md and docs/AGENT_REFERENCE.md edits remain untouched. The user authorized preparing the production replacement on September 13; main-only release checks are in progress. Routine screenshots are disabled.
+
 ## Documentation Status - July 15, 2026
 
 Refreshed for the July 10 Release A deployment. Historical feature entries

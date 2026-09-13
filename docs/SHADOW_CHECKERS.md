@@ -1,6 +1,6 @@
 # Shadow Checkers
 
-## Documentation Status - July 17, 2026
+## Documentation Status - September 13, 2026
 
 Reviewed during the June 1, 2026 documentation refresh. This feature guide is current for the shipped product surface, with any known hardening or polish follow-ups tracked in [FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md](C:/repos/chat2.0/docs/FULL_CODEBASE_AUDIT_NEXT_STEPS_2026-06-01.md:1).
 
@@ -19,7 +19,7 @@ It shares the existing Entertainment picker with Shadow War and uses the shared
 - Multi-jumps are required when available.
 - Promotion ends the move, including during a jump.
 - A player wins when the opponent has no pieces, has no legal moves, or resigns.
-- There is no timer, undo, AI opponent, or sound in v1.
+- There is no timer, undo or AI opponent. The Unity replacement keeps the original music at lower volume and adds fire ambience and varied piece-contact sounds.
 
 ## Backend
 
@@ -58,8 +58,7 @@ Key files:
 - `src/features/games/shadow-checkers/hooks/useShadowCheckers.ts`
 - `src/features/games/shadow-checkers/assets/manifest.ts`
 
-The board is a mobile-first cinematic 2.5D implementation. It is intentionally
-dependency-free for v1 to avoid adding a heavy 3D runtime to the main app bundle.
+The replacement board is a lazy-loaded Unity 3D medieval study with silver/black marble pieces, reflections, animated fire and cinematic movement. Phones use a landscape gate and supported orientation-lock requests. The original board remains available as accessible controls and load recovery. Existing rules, server actions and social features remain authoritative. See [the Unity implementation and verification record](features/SHADOW_CHECKERS_UNITY.md) for source, evidence and open physical-device/art gaps.
 
 The current polish pass uses generated WebP assets under
 `public/games/shadow-checkers/` for the game logo, picker/lobby background,

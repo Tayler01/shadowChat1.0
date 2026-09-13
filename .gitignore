@@ -45,3 +45,16 @@ firmware/esp-bridge/sdkconfig.old
 # Local Codex/agent skill installs
 .agents/
 skills-lock.json
+
+# Unity generated caches; source assets and Web runtime are versioned
+native/shadow-checkers-unity/[Ll]ibrary/
+native/shadow-checkers-unity/[Tt]emp/
+native/shadow-checkers-unity/[Oo]bj/
+native/shadow-checkers-unity/[Ll]ogs/
+native/shadow-checkers-unity/[Uu]serSettings/
+native/shadow-checkers-unity/*.csproj
+native/shadow-checkers-unity/*.sln
+native/shadow-checkers-unity/.vs/
+native/shadow-checkers-unity/Assets/**/*.blend1
+native/shadow-checkers-unity/ArtSource/*.blend1
+native/shadow-checkers-unity/Captures/

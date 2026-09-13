@@ -7,6 +7,7 @@ interface StopOptions {
 }
 
 export interface GameSoundtrackController {
+  setVolume: (value: number) => void
   play: (source: string) => Promise<boolean>
   stop: (options?: StopOptions) => void
   dispose: () => void
@@ -156,6 +157,10 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
   }
 
   return {
+    setVolume: (value: number) => {
+      volume = Math.max(0, Math.min(1, value))
+      if (gain && context) gain.gain.setTargetAtTime(volume, context.currentTime, 0.15)
+    },
     play,
     stop,
     dispose,

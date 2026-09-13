@@ -4,7 +4,7 @@ import { cn } from '../../../../lib/utils'
 import { SHADOW_CHECKERS_ASSETS } from '../assets/manifest'
 import type { CheckersBoardState, CheckersMove, CheckersPiece, CheckersPlayer, CheckersPosition } from '../engine/types'
 
-interface ShadowCheckersBoardProps {
+export interface ShadowCheckersBoardProps {
   state: CheckersBoardState
   viewerSlot?: CheckersPlayer | 'spectator'
   selectedPieceId?: string | null

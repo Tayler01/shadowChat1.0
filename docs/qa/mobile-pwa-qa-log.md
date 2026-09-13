@@ -1,5 +1,12 @@
 # Mobile PWA QA Log
 
+## September 13 Shadow Checkers Unity landscape checkpoint
+
+- Local candidate only. Android/Chromium and headed iPhone/WebKit emulation passed portrait gate to landscape, actual Unity touch moves for both players, authoritative persistence, realtime turn update, temporary chat and camera controls. Created test matches were removed; no ranked game was completed.
+- Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1789330477633/summary.json` and `multiplayer-1789330714568/summary.json`. Reviewed current WebKit screenshots show the scene; an earlier build's black capture is historical, with exact cause unisolated.
+- Actual Unity fixture footage covers room reveal, double capture and kinging: `cinematics-1789330399443`. Shared reduced-motion support is implemented; physical-device thermal/frame-rate, installed-PWA lifecycle and rotation policy proof remain open.
+- Reference-level room realism remains an active art milestone. No release, push or deploy performed.
+
 ## Documentation Status - July 10, 2026
 
 Older artifact paths remain historical evidence. The July 10 web Release A is

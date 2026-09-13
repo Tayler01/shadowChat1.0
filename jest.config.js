@@ -18,5 +18,7 @@ export default {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy'
   },
   testPathIgnorePatterns: ['\\.node\\.test\\.mjs$'],
+  // Unity caches and local media evidence are not JavaScript test roots.
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
   setupFilesAfterEnv: ['<rootDir>/tests/setupTests.ts']
 };

@@ -9,6 +9,15 @@ const getHeaderBlock = (config, path) => {
   return blocks.find(block => new RegExp(`^\\s*for\\s*=\\s*"${path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`, 'm').test(block)) || ''
 }
 
+test('only the Unity player permits same-origin framing and its manifest revalidates', () => {
+  const config = read('netlify.toml')
+  const frame = getHeaderBlock(config, '/games/shadow-checkers/unity/frame.html')
+  assert.match(frame, /X-Frame-Options\s*=\s*"SAMEORIGIN"/)
+  assert.match(frame, /Content-Security-Policy\s*=\s*"frame-ancestors 'self';/)
+  assert.match(getHeaderBlock(config, '/games/shadow-checkers/unity/build-manifest.json'), /Cache-Control\s*=\s*"no-cache"/)
+  assert.match(getHeaderBlock(config, '/*'), /X-Frame-Options\s*=\s*"DENY"/)
+})
+
 test('Netlify ships safe immediate browser headers while CSP remains report-only', () => {
   const config = read('netlify.toml')
   const block = getHeaderBlock(config, '/*')

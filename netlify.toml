@@ -23,6 +23,18 @@ for = "/*"
   Content-Security-Policy-Report-Only = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://assets.mediadelivery.net https://assets.pinterest.com https://platform.x.com https://platform.twitter.com https://cdn.syndication.twimg.com https://www.instagram.com https://static.cdninstagram.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: https://tile.openstreetmap.org https://tilecache.rainviewer.com; media-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.livekit.cloud wss://*.livekit.cloud https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.weather.gov https://api.rainviewer.com https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.mediadelivery.net https://syndication.twitter.com https://api.twitter.com https://www.instagram.com; frame-src 'self' data: blob: https://*.supabase.co https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://player.mediadelivery.net https://iframe.mediadelivery.net https://assets.pinterest.com https://platform.x.com https://platform.twitter.com https://www.instagram.com; worker-src 'self' blob:; manifest-src 'self'"
 
 [[headers]]
+for = "/games/shadow-checkers/unity/frame.html"
+[headers.values]
+  X-Frame-Options = "SAMEORIGIN"
+  Content-Security-Policy = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'"
+  Cache-Control = "no-cache"
+
+[[headers]]
+for = "/games/shadow-checkers/unity/build-manifest.json"
+[headers.values]
+  Cache-Control = "no-cache"
+
+[[headers]]
 for = "/manifest.webmanifest"
 [headers.values]
   Content-Type = "application/manifest+json; charset=utf-8"

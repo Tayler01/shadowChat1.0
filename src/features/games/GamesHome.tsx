@@ -167,7 +167,9 @@ export function GamesHome({
       return
     }
 
-    const played = await getSoundtrack().play(source)
+    const soundtrack = getSoundtrack()
+    soundtrack.setVolume(source === SHADOW_CHECKERS_ASSETS.music ? 0.11 : 0.42)
+    const played = await soundtrack.play(source)
     if (currentMusicSourceRef.current !== source) return
 
     setMusicPlaying(played)

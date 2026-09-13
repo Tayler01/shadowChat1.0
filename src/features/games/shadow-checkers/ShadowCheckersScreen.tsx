@@ -1,6 +1,7 @@
 import React from 'react'
+import { useLandscapeGate } from '../shared/useLandscapeGate'
 import { ArrowLeft, Crown, Eye, HelpCircle, Loader2, MessageSquare, MoreHorizontal, Music, Plus, Shield, Swords, Trophy, Users, Volume2, VolumeX, X } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { CheckersNotice, type CheckersNoticeMessage } from './components/CheckersNotice'
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
 import { useAdminAccess } from '../../../hooks/useAdminAccess'
@@ -8,7 +9,7 @@ import { cn } from '../../../lib/utils'
 import { shouldShowLegacyAchievementBadges } from '../../../lib/achievementBadges'
 import type { ShadowCheckersMatch } from '../../../lib/supabase'
 import { SHADOW_CHECKERS_ASSETS, SHADOW_CHECKERS_CHARACTERS, getShadowCheckersCharacter } from './assets/manifest'
-import { ShadowCheckersBoard } from './components/ShadowCheckersBoard'
+import { ShadowCheckersUnityBoard } from './components/ShadowCheckersUnityBoard'
 import { CheckersCrownBadge } from './components/CheckersCrownBadge'
 import { deserializeBoard, getLegalMoves, hasMandatoryCapture } from './engine/checkers'
 import type { CheckersMove, CheckersPiece, CheckersPlayer } from './engine/types'
@@ -105,6 +106,35 @@ export function ShadowCheckersScreen({
   onToggleMusic,
   unreadMatchCounts = {},
 }: ShadowCheckersScreenProps) {
+  const rotateGate = useLandscapeGate()
+  const [notice, setNotice] = React.useState<CheckersNoticeMessage | null>(null)
+  const noticeSequence = React.useRef(0)
+  const dismissNotice = React.useCallback(() => setNotice(null), [])
+  const notify = (tone: CheckersNoticeMessage['tone'], message: string) => setNotice({ id: ++noticeSequence.current, tone, message })
+  const gameRoot = React.useRef<HTMLDivElement>(null)
+  const [matchChatOpen, setMatchChatOpen] = React.useState(false)
+  const orientationLocked = React.useRef(false)
+  const orientationSession = React.useRef(0)
+  const requestLandscape = React.useCallback(async (gesture = false) => {
+    const session = orientationSession.current
+    const orientation = window.screen.orientation as ScreenOrientation & { lock?: (orientation: 'landscape') => Promise<void> }
+    if (gesture && !document.fullscreenElement && gameRoot.current?.requestFullscreen) {
+      await gameRoot.current.requestFullscreen().catch(() => {})
+    }
+    if (orientation?.lock) {
+      try {
+        if (session !== orientationSession.current) return
+        await orientation.lock('landscape')
+        if (session !== orientationSession.current) orientation.unlock?.()
+        else orientationLocked.current = true
+      } catch { /* iPhone/browser policy: the rotate gate remains authoritative. */ }
+    }
+  }, [])
+  React.useEffect(() => {
+    const session = orientationSession.current
+    void requestLandscape()
+    return () => { orientationSession.current = session + 1; if (orientationLocked.current) window.screen.orientation?.unlock?.(); orientationLocked.current = false }
+  }, [requestLandscape])
   const { user } = useAuth()
   const { isAdmin } = useAdminAccess()
   const [selectedCharacter, setSelectedCharacter] = React.useState(SHADOW_CHECKERS_CHARACTERS[0].key)
@@ -224,9 +254,9 @@ export function ShadowCheckersScreen({
   const guarded = async (action: () => Promise<unknown>, success: string) => {
     try {
       await action()
-      toast.success(success)
+      notify('success', success)
     } catch (err) {
-      toast.error(formatCheckersActionError(err))
+      notify('error', formatCheckersActionError(err))
     }
   }
 
@@ -238,7 +268,7 @@ export function ShadowCheckersScreen({
   const handleSelectPiece = (piece: CheckersPiece) => {
     if (!state || !myTurn || viewerSlot === 'spectator') return
     if (piece.owner !== viewerSlot) {
-      toast.error('Choose one of your pieces')
+      notify('error', 'Choose one of your pieces')
       return
     }
 
@@ -247,9 +277,9 @@ export function ShadowCheckersScreen({
       if (hasMandatoryCapture(state, viewerSlot)) {
         const captureMoves = getLegalMoves(state, viewerSlot).filter(move => move.captures.length > 0)
         setHelperMoves(captureMoves)
-        toast.error('Mandatory jump available')
+        notify('error', 'Mandatory jump available')
       } else {
-        toast.error('That piece has no legal moves')
+        notify('error', 'That piece has no legal moves')
       }
       return
     }
@@ -263,10 +293,10 @@ export function ShadowCheckersScreen({
     const captureMoves = getLegalMoves(state, viewerSlot).filter(move => move.captures.length > 0)
     if (captureMoves.length > 0) {
       setHelperMoves(captureMoves)
-      toast.error('Mandatory jump available. You have to take the jump.')
+      notify('error', 'Mandatory jump available. You have to take the jump.')
       return
     }
-    toast.error('That move is not legal')
+    notify('error', 'That move is not legal')
   }
 
   const handleSelectMove = (move: CheckersMove) => {
@@ -274,13 +304,13 @@ export function ShadowCheckersScreen({
     void (async () => {
       try {
         await actions.submitMove(activeMatch.id, move.pieceId, move.path)
-        toast.success('Move submitted')
+        notify('success', 'Your move is played')
       } catch (err) {
         if (isMandatoryJumpError(err) && state && viewerSlot !== 'spectator') {
           const captureMoves = getLegalMoves(state, viewerSlot).filter(candidate => candidate.captures.length > 0)
           setHelperMoves(captureMoves)
         }
-        toast.error(formatCheckersActionError(err, 'That move is not legal.'))
+        notify('error', formatCheckersActionError(err, 'That move is not legal.'))
       }
     })()
   }
@@ -334,7 +364,7 @@ export function ShadowCheckersScreen({
             <p>Shadow Checkers uses standard American checkers rules on an 8x8 board. Only dark squares are playable.</p>
             <p>Regular pieces move and capture diagonally forward. Crowned pieces move and capture diagonally forward or backward.</p>
             <p>Captures are mandatory. If a jump creates another jump for the same piece, the multi-jump must continue. Promotion ends that move.</p>
-            <p>You win when your opponent has no pieces, no legal moves, or resigns. There is no timer, undo, AI opponent, or sound in v1.</p>
+            <p>You win when your opponent has no pieces, no legal moves, or resigns. There is no timer, undo, or AI opponent. Music is optional.</p>
             <p>Active players can toggle legal hints. Spectators can watch and use temporary match chat, but cannot move pieces.</p>
           </div>
         </section>
@@ -731,16 +761,19 @@ export function ShadowCheckersScreen({
     const myTurnSlot = myTurn ? viewerSlot : null
 
     return (
-      <main className="shadow-checkers-match-surface relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2 pb-[calc(env(safe-area-inset-bottom)_+_0.65rem)] md:px-6">
-        <section className="shadow-checkers-keyboard-collapse mb-2 grid grid-cols-2 items-center gap-2 rounded-[1rem] border border-[#b9934c]/28 bg-black/58 p-2.5">
+      <main className="shadow-checkers-match-surface relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden pb-[env(safe-area-inset-bottom)]">
+        <section className="hidden">
           <PlayerChip name={displayName(activeMatch.player_one, 'Player one')} characterKey={activeMatch.player_one_character_key} crown={shouldShowLegacyAchievementBadges(activeMatch.player_one) && activeMatch.player_one?.checkers_crown} detail={`${playerOnePieces} pieces`} activeTurn={!state.winner && currentTurnSlot === 'player_one'} turnFlash={showYourTurnBanner && myTurnSlot === 'player_one'} />
           <PlayerChip name={displayName(activeMatch.player_two, 'Open seat')} characterKey={activeMatch.player_two_character_key} crown={shouldShowLegacyAchievementBadges(activeMatch.player_two) && activeMatch.player_two?.checkers_crown} detail={`${playerTwoPieces} pieces`} align="right" muted={!activeMatch.player_two} activeTurn={!state.winner && currentTurnSlot === 'player_two'} turnFlash={showYourTurnBanner && myTurnSlot === 'player_two'} />
         </section>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2 xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:gap-3">
-          <section className="shadow-checkers-keyboard-collapse relative shrink-0 overflow-hidden rounded-[1.25rem] border border-[#b9934c]/28 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.11),rgba(0,0,0,0.66)_42%,rgba(0,0,0,0.82))] p-2.5 shadow-[0_24px_70px_rgba(0,0,0,0.54)] xl:min-h-0 xl:p-3">
-            <div className="relative">
-              <ShadowCheckersBoard
+        <div className="relative flex min-h-0 flex-1">
+          <section className="relative min-h-0 min-w-0 flex-1 overflow-hidden">
+            <div className="relative h-full">
+              <ShadowCheckersUnityBoard
+                key={activeMatch.id}
+                fill
+                paused={rotateGate}
                 state={state}
                 viewerSlot={viewerSlot}
                 selectedPieceId={selectedPieceId}
@@ -750,7 +783,7 @@ export function ShadowCheckersScreen({
                 onSelectPiece={handleSelectPiece}
                 onSelectMove={handleSelectMove}
                 onInvalidDestination={handleInvalidDestination}
-                disabled={!myTurn || Boolean(state.winner) || busy === 'move'}
+                disabled={rotateGate || !myTurn || Boolean(state.winner) || busy === 'move'}
                 showHints={showHints}
                 boardSkin={activeBoardSkin}
               />
@@ -782,7 +815,7 @@ export function ShadowCheckersScreen({
             </div>
           </section>
 
-          <aside className="shadow-checkers-match-chat-wrap flex min-h-0 flex-1 flex-col gap-2 overflow-hidden xl:gap-3">
+          <aside hidden={!matchChatOpen} className={cn('shadow-checkers-match-chat-wrap absolute inset-y-0 right-0 z-40 w-[min(23rem,52vw)] min-h-0 flex-col gap-2 overflow-hidden border-l border-[#b9934c]/30 bg-[#080909] p-2', matchChatOpen ? 'flex' : 'hidden')}>
             <section className="shadow-checkers-match-chat flex min-h-0 flex-1 flex-col rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-3">
               <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Match Chat</h3>
               <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
@@ -819,15 +852,25 @@ export function ShadowCheckersScreen({
   }
 
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#030405] text-[#f6e0a2]">
+    <div ref={gameRoot} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#030405] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-[#f6e0a2]">
+      {!rotateGate && <CheckersNotice notice={notice} onDismiss={dismissNotice} />}
+      {rotateGate && <div className="absolute inset-0 z-[150] flex flex-col items-center justify-center gap-4 bg-[#030405] px-8 text-center" role="dialog" aria-modal="true" aria-label="Rotate phone to play">
+        <p className="text-2xl font-semibold text-[#f0d381]">Rotate your phone</p>
+        <p className="max-w-xs text-sm text-[#d9c79f]">Shadow Checkers plays sideways. Turn your phone to enter the study.</p>
+        <CheckersButton onClick={() => void requestLandscape(true)}>Enter landscape</CheckersButton>
+        <CheckersButton variant="ghost" onClick={onExit}>Back to entertainment</CheckersButton>
+      </div>}
+      <div className={cn('relative flex min-h-0 flex-1 flex-col', rotateGate && 'invisible')} aria-hidden={rotateGate || undefined}>
       <img src={SHADOW_CHECKERS_ASSETS.background} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.56]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.58),rgba(0,0,0,0.20)_42%,rgba(0,0,0,0.84))]" />
       <header className="shadow-checkers-keyboard-collapse relative z-20 shrink-0 border-b border-[#b9934c]/35 bg-black/86 shadow-[0_16px_40px_rgba(0,0,0,0.58)]">
-        <div className="flex min-h-[calc(env(safe-area-inset-top)_+_6.2rem)] items-center gap-1.5 px-2 pb-1.5 pt-[calc(env(safe-area-inset-top)_+_0.35rem)]">
+        <div className="flex min-h-11 items-center gap-1.5 px-2 pt-[env(safe-area-inset-top)]">
           <button type="button" aria-label={selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Back to entertainment'} onClick={() => selectedMatchId ? handleSelectMatch(null) : onExit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-[5.35rem] min-w-0 flex-1 object-contain drop-shadow-[0_12px_28px_rgba(0,0,0,0.72)]" />
+          <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-10 w-40 min-w-0 shrink object-contain" />
+          {activeMatch && state && <p className="min-w-0 flex-1 truncate text-center text-xs text-[#e6d2a8]" aria-live="polite">{state.winner ? 'Match complete' : myTurn ? 'Your turn' : `${displayName(currentTurnSlot === 'player_one' ? activeMatch.player_one : activeMatch.player_two)}’s turn`} · {state.pieces.filter(p => p.owner === 'player_one').length} silver / {state.pieces.filter(p => p.owner === 'player_two').length} black</p>}
+          {activeMatch && <button type="button" aria-label={matchChatOpen ? 'Close match chat' : 'Open match chat'} aria-expanded={matchChatOpen} onClick={() => setMatchChatOpen(open => !open)} className="flex h-11 min-w-11 items-center justify-center rounded-lg text-[#f0d381]"><MessageSquare className="h-5 w-5" /></button>}
           {renderHeaderMenu()}
         </div>
       </header>
@@ -851,6 +894,7 @@ export function ShadowCheckersScreen({
       {renderRulesDialog()}
       {renderBoardChoiceDialog()}
       {renderCharacterDialog()}
+      </div>
     </div>
   )
 }

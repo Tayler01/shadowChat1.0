@@ -1,10 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render as renderBase, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { ComfortProvider } from '../src/hooks/useComfortPreferences'
 import { ShadowCheckersScreen } from '../src/features/games/shadow-checkers/ShadowCheckersScreen'
 import { createInitialBoard, serializeBoard } from '../src/features/games/shadow-checkers/engine/checkers'
 import type { BasicUser, ShadowCheckersMatch } from '../src/lib/supabase'
 
 const mockUseShadowCheckers = jest.fn()
 const mockSelectMatch = jest.fn()
+
+const render = (ui: ReactElement) => renderBase(<ComfortProvider>{ui}</ComfortProvider>)
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
@@ -120,13 +124,13 @@ beforeEach(() => {
 
 test('prioritizes Shadow Checkers match chat during Android keyboard compression', () => {
   render(<ShadowCheckersScreen />)
-
+  fireEvent.click(screen.getByRole('button', { name: 'Open match chat' }))
   const chatHeading = screen.getByRole('heading', { name: /match chat/i })
   const chatPanel = chatHeading.closest('section')
 
   expect(screen.getByPlaceholderText(/say something/i)).toBeInTheDocument()
   expect(chatPanel).toHaveClass('shadow-checkers-match-chat')
-  expect(document.querySelectorAll('.shadow-checkers-keyboard-collapse')).toHaveLength(3)
+  expect(document.querySelector('.shadow-checkers-keyboard-collapse')).toBeInTheDocument()
   expect(document.querySelector('.shadow-checkers-match-surface')).toBeInTheDocument()
   expect(document.querySelector('.shadow-checkers-match-chat-wrap')).toBeInTheDocument()
 })

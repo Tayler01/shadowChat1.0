@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
       __SHADOWCHAT_CATCH_UP_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_CATCH_UP')),
     },
     plugins: [react()],
+    // Unity's asset cache is unrelated to Vite and changes heavily during imports.
+    server: { watch: { ignored: ['**/native/shadow-checkers-unity/**'] } },
     optimizeDeps: {
       exclude: ['lucide-react'],
     },
