@@ -1,0 +1,791 @@
+{
+  "schemaVersion": 1,
+  "source": "S07",
+  "note": "Source byte mapping only. Internal/unused IDs preserved and flagged; not silently made traversable. Directions in legacy order N,W,S,E. Layer semantics still require normalization.",
+  "tiles": [
+    {
+      "id": 0,
+      "hex": "0x00",
+      "semantic": "floor",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 1,
+      "hex": "0x01",
+      "semantic": "wall",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 2,
+      "hex": "0x02",
+      "semantic": "chip",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 3,
+      "hex": "0x03",
+      "semantic": "water",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 4,
+      "hex": "0x04",
+      "semantic": "fire",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 5,
+      "hex": "0x05",
+      "semantic": "invisible-wall",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 6,
+      "hex": "0x06",
+      "semantic": "thin-wall-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 7,
+      "hex": "0x07",
+      "semantic": "thin-wall-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 8,
+      "hex": "0x08",
+      "semantic": "thin-wall-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 9,
+      "hex": "0x09",
+      "semantic": "thin-wall-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 10,
+      "hex": "0x0A",
+      "semantic": "dirt-block",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 11,
+      "hex": "0x0B",
+      "semantic": "dirt",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 12,
+      "hex": "0x0C",
+      "semantic": "ice",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 13,
+      "hex": "0x0D",
+      "semantic": "force-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 14,
+      "hex": "0x0E",
+      "semantic": "clone-block-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 15,
+      "hex": "0x0F",
+      "semantic": "clone-block-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 16,
+      "hex": "0x10",
+      "semantic": "clone-block-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 17,
+      "hex": "0x11",
+      "semantic": "clone-block-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 18,
+      "hex": "0x12",
+      "semantic": "force-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 19,
+      "hex": "0x13",
+      "semantic": "force-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 20,
+      "hex": "0x14",
+      "semantic": "force-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 21,
+      "hex": "0x15",
+      "semantic": "exit",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 22,
+      "hex": "0x16",
+      "semantic": "door-blue",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 23,
+      "hex": "0x17",
+      "semantic": "door-red",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 24,
+      "hex": "0x18",
+      "semantic": "door-green",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 25,
+      "hex": "0x19",
+      "semantic": "door-yellow",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 26,
+      "hex": "0x1A",
+      "semantic": "ice-SE",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 27,
+      "hex": "0x1B",
+      "semantic": "ice-SW",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 28,
+      "hex": "0x1C",
+      "semantic": "ice-NW",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 29,
+      "hex": "0x1D",
+      "semantic": "ice-NE",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 30,
+      "hex": "0x1E",
+      "semantic": "blue-wall-fake",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 31,
+      "hex": "0x1F",
+      "semantic": "blue-wall-real",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 32,
+      "hex": "0x20",
+      "semantic": "unused-20",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 33,
+      "hex": "0x21",
+      "semantic": "thief",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 34,
+      "hex": "0x22",
+      "semantic": "socket",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 35,
+      "hex": "0x23",
+      "semantic": "button-green",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 36,
+      "hex": "0x24",
+      "semantic": "button-red",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 37,
+      "hex": "0x25",
+      "semantic": "toggle-closed",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 38,
+      "hex": "0x26",
+      "semantic": "toggle-open",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 39,
+      "hex": "0x27",
+      "semantic": "button-brown",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 40,
+      "hex": "0x28",
+      "semantic": "button-blue",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 41,
+      "hex": "0x29",
+      "semantic": "teleport",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 42,
+      "hex": "0x2A",
+      "semantic": "bomb",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 43,
+      "hex": "0x2B",
+      "semantic": "trap",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 44,
+      "hex": "0x2C",
+      "semantic": "reveal-wall",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 45,
+      "hex": "0x2D",
+      "semantic": "gravel",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 46,
+      "hex": "0x2E",
+      "semantic": "pop-up-wall",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 47,
+      "hex": "0x2F",
+      "semantic": "hint",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 48,
+      "hex": "0x30",
+      "semantic": "thin-wall-SE",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 49,
+      "hex": "0x31",
+      "semantic": "cloner",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 50,
+      "hex": "0x32",
+      "semantic": "force-random",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 51,
+      "hex": "0x33",
+      "semantic": "player-drowning",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 52,
+      "hex": "0x34",
+      "semantic": "player-burned",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 53,
+      "hex": "0x35",
+      "semantic": "player-burned-2",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 54,
+      "hex": "0x36",
+      "semantic": "unused-36",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 55,
+      "hex": "0x37",
+      "semantic": "unused-37",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 56,
+      "hex": "0x38",
+      "semantic": "unused-38",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 57,
+      "hex": "0x39",
+      "semantic": "internal-exit-player",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 58,
+      "hex": "0x3A",
+      "semantic": "internal-exit-2",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 59,
+      "hex": "0x3B",
+      "semantic": "internal-exit-3",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 60,
+      "hex": "0x3C",
+      "semantic": "player-swimming-N",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 61,
+      "hex": "0x3D",
+      "semantic": "player-swimming-W",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 62,
+      "hex": "0x3E",
+      "semantic": "player-swimming-S",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 63,
+      "hex": "0x3F",
+      "semantic": "player-swimming-E",
+      "normalizationReviewRequired": true,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 64,
+      "hex": "0x40",
+      "semantic": "bug-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 65,
+      "hex": "0x41",
+      "semantic": "bug-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 66,
+      "hex": "0x42",
+      "semantic": "bug-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 67,
+      "hex": "0x43",
+      "semantic": "bug-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 68,
+      "hex": "0x44",
+      "semantic": "fireball-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 69,
+      "hex": "0x45",
+      "semantic": "fireball-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 70,
+      "hex": "0x46",
+      "semantic": "fireball-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 71,
+      "hex": "0x47",
+      "semantic": "fireball-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 72,
+      "hex": "0x48",
+      "semantic": "ball-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 73,
+      "hex": "0x49",
+      "semantic": "ball-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 74,
+      "hex": "0x4A",
+      "semantic": "ball-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 75,
+      "hex": "0x4B",
+      "semantic": "ball-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 76,
+      "hex": "0x4C",
+      "semantic": "tank-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 77,
+      "hex": "0x4D",
+      "semantic": "tank-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 78,
+      "hex": "0x4E",
+      "semantic": "tank-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 79,
+      "hex": "0x4F",
+      "semantic": "tank-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 80,
+      "hex": "0x50",
+      "semantic": "glider-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 81,
+      "hex": "0x51",
+      "semantic": "glider-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 82,
+      "hex": "0x52",
+      "semantic": "glider-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 83,
+      "hex": "0x53",
+      "semantic": "glider-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 84,
+      "hex": "0x54",
+      "semantic": "teeth-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 85,
+      "hex": "0x55",
+      "semantic": "teeth-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 86,
+      "hex": "0x56",
+      "semantic": "teeth-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 87,
+      "hex": "0x57",
+      "semantic": "teeth-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 88,
+      "hex": "0x58",
+      "semantic": "walker-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 89,
+      "hex": "0x59",
+      "semantic": "walker-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 90,
+      "hex": "0x5A",
+      "semantic": "walker-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 91,
+      "hex": "0x5B",
+      "semantic": "walker-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 92,
+      "hex": "0x5C",
+      "semantic": "blob-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 93,
+      "hex": "0x5D",
+      "semantic": "blob-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 94,
+      "hex": "0x5E",
+      "semantic": "blob-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 95,
+      "hex": "0x5F",
+      "semantic": "blob-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 96,
+      "hex": "0x60",
+      "semantic": "paramecium-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 97,
+      "hex": "0x61",
+      "semantic": "paramecium-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 98,
+      "hex": "0x62",
+      "semantic": "paramecium-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 99,
+      "hex": "0x63",
+      "semantic": "paramecium-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 100,
+      "hex": "0x64",
+      "semantic": "key-blue",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 101,
+      "hex": "0x65",
+      "semantic": "key-red",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 102,
+      "hex": "0x66",
+      "semantic": "key-green",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 103,
+      "hex": "0x67",
+      "semantic": "key-yellow",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 104,
+      "hex": "0x68",
+      "semantic": "flippers",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 105,
+      "hex": "0x69",
+      "semantic": "fire-boots",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 106,
+      "hex": "0x6A",
+      "semantic": "ice-skates",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 107,
+      "hex": "0x6B",
+      "semantic": "suction-boots",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 108,
+      "hex": "0x6C",
+      "semantic": "player-N",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 109,
+      "hex": "0x6D",
+      "semantic": "player-W",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 110,
+      "hex": "0x6E",
+      "semantic": "player-S",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    },
+    {
+      "id": 111,
+      "hex": "0x6F",
+      "semantic": "player-E",
+      "normalizationReviewRequired": false,
+      "implementationStatus": "NOT_STARTED"
+    }
+  ]
+}

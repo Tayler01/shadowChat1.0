@@ -1,0 +1,50 @@
+test_allow_https (test_fetch_resources.ResourceTests.test_allow_https) ... ok
+test_archive_path_rejection (test_fetch_resources.ResourceTests.test_archive_path_rejection) ... ok
+test_case_collision (test_fetch_resources.ResourceTests.test_case_collision) ... ok
+test_executables_flagged_never_extracted (test_fetch_resources.ResourceTests.test_executables_flagged_never_extracted) ... ok
+test_existing_file_not_overwritten (test_fetch_resources.ResourceTests.test_existing_file_not_overwritten) ... ok
+test_manifest_filename_rejected (test_fetch_resources.ResourceTests.test_manifest_filename_rejected) ... ok
+test_mocked_download_and_provenance (test_fetch_resources.ResourceTests.test_mocked_download_and_provenance) ... ok
+test_mocked_download_over_limit_cleans_temporary_file (test_fetch_resources.ResourceTests.test_mocked_download_over_limit_cleans_temporary_file) ... ok
+test_reject_urls (test_fetch_resources.ResourceTests.test_reject_urls) ... ok
+test_safe_zip (test_fetch_resources.ResourceTests.test_safe_zip) ... ok
+test_suspicious_ratio (test_fetch_resources.ResourceTests.test_suspicious_ratio) ... ok
+test_symlink_rejection (test_fetch_resources.ResourceTests.test_symlink_rejection) ... ok
+test_all_truncations_rejected (test_import_legacy_dat.DatTests.test_all_truncations_rejected) ... ok
+test_bad_link_coordinates (test_import_legacy_dat.DatTests.test_bad_link_coordinates) ... ok
+test_bad_link_record_width (test_import_legacy_dat.DatTests.test_bad_link_record_width) ... ok
+test_bytes_required (test_import_legacy_dat.DatTests.test_bytes_required) ... ok
+test_count_limit (test_import_legacy_dat.DatTests.test_count_limit) ... ok
+test_duplicate_level_number_preserved (test_import_legacy_dat.DatTests.test_duplicate_level_number_preserved) ... ok
+test_duplicate_optional_preserved (test_import_legacy_dat.DatTests.test_duplicate_optional_preserved) ... ok
+test_empty_pack (test_import_legacy_dat.DatTests.test_empty_pack) ... ok
+test_internal_tiles_preserved_warning (test_import_legacy_dat.DatTests.test_internal_tiles_preserved_warning) ... ok
+test_invalid_header (test_import_legacy_dat.DatTests.test_invalid_header) ... ok
+test_invalid_tile_literal (test_import_legacy_dat.DatTests.test_invalid_tile_literal) ... ok
+test_invalid_tile_run (test_import_legacy_dat.DatTests.test_invalid_tile_run) ... ok
+test_layer_overflow (test_import_legacy_dat.DatTests.test_layer_overflow) ... ok
+test_layer_short (test_import_legacy_dat.DatTests.test_layer_short) ... ok
+test_lynx_hint (test_import_legacy_dat.DatTests.test_lynx_hint) ... ok
+test_max_run_chain (test_import_legacy_dat.DatTests.test_max_run_chain) ... ok
+test_missing_nul_is_warning (test_import_legacy_dat.DatTests.test_missing_nul_is_warning) ... ok
+test_odd_actor_bytes (test_import_legacy_dat.DatTests.test_odd_actor_bytes) ... ok
+test_optional_links (test_import_legacy_dat.DatTests.test_optional_links) ... ok
+test_order_bad_coordinates (test_import_legacy_dat.DatTests.test_order_bad_coordinates) ... ok
+test_order_not_sorted (test_import_legacy_dat.DatTests.test_order_not_sorted) ... ok
+test_oversize_file (test_import_legacy_dat.DatTests.test_oversize_file) ... ok
+test_record_extra_bytes (test_import_legacy_dat.DatTests.test_record_extra_bytes) ... ok
+test_run_truncated (test_import_legacy_dat.DatTests.test_run_truncated) ... ok
+test_source_record_round_trip (test_import_legacy_dat.DatTests.test_source_record_round_trip) ... ok
+test_text_cp1252_raw (test_import_legacy_dat.DatTests.test_text_cp1252_raw) ... ok
+test_trailing_bytes_rejected (test_import_legacy_dat.DatTests.test_trailing_bytes_rejected) ... ok
+test_unknown_optional_bytes (test_import_legacy_dat.DatTests.test_unknown_optional_bytes) ... ok
+test_unsupported_encoding (test_import_legacy_dat.DatTests.test_unsupported_encoding) ... ok
+test_untimed (test_import_legacy_dat.DatTests.test_untimed) ... ok
+test_valid_literal_layer (test_import_legacy_dat.DatTests.test_valid_literal_layer) ... ok
+test_valid_synthetic_corridor (test_import_legacy_dat.DatTests.test_valid_synthetic_corridor) ... ok
+test_zero_run (test_import_legacy_dat.DatTests.test_zero_run) ... ok
+
+----------------------------------------------------------------------
+Ran 45 tests in 0.031s
+
+OK

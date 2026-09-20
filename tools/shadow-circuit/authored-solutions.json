@@ -1,0 +1,9 @@
+{
+  "ruleset": "shadow-grid-v0",
+  "provenance": "Routes authored by reading the original ASCII chamber maps. These are development chamber expectations, not an MSCC reference oracle.",
+  "routes": [
+    {"levelId":"shadow-fixtures:vestibule","steps":"E2 S2 E6 S5 E1 S1 W9 N2 E1 S2 E9 N6 W1 N2 E1","expectedExit":[11,1],"expectedEvents":["chip","key","door","win"]},
+    {"levelId":"shadow-fixtures:waterworks","steps":"S2 E6 W6 N2 E8","expectedExit":[9,1],"expectedEvents":["chip","key","door","push","win"]},
+    {"levelId":"shadow-fixtures:cold-path","steps":"E8 S2 W3 E3 S3","expectedExit":[9,6],"expectedEvents":["chip","win"]}
+  ]
+}

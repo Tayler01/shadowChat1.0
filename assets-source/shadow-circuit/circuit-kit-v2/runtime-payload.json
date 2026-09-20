@@ -1,0 +1,127 @@
+[
+  {
+    "name": "door-blue.glb",
+    "sourceBytes": 14408,
+    "runtimeBytes": 2831
+  },
+  {
+    "name": "door-green.glb",
+    "sourceBytes": 14412,
+    "runtimeBytes": 2828
+  },
+  {
+    "name": "door-red.glb",
+    "sourceBytes": 14408,
+    "runtimeBytes": 2828
+  },
+  {
+    "name": "door-yellow.glb",
+    "sourceBytes": 14412,
+    "runtimeBytes": 2826
+  },
+  {
+    "name": "enemy-ball.glb",
+    "sourceBytes": 29192,
+    "runtimeBytes": 7906
+  },
+  {
+    "name": "enemy-blob.glb",
+    "sourceBytes": 40288,
+    "runtimeBytes": 16575
+  },
+  {
+    "name": "enemy-bug.glb",
+    "sourceBytes": 46964,
+    "runtimeBytes": 13082
+  },
+  {
+    "name": "enemy-fireball.glb",
+    "sourceBytes": 17432,
+    "runtimeBytes": 5025
+  },
+  {
+    "name": "enemy-glider.glb",
+    "sourceBytes": 30016,
+    "runtimeBytes": 9474
+  },
+  {
+    "name": "enemy-paramecium.glb",
+    "sourceBytes": 33472,
+    "runtimeBytes": 9924
+  },
+  {
+    "name": "enemy-tank.glb",
+    "sourceBytes": 52828,
+    "runtimeBytes": 17620
+  },
+  {
+    "name": "enemy-teeth.glb",
+    "sourceBytes": 40664,
+    "runtimeBytes": 10764
+  },
+  {
+    "name": "enemy-walker.glb",
+    "sourceBytes": 49744,
+    "runtimeBytes": 17313
+  },
+  {
+    "name": "hero-explorer.glb",
+    "sourceBytes": 271632,
+    "runtimeBytes": 144113
+  },
+  {
+    "name": "item-boot-0.glb",
+    "sourceBytes": 49368,
+    "runtimeBytes": 11127
+  },
+  {
+    "name": "item-boot-1.glb",
+    "sourceBytes": 49352,
+    "runtimeBytes": 11103
+  },
+  {
+    "name": "item-boot-2.glb",
+    "sourceBytes": 52092,
+    "runtimeBytes": 12355
+  },
+  {
+    "name": "item-boot-3.glb",
+    "sourceBytes": 49368,
+    "runtimeBytes": 11124
+  },
+  {
+    "name": "item-chip.glb",
+    "sourceBytes": 13700,
+    "runtimeBytes": 2584
+  },
+  {
+    "name": "key-blue.glb",
+    "sourceBytes": 28320,
+    "runtimeBytes": 6116
+  },
+  {
+    "name": "key-green.glb",
+    "sourceBytes": 28324,
+    "runtimeBytes": 6111
+  },
+  {
+    "name": "key-red.glb",
+    "sourceBytes": 28320,
+    "runtimeBytes": 6119
+  },
+  {
+    "name": "key-yellow.glb",
+    "sourceBytes": 28328,
+    "runtimeBytes": 6113
+  },
+  {
+    "name": "tile-floor.glb",
+    "sourceBytes": 5760,
+    "runtimeBytes": 1432
+  },
+  {
+    "name": "tile-wall.glb",
+    "sourceBytes": 7200,
+    "runtimeBytes": 1585
+  }
+]

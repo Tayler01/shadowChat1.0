@@ -1,0 +1,3 @@
+cclp1-archive: https://bitbusters.club/cclp1/CCLP1.zip [REVIEW_ARCHIVE_TERMS]
+cclp1-dat: https://bitbusters.club/cclp1/CCLP1.dat [REVIEW_ARCHIVE_TERMS_AND_CREDITS]
+cclp1-lexy-mirror: https://raw.githubusercontent.com/eevee/lexys-labyrinth/master/levels/CCLP1.ccl [REVIEW_UPSTREAM_PACK_TERMS]

@@ -1,0 +1,634 @@
+{
+  "version": 1,
+  "blender": "4.5.10 LTS",
+  "source": "Original procedural recipes for Shadow Circuit",
+  "coordinates": "Blender -Y forward / +Z up; glTF +Z forward / +Y up; feet at origin",
+  "scope": "Static calibration only. Animation, runtime orientation and gameplay-scale review are pending.",
+  "assets": [
+    {
+      "id": "tile-floor",
+      "triangles": 68,
+      "triangleCeiling": 120,
+      "blenderBounds": [
+        [
+          -0.48500001430511475,
+          0.48500001430511475
+        ],
+        [
+          -0.48500001430511475,
+          0.48500001430511475
+        ],
+        [
+          -0.18000000715255737,
+          0.008000001311302185
+        ]
+      ],
+      "sha256": "912180ce5ac7495fbab1d10b93ec6a0b849acbafb96f5d11bf0f61871d1ce285",
+      "bytes": 5760,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "tile-floor"
+    },
+    {
+      "id": "tile-wall",
+      "triangles": 80,
+      "triangleCeiling": 120,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.7450000047683716
+        ]
+      ],
+      "sha256": "8db57d75ec5e8a5ce793f07ad273b9b5aa4f178884c6829ab67f0af787c14218",
+      "bytes": 7200,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "tile-wall"
+    },
+    {
+      "id": "hero-explorer",
+      "triangles": 27456,
+      "triangleCeiling": 28000,
+      "blenderBounds": [
+        [
+          -0.3442087173461914,
+          0.3442080616950989
+        ],
+        [
+          -0.20400002598762512,
+          0.3039999008178711
+        ],
+        [
+          0.008000001311302185,
+          1.1660796403884888
+        ]
+      ],
+      "sha256": "07c16d472d238b8371aaa63c6f2a377d8e9a53e7b9cb8215f6614817ec8e2fdf",
+      "bytes": 508888,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "hero-explorer"
+    },
+    {
+      "id": "enemy-bug",
+      "triangles": 1788,
+      "triangleCeiling": 3000,
+      "blenderBounds": [
+        [
+          -0.41061875224113464,
+          0.41061875224113464
+        ],
+        [
+          -0.3659999966621399,
+          0.35999998450279236
+        ],
+        [
+          0.021904289722442627,
+          0.46400001645088196
+        ]
+      ],
+      "sha256": "a0da84a34c6e1685bd96ad41a280de3e2824ebfb7ba507d56ad1437df66fb063",
+      "bytes": 46964,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-bug"
+    },
+    {
+      "id": "enemy-fireball",
+      "triangles": 514,
+      "triangleCeiling": 4000,
+      "blenderBounds": [
+        [
+          -0.2541550397872925,
+          0.26999998092651367
+        ],
+        [
+          -0.26598846912384033,
+          0.26598846912384033
+        ],
+        [
+          0.030000001192092896,
+          0.699999988079071
+        ]
+      ],
+      "sha256": "2283fa442b36a9973312c609bd73e303f1493c8fb48b0885b368f83c909e437e",
+      "bytes": 17432,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-fireball"
+    },
+    {
+      "id": "enemy-ball",
+      "triangles": 744,
+      "triangleCeiling": 1500,
+      "blenderBounds": [
+        [
+          -0.28700000047683716,
+          0.28700000047683716
+        ],
+        [
+          -0.28700000047683716,
+          0.28700000047683716
+        ],
+        [
+          0.009999990463256836,
+          0.5699999928474426
+        ]
+      ],
+      "sha256": "50f7b94a4f3b6d9d9f3ca3e66e03a6e3e292b70747b54416525f0ddbe4e10a3a",
+      "bytes": 29192,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-ball"
+    },
+    {
+      "id": "enemy-tank",
+      "triangles": 2364,
+      "triangleCeiling": 4000,
+      "blenderBounds": [
+        [
+          -0.32600003480911255,
+          0.32600003480911255
+        ],
+        [
+          -0.46000003814697266,
+          0.3499999940395355
+        ],
+        [
+          0.019999995827674866,
+          0.5299999713897705
+        ]
+      ],
+      "sha256": "6a6923184ac7938903192f479ef7e5e4ee95c5309ca351f4a37de1867c078266",
+      "bytes": 52828,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-tank"
+    },
+    {
+      "id": "enemy-glider",
+      "triangles": 1212,
+      "triangleCeiling": 2200,
+      "blenderBounds": [
+        [
+          -0.47553062438964844,
+          0.47553062438964844
+        ],
+        [
+          -0.30000007152557373,
+          0.3349999785423279
+        ],
+        [
+          0.14000001549720764,
+          0.4399999976158142
+        ]
+      ],
+      "sha256": "62f89a8c390a811c546f523a2157d754b2dfae0aade6472f7430d872886e25c2",
+      "bytes": 30016,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-glider"
+    },
+    {
+      "id": "enemy-teeth",
+      "triangles": 1160,
+      "triangleCeiling": 2400,
+      "blenderBounds": [
+        [
+          -0.3000001609325409,
+          0.30000004172325134
+        ],
+        [
+          -0.28000006079673767,
+          0.2849999964237213
+        ],
+        [
+          0.040000006556510925,
+          0.5399999618530273
+        ]
+      ],
+      "sha256": "e3efd0681f6ff96b08cd0d882a979e46139632780ac7422c065e5bcbe8ad32ad",
+      "bytes": 40664,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-teeth"
+    },
+    {
+      "id": "enemy-walker",
+      "triangles": 2316,
+      "triangleCeiling": 3800,
+      "blenderBounds": [
+        [
+          -0.43000003695487976,
+          0.4300000071525574
+        ],
+        [
+          -0.33500000834465027,
+          0.3349999785423279
+        ],
+        [
+          0.0,
+          0.4950000047683716
+        ]
+      ],
+      "sha256": "217aec45161b057825c4af0ee74d64833cc8d9ada744eb1e4520762ee4c9b08c",
+      "bytes": 49744,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-walker"
+    },
+    {
+      "id": "enemy-blob",
+      "triangles": 2160,
+      "triangleCeiling": 3000,
+      "blenderBounds": [
+        [
+          -0.3098936080932617,
+          0.3500000238418579
+        ],
+        [
+          -0.3397219181060791,
+          0.3397218585014343
+        ],
+        [
+          0.0,
+          0.47999998927116394
+        ]
+      ],
+      "sha256": "df088228540e352daefe54a7cdf422510337476016b2eb197f6d0cdc7370e95a",
+      "bytes": 40288,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-blob"
+    },
+    {
+      "id": "enemy-paramecium",
+      "triangles": 1112,
+      "triangleCeiling": 2500,
+      "blenderBounds": [
+        [
+          -0.28943169116973877,
+          0.28943169116973877
+        ],
+        [
+          -0.34000009298324585,
+          0.3400000035762787
+        ],
+        [
+          0.040000006556510925,
+          0.4399999976158142
+        ]
+      ],
+      "sha256": "d842533989b246e6bb8ded5f1921c62e0665fa40141fb2992bc9b0320f7189ef",
+      "bytes": 33472,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-paramecium"
+    },
+    {
+      "id": "item-boot-0",
+      "triangles": 1368,
+      "triangleCeiling": 2500,
+      "blenderBounds": [
+        [
+          -0.24500004947185516,
+          0.24500001966953278
+        ],
+        [
+          -0.33000004291534424,
+          0.17000001668930054
+        ],
+        [
+          0.019999995827674866,
+          0.41750001907348633
+        ]
+      ],
+      "sha256": "5a57b6c319e3972eb313e9a8c570c1f340cf6d346fd985627bdd9b44c0b8f2b9",
+      "bytes": 49368,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "item-boot-0"
+    },
+    {
+      "id": "item-boot-1",
+      "triangles": 1368,
+      "triangleCeiling": 2500,
+      "blenderBounds": [
+        [
+          -0.24500004947185516,
+          0.24500001966953278
+        ],
+        [
+          -0.33000004291534424,
+          0.17000001668930054
+        ],
+        [
+          0.019999995827674866,
+          0.41750001907348633
+        ]
+      ],
+      "sha256": "44ff5c52b3311f9c719e72ffe8b78991e4163bc883e3a0580ab45b584f393b91",
+      "bytes": 49352,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "item-boot-1"
+    },
+    {
+      "id": "item-boot-2",
+      "triangles": 1392,
+      "triangleCeiling": 2500,
+      "blenderBounds": [
+        [
+          -0.24500004947185516,
+          0.24500001966953278
+        ],
+        [
+          -0.33000004291534424,
+          0.17000001668930054
+        ],
+        [
+          0.007500000298023224,
+          0.41750001907348633
+        ]
+      ],
+      "sha256": "88c6aa3684437abf8121a68748791cd8680d1a57016e59b9bdd453f27a86374d",
+      "bytes": 52092,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "item-boot-2"
+    },
+    {
+      "id": "item-boot-3",
+      "triangles": 1368,
+      "triangleCeiling": 2500,
+      "blenderBounds": [
+        [
+          -0.24500004947185516,
+          0.24500001966953278
+        ],
+        [
+          -0.33000004291534424,
+          0.17000001668930054
+        ],
+        [
+          0.019999995827674866,
+          0.41750001907348633
+        ]
+      ],
+      "sha256": "c8f946a250963a500350e2ef9eb0b4d91a7dae68d46dc24b3474e1fe88a74331",
+      "bytes": 49368,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "item-boot-3"
+    },
+    {
+      "id": "door-blue",
+      "triangles": 220,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.4000000059604645,
+          0.4000000059604645
+        ],
+        [
+          -0.4000000059604645,
+          0.4000000059604645
+        ],
+        [
+          0.0,
+          0.6929999589920044
+        ]
+      ],
+      "sha256": "d5a7b98311fdeba6543f0dceca9552c7e66288df12fd61a398675e7979817665",
+      "bytes": 14408,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "door-blue"
+    },
+    {
+      "id": "key-blue",
+      "triangles": 500,
+      "triangleCeiling": 600,
+      "blenderBounds": [
+        [
+          -0.1680000126361847,
+          0.1680000126361847
+        ],
+        [
+          -0.30000001192092896,
+          0.328000009059906
+        ],
+        [
+          0.08699999749660492,
+          0.15299999713897705
+        ]
+      ],
+      "sha256": "1a20eb63a20d5079fd4e8c29a4d223801cb07da722826936d5ba1972564ebf54",
+      "bytes": 28320,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "key-blue"
+    },
+    {
+      "id": "door-red",
+      "triangles": 220,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.4000000059604645,
+          0.4000000059604645
+        ],
+        [
+          -0.4000000059604645,
+          0.4000000059604645
+        ],
+        [
+          0.0,
+          0.6929999589920044
+        ]
+      ],
+      "sha256": "37fb55941945e6812d599d7dfa0a04a6213e59cdb985f0f1188d277eb60e2482",
+      "bytes": 14408,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "door-red"
+    },
+    {
+      "id": "key-red",
+      "triangles": 500,
+      "triangleCeiling": 600,
+      "blenderBounds": [
+        [
+          -0.1680000126361847,
+          0.1680000126361847
+        ],
+        [
+          -0.30000001192092896,
+          0.328000009059906
+        ],
+        [
+          0.08699999749660492,
+          0.15299999713897705
+        ]
+      ],
+      "sha256": "42746f25c6b2d4d2add3f9f850f244e6471eaef81aed69bffd16015533f31764",
+      "bytes": 28320,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "key-red"
+    },
+    {
+      "id": "door-green",
+      "triangles": 220,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.4000000059604645,
+          0.4000000059604645
+        ],
+        [
+          -0.4000000059604645,
+          0.4000000059604645
+        ],
+        [
+          0.0,
+          0.6929999589920044
+        ]
+      ],
+      "sha256": "53b3dfc7daab17608ca854ad0647ebc4aa1a224d6dc9caa9fdbd93d1bee3e259",
+      "bytes": 14412,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "door-green"
+    },
+    {
+      "id": "key-green",
+      "triangles": 500,
+      "triangleCeiling": 600,
+      "blenderBounds": [
+        [
+          -0.1680000126361847,
+          0.1680000126361847
+        ],
+        [
+          -0.30000001192092896,
+          0.328000009059906
+        ],
+        [
+          0.08699999749660492,
+          0.15299999713897705
+        ]
+      ],
+      "sha256": "37c72fc0f9f5ffcd91e5778832c9059e67ab043b06f14ec77e04e582c9444511",
+      "bytes": 28324,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "key-green"
+    },
+    {
+      "id": "door-yellow",
+      "triangles": 220,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.4000000059604645,
+          0.4000000059604645
+        ],
+        [
+          -0.4000000059604645,
+          0.4000000059604645
+        ],
+        [
+          0.0,
+          0.6929999589920044
+        ]
+      ],
+      "sha256": "36c0920d7fa3938608fb7c8b3407b0648bdd679070826e30f80fbf4494b88ab4",
+      "bytes": 14412,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "door-yellow"
+    },
+    {
+      "id": "key-yellow",
+      "triangles": 500,
+      "triangleCeiling": 600,
+      "blenderBounds": [
+        [
+          -0.1680000126361847,
+          0.1680000126361847
+        ],
+        [
+          -0.30000001192092896,
+          0.328000009059906
+        ],
+        [
+          0.08699999749660492,
+          0.15299999713897705
+        ]
+      ],
+      "sha256": "6bddccf33f0b31f86713eda26f2acc17fd68fc23416445d4c0d6b73d0161a8ff",
+      "bytes": 28328,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "key-yellow"
+    },
+    {
+      "id": "item-chip",
+      "triangles": 200,
+      "triangleCeiling": 600,
+      "blenderBounds": [
+        [
+          -0.30000001192092896,
+          0.30000001192092896
+        ],
+        [
+          -0.27000001072883606,
+          0.27000001072883606
+        ],
+        [
+          0.09000000357627869,
+          0.22450000047683716
+        ]
+      ],
+      "sha256": "c8d537a8faa2116a4c55a6e9024fa0cd6a23e4bb5c8a28d590d9896c81db9384",
+      "bytes": 13700,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "item-chip"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# Original packet material
+The newly authored instructions, scripts, schemas and tiny synthetic fixtures in this packet are provided for Tayler's use and modification in the Shadow Chat project. No claim of rights to Chip's Challenge, Nintendo material, community level packs, referenced repositories or third-party assets is conveyed. External content remains under its respective terms. No original commercial game assets or full campaign binary are bundled.

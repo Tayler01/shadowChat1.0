@@ -1,4 +1,26 @@
+## September 20 Shadow Circuit branded test release preparation
+
+- User authorized main deployment and manual Netlify fallback. Integrated selected PCB branding, existing-format Games card, raised rounded buttons and themed loading.
+- Twenty-five static Blender models now cover all monster roles/boots/keys/doors; closer explorer sculpt with separate gameplay LOD. Exact likeness and animations remain unfinished.
+- Fixed camera follow orbit, smooth actor motion, music/MIDI support, campaign progression and original-password unlocks. Portrait gate and best-effort native landscape lock follow host game behavior.
+- 252 Jest suites pass (1,436 tests), 70 game tests and 58 repository node tests pass. Chromium/WebKit touch/progression checks pass; WebKit-on-Windows audio API is unavailable. Physical phones still need validation. Original files remain private pending redistribution permission.
+
+## 2026-09-20 — Shadow Circuit original reference and classic revision
+
+- User supplied original Windows game ZIP; portable WineVDM 0.9.0 opens LESSON 1. Launcher and setup: `tools/shadow-circuit/Start-Original.ps1`, `docs/shadow-circuit/ORIGINAL_REFERENCE.md`.
+- All 149 original DAT records match Python/TypeScript parsers, with both layers/metadata retained. Private atlas inventories every map and mechanism; all layout overview sheets inspected. Campaign completion remains unverified.
+- 13 classic gray/green Blender models integrated; colored keyhole locks, IC chips, nine-tile camera, silver HUD and readable terrain/mechanism shapes replace the earlier dark/gold game direction.
+- Lesson 1 clears by 96 D-pad taps in Chromium and WebKit, collecting 11 chips/opening eight locks and retaining green key. 37 rules tests and 16 model/budget tests pass; lint, app typecheck and enabled build pass. Physical-device and exact Windows compatibility remain open.
+- Originals stay ignored/local, preview is loopback-only, no public maps or original audio/sprites included. No push, deploy, linked migration or paid generation.
+
 # Feature Progress Log
+
+## September 19 Shadow Circuit build started
+
+- User-authorized implementation of `docs/shadow-circuit-build/` inside Shadow Chat; Babylon/TypeScript, Blender assets, default-off launch flag. No push, deployment or linked migration.
+- Three authored development chambers clear with real D-pad input in Chromium and WebKit; deterministic core, import parity, device checkpoints and six static Blender calibration exports have recorded evidence.
+- This is not a finished sample/campaign or release candidate. Exact original source/rights, historical rules oracle, runtime art/audio, cloud/offline work and physical-device gates remain open. Payload headroom is only about 198 KB under the existing cap.
+- Current contract and continuation: [Shadow Circuit status](../shadow-circuit/STATUS.md) and [test evidence](../shadow-circuit/TEST_REPORT.md). Preserve unrelated existing Unity/instruction changes.
 
 ## September 13 Shadow Checkers Unity rebuild
 

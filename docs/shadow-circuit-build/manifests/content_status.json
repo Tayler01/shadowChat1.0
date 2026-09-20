@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "originalWindowsCampaign": {
+    "requestedLevelCount": 149,
+    "acquired": false,
+    "redistributionApproved": false,
+    "identityVerified": false,
+    "allLevelsSolved": false,
+    "status": "BLOCKED_SOURCE"
+  },
+  "communityCCLP1": {
+    "sourceLocated": true,
+    "acquired": false,
+    "expectedLevelCountToVerify": 149,
+    "redistributionApproved": false,
+    "status": "DOWNLOAD_AND_TERMS_REVIEW_REQUIRED"
+  },
+  "syntheticFixtures": {
+    "included": true,
+    "source": "Original fixtures authored for this packet",
+    "campaign": false,
+    "originalGameContent": false
+  },
+  "shippingPolicy": "Do not ship unapproved content; source URLs and file counts are not permission or solution proof."
+}

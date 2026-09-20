@@ -1,48 +1,26 @@
-# Production Social Hotfix Design QA
+# Shadow Circuit selected-image implementation review
 
-Date: 2026-07-16
-Production origin: `https://shadochat.online`
-Frontend commit reviewed: `eecd772c3186a507aac45c73a376950fb2ba05d7`
+Reviewed 2026-09-20 against `assets-source/shadow-circuit/branding/selected/reference.png`.
 
-## Catch-Up profile identity
+## Method and evidence
 
-- Source screenshot: `C:\Users\tayle\OneDrive\Pictures\2.0\photo_2026-07-16_16-47-42.jpg`
-- Production screenshots:
-  - `C:\repos\chat2.0-main\output\playwright\production-social-hotfix\pixel-chromium-catch-up-clean.png`
-  - `C:\repos\chat2.0-main\output\playwright\production-social-hotfix\iphone-webkit-catch-up-clean.png`
-- State compared: authenticated Catch-Up list with ShadowPin activity.
-- Result: all eight visible actor controls loaded real avatar images in both Pixel Chromium and iPhone WebKit. The avatar controls opened the existing public-profile dialog and closed normally.
-- Visible change: the initial-only fallback circles in the source are replaced by the same profile photos and circular treatment used elsewhere in ShadowChat.
+Compared the source and rendered desktop (1672 x 941), Android/Chromium and iPhone/WebKit (844 x 390) screenshots together. Evidence: `output/playwright/shadow-circuit-branding/`. Browser automation uses local backend stubs; this is not physical-device evidence.
 
-## ShadowPin conversation and composer
+## Matches and deliberate adaptations
 
-- Source screenshots:
-  - `C:\Users\tayle\OneDrive\Pictures\2.0\photo_2026-07-16_16-47-08.jpg`
-  - `C:\Users\tayle\OneDrive\Pictures\2.0\photo_2026-07-16_16-47-35.jpg`
-  - `C:\Users\tayle\OneDrive\Pictures\2.0\photo_2026-07-16_16-47-38.jpg`
-  - `C:\Users\tayle\OneDrive\Pictures\2.0\photo_2026-07-16_16-47-45.jpg`
-- Production screenshots:
-  - `C:\repos\chat2.0-main\output\playwright\production-social-hotfix\pixel-chromium-pin-comments-clean.png`
-  - `C:\repos\chat2.0-main\output\playwright\production-social-hotfix\iphone-webkit-pin-comments-clean.png`
-  - `C:\repos\chat2.0-main\output\playwright\production-social-hotfix\pixel-chromium-pin-comment-menu-clean.png`
-  - `C:\repos\chat2.0-main\output\playwright\production-social-hotfix\iphone-webkit-pin-comment-menu-clean.png`
-  - `C:\repos\chat2.0-main\output\playwright\production-social-hotfix\pixel-chromium-pin-comment-quick-reactions-clean.png`
-  - `C:\repos\chat2.0-main\output\playwright\production-social-hotfix\iphone-webkit-pin-comment-quick-reactions-clean.png`
-- State compared: authenticated full-screen ShadowPin conversation with an existing comment and the composer focused.
-- Result: the dialog stayed inside each visual viewport. The focused composer ended at 826px in an 839px Pixel viewport and 651px in a 664px iPhone WebKit visual viewport.
-- Visible change: comments now use compact content-sized General Chat message rows, clickable author identity, a three-dot context menu, tap quick reactions, and no always-visible action shelf.
-- Interaction check: Copy, Reply, and Add Reaction were present in the context menu; the quick-reaction rail stayed completely inside both phone viewports.
+- Preserved green PCB environment, gray puzzle diorama, green keyhole microchip logo, silver/green title and Play/Levels/Settings hierarchy.
+- Replaced baked buttons with working controls. Thick silver borders, rounded edges, layered raised bases and pressed states implement the user's later request for blockier buttons.
+- Kept compact secondary guide/records/codes/credits links and a host exit. Mobile primary controls are at least 48 px high; secondary touch targets were increased to 44 px.
+- Launcher artwork uses the existing Games card layout and centered cover crop. Title, emblem and character survive the 358 x 132 mobile crop.
+- Gameplay has a real PCB background, metallic keyhole doors and raised gray tiles. Loading uses a branded panel and indeterminate activity bar, with reduced-motion handling.
+- WebP runtime images replace AVIF after Windows WebKit could not decode the AVIF exports.
 
-## Shado Live message consistency
+## Remaining differences and acceptance limits
 
-- The production database exposes the new list/toggle reaction RPCs.
-- Component tests cover the compact message row, clickable avatar, three-dot menu, quick reactions, reaction summaries, and report action.
-- No controlled active production room was available, so the live-room visual was not recreated with production user content during this pass.
+- Desktop logo is slightly smaller and lower than the selected composition to preserve responsive controls and the exit.
+- The actual hero is a new static Blender model, with swept brown hair, open black glasses, green clothing and backpack. It is closer in silhouette and detail but is not an exact likeness of the generated reference. Its current face/hair sculpt and animations remain art work, not signed-off final assets.
+- All nine monster roles have independent static models. Several terrain assets remain provisional; complete campaign fidelity and final animation/VFX are not accepted.
+- Windows WebKit has neither AudioContext nor webkitAudioContext. Its visual/touch checks pass; real iPhone audio remains unverified.
+- Landscape is requested on launcher interaction. Browsers that disallow orientation locking retain the rotation gate; physical iPhone/Android installed-PWA rotation, sound and thermal performance need user testing.
 
-## Review history
-
-1. The first automated capture was obscured by queued in-app notification cards.
-2. The pass was repeated after the normal notification window and the phone-setup overlay was explicitly dismissed.
-3. Pixel Chromium and iPhone WebKit then passed with no console errors, page errors, failed app requests, or HTTP error responses.
-
-final result: passed
+Verdict: suitable for an explicitly labeled initial testing milestone after release checks; not final visual or full-package acceptance.

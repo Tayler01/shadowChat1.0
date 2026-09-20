@@ -4,6 +4,7 @@ import {
   CATCH_UP_FEATURE_ENABLED,
   SHADO_LIVE_PROTOTYPE_ENABLED,
   SHADO_LIVE_REAL_ENABLED,
+  SHADOW_CIRCUIT_ENABLED,
 } from '../config/featureFlags'
 import type { AppView } from '../types/navigation'
 
@@ -90,6 +91,7 @@ export const resolveChatThreadRouteMutation = ({
 }
 
 export type PlayExperience =
+  | 'shadow-circuit'
   | 'shadow-runner'
   | 'shadow-war'
   | 'shadow-checkers'
@@ -105,6 +107,7 @@ export type PlayRouteMutation =
   | { method: 'push' | 'replace'; url: URL; layer: PlayHistoryLayer }
 
 const PLAY_EXPERIENCES = new Set<PlayExperience>([
+  ...(SHADOW_CIRCUIT_ENABLED ? ['shadow-circuit' as const] : []),
   'shadow-runner',
   'shadow-war',
   'shadow-checkers',

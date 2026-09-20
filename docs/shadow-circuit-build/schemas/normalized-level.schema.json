@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Initial normalized level contract; validate semantic enums/links/topology separately",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "levelId",
+    "packId",
+    "contentHash",
+    "sourceHash",
+    "rulesetId",
+    "sourceNumber",
+    "title",
+    "width",
+    "height",
+    "timeLimitSeconds",
+    "requiredChips",
+    "cells",
+    "actors",
+    "links"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "levelId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "packId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sourceHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "rulesetId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "sourceNumber": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "title": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "hint": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "password": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 32
+    },
+    "width": {
+      "const": 32
+    },
+    "height": {
+      "const": 32
+    },
+    "timeLimitSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "requiredChips": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cells": {
+      "type": "array",
+      "minItems": 1024,
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "required": [
+          "terrain",
+          "contents"
+        ],
+        "properties": {
+          "terrain": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "contents": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "maxItems": 8
+          },
+          "edgeMask": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 15
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "actors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "cell",
+          "facing",
+          "sourceOrder"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "kind": {
+            "enum": [
+              "player",
+              "block",
+              "bug",
+              "fireball",
+              "ball",
+              "tank",
+              "glider",
+              "teeth",
+              "walker",
+              "blob",
+              "paramecium"
+            ]
+          },
+          "cell": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          },
+          "facing": {
+            "enum": [
+              "N",
+              "E",
+              "S",
+              "W"
+            ]
+          },
+          "sourceOrder": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      },
+      "maxItems": 4096
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "kind",
+          "buttonCell",
+          "targetCell"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "trap",
+              "clone"
+            ]
+          },
+          "buttonCell": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          },
+          "targetCell": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1023
+          },
+          "legacyState": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "renderOverlay": {
+      "type": "object",
+      "required": [
+        "version",
+        "heightByCell"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "heightByCell": {
+          "type": "array",
+          "minItems": 1024,
+          "maxItems": 1024,
+          "items": {
+            "type": "number",
+            "minimum": -2,
+            "maximum": 2
+          }
+        },
+        "themeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

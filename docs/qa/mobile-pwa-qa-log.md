@@ -1,3 +1,9 @@
+## September 20 Shadow Circuit test build
+
+- Local Android/Chromium and iPhone/WebKit emulation at 844x390 passes menu/touch play, pause/reload, locked levels/password persistence and portrait gate at 390x844. Screens: `output/playwright/shadow-circuit-branding/` and `output/playwright/shadow-circuit-progression/`.
+- Chromium audio gesture/mute/pause checks pass. This Windows WebKit has no Web Audio API, so iPhone audio is unverified. Native orientation lock is best-effort with a blocking portrait gate where unsupported.
+- Not physical-device proof: installed PWA safe areas, landscape lock, audio, background/foreground and thermal performance remain pending.
+
 # Mobile PWA QA Log
 
 ## September 13 Shadow Checkers Unity landscape checkpoint

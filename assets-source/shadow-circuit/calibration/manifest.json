@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "blender": "4.5.10 LTS",
+  "source": "Original procedural recipes for Shadow Circuit",
+  "coordinates": "Blender -Y forward / +Z up; glTF +Z forward / +Y up; feet at origin",
+  "scope": "Static calibration only. Animation, runtime orientation and gameplay-scale review are pending.",
+  "assets": [
+    {
+      "id": "tile-floor",
+      "triangles": 68,
+      "triangleCeiling": 120,
+      "blenderBounds": [
+        [
+          -0.48500001430511475,
+          0.48500001430511475
+        ],
+        [
+          -0.48500001430511475,
+          0.48500001430511475
+        ],
+        [
+          -0.18000000715255737,
+          0.008000001311302185
+        ]
+      ],
+      "sha256": "7954e8b11f03fad013bfb7d8993c307bea5e0991ab815d5376a50abc6716e132",
+      "bytes": 7200,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "tile-floor"
+    },
+    {
+      "id": "tile-wall",
+      "triangles": 80,
+      "triangleCeiling": 120,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.7450000047683716
+        ]
+      ],
+      "sha256": "0ab29e839efc4d0b0607403ea8e6885f190c56a218087cc9dd729b2f94cba409",
+      "bytes": 8996,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "tile-wall"
+    },
+    {
+      "id": "hero-explorer",
+      "triangles": 988,
+      "triangleCeiling": 8000,
+      "blenderBounds": [
+        [
+          -0.35199999809265137,
+          0.35199999809265137
+        ],
+        [
+          -0.24399998784065247,
+          0.2604999840259552
+        ],
+        [
+          0.0,
+          1.0500000715255737
+        ]
+      ],
+      "sha256": "f43e3cdb176604ec1dffef07d7756294cecd6b049adef9707d1f43fd2f096113",
+      "bytes": 49908,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "hero-explorer"
+    },
+    {
+      "id": "enemy-bug",
+      "triangles": 828,
+      "triangleCeiling": 3000,
+      "blenderBounds": [
+        [
+          -0.41061875224113464,
+          0.41061875224113464
+        ],
+        [
+          -0.3659999966621399,
+          0.35999998450279236
+        ],
+        [
+          0.021904289722442627,
+          0.46400001645088196
+        ]
+      ],
+      "sha256": "3065a7b48c7297f7762f1fec545ad1ae9f759f8825e9bd13279921e564562e12",
+      "bytes": 40640,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "enemy-bug"
+    },
+    {
+      "id": "door-blue",
+      "triangles": 220,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.4350000023841858,
+          0.4349999725818634
+        ],
+        [
+          -0.15000000596046448,
+          0.15000000596046448
+        ],
+        [
+          0.0,
+          1.190000057220459
+        ]
+      ],
+      "sha256": "a1dcd65223e3dacae8e3e71c1422425106991644b711246d71ca82e3230affbe",
+      "bytes": 19828,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "door-blue"
+    },
+    {
+      "id": "key-blue",
+      "triangles": 96,
+      "triangleCeiling": 600,
+      "blenderBounds": [
+        [
+          -0.138592928647995,
+          0.138592928647995
+        ],
+        [
+          0.13749997317790985,
+          0.2225000262260437
+        ],
+        [
+          -0.19359296560287476,
+          0.3174999952316284
+        ]
+      ],
+      "sha256": "593e2aad840f3e156450d7d0c0fcd22a7bc7923e331ede5d27c2505953a2e935",
+      "bytes": 8980,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "key-blue"
+    }
+  ]
+}

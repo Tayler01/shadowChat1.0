@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "resources": [
+    {
+      "id": "cclp1-archive",
+      "url": "https://bitbusters.club/cclp1/CCLP1.zip",
+      "filename": "CCLP1.zip",
+      "kind": "zip",
+      "maxBytes": 16777216,
+      "source": "S04",
+      "licenseStatus": "REVIEW_ARCHIVE_TERMS",
+      "downloadedInPreparation": false
+    },
+    {
+      "id": "cclp1-dat",
+      "url": "https://bitbusters.club/cclp1/CCLP1.dat",
+      "filename": "CCLP1.dat",
+      "kind": "legacy-dat",
+      "maxBytes": 16777216,
+      "source": "S04",
+      "licenseStatus": "REVIEW_ARCHIVE_TERMS_AND_CREDITS",
+      "downloadedInPreparation": false
+    },
+    {
+      "id": "cclp1-lexy-mirror",
+      "url": "https://raw.githubusercontent.com/eevee/lexys-labyrinth/master/levels/CCLP1.ccl",
+      "filename": "CCLP1.ccl",
+      "kind": "legacy-dat",
+      "maxBytes": 16777216,
+      "expectedGitBlobSha1": "8358a9744978125fd9b484221635b0f4d3187ec0",
+      "observedBytes": 109566,
+      "source": "S08",
+      "licenseStatus": "REVIEW_UPSTREAM_PACK_TERMS",
+      "downloadedInPreparation": false
+    }
+  ]
+}

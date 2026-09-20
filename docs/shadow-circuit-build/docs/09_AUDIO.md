@@ -1,0 +1,16 @@
+# Audio and feedback
+
+No paid generation, no extracted original/Nintendo music, no unrelated sound autoplay from other games. Create original sound design using a reproducible offline Python/DSP process or appropriately licensed assets with provenance. Soundtrack quality matters: a polished restrained ambient composition, not a single oscillator loop advertised as music. A first implementation may synthesize effects; music is not visually complete until listening review passes. Record attribution and licenses for every external sound.
+
+## Deliverables
+Three complementary short musical arrangements: main-menu theme, exploration loop, tension variation; a completion sting. Reuse shared motifs to keep download size small. Game music starts only following a valid user interaction and the shared Comfort/media preference contract. Effects: UI press/back/invalid, step variants, bump, chip/key/boot pickup, door unlock, socket open, block push, dirt clear, ice slide, force floor, water splash, fire contact, button, toggle, trap, clone, teleport, bomb, death per cause, countdown warning and victory. One identifiable priority event should not be obscured by repeated footsteps.
+
+Preferred runtime assets: broadly supported compressed audio chosen after actual browser decode verification, with an explicit fallback where necessary. Do not ship WAV source files as runtime music. Decode only needed effects; music should not unnecessarily become a giant decoded buffer. Loop boundaries must be click-free and verified by listening across at least five repeats. Bound concurrent voices (start target: 12) and pool reusable nodes. Cull distant repetitive ambience. Do not create a new AudioContext for each cue.
+
+## Ownership and policy
+One game audio controller integrated with Shadow Chat's existing soundtrack ownership. Entering the game stops conflicting menu/game tracks; exiting stops/disposes game tracks and restores the appropriate host state. Respect shared Comfort policy and user-requested mute. Distinguish music, SFX and interface volume, but do not use independent storage/API checks to override the app's effective policy. Audio can fail without blocking play. Offer a clear muted/retry action on gesture failure; never spam promises or console exceptions.
+
+On `visibilitychange`/pagehide: pause simulation and stop/suspend audio; clear touch input. On return: remain paused with Resume. Resume audio only after an allowed gesture and no duplicate source nodes. A device lock must not leave the soundtrack playing behind the lock screen. No use of unsupported vibration as a substitute for essential feedback. Haptics only via shared policy and feature support.
+
+## Verification
+Test mute before first launch, toggling mute while effects are active, volume persistence, headphones/Bluetooth route change where practical, interrupted playback, iOS silent-mode behavior, rapid restart, exiting during a decode, and 20 game enter/exit cycles. Listen for clipping/clicks/harsh tones. Keep music beneath effects and avoid repeatedly startling the user. Count actual encoded bytes and peak decoded buffers. Every gameplay-critical sound has a visible equivalent. Store production samples/asset hashes and a listening checklist, not only an automated existence test.

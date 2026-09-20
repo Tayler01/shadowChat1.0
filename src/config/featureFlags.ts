@@ -19,6 +19,9 @@ export const SHADO_LIVE_REAL_ENABLED =
 export const CATCH_UP_FEATURE_ENABLED =
   typeof __SHADOWCHAT_CATCH_UP_ENABLED__ !== 'undefined' && __SHADOWCHAT_CATCH_UP_ENABLED__ === true
 
+export const SHADOW_CIRCUIT_ENABLED =
+  typeof __SHADOWCHAT_SHADOW_CIRCUIT_ENABLED__ !== 'undefined' && __SHADOWCHAT_SHADOW_CIRCUIT_ENABLED__ === true
+
 export const SHADOWCHAT_FEATURES = Object.freeze({
   boards: BOARDS_FEATURE_ENABLED,
   news: BOARDS_FEATURE_ENABLED,
@@ -28,4 +31,5 @@ export const SHADOWCHAT_FEATURES = Object.freeze({
   shadoLivePrototype: SHADO_LIVE_PROTOTYPE_ENABLED,
   shadoLiveReal: SHADO_LIVE_REAL_ENABLED,
   catchUp: CATCH_UP_FEATURE_ENABLED,
+  shadowCircuit: SHADOW_CIRCUIT_ENABLED,
 })

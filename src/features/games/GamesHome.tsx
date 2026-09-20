@@ -1,3 +1,5 @@
+import circuitPickerBanner from './shadow-circuit/assets/branding/picker-banner.webp'
+import { enterCircuitLandscape, leaveCircuitLandscape } from './shadow-circuit/ui/landscape'
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Film, Gamepad2, Volume2, VolumeX } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -19,7 +21,7 @@ import { SHADOW_MYSTERY_ASSETS } from '../entertainment/shadow-mystery/assets/ma
 import { WillKirkScreen } from '../entertainment/will-kirk/WillKirkScreen'
 import { WILL_KIRK_ASSETS } from '../entertainment/will-kirk/assets/manifest'
 import { SHADO_LIVE_ASSETS } from '../entertainment/shado-live/assets/manifest'
-import { SHADO_LIVE_PROTOTYPE_ENABLED, SHADO_LIVE_REAL_ENABLED } from '../../config/featureFlags'
+import { SHADO_LIVE_PROTOTYPE_ENABLED, SHADO_LIVE_REAL_ENABLED, SHADOW_CIRCUIT_ENABLED } from '../../config/featureFlags'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import { useAppBadgeState } from '../../hooks/useAppBadgeState'
 import type { AppView } from '../../types/navigation'
@@ -35,6 +37,10 @@ interface GamesHomeProps {
 }
 
 type SelectedEntertainment = PlayExperience | null
+
+const LazyShadowCircuit = SHADOW_CIRCUIT_ENABLED
+  ? lazy(() => import('./shadow-circuit/ShadowCircuitScreen').then(module => ({ default: module.ShadowCircuitScreen })))
+  : null
 
 const LazyShadoLivePrototype = SHADO_LIVE_PROTOTYPE_ENABLED
   ? lazy(() => import('../entertainment/shado-live/ShadoLivePrototype').then(module => ({ default: module.ShadoLivePrototype })))
@@ -75,7 +81,7 @@ function readLocalPreviewEntertainment(): SelectedEntertainment {
   if (!isLocalHost) return null
 
   const localPreview = new URLSearchParams(window.location.search).get('localPreview')
-  if (localPreview === 'shadow-runner' || localPreview === 'shado-tv' || localPreview === 'shadow-mystery' || (SHADO_LIVE_ENABLED && localPreview === 'shado-live')) {
+  if (localPreview === 'shadow-runner' || localPreview === 'shado-tv' || localPreview === 'shadow-mystery' || (SHADO_LIVE_ENABLED && localPreview === 'shado-live') || (SHADOW_CIRCUIT_ENABLED && localPreview === 'shadow-circuit')) {
     return localPreview
   }
 
@@ -194,6 +200,7 @@ export function GamesHome({
   }
 
   const closeExperience = (experience: PlayExperience) => {
+    if(experience==='shadow-circuit')leaveCircuitLandscape()
     setSelectedEntertainment(null)
     onPlayRoute?.('close-experience', experience)
     onImmersiveChange?.(false)
@@ -343,7 +350,13 @@ export function GamesHome({
 
   return (
     <>
-      {selectedEntertainment === 'shadow-runner' ? (
+      {selectedEntertainment === 'shadow-circuit' && LazyShadowCircuit ? (
+        <div className="h-full min-h-0 overflow-hidden bg-black">
+          <Suspense fallback={<div role="status" aria-live="polite" className="flex h-full flex-col items-center justify-center gap-5 bg-[#033516] p-6 text-[#efffe8]"><img src={circuitPickerBanner} alt="Shadow Circuit" className="w-full max-w-xl rounded-2xl border-4 border-[#adbaa6] shadow-2xl"/><p className="text-lg font-semibold">Powering up Shadow Circuit…</p><progress aria-label="Loading game" className="h-3 w-56 accent-green-400"/></div>}>
+            <LazyShadowCircuit onExit={() => closeExperience('shadow-circuit')} />
+          </Suspense>
+        </div>
+      ) : selectedEntertainment === 'shadow-runner' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
           <ShadowRunnerScreen
             onExit={exitShadowRunner}
@@ -435,6 +448,14 @@ export function GamesHome({
       />
 
       <main className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-[calc(env(safe-area-inset-top)+1rem)] md:p-6">
+        {SHADOW_CIRCUIT_ENABLED && <button type="button" aria-label="Open Shadow Circuit" className={pickerCardClass} onClick={() => {
+          void enterCircuitLandscape()
+          pauseMusic({ closeContext: true })
+          setAudioBlocked(false)
+          openExperience('shadow-circuit')
+        }}>
+          <img src={circuitPickerBanner} alt="Shadow Circuit" className="absolute inset-0 h-full w-full object-cover object-center" loading="eager" decoding="async" width={1920} height={720}/>
+        </button>}
         {SHADO_LIVE_ENABLED && <button
           type="button"
           aria-label={SHADO_LIVE_REAL_ENABLED ? 'Open Shado Live' : 'Open Shado Live prototype'}

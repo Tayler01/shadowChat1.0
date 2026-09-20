@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Versioned checkpoint envelope; extend with strict CoreState schema before runtime import",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "ownerNamespace",
+    "attemptId",
+    "packHash",
+    "levelId",
+    "rulesetId",
+    "revision",
+    "generation",
+    "simulationTick",
+    "stateHash",
+    "assistFlags",
+    "state"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "ownerNamespace": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "attemptId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "packHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "levelId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "rulesetId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "simulationTick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "stateHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "assistFlags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "uniqueItems": true
+    },
+    "state": {
+      "type": "object",
+      "description": "Freeze exact CoreState schema during P02/P03. This envelope does not by itself validate simulation state."
+    }
+  },
+  "additionalProperties": false
+}

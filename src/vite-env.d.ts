@@ -7,3 +7,4 @@ declare const __SHADOWCHAT_MEMBER_REPORTING_ENABLED__: boolean
 declare const __SHADOWCHAT_SHADO_LIVE_PROTOTYPE_ENABLED__: boolean
 declare const __SHADOWCHAT_SHADO_LIVE_REAL_ENABLED__: boolean
 declare const __SHADOWCHAT_CATCH_UP_ENABLED__: boolean
+declare const __SHADOWCHAT_SHADOW_CIRCUIT_ENABLED__: boolean

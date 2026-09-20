@@ -1,0 +1,9 @@
+requirements.csv: 142 unique planned rows
+assets.csv: 97 unique planned rows
+Legacy tile mappings: 112
+Parsed original synthetic fixture: synthetic-corridor.dat
+Parsed original synthetic fixture: synthetic-wiring.dat
+JSON Schema 2020-12 meta-validation and raw fixture schema validation: PASS
+SHA256 inventory checked: 47 files
+PACKAGE CHECK: PASS
+Scope: packet/tooling only. No game, Blender, XPS, full-campaign or physical-device validation asserted.

@@ -1,0 +1,2 @@
+Imported 1 level records into /mnt/data/synthetic-corridor.raw.json
+SHA256: 6979ca5bd7ba11a0863a0f474c17cdd55adb6c57c1cba1f700d3ce56feeb60d4; structural validation only

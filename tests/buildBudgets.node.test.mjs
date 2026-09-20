@@ -71,3 +71,24 @@ test('verifyBuildBudgets keeps Phaser and optional LiveKit exceptions lazy', () 
     rmSync(distDir, { recursive: true, force: true })
   }
 })
+
+test('Babylon exception rejects preload, transitive eager import, duplicate chunks and excess size', () => {
+  const distDir = mkdtempSync(path.join(tmpdir(), 'shadowchat-babylon-budget-'))
+  try {
+    mkdirSync(path.join(distDir,'.vite'),{recursive:true});mkdirSync(path.join(distDir,'assets'),{recursive:true})
+    const file=(name,text)=>writeFileSync(path.join(distDir,name),text)
+    file('index.html','<script type="module" src="/assets/index.js"></script>')
+    file('assets/index.js','entry');file('assets/vendor-phaser-test.js','phaser');file('assets/vendor-babylon-test.js','babylon')
+    file('.vite/manifest.json',JSON.stringify({'index.html':{file:'assets/index.js',isEntry:true,dynamicImports:['scene']},scene:{file:'assets/vendor-babylon-test.js'}}))
+    assert.equal(verifyBuildBudgets({distDir,log(){}}).babylonAsset.relativePath,'assets/vendor-babylon-test.js')
+    file('index.html','<script type="module" src="/assets/index.js"></script><link rel="modulepreload" href="/assets/vendor-babylon-test.js">')
+    assert.throws(()=>verifyBuildBudgets({distDir,log(){}}),/Lazy Babylon exception became eager/)
+    file('index.html','<script type="module" src="/assets/index.js"></script>')
+    file('.vite/manifest.json',JSON.stringify({'index.html':{file:'assets/index.js',isEntry:true,imports:['shared']},shared:{file:'assets/shared.js',imports:['scene']},scene:{file:'assets/vendor-babylon-test.js'}}))
+    assert.throws(()=>verifyBuildBudgets({distDir,log(){}}),/Lazy Babylon exception became eager/)
+    file('.vite/manifest.json','{}')
+    assert.throws(()=>verifyBuildBudgets({distDir,budgets:{...DEFAULT_BUILD_BUDGETS,babylonRawBytes:1},log(){}}),/vendor-babylon.*exceeds/)
+    file('assets/vendor-babylon-second.js','duplicate')
+    assert.throws(()=>verifyBuildBudgets({distDir,log(){}}),/at most one lazy Babylon/)
+  } finally { rmSync(distDir,{recursive:true,force:true}) }
+})

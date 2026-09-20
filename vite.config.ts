@@ -1,11 +1,13 @@
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import { privateCircuitPreview } from './scripts/shadow-circuit/private-preview';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const isEnabled = (name: string) => (process.env[name] ?? env[name] ?? '').trim().toLowerCase() === 'true'
   const shadoLiveRealEnabled = isEnabled('VITE_FEATURE_SHADO_LIVE_REAL')
+  const shadowCircuitEnabled = (process.env.VITE_FEATURE_SHADOW_CIRCUIT ?? env.VITE_FEATURE_SHADOW_CIRCUIT ?? 'true').trim().toLowerCase() === 'true'
 
   return {
     define: {
@@ -16,8 +18,9 @@ export default defineConfig(({ mode }) => {
       __SHADOWCHAT_SHADO_LIVE_PROTOTYPE_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_SHADO_LIVE_PROTOTYPE')),
       __SHADOWCHAT_SHADO_LIVE_REAL_ENABLED__: JSON.stringify(shadoLiveRealEnabled),
       __SHADOWCHAT_CATCH_UP_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_CATCH_UP')),
+      __SHADOWCHAT_SHADOW_CIRCUIT_ENABLED__: JSON.stringify(shadowCircuitEnabled),
     },
-    plugins: [react()],
+    plugins: [react(), privateCircuitPreview()],
     // Unity's asset cache is unrelated to Vite and changes heavily during imports.
     server: { watch: { ignored: ['**/native/shadow-checkers-unity/**'] } },
     optimizeDeps: {
@@ -32,6 +35,9 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks(id) {
+            // Babylon's shader imports share Vite's preload helper with app routes.
+            // Keep that tiny helper outside the lazy engine to avoid an eager edge.
+            if (id.includes('vite/preload-helper')) return 'vite-preload-helper'
             if (!id.includes('node_modules')) {
               return undefined
             }
@@ -56,6 +62,10 @@ export default defineConfig(({ mode }) => {
 
             if (packageName === 'phaser') {
               return 'vendor-phaser'
+            }
+
+            if (shadowCircuitEnabled && packageName.startsWith('@babylonjs/')) {
+              return 'vendor-babylon'
             }
 
             if (shadoLiveRealEnabled && (packageName === 'livekit-client' || packageName.startsWith('@livekit/'))) {

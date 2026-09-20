@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { LoginForm } from './LoginForm';
+import { SHADOW_CIRCUIT_ENABLED } from '../../config/featureFlags';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -13,7 +14,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   // Local-only visual QA escape hatch for previewing Entertainment surfaces without test credentials.
   const isLocalEntertainmentPreview = typeof window !== 'undefined'
     && (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost')
-    && ['shado-tv', 'shadow-mystery', 'shadow-runner'].includes(new URLSearchParams(window.location.search).get('localPreview') ?? '');
+    && ['shado-tv', 'shadow-mystery', 'shadow-runner', ...(SHADOW_CIRCUIT_ENABLED ? ['shadow-circuit'] : [])].includes(new URLSearchParams(window.location.search).get('localPreview') ?? '');
 
   if (isLocalEntertainmentPreview) {
     return <>{children}</>;

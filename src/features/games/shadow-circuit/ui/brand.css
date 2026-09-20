@@ -1,0 +1,43 @@
+/* Selected Classic Circuit Console art, with live accessible controls. */
+.circuit-root .circuit-menu-atmosphere{background:#033516}
+.circuit-root{background:linear-gradient(#00230c55,#001b0d77),#033516 url('../assets/branding/gameplay-pcb.webp') center/cover}
+.circuit-menu-atmosphere img{width:100%;height:100%;object-fit:cover;object-position:center}
+.circuit-root .circuit-menu-atmosphere:after{display:none}
+.circuit-root .circuit-brand-menu{inset:0 auto 0 0;width:36%;padding:5vh 2.8vw 3vh;display:flex;align-items:center;justify-content:center;gap:1.5vh;overflow:auto}
+.circuit-brand-menu h1{width:100%;margin:0;line-height:0;flex-shrink:1;min-height:0}
+.circuit-brand-logo{display:block;width:100%;max-height:52vh;object-fit:contain}
+.circuit-brand-menu .circuit-menu-actions{position:static;display:flex;flex-direction:column;gap:1.6vh;width:88%;flex-shrink:0}
+.circuit-root .circuit-launch{position:relative;min-height:56px;height:8vh;max-height:92px;border:5px solid #d9dfd6;border-top-color:#fbfff5;border-bottom-color:#829080;border-radius:13px;background:#bfc3bd;color:#142119;font-size:clamp(17px,2.3vw,38px);font-weight:850;letter-spacing:.02em;box-shadow:0 7px 0 #677260,0 11px 0 #19271a,0 16px 16px #0009,inset 0 2px 3px #fff9}
+.circuit-root .circuit-launch-primary{height:10vh;max-height:110px;background:#079d20;color:#f4fff0;border-color:#e9f6df;font-size:clamp(24px,3vw,48px);text-shadow:0 2px 3px #00450e}
+.circuit-launch svg{position:absolute;left:12%;width:12%;height:55%;stroke-width:1.5}
+.circuit-launch span{padding-left:12%}
+.circuit-root .circuit-launch[aria-label='Continue expedition']{font-size:clamp(18px,2.2vw,35px)}
+.circuit-root .circuit-launch:hover{background:#e8ede3;border-color:#fff}
+.circuit-root .circuit-launch-primary:hover{background:#12bb2d}
+.circuit-root .circuit-launch:active{transform:translateY(5px);box-shadow:0 2px 0 #677260,0 6px 0 #19271a,inset 0 2px 8px #13291588}
+.circuit-brand-links{display:flex;gap:0;flex-wrap:wrap;justify-content:center;width:100%;flex-shrink:0}
+.circuit-root .circuit-brand-links button{background:#032b1ade;color:#e2efdf;border:0;box-shadow:none;min-height:32px;font-size:11px;padding:6px 9px}
+.circuit-root[data-screen='menu'] .circuit-topline{left:12px;right:12px;top:8px}
+.circuit-root[data-screen='menu'] .circuit-edition{display:none}
+.circuit-root[data-screen='menu'] .circuit-topline button{min-height:44px;font-size:12px;padding:5px 8px;background:#062f1cc9;color:#d9ecdf;border:1px solid #5d9f6c}
+.circuit-root .circuit-level-locked{background:#afb3ad;color:#626a60;border-style:solid;border-color:#a0a79b}
+.circuit-level-locked .circuit-level-number,.circuit-level-locked small{color:#515a4d}
+.circuit-level-locked>svg{color:#375832;flex-shrink:0}
+.circuit-root .circuit-loading{background:#02331cea}
+.circuit-loading .circuit-modal{width:min(450px,90%);background:#053923;color:#e9f6e4;border:4px solid #a6b69d;box-shadow:0 8px 0 #52664a,0 24px 60px #000b}
+.circuit-loading img{height:min(22vh,210px);width:100%;object-fit:contain}
+.circuit-root .circuit-loading p{color:#c8ddc0}
+.circuit-loader{height:14px;background:#032214;border:2px inset #7f9872;border-radius:5px;overflow:hidden}
+.circuit-loader span{display:block;background:#53dd35;width:35%;height:100%;animation:circuit-load 1.5s ease-in-out infinite alternate}
+@keyframes circuit-load{from{transform:translateX(-100%)}to{transform:translateX(290%)}}
+[data-comfort-motion='none'] .circuit-loader span,[data-comfort-motion='reduced'] .circuit-loader span{animation:none;width:100%}
+@media(max-height:500px) and (orientation:landscape){
+ .circuit-root .circuit-brand-menu{padding:25px 2vw 5px;gap:3px;width:36%}
+ .circuit-brand-logo{max-height:43vh}
+ .circuit-brand-menu .circuit-menu-actions{gap:6px;width:88%}
+ .circuit-root .circuit-launch{height:48px;min-height:48px;border-width:3px;border-radius:8px;font-size:18px}
+ .circuit-root .circuit-launch-primary{height:50px;font-size:25px}
+ .circuit-root .circuit-brand-links button{font-size:10px;min-height:44px;min-width:44px;padding:4px 7px}
+}
+@media(max-width:600px) and (orientation:portrait){.circuit-root .circuit-brand-menu{width:100%;padding:55px 12vw 25px;background:#003014bf}.circuit-brand-logo{max-height:42vh}.circuit-brand-menu .circuit-menu-actions{width:100%}.circuit-root .circuit-launch{font-size:24px}.circuit-menu-atmosphere img{object-position:70% center}}
+@media(forced-colors:active){.circuit-root .circuit-launch,.circuit-root .circuit-brand-links button{background:ButtonFace;color:ButtonText;border:2px solid ButtonText}.circuit-brand-menu h1:after{content:'Shadow Circuit';color:CanvasText;font-size:32px;line-height:1}.circuit-brand-logo{display:none}}

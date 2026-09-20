@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Deterministic replay envelope; monotonic tick/sequence and ruleset consistency must be checked separately",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "rulesetId",
+    "packHash",
+    "levelId",
+    "seed",
+    "events",
+    "terminalTick",
+    "expectedOutcome",
+    "expectedStateHash",
+    "assistFlags"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "rulesetId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "packHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "levelId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4294967295
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 1000000,
+      "items": {
+        "type": "object",
+        "required": [
+          "tick",
+          "sequence",
+          "action"
+        ],
+        "properties": {
+          "tick": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "action": {
+            "enum": [
+              "move-N",
+              "move-E",
+              "move-S",
+              "move-W",
+              "release",
+              "pause",
+              "resume",
+              "assist",
+              "undo"
+            ]
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "terminalTick": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "expectedOutcome": {
+      "enum": [
+        "won",
+        "lost",
+        "active"
+      ]
+    },
+    "expectedStateHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "assistFlags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200
+      },
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

@@ -15,3 +15,6 @@
 *.mp4 binary
 *.woff binary
 *.woff2 binary
+
+# Preserve the supplied handoff packet's checksum-verified bytes.
+docs/shadow-circuit-build/** -text whitespace=cr-at-eol

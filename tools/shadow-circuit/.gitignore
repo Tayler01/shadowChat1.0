@@ -1,0 +1,5 @@
+incoming/
+private-originals/
+working/
+__pycache__/
+*.blend1

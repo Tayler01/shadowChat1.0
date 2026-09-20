@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "repository": "Tayler01/shadowChat1.0",
+  "observedDate": "2026-09-17",
+  "scope": "Partial reads, not a full audit or inspected XPS checkout",
+  "files": [
+    {
+      "path": "package.json",
+      "gitBlobSha1": "87e099930a20ff5731fc9a59df861fd46a9947c8",
+      "scope": "prior-turn package snapshot",
+      "url": "https://github.com/Tayler01/shadowChat1.0/blob/main/package.json"
+    },
+    {
+      "path": "AGENTS.md",
+      "gitBlobSha1": "21455d73720716104d5241d9a4ec2e6e405c1ad3",
+      "scope": "first 170 lines only; local instructions authoritative",
+      "url": "https://github.com/Tayler01/shadowChat1.0/blob/main/AGENTS.md"
+    },
+    {
+      "path": "src/lib/appRouting.ts",
+      "gitBlobSha1": "604b048352dc12a80a8d39397fdb556b0775b622",
+      "scope": "first 220 lines only",
+      "url": "https://github.com/Tayler01/shadowChat1.0/blob/main/src/lib/appRouting.ts"
+    },
+    {
+      "path": "docs/ACCESSIBILITY_COMFORT.md",
+      "gitBlobSha1": "524a8b120edd037125e578e55403cc9725a6658c",
+      "scope": "first 175 lines",
+      "url": "https://github.com/Tayler01/shadowChat1.0/blob/main/docs/ACCESSIBILITY_COMFORT.md"
+    },
+    {
+      "path": "scripts/verify-build-budgets.mjs",
+      "gitBlobSha1": "bca664f492daf1059cdaabd76b9c6c37c3bacf31",
+      "scope": "first 180 lines",
+      "url": "https://github.com/Tayler01/shadowChat1.0/blob/main/scripts/verify-build-budgets.mjs"
+    },
+    {
+      "path": "src/features/games/GamesHome.tsx",
+      "gitBlobSha1": null,
+      "scope": "partial prior-turn host read; not entire repo",
+      "url": "https://github.com/Tayler01/shadowChat1.0/blob/main/src/features/games/GamesHome.tsx"
+    }
+  ]
+}

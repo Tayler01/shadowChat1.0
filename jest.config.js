@@ -12,6 +12,7 @@ export default {
     ]
   },
   moduleNameMapper: {
+    '\\.(png|jpe?g|webp|avif|gif|svg)$': '<rootDir>/tests/mocks/fileAsset.ts',
     '^@supabase/supabase-js$': '<rootDir>/tests/mocks/supabase-js.ts',
     '^\\./env$': '<rootDir>/tests/mocks/env.ts',
     '^(\\.{1,2}/.*)\\.js$': '$1',

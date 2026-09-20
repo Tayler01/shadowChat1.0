@@ -15,7 +15,7 @@ export const DEFAULT_BUILD_BUDGETS = Object.freeze({
   regularJavaScriptGzipBytes: 160_000,
 
   // Phaser 3 is a deliberately lazy game-engine dependency. It must never be
-  // preloaded by index.html and is the only JavaScript chunk allowed above the
+  // preloaded by index.html. Explicit lazy-engine exceptions may exceed the
   // regular cap.
   phaserRawBytes: 1_550_000,
   phaserGzipBytes: 365_000,
@@ -26,6 +26,11 @@ export const DEFAULT_BUILD_BUDGETS = Object.freeze({
   liveKitRawBytes: 600_000,
   liveKitGzipBytes: 160_000,
 
+  // Shadow Circuit's direct-module WebGL runtime, only reached after game launch.
+  // Measured and isolated separately; eager and ordinary chunk caps stay unchanged.
+  babylonRawBytes: 1_650_000,
+  babylonGzipBytes: 450_000,
+
   // Runtime-only public assets keep the deploy near 75 MiB. Preserve source
   // material outside public/ and keep enough headroom for intentional releases.
   deployRawBytes: 100_000_000,
@@ -33,6 +38,7 @@ export const DEFAULT_BUILD_BUDGETS = Object.freeze({
 
 const PHASER_CHUNK_PATTERN = /^vendor-phaser-[A-Za-z0-9_-]+\.js$/
 const LIVEKIT_CHUNK_PATTERN = /^vendor-livekit-[A-Za-z0-9_-]+\.js$/
+const BABYLON_CHUNK_PATTERN = /^vendor-babylon-[A-Za-z0-9_-]+\.js$/
 
 export function extractInitialAssetPaths(indexHtml) {
   const assetPaths = new Set(['index.html'])
@@ -88,9 +94,11 @@ export function verifyBuildBudgets({
     .map((filePath) => measureFile(resolvedDistDir, filePath))
   const phaserAssets = allJavaScript.filter((asset) => PHASER_CHUNK_PATTERN.test(path.basename(asset.relativePath)))
   const liveKitAssets = allJavaScript.filter((asset) => LIVEKIT_CHUNK_PATTERN.test(path.basename(asset.relativePath)))
+  const babylonAssets = allJavaScript.filter((asset) => BABYLON_CHUNK_PATTERN.test(path.basename(asset.relativePath)))
   const regularJavaScript = allJavaScript.filter((asset) => (
     !PHASER_CHUNK_PATTERN.test(path.basename(asset.relativePath))
     && !LIVEKIT_CHUNK_PATTERN.test(path.basename(asset.relativePath))
+    && !BABYLON_CHUNK_PATTERN.test(path.basename(asset.relativePath))
   ))
   const deployRawBytes = allFiles.reduce((total, filePath) => total + statSync(filePath).size, 0)
   const initialRawBytes = sumBy(initialAssets, 'rawBytes')
@@ -136,6 +144,26 @@ export function verifyBuildBudgets({
     checkLimit(failures, `${liveKitAsset.relativePath} (gzip)`, liveKitAsset.gzipBytes, budgets.liveKitGzipBytes)
   }
 
+  if (babylonAssets.length > 1) {
+    failures.push(`Expected at most one lazy Babylon chunk, found ${babylonAssets.length}`)
+  } else if (babylonAssets.length === 1) {
+    const babylonAsset = babylonAssets[0]
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    const eagerFiles = new Set(initialPaths)
+    const visit = (key, seen = new Set()) => {
+      if (seen.has(key)) return
+      seen.add(key)
+      const entry = manifest[key]
+      if (!entry) return
+      eagerFiles.add(entry.file)
+      for (const dependency of entry.imports ?? []) visit(dependency, seen)
+    }
+    for (const [key, entry] of Object.entries(manifest)) if (entry.isEntry) visit(key)
+    if (eagerFiles.has(babylonAsset.relativePath)) failures.push(`Lazy Babylon exception became eager: ${babylonAsset.relativePath}`)
+    checkLimit(failures, `${babylonAsset.relativePath} (raw)`, babylonAsset.rawBytes, budgets.babylonRawBytes)
+    checkLimit(failures, `${babylonAsset.relativePath} (gzip)`, babylonAsset.gzipBytes, budgets.babylonGzipBytes)
+  }
+
   checkLimit(failures, 'Total deploy payload (raw)', deployRawBytes, budgets.deployRawBytes)
 
   if (failures.length > 0) {
@@ -145,6 +173,7 @@ export function verifyBuildBudgets({
   const largestEagerJavaScript = largestByRawBytes(initialJavaScript)
   const phaserAsset = phaserAssets[0]
   const liveKitAsset = liveKitAssets[0]
+  const babylonAsset = babylonAssets[0]
   log('Build budgets passed:')
   log(`  Initial HTML/preloads: ${initialAssets.length} files, ${formatBytes(initialRawBytes)} raw / ${formatBytes(initialGzipBytes)} gzip`)
   if (largestEagerJavaScript) {
@@ -156,6 +185,7 @@ export function verifyBuildBudgets({
   if (liveKitAsset) {
     log(`  Lazy LiveKit exception: ${liveKitAsset.relativePath}, ${formatBytes(liveKitAsset.rawBytes)} raw / ${formatBytes(liveKitAsset.gzipBytes)} gzip`)
   }
+  if (babylonAsset) log(`  Lazy Babylon exception: ${babylonAsset.relativePath}, ${formatBytes(babylonAsset.rawBytes)} raw / ${formatBytes(babylonAsset.gzipBytes)} gzip`)
   log(`  Total deploy payload: ${allFiles.length} files, ${formatBytes(deployRawBytes)} raw`)
 
   return {
@@ -165,6 +195,7 @@ export function verifyBuildBudgets({
     initialRawBytes,
     largestEagerJavaScript,
     liveKitAsset,
+    babylonAsset,
     phaserAsset,
   }
 }
