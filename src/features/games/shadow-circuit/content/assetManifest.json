@@ -1,0 +1,398 @@
+{
+  "models": [
+    {
+      "id": "door-blue",
+      "bytes": 2871,
+      "sha256": "0a9bf4c3159d1ceeb88e6ae9f71e6d15b992901af1abddc708204bcbac74acdd",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/0a9bf4c3159d1ceeb88e6ae9f71e6d15b992901af1abddc708204bcbac74acdd/door-blue.glbz"
+    },
+    {
+      "id": "door-green",
+      "bytes": 2869,
+      "sha256": "30b6b3ff41babda6269406fa009969c42a7fe9cba7025f25b34efc35006e4372",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/30b6b3ff41babda6269406fa009969c42a7fe9cba7025f25b34efc35006e4372/door-green.glbz"
+    },
+    {
+      "id": "door-red",
+      "bytes": 2869,
+      "sha256": "6bf659d89a502f1d7256942e4b62f08439495a234327b428224f272699cdad58",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/6bf659d89a502f1d7256942e4b62f08439495a234327b428224f272699cdad58/door-red.glbz"
+    },
+    {
+      "id": "door-yellow",
+      "bytes": 2867,
+      "sha256": "a7a46ab6ba4dd4497445bff37e98a9049c084f9912a84975e6a4c01a99efd9cc",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/a7a46ab6ba4dd4497445bff37e98a9049c084f9912a84975e6a4c01a99efd9cc/door-yellow.glbz"
+    },
+    {
+      "id": "enemy-ball",
+      "bytes": 7905,
+      "sha256": "fae2aab8f892b99a459882f1257e47da257e30d125c4b6949d57c5ce1b37c5af",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/fae2aab8f892b99a459882f1257e47da257e30d125c4b6949d57c5ce1b37c5af/enemy-ball.glbz"
+    },
+    {
+      "id": "enemy-blob",
+      "bytes": 16574,
+      "sha256": "ea7773fafaf74c69a60b157d2c83bee9990bfc924ba3d955be7033a290a20960",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/ea7773fafaf74c69a60b157d2c83bee9990bfc924ba3d955be7033a290a20960/enemy-blob.glbz"
+    },
+    {
+      "id": "enemy-bug",
+      "bytes": 12923,
+      "sha256": "a3c07d3747027777955aa492ef452ea34db19cd0d6045f106f873bbfd87570e9",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/a3c07d3747027777955aa492ef452ea34db19cd0d6045f106f873bbfd87570e9/enemy-bug.glbz"
+    },
+    {
+      "id": "enemy-fireball",
+      "bytes": 5021,
+      "sha256": "8522728fc643069cc1b34fa8e83c8b5d4d8a73068c6ababd9b35476d5dedcba9",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/8522728fc643069cc1b34fa8e83c8b5d4d8a73068c6ababd9b35476d5dedcba9/enemy-fireball.glbz"
+    },
+    {
+      "id": "enemy-glider",
+      "bytes": 9475,
+      "sha256": "1e33ead6d18ce4aafbdf2f994d0f52b3510b729de4557b0feac5ba2d54b226f7",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/1e33ead6d18ce4aafbdf2f994d0f52b3510b729de4557b0feac5ba2d54b226f7/enemy-glider.glbz"
+    },
+    {
+      "id": "enemy-paramecium",
+      "bytes": 9923,
+      "sha256": "1e1e40a3a162c2557aacc70e1dd98826a7cf9b58a9e3a3a056cc9344530ec441",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/1e1e40a3a162c2557aacc70e1dd98826a7cf9b58a9e3a3a056cc9344530ec441/enemy-paramecium.glbz"
+    },
+    {
+      "id": "enemy-tank",
+      "bytes": 17620,
+      "sha256": "cc0e01da8047bc031dec85005e2fb00c9d88e884301af28fdecc5e30d00927fe",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/cc0e01da8047bc031dec85005e2fb00c9d88e884301af28fdecc5e30d00927fe/enemy-tank.glbz"
+    },
+    {
+      "id": "enemy-teeth",
+      "bytes": 10764,
+      "sha256": "eb48f7584cabecb004c22de7f843add9cdfc0c1a7fcc5650a9620646c94d0a36",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/eb48f7584cabecb004c22de7f843add9cdfc0c1a7fcc5650a9620646c94d0a36/enemy-teeth.glbz"
+    },
+    {
+      "id": "enemy-walker",
+      "bytes": 17306,
+      "sha256": "d67e8e15cfa63595d3a694c4c3d1c365ad2c5ed501a5dd8425d6b57c0f84e1ed",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/d67e8e15cfa63595d3a694c4c3d1c365ad2c5ed501a5dd8425d6b57c0f84e1ed/enemy-walker.glbz"
+    },
+    {
+      "id": "hero-explorer",
+      "bytes": 143485,
+      "sha256": "32b26b43913d7f552eae31816cbb9efd4e49a571855baa48517b9244068a5aad",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/32b26b43913d7f552eae31816cbb9efd4e49a571855baa48517b9244068a5aad/hero-explorer.glbz"
+    },
+    {
+      "id": "item-boot-0",
+      "bytes": 11124,
+      "sha256": "874513ff330c240afa723395b62742437b4d7d8e177ab7b13886c0f591cfd83d",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/874513ff330c240afa723395b62742437b4d7d8e177ab7b13886c0f591cfd83d/item-boot-0.glbz"
+    },
+    {
+      "id": "item-boot-1",
+      "bytes": 11102,
+      "sha256": "5e6018ed51fffbbc8a3ba9a6b7ae3eafa048557bbf00c3045bba39d0b5dde399",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/5e6018ed51fffbbc8a3ba9a6b7ae3eafa048557bbf00c3045bba39d0b5dde399/item-boot-1.glbz"
+    },
+    {
+      "id": "item-boot-2",
+      "bytes": 12352,
+      "sha256": "bb0f481fc0c221a02837c166d3dc26ecaaec1f0e6795b49de335902891cd8dec",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/bb0f481fc0c221a02837c166d3dc26ecaaec1f0e6795b49de335902891cd8dec/item-boot-2.glbz"
+    },
+    {
+      "id": "item-boot-3",
+      "bytes": 11122,
+      "sha256": "704ecd953fb2d01f0a7159bc4c62b72a8ea2a43ad829321163d3c36e98e6d664",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/704ecd953fb2d01f0a7159bc4c62b72a8ea2a43ad829321163d3c36e98e6d664/item-boot-3.glbz"
+    },
+    {
+      "id": "item-chip",
+      "bytes": 2619,
+      "sha256": "7a63c583e72221e2735ff209d33edb12900a771aa0874efc204487c42fc36ed0",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/7a63c583e72221e2735ff209d33edb12900a771aa0874efc204487c42fc36ed0/item-chip.glbz"
+    },
+    {
+      "id": "key-blue",
+      "bytes": 6116,
+      "sha256": "71583c4af2528ed75ef7089c3b4f21d9f7c2e762c39785d7c8d0b6fa269d4ec5",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/71583c4af2528ed75ef7089c3b4f21d9f7c2e762c39785d7c8d0b6fa269d4ec5/key-blue.glbz"
+    },
+    {
+      "id": "key-green",
+      "bytes": 6111,
+      "sha256": "4ff374f552580f51fb81d82df63f0fc2b84a8a5a73180600ae1c1a3158f045de",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/4ff374f552580f51fb81d82df63f0fc2b84a8a5a73180600ae1c1a3158f045de/key-green.glbz"
+    },
+    {
+      "id": "key-red",
+      "bytes": 6119,
+      "sha256": "9e453809ed9cdfd8cb0e8e373e90b8f8a58eb246ba6f03e9a4ef683db31656fe",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/9e453809ed9cdfd8cb0e8e373e90b8f8a58eb246ba6f03e9a4ef683db31656fe/key-red.glbz"
+    },
+    {
+      "id": "key-yellow",
+      "bytes": 6113,
+      "sha256": "b8a34f110b32e07199589de6d324a91506eb37ba14a5e9d1bc2010f6b10b248c",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/b8a34f110b32e07199589de6d324a91506eb37ba14a5e9d1bc2010f6b10b248c/key-yellow.glbz"
+    },
+    {
+      "id": "terrain-block",
+      "bytes": 2886,
+      "sha256": "fdabe9b06b726fbafdd184cc8fde89900b14cb05ac875ce11cccb5e581b74fe4",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/fdabe9b06b726fbafdd184cc8fde89900b14cb05ac875ce11cccb5e581b74fe4/terrain-block.glbz"
+    },
+    {
+      "id": "terrain-blue-wall",
+      "bytes": 1082,
+      "sha256": "031491927b94a0a2157f82b2f5e184a103bf8c3d167b29e2c0a8e613378356a8",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/031491927b94a0a2157f82b2f5e184a103bf8c3d167b29e2c0a8e613378356a8/terrain-blue-wall.glbz"
+    },
+    {
+      "id": "terrain-bomb",
+      "bytes": 7218,
+      "sha256": "6caa4d97306bba156cb447ca602a316fdc191a0eb287dbf3c6a601f70646d680",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/6caa4d97306bba156cb447ca602a316fdc191a0eb287dbf3c6a601f70646d680/terrain-bomb.glbz"
+    },
+    {
+      "id": "terrain-button-35",
+      "bytes": 2839,
+      "sha256": "d2274b0a0bfdb785c4e7a41808c5c2566b4dd19dd9b5b6beb3500688facf0c14",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/d2274b0a0bfdb785c4e7a41808c5c2566b4dd19dd9b5b6beb3500688facf0c14/terrain-button-35.glbz"
+    },
+    {
+      "id": "terrain-button-36",
+      "bytes": 2842,
+      "sha256": "8c7c99a84dd157bc68b65e86e695a2677010948e2d7737dc050d0a9dfa4ddc74",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/8c7c99a84dd157bc68b65e86e695a2677010948e2d7737dc050d0a9dfa4ddc74/terrain-button-36.glbz"
+    },
+    {
+      "id": "terrain-button-39",
+      "bytes": 2835,
+      "sha256": "4a28ceacc7773dd4a21f09c3d74dc69d0bbc41ceadb6ad0a6dacefa8d291a90b",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/4a28ceacc7773dd4a21f09c3d74dc69d0bbc41ceadb6ad0a6dacefa8d291a90b/terrain-button-39.glbz"
+    },
+    {
+      "id": "terrain-button-40",
+      "bytes": 2839,
+      "sha256": "bc6b234cf14bc0b15ac12e4945bc09c94ffb58267a486f32efe2813d2afa0a60",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/bc6b234cf14bc0b15ac12e4945bc09c94ffb58267a486f32efe2813d2afa0a60/terrain-button-40.glbz"
+    },
+    {
+      "id": "terrain-cloner",
+      "bytes": 3938,
+      "sha256": "5c60c2a408d3700656cfa04b8ef6dd9a8d75daed83af9845b24774faca48da11",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/5c60c2a408d3700656cfa04b8ef6dd9a8d75daed83af9845b24774faca48da11/terrain-cloner.glbz"
+    },
+    {
+      "id": "terrain-dirt",
+      "bytes": 23249,
+      "sha256": "a8c973ac9b3e99f97022b0a113749c98090984bb9a3ab89225313ba643c007c4",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/a8c973ac9b3e99f97022b0a113749c98090984bb9a3ab89225313ba643c007c4/terrain-dirt.glbz"
+    },
+    {
+      "id": "terrain-exit",
+      "bytes": 6903,
+      "sha256": "0030dd7c90573ecec28dc1415353076be559451f842f35f64e44222739dc1561",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/0030dd7c90573ecec28dc1415353076be559451f842f35f64e44222739dc1561/terrain-exit.glbz"
+    },
+    {
+      "id": "terrain-fire",
+      "bytes": 11432,
+      "sha256": "309312f41e15a02bc43e8a129959668652bb3451f2503a96403244d94d4bd999",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/309312f41e15a02bc43e8a129959668652bb3451f2503a96403244d94d4bd999/terrain-fire.glbz"
+    },
+    {
+      "id": "terrain-force-13",
+      "bytes": 4205,
+      "sha256": "ba32d791e12d0596616c02dfcca912d7e0660b92c312aaefab25a99cd1b2affa",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/ba32d791e12d0596616c02dfcca912d7e0660b92c312aaefab25a99cd1b2affa/terrain-force-13.glbz"
+    },
+    {
+      "id": "terrain-force-18",
+      "bytes": 4210,
+      "sha256": "da0e75afdbd17717113118553c285d962fd3f057446953f97cb8d76ee0fc9a1a",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/da0e75afdbd17717113118553c285d962fd3f057446953f97cb8d76ee0fc9a1a/terrain-force-18.glbz"
+    },
+    {
+      "id": "terrain-force-19",
+      "bytes": 4143,
+      "sha256": "2c0d0981e6db806f976f2d0c2b2e54be046d24fcd5735291be09071e51168dee",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/2c0d0981e6db806f976f2d0c2b2e54be046d24fcd5735291be09071e51168dee/terrain-force-19.glbz"
+    },
+    {
+      "id": "terrain-force-20",
+      "bytes": 4146,
+      "sha256": "d0bb09c86f0bd0e3f340765627a375194e7670ab13fa0dd6c5e57ea1e6a9e33c",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/d0bb09c86f0bd0e3f340765627a375194e7670ab13fa0dd6c5e57ea1e6a9e33c/terrain-force-20.glbz"
+    },
+    {
+      "id": "terrain-force-50",
+      "bytes": 4209,
+      "sha256": "e54dea63c200ed3ebe03342924696239c182665f760dd877325c2277ded3a4b5",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/e54dea63c200ed3ebe03342924696239c182665f760dd877325c2277ded3a4b5/terrain-force-50.glbz"
+    },
+    {
+      "id": "terrain-gravel",
+      "bytes": 7792,
+      "sha256": "6e2951da8620c21f2adbfadd21bbc049ea406ba3a3de4e0677b71b1708ecbc3f",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/6e2951da8620c21f2adbfadd21bbc049ea406ba3a3de4e0677b71b1708ecbc3f/terrain-gravel.glbz"
+    },
+    {
+      "id": "terrain-hint",
+      "bytes": 5629,
+      "sha256": "01d8763344ff09ce99e3fb91f96e9815fa4895cf6499ff78f57ad5462aeef0bb",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/01d8763344ff09ce99e3fb91f96e9815fa4895cf6499ff78f57ad5462aeef0bb/terrain-hint.glbz"
+    },
+    {
+      "id": "terrain-ice-26",
+      "bytes": 5424,
+      "sha256": "7115941fc42174433b444c827d28421fda1ce0df0f476cbab91dafaba30db51c",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/7115941fc42174433b444c827d28421fda1ce0df0f476cbab91dafaba30db51c/terrain-ice-26.glbz"
+    },
+    {
+      "id": "terrain-ice-27",
+      "bytes": 5427,
+      "sha256": "50f334d5bc0c27147ec7d49c881764be51719e974df3b70583094e9af459b97a",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/50f334d5bc0c27147ec7d49c881764be51719e974df3b70583094e9af459b97a/terrain-ice-27.glbz"
+    },
+    {
+      "id": "terrain-ice-28",
+      "bytes": 5427,
+      "sha256": "4b67ee2825f07ad48ed76fdcbd442a04e63a0601bf53a446b8b8fbdc51651c7c",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/4b67ee2825f07ad48ed76fdcbd442a04e63a0601bf53a446b8b8fbdc51651c7c/terrain-ice-28.glbz"
+    },
+    {
+      "id": "terrain-ice-29",
+      "bytes": 5425,
+      "sha256": "4c58eeb4bffffb9c2b4f2c5d8d384e1b13050a286a2be070738771a8d527a547",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/4c58eeb4bffffb9c2b4f2c5d8d384e1b13050a286a2be070738771a8d527a547/terrain-ice-29.glbz"
+    },
+    {
+      "id": "terrain-ice",
+      "bytes": 4766,
+      "sha256": "56f9f5b8588df899cb11a0532571027d926dd208177ebfc6e4db8224c1548173",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/56f9f5b8588df899cb11a0532571027d926dd208177ebfc6e4db8224c1548173/terrain-ice.glbz"
+    },
+    {
+      "id": "terrain-popup",
+      "bytes": 3502,
+      "sha256": "4c5246bae73220a5ca36ca519e11d5200c64bb3c76875c536aa78ca02155507d",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/4c5246bae73220a5ca36ca519e11d5200c64bb3c76875c536aa78ca02155507d/terrain-popup.glbz"
+    },
+    {
+      "id": "terrain-socket",
+      "bytes": 7505,
+      "sha256": "906767063d748a998fd7f77b05fc6631cafc825f536c10a94c47f20ef800c120",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/906767063d748a998fd7f77b05fc6631cafc825f536c10a94c47f20ef800c120/terrain-socket.glbz"
+    },
+    {
+      "id": "terrain-teleport",
+      "bytes": 5896,
+      "sha256": "30db573c693103906ca268e6602fbfe2fda98ce929ea42bfb9ad7cfbf8a2fcb1",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/30db573c693103906ca268e6602fbfe2fda98ce929ea42bfb9ad7cfbf8a2fcb1/terrain-teleport.glbz"
+    },
+    {
+      "id": "terrain-thief",
+      "bytes": 8363,
+      "sha256": "172672c1509b0651fd35d2c075bc92f28093f76cc1e813cb49b24224e9662c9d",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/172672c1509b0651fd35d2c075bc92f28093f76cc1e813cb49b24224e9662c9d/terrain-thief.glbz"
+    },
+    {
+      "id": "terrain-thin-48",
+      "bytes": 1480,
+      "sha256": "62e692e1cf019135823b2a6bcd5900dad436b3e4759db114bc5d877a3ceef71b",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/62e692e1cf019135823b2a6bcd5900dad436b3e4759db114bc5d877a3ceef71b/terrain-thin-48.glbz"
+    },
+    {
+      "id": "terrain-thin-6",
+      "bytes": 1132,
+      "sha256": "708b82156da5ef5df70bb1ae8da4eb4f9617a20b0a5bdadd64aef62ea1c5709a",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/708b82156da5ef5df70bb1ae8da4eb4f9617a20b0a5bdadd64aef62ea1c5709a/terrain-thin-6.glbz"
+    },
+    {
+      "id": "terrain-thin-7",
+      "bytes": 1112,
+      "sha256": "bf8084e4fa12275894843a4137f5d10e67eda61665c0f1972ba624e16cea88b4",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/bf8084e4fa12275894843a4137f5d10e67eda61665c0f1972ba624e16cea88b4/terrain-thin-7.glbz"
+    },
+    {
+      "id": "terrain-thin-8",
+      "bytes": 1130,
+      "sha256": "300aefb2f1fa4371a2ff6606a2385e1f9bad68583df55946f6e9c98998c04ef0",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/300aefb2f1fa4371a2ff6606a2385e1f9bad68583df55946f6e9c98998c04ef0/terrain-thin-8.glbz"
+    },
+    {
+      "id": "terrain-thin-9",
+      "bytes": 1111,
+      "sha256": "5d31108b96fc88d8168606c7017505ae29dfcc74266363ff3887b5f260c318ee",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/5d31108b96fc88d8168606c7017505ae29dfcc74266363ff3887b5f260c318ee/terrain-thin-9.glbz"
+    },
+    {
+      "id": "terrain-toggle-closed",
+      "bytes": 3320,
+      "sha256": "421056e992b6f84920827091a8ea80c1fca8284d16ad5b52b8a82ad40ee76120",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/421056e992b6f84920827091a8ea80c1fca8284d16ad5b52b8a82ad40ee76120/terrain-toggle-closed.glbz"
+    },
+    {
+      "id": "terrain-toggle-open",
+      "bytes": 3181,
+      "sha256": "56f986adbbc501fd85fbc0f4fb99983a44861fdfa4c764786173b3e0a6dd604a",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/56f986adbbc501fd85fbc0f4fb99983a44861fdfa4c764786173b3e0a6dd604a/terrain-toggle-open.glbz"
+    },
+    {
+      "id": "terrain-trap",
+      "bytes": 3663,
+      "sha256": "75f16c1c0a7c6ecd61be6bc6336b99d4b0535ba23eb684a442d74f5ed074a254",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/75f16c1c0a7c6ecd61be6bc6336b99d4b0535ba23eb684a442d74f5ed074a254/terrain-trap.glbz"
+    },
+    {
+      "id": "terrain-water",
+      "bytes": 14789,
+      "sha256": "2a69e51c0e242ec18ace872f4e1e1ec75ee5b9d1b7a727d1cd4d2c32891fb69e",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/2a69e51c0e242ec18ace872f4e1e1ec75ee5b9d1b7a727d1cd4d2c32891fb69e/terrain-water.glbz"
+    },
+    {
+      "id": "tile-floor",
+      "bytes": 1432,
+      "sha256": "05326b764ffe8bbcc6966f457675ab693b1c760149ea4310adcc2597a5e04863",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/05326b764ffe8bbcc6966f457675ab693b1c760149ea4310adcc2597a5e04863/tile-floor.glbz"
+    },
+    {
+      "id": "tile-wall",
+      "bytes": 1372,
+      "sha256": "088c86b8e00ee4bb2c6b45055ed7cf29239e22bde73114de3d56c349fb2ad20f",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/088c86b8e00ee4bb2c6b45055ed7cf29239e22bde73114de3d56c349fb2ad20f/tile-wall.glbz"
+    }
+  ],
+  "original": {
+    "chip01.mid": {
+      "bytes": 9758,
+      "sha256": "4ea9de6ca3e63f3534de5672adc1e7eec05dbcbd59859d5f729e546e109b93d2",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/4ea9de6ca3e63f3534de5672adc1e7eec05dbcbd59859d5f729e546e109b93d2/chip01.mid"
+    },
+    "chips.dat": {
+      "bytes": 108569,
+      "sha256": "b0a68f21642447385512e0ed9386a4a13a4f7e9a38f909da772104d8e6b5c1fb",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/b0a68f21642447385512e0ed9386a4a13a4f7e9a38f909da772104d8e6b5c1fb/chips.dat"
+    },
+    "chip01.mp3": {
+      "bytes": 515701,
+      "sha256": "72783d17e40cf5797ee57b7eada80f45b34f27f51f32f8e7f3eaeb25285cca55",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/72783d17e40cf5797ee57b7eada80f45b34f27f51f32f8e7f3eaeb25285cca55/chip01.mp3"
+    },
+    "chip02.mid": {
+      "bytes": 11837,
+      "sha256": "775cb2a52624cc256a6047228ab4d6c6b7a588cf3067fd8af89f5a286e2eed25",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/775cb2a52624cc256a6047228ab4d6c6b7a588cf3067fd8af89f5a286e2eed25/chip02.mid"
+    },
+    "chip02.mp3": {
+      "bytes": 642238,
+      "sha256": "09fbeed4295ffb042f0631891cc4821be8ea2f6fd427bb40d62e4144d29ac81d",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/09fbeed4295ffb042f0631891cc4821be8ea2f6fd427bb40d62e4144d29ac81d/chip02.mp3"
+    }
+  },
+  "version": 3
+}

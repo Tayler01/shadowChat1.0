@@ -1,3 +1,11 @@
+## September 20 Shadow Circuit reference-polish mobile pass
+
+- Reviewed actual Android/Chromium and iPhone/WebKit 844x390 rendering, 390x844 branded rotation gate, original Lesson 1 and Lesson 3. Full-surface movement pad, independent camera D-pad/zoom, compact HUD and raised controls replace the earlier small arrows/flat panels.
+- Browser checks cover all 61 model downloads, 149 original levels, countdown input/timer gating, interrupted introduction, skip-to-countdown, continuous cardinal steering without lifting, camera tilt/turn/zoom/reset, progression/passwords and pause/resume. Reduced-motion and larger-touch layouts have dedicated checks.
+- Original Lesson 1 clears through 96 actual D-pad touches in both engines (11 chips, eight locks, retained green key). Three authored fixture solutions and zero WebGL resources after exit pass in WebKit and full Chromium. Packaged headless-shell still intermittently stalls; full Chromium is used for final browser proof.
+- Actual CHIP01/CHIP02 recording playback/looping, switching and pause pass in Chromium. Windows WebKit has no Web Audio API. Emulation is not physical-device installed-PWA rotation, audio, safe-area, thermal or real-thumb ergonomics proof.
+- Evidence: output/playwright/shadow-circuit-polish, original, and timestamped game smoke reports. Headed authenticated host smoke passed with cleanup verified (no created messages/media retained).
+
 ## September 20 Shadow Circuit test build
 
 - Local Android/Chromium and iPhone/WebKit emulation at 844x390 passes menu/touch play, pause/reload, locked levels/password persistence and portrait gate at 390x844. Screens: `output/playwright/shadow-circuit-branding/` and `output/playwright/shadow-circuit-progression/`.

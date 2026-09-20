@@ -1,3 +1,15 @@
+# 2026-09-20 reference-polish testing update
+
+- 111 game node tests pass, including original recording lifecycle, model/manifest hashes, full-pad steering, camera follow, progression and introduction timing. All 61 source and runtime GLBs have zero Khronos errors/warnings.
+- Full Jest: 252 suites, 1,436 passed, 16 existing todo. Repository node suite: 58 passed. Lint, app TypeScript and budgeted production-format build pass. Audit: zero vulnerabilities. Supabase local inventory: 29 functions verified.
+- Original campaign is fetched by verified hash from authorized public game assets: 149 levels plus three authored fixtures. Original Lesson 1 clears by real D-pad input in Chromium/WebKit, with eight locks and retained green key. Lesson 3 original password ECBQ unlocks correctly. All 149 maps are inventoried, not all solved or certified against the original executable.
+- Visual/control evidence: output/playwright/shadow-circuit-polish. Covers three viewport/browser profiles, model loading, branding, intro/countdown, background interruption, continuous sliding pad, manual camera controls, original music and orientation gate. Reduced-motion and larger-touch profiles have separate cases.
+- Three authored fixtures clear in full Chromium and WebKit; pause/reload and zero tracked WebGL resources after exit pass. Bundled Chromium headless-shell intermittently stalls; full Chromium is the final browser target. Headed host auth smoke passes and cleanup is verified.
+- Original recordings use FluidSynth/GeneralUser GS and preserve the supplied compositions. Chromium decodes/loops both tracks and suspends on pause. Windows WebKit lacks Web Audio; real iPhone listening remains required.
+- Physical devices, exact character likeness, final skeletal animation/VFX and complete original-game compatibility remain open. This is a personal testing build.
+
+## Earlier initial-release evidence
+
 # 2026-09-20 initial test release checks
 
 - Selected menu/logo/launcher and PCB gameplay background integrated. Desktop 1672x941 and phone landscape 844x390 visual review: `output/playwright/shadow-circuit-branding/`; source comparison is in root `design-qa.md`.

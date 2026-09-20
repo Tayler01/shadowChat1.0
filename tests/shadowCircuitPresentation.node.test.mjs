@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { trackMotion, sampleMotion } from '../src/features/games/shadow-circuit/renderer/actorMotion.ts'
 import { CircuitAudio } from '../src/features/games/shadow-circuit/audio/circuitAudio.ts'
+import {createHash} from 'node:crypto'
 const actor={id:1,kind:'bug',cell:11,previous:11,direction:1,readyAt:0,alive:true}
 test('tile motion reaches each corner exactly without diagonal cutting, at 30 and 60 Hz',()=>{
   for(const fps of [30,60]){
@@ -47,4 +48,34 @@ test('music is gesture gated, independent of SFX, and releases every voice on pa
     await new Promise(resolve=>setTimeout(resolve,35));assert.ok(context.nodes.length>count+1)
     audio.dispose();assert.equal(context.state,'closed');assert.ok(context.nodes.every(n=>n.disconnected))
   }finally{audio.dispose();globalThis.AudioContext=original}
+})
+test('original recordings remain stopped if decoding completes after pause, then resume without synthesis',async()=>{
+  const originalContext=globalThis.AudioContext,originalFetch=globalThis.fetch
+  const bytes=Buffer.from('original recording fixture'),sources=[]
+  let context,completeDecode
+  class FakeContext{
+    currentTime=0;state='suspended';destination={}
+    constructor(){context=this}
+    resume(){this.state='running';return Promise.resolve()}
+    suspend(){this.state='suspended';return Promise.resolve()}
+    close(){this.state='closed';return Promise.resolve()}
+    decodeAudioData(){return new Promise(resolve=>{completeDecode=resolve})}
+    createGain(){return {gain:{value:0},connect(){},disconnect(){}}}
+    createBufferSource(){const s={connect(){},disconnect(){this.disconnected=true},start(at,offset){this.offset=offset},stop(){this.stopped=true}};sources.push(s);return s}
+    createOscillator(){throw new Error('Original playback must not substitute oscillator music')}
+  }
+  globalThis.AudioContext=FakeContext;globalThis.fetch=async()=>new Response(bytes)
+  const audio=new CircuitAudio()
+  try{
+    audio.loadRecording({url:'https://example.test/chip01.mp3',bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')})
+    await audio.unlock({music:true,sfx:false})
+    while(!completeDecode)await new Promise(resolve=>setImmediate(resolve))
+    audio.pause();completeDecode({duration:36.761});await new Promise(resolve=>setImmediate(resolve))
+    assert.equal(sources.length,0)
+    await audio.unlock({music:true,sfx:false});assert.equal(sources.length,1);assert.equal(sources[0].loop,true)
+    context.currentTime=5;audio.pause();assert.equal(sources[0].stopped,true);assert.equal(sources[0].disconnected,true)
+    await audio.unlock({music:true,sfx:false});assert.equal(sources[1].offset,5)
+    audio.configure({music:false,sfx:false});assert.equal(sources[1].stopped,true)
+    audio.dispose();assert.equal(context.state,'closed')
+  }finally{audio.dispose();globalThis.AudioContext=originalContext;globalThis.fetch=originalFetch}
 })

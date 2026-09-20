@@ -39,7 +39,7 @@ rod('neck',(0,0,.69),(0,0,.8),.065,'skin')
 for side in (-1,1):
     # Natural arm bend and separate cuffs; sculpted palms, thumbs and four fingers.
     shoulder=(side*.202,.004,.684);elbow=(side*.25,-.012,.573);wrist=(side*.275,-.037,.486)
-    sleeve=sphere('upper-sleeve',((shoulder[0]+elbow[0])/2,0,.635),(.088,.101,.142),'cloth')
+    sleeve=sphere('upper-sleeve',((shoulder[0]+elbow[0])/2,0,.635),(.077,.090,.138),'cloth')
     sleeve.rotation_euler.y=side*.25
     sphere('lower-sleeve',(side*.265,-.029,.532),(.072,.089,.093),'cloth')
     cuff=smooth_box('shirt-cuff',(side*.276,-.039,.495),(.139,.16,.05),'cloth',.02)
@@ -70,13 +70,13 @@ for vertex in head.data.vertices:
 for side in (-1,1):
     sphere('ear',(side*.175,.002,.901),(.041,.032,.061),'skin')
     sphere('ear-fold',(side*.193,-.024,.903),(.012,.01,.032),'skin')
-    sphere('eye-white',(side*.073,-.144,.928),(.039,.014,.045),'eye')
-    sphere('iris',(side*.070,-.158,.931),(.018,.009,.027),'rubber')
-    sphere('eye-glint',(side*.063,-.167,.942),(.006,.004,.008),'eye')
+    sphere('eye-white',(side*.073,-.144,.928),(.035,.009,.032),'eye')
+    sphere('iris',(side*.070,-.154,.931),(.016,.005,.021),'rubber')
+    sphere('eye-glint',(side*.065,-.160,.940),(.004,.003,.005),'eye')
     # Rounded rectangular frame, with open lenses: actual face and eyes visible through it.
     cx=side*.079
     points=[(cx-.049,-.166,.978),(cx+.049,-.166,.978),(cx+.061,-.163,.966),(cx+.055,-.169,.887),(cx+.043,-.173,.876),(cx-.046,-.173,.881),(cx-.056,-.168,.895),(cx-.061,-.162,.965)]
-    curve_mesh('glasses-frame',points,.009,'rubber',True)
+    curve_mesh('glasses-frame',points,.011,'rubber',True)
     curve_mesh('glasses-temple',[(side*.14,-.164,.967),(side*.179,-.06,.956),(side*.187,.024,.951)],.008,'rubber')
     curve_mesh('brow',[(side*.037,-.139,.995),(side*.078,-.144,1.008),(side*.12,-.12,1.002)],.011,'hair')
 curve_mesh('glasses-bridge',[(-.019,-.169,.946),(0,-.178,.95),(.019,-.169,.946)],.009,'rubber')
@@ -121,5 +121,5 @@ def sculpt_union(prefixes,voxel,ratio):
 
 sculpt_union(['hair-back','hair-side','swept-quiff','front-lock'],.008,.1)
 sculpt_union(['shirt-body','upper-sleeve','lower-sleeve','shirt-cuff'],.009,.1)
-for points in strand_paths:curve_mesh('quiff-strand',points,.0016,'hair')
+for points in strand_paths:curve_mesh('quiff-strand',points,.0026,'hair-light')
 export_asset('hero-explorer',28000)

@@ -188,7 +188,8 @@ test('pointer ownership, tap, release and cancellation do not leave movement stu
   const i=new IntentBuffer();assert.equal(i.press(1,0),true);assert.equal(i.press(2,1),false);i.release(1);assert.equal(i.take(),0);assert.equal(i.take(),null)
   i.press(2,1);assert.equal(i.take(),1);assert.equal(i.take(),1);i.clear();assert.equal(i.take(),null)
 })
-test('fresh diagonals remain neutral; previous sector has hysteresis',()=>{assert.equal(padSector(.7,.7,null),null);assert.equal(padSector(.7,.7,1),1);assert.equal(padSector(-.8,.1,null),3);assert.equal(padSector(2,0,1),null)})
+test('full pad accepts diagonals and captured drags, with quadrant-correct hysteresis',()=>{assert.equal(padSector(.7,.7,null),2);assert.equal(padSector(.7,.7,1),1);assert.equal(padSector(-.8,.1,null),3);assert.equal(padSector(2,0,1),1);assert.equal(padSector(.7,.7,0),2);assert.equal(padSector(0,0,1),null)})
+test('a neutral initial pad touch owns the gesture and may steer without lifting',()=>{const input=new IntentBuffer();assert.equal(input.press(4,null),true);assert.equal(input.take(),null);input.steer(4,1);assert.equal(input.take(),1);assert.equal(input.take(),1);input.steer(4,2);assert.equal(input.take(),2);assert.equal(input.press(7,3),false);input.steer(4,null);assert.equal(input.take(),null);input.steer(4,3);assert.equal(input.take(),3);input.release(4);assert.equal(input.take(),null)})
 test('screen arrows map deterministically at all four camera headings',()=>{for(let heading=0;heading<4;heading++)assert.deepEqual([0,1,2,3].map(d=>screenDirection(d,heading)),[heading,(heading+1)%4,(heading+2)%4,(heading+3)%4])})
 for(const name of ['synthetic-corridor','synthetic-wiring']) test(`DAT ${name} preserves source structure and rejects truncation`,()=>{
   const bytes=readFileSync(`docs/shadow-circuit-build/resources/fixtures/${name}.dat`);const pack=parseLegacyDat(bytes)

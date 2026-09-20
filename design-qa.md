@@ -1,3 +1,29 @@
+# September 20 reference-polish review
+
+Compared the selected reference against actual runtime screenshots in
+`output/playwright/shadow-circuit-polish/`, including the close character view,
+original Lesson 1/3, rotation gate, settings, pause, and new thumb consoles.
+
+- PCB/logo and thick rounded metal controls now extend to rotation, loading,
+  submenus and dialogs. The HUD is a compact top console; the chamber and both
+  thumb areas stay distinct on the tested landscape screens.
+- Darker beveled wall/lock bodies and brighter floor tops restore the reference
+  contrast. The real square-spiral exit, socket and 34 other terrain variants
+  replace runtime placeholders. Every visible template uses the current kit.
+- The actual runtime explorer appears in the opening flyover; eyes/glasses,
+  sleeves and hair were refined. It remains a stylized approximation, not an
+  accepted exact likeness. Source and in-game views are clearly distinguished.
+- Larger solid movement arrows, raised green pressed feedback, whole-surface
+  sliding, and a separate manual camera pad/zoom improve touch control. Camera
+  motion never follows the character's facing direction automatically.
+- Original compositions and campaign are included following the user's explicit
+  permission. MIDI instrumentation is General MIDI, not a claim of identical
+  historic device samples. Physical phone audio and performance remain open.
+
+This is the next personal-testing milestone, not final campaign/art acceptance.
+
+## Previous menu baseline review
+
 # Shadow Circuit selected-image implementation review
 
 Reviewed 2026-09-20 against `assets-source/shadow-circuit/branding/selected/reference.png`.

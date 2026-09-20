@@ -1,3 +1,11 @@
+## September 20 Shadow Circuit reference polish and original campaign
+
+- User confirmed permission to deploy supplied original campaign/music/assets for personal testing. The build loads all 149 original levels plus three authored fixtures, preserves sequential locks/original passwords, and labels the original campaign on the menu.
+- 61 validated Blender templates replace all rendered placeholders, including a square blue spiral exit, chip socket, terrain and mechanisms. Dark wall/lock bodies contrast with lighter floors; the explorer has refined eyes, glasses, hair and sleeves. Static art is still short of exact likeness/final animation acceptance.
+- Added interruptible character flyover, fixed-camera settling and three-second countdown. Simulation/input remain paused; reduced motion skips the flyover. Full-surface movement pad supports continuous sliding, quadrant hysteresis, neutral-center stopping and pointer capture. Right-hand camera pad offers manual quarter turns, tilt, zoom and reset; top HUD frees both thumb zones.
+- Rotation/loading/submenus use the approved PCB/logo and raised rounded silver/green controls. Original CHIP01/CHIP02 recordings use the actual supplied MIDI scores with General MIDI instrumentation, not the temporary score.
+- Models/music/campaign use hash-addressed public game-assets Storage objects with runtime SHA checks and no client-write policy. Frontend remains below the unchanged 100 MB cap. Source/provenance and publishing recipe retained. Physical iPhone audio/PWA performance and full campaign compatibility remain open.
+
 ## September 20 Shadow Circuit branded test release preparation
 
 - User authorized main deployment and manual Netlify fallback. Integrated selected PCB branding, existing-format Games card, raised rounded buttons and themed loading.

@@ -16,4 +16,12 @@ Babylon core/loaders pinned together at 9.27.1 (Apache-2.0), queried from npm on
 
 ## Original content
 
+September 20 authorization update: the user explicitly confirmed permission to
+use and deploy all supplied original assets, including music, for personal
+testing. The current testing build therefore includes the original campaign
+and recordings of CHIP01.MID / CHIP02.MID through versioned public
+Storage URLs. See `assets-source/shadow-circuit/original-authorized/README.md`
+for the rendering sources and instrument-fidelity distinction. Earlier
+local-only restrictions below describe the initial acquisition stage.
+
 Original ZIP supplied by the user on 2026-09-20; DAT SHA-256 `b0a68f21642447385512e0ed9386a4a13a4f7e9a38f909da772104d8e6b5c1fb`, 108,569 bytes, 149 records. See [ORIGINAL_REFERENCE.md](ORIGINAL_REFERENCE.md) for archive/runtime provenance and local-only preview. No original source sprites, Nintendo content, downloaded music or paid generation. Authored test chambers must be clearly labeled as original development fixtures, never substituted for the requested campaign.

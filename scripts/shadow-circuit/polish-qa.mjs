@@ -1,0 +1,138 @@
+import {chromium,webkit} from 'playwright'
+import {mkdir,writeFile} from 'node:fs/promises'
+import assert from 'node:assert/strict'
+const out='output/playwright/shadow-circuit-polish'
+await mkdir(out,{recursive:true})
+const results=[]
+for(const [name,type,viewport] of [['desktop',chromium,{width:1672,height:941}],['android',chromium,{width:844,height:390}],['iphone',webkit,{width:844,height:390}],['reduced',chromium,{width:844,height:390}],['large',chromium,{width:844,height:390}]]){
+  if(process.env.CIRCUIT_POLISH_BROWSER&&name!==process.env.CIRCUIT_POLISH_BROWSER)continue
+  const browser=await type.launch({headless:true,...(type===chromium?{channel:'chromium',args:['--use-angle=swiftshader']}: {})})
+  try{
+    const page=await browser.newPage({viewport,hasTouch:name!=='desktop',isMobile:name!=='desktop',reducedMotion:name==='reduced'?'reduce':'no-preference'})
+    const errors=[],models=new Set()
+    page.on('pageerror',e=>errors.push(e.message))
+    page.on('response',r=>{if(r.url().endsWith('.glbz')&&r.ok())models.add(r.url())})
+    await page.addInitScript(()=>{
+      const originalFetch=window.fetch.bind(window)
+      window.fetch=(input,init)=>{
+        const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,location.href)
+        return url.hostname.endsWith('.supabase.co')&&!url.pathname.startsWith('/storage/v1/object/public/game-assets/')?Promise.resolve(new Response(url.pathname.startsWith('/auth/')?'{}':'[]',{headers:{'content-type':'application/json'}})):originalFetch(input,init)
+      }
+      window.__recordingQA={contexts:[],sources:[],supported:!!(window.AudioContext??window.webkitAudioContext)}
+      const Context=window.AudioContext??window.webkitAudioContext
+      if(Context){const create=Context.prototype.createBufferSource;Context.prototype.createBufferSource=function(){const s=create.call(this);window.__recordingQA.sources.push(s);if(!window.__recordingQA.contexts.includes(this))window.__recordingQA.contexts.push(this);return s}}
+    })
+    if(name==='large')await page.addInitScript(()=>localStorage.setItem('shadowchat:comfort-preferences:v1',JSON.stringify({version:1,preset:'custom',touchTarget:'large',textScale:130,motion:'reduced'})))
+    await page.goto('http://127.0.0.1:4175/?view=games&localPreview=shadow-circuit')
+    const root=page.getByTestId('shadow-circuit')
+    await page.getByRole('button',{name:'Play',exact:true}).waitFor()
+    await page.getByText('ORIGINAL CAMPAIGN · 149 LEVELS',{exact:true}).waitFor()
+    await page.locator('.circuit-brand-logo').evaluate(img=>img.decode())
+    await page.screenshot({path:`${out}/${name}-menu.png`})
+    const buttons=await page.locator('.circuit-launch').evaluateAll(elements=>elements.map(e=>{const r=e.getBoundingClientRect();return {height:r.height,top:r.top,bottom:r.bottom,viewport:innerHeight}}))
+    assert.ok(buttons.every(b=>b.height>=48&&b.top>=0&&b.bottom<=b.viewport),'Main menu controls clipped')
+    await page.getByRole('button',{name:'Play',exact:true}).click()
+    await page.getByRole('button',{name:'Enter chamber',exact:true}).waitFor({timeout:45000})
+    assert.equal(models.size,61)
+    await page.getByRole('button',{name:'Enter chamber',exact:true}).click()
+    if(name==='reduced'||name==='large'){
+      assert.equal(await root.getAttribute('data-screen'),'countdown')
+      assert.equal(await page.getByRole('button',{name:'Skip flyover'}).count(),0)
+      assert.equal(await root.getAttribute('data-tick'),'0')
+      await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]').dataset.screen==='playing')
+      assert.equal(await root.getAttribute('data-heading'),'0')
+      if(name==='large'){
+        const targets=await page.locator('.circuit-direction,.circuit-zoom button').evaluateAll(buttons=>buttons.map(b=>{const r=b.getBoundingClientRect();return {width:r.width,height:r.height,left:r.left,right:r.right,top:r.top,bottom:r.bottom}}))
+        assert.ok(targets.every(t=>t.width>=59&&t.height>=59&&t.left>=0&&t.right<=844&&t.top>=0&&t.bottom<=390),'Large controls are clipped or undersized')
+        await page.screenshot({path:`${out}/large-controls.png`})
+      }
+      results.push({name,status:'PASS',reducedMotionSkipsFlyover:true,countdownPreserved:true})
+      continue
+    }
+    await page.waitForTimeout(650)
+    assert.equal(await root.getAttribute('data-screen'),'cinematic')
+    await page.screenshot({path:`${out}/${name}-flyover.png`})
+    await page.keyboard.press('ArrowUp')
+    assert.equal(await root.getAttribute('data-tick'),'0')
+    assert.equal(await root.getAttribute('data-elapsed'),'0')
+    await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]').dataset.screen==='countdown')
+    await page.screenshot({path:`${out}/${name}-countdown.png`})
+    assert.equal(await root.getAttribute('data-tick'),'0')
+    await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]').dataset.screen==='playing')
+    await page.screenshot({path:`${out}/${name}-gameplay.png`})
+    const audio=await page.evaluate(()=>({supported:window.__recordingQA.supported,recordings:window.__recordingQA.sources.map(s=>({duration:s.buffer?.duration,loop:s.loop})),states:window.__recordingQA.contexts.map(c=>c.state)}))
+    if(audio.supported)assert.ok(audio.recordings.some(s=>s.duration>36&&s.duration<38&&s.loop),'Original recording was not playing')
+    const before=await root.getAttribute('data-cell')
+    await page.getByRole('button',{name:'Move right',exact:true}).click()
+    await page.waitForTimeout(300)
+    assert.notEqual(await root.getAttribute('data-cell'),before)
+    // Start on the pad's neutral center, steer across all directions without releasing.
+    const pad=await page.getByRole('group',{name:'Movement controls',exact:true}).boundingBox()
+    const center={x:pad.x+pad.width/2,y:pad.y+pad.height/2}
+    await page.mouse.move(center.x,center.y);await page.mouse.down()
+    for(const [direction,x,y] of [['right',.92,.78],['down',.65,.93],['left',.06,.65],['up',.40,.04]]){
+      await page.mouse.move(pad.x+pad.width*x,pad.y+pad.height*y,{steps:5})
+      await page.waitForFunction(direction=>document.querySelector(`[aria-label="Move ${direction}"]`)?.getAttribute('aria-pressed')==='true',direction,{timeout:2000})
+      await page.waitForTimeout(90)
+    }
+    await page.mouse.move(center.x,center.y,{steps:3})
+    await page.waitForFunction(()=>document.querySelectorAll('.circuit-movement-console [aria-pressed="true"]').length===0)
+    await page.mouse.up()
+    await page.getByRole('button',{name:'Rotate camera right',exact:true}).click()
+    assert.equal(await root.getAttribute('data-heading'),'1')
+    await page.getByRole('button',{name:'Tilt camera down',exact:true}).click()
+    assert.ok(Number(await root.getAttribute('data-tilt'))>.64)
+    await page.getByRole('button',{name:'Zoom in',exact:true}).click()
+    assert.equal(await root.getAttribute('data-zoom'),'4')
+    await page.screenshot({path:`${out}/${name}-camera-zoom.png`})
+    await page.getByRole('button',{name:'Reset camera',exact:true}).click()
+    assert.equal(await root.getAttribute('data-heading'),'0')
+    assert.equal(await root.getAttribute('data-zoom'),'4.5')
+    await page.getByRole('button',{name:'Pause game',exact:true}).click()
+    await page.screenshot({path:`${out}/${name}-pause.png`})
+    if(audio.supported)await page.waitForFunction(()=>window.__recordingQA.contexts.every(c=>c.state!=='running'))
+    await page.getByRole('button',{name:'Settings',exact:true}).click()
+    await page.getByLabel('Original soundtrack').selectOption('chip02.mp3')
+    await page.screenshot({path:`${out}/${name}-settings.png`})
+    await page.getByRole('button',{name:'Back',exact:true}).click()
+    await page.getByRole('button',{name:'Resume expedition',exact:true}).click()
+    if(audio.supported)await page.waitForFunction(()=>window.__recordingQA.sources.some(s=>s.buffer?.duration>45&&s.buffer?.duration<47),{timeout:15000})
+    await page.getByRole('button',{name:'Pause game',exact:true}).click()
+    await page.getByRole('button',{name:'Restart chamber',exact:true}).click()
+    await page.getByRole('button',{name:'Restart chamber',exact:true}).click()
+    await page.getByRole('button',{name:'Enter chamber',exact:true}).click()
+    await page.waitForTimeout(250)
+    await page.evaluate(()=>window.dispatchEvent(new Event('blur')))
+    assert.equal(await root.getAttribute('data-screen'),'intro')
+    assert.equal(await root.getAttribute('data-tick'),'0')
+    await page.getByRole('button',{name:'Enter chamber',exact:true}).click()
+    await page.getByRole('button',{name:'Skip flyover',exact:true}).click()
+    await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]').dataset.screen==='countdown')
+    assert.equal(await root.getAttribute('data-tick'),'0')
+    await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]').dataset.screen==='playing')
+    await page.getByRole('button',{name:'Pause game',exact:true}).click()
+    await page.getByRole('button',{name:'Main menu',exact:true}).click()
+    await page.getByRole('button',{name:'Levels',exact:true}).click()
+    assert.equal(await page.locator('.circuit-level-list>button').count(),152)
+    await page.getByRole('button',{name:'Unlock level 3: LESSON 3',exact:true}).click()
+    await page.getByLabel('Code or level password').fill('ECBQ')
+    await page.getByRole('button',{name:'Apply',exact:true}).click()
+    await page.locator('.circuit-level-list>button').filter({hasText:'LESSON 3'}).click()
+    await page.getByRole('button',{name:'Enter chamber',exact:true}).click()
+    await page.getByRole('button',{name:'Skip flyover',exact:true}).click()
+    await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]').dataset.screen==='playing')
+    await page.screenshot({path:`${out}/${name}-lesson3.png`})
+    if(name!=='desktop'){
+      await page.setViewportSize({width:390,height:844})
+      await page.getByRole('heading',{name:'Rotate to explore'}).waitFor()
+      await page.screenshot({path:`${out}/${name}-rotate.png`})
+      const bounds=await page.locator('.circuit-rotate-console').boundingBox()
+      assert.ok(bounds.y>=0&&bounds.y+bounds.height<=844,'Rotation console clips')
+      assert.equal(await root.getAttribute('data-screen'),'paused')
+    }
+    assert.deepEqual(errors,[])
+    results.push({name,status:'PASS',modelFiles:models.size,originalCampaign:149,timerAndInputGated:true,backgroundCancelsIntroduction:true,skipKeepsCountdown:true,continuousPadSteering:true,manualCameraTiltRotateZoom:true,music:audio,physicalDevice:false})
+  }catch(error){results.push({name,status:'FAIL',error:error.message,stack:error.stack});process.exitCode=1}finally{await browser.close()}
+}
+await writeFile(`${out}/report.json`,JSON.stringify(results,null,2))
+console.log(JSON.stringify(results,null,2))

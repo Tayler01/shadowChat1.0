@@ -32,24 +32,24 @@
     },
     {
       "id": "tile-wall",
-      "triangles": 80,
+      "triangles": 88,
       "triangleCeiling": 120,
       "blenderBounds": [
         [
-          -0.47999998927116394,
-          0.47999998927116394
+          -0.48249998688697815,
+          0.48249998688697815
         ],
         [
-          -0.47999998927116394,
-          0.47999998927116394
+          -0.48249998688697815,
+          0.48249998688697815
         ],
         [
           0.0,
-          0.7450000047683716
+          0.7400000691413879
         ]
       ],
-      "sha256": "8db57d75ec5e8a5ce793f07ad273b9b5aa4f178884c6829ab67f0af787c14218",
-      "bytes": 7200,
+      "sha256": "35cea2f6478259c60d9a3d2c9bf8e3dfa7f9acab8a84a329082a25ba6f4424bd",
+      "bytes": 6640,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
@@ -57,12 +57,12 @@
     },
     {
       "id": "hero-explorer",
-      "triangles": 27456,
+      "triangles": 27400,
       "triangleCeiling": 28000,
       "blenderBounds": [
         [
           -0.3442087173461914,
-          0.3442080616950989
+          0.3442089259624481
         ],
         [
           -0.20400002598762512,
@@ -73,8 +73,8 @@
           1.1660796403884888
         ]
       ],
-      "sha256": "07c16d472d238b8371aaa63c6f2a377d8e9a53e7b9cb8215f6614817ec8e2fdf",
-      "bytes": 508888,
+      "sha256": "39792ef8547649de19455dc703a77f92806c24dc9e55a689a205edb2464dc91c",
+      "bytes": 508716,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
@@ -98,7 +98,7 @@
           0.46400001645088196
         ]
       ],
-      "sha256": "a0da84a34c6e1685bd96ad41a280de3e2824ebfb7ba507d56ad1437df66fb063",
+      "sha256": "8ffea98e8d21946be5258ccfc7c1363b98d584e5f7c5c4a237db4c6330a4b004",
       "bytes": 46964,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -123,7 +123,7 @@
           0.699999988079071
         ]
       ],
-      "sha256": "2283fa442b36a9973312c609bd73e303f1493c8fb48b0885b368f83c909e437e",
+      "sha256": "693378f7d416f5f40e10f47af7b6978888573266a331a8cf4a137c67bf0c83c7",
       "bytes": 17432,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -148,7 +148,7 @@
           0.5699999928474426
         ]
       ],
-      "sha256": "50f7b94a4f3b6d9d9f3ca3e66e03a6e3e292b70747b54416525f0ddbe4e10a3a",
+      "sha256": "1b10a9a5f3c8a007072f5ff82ed0f070a1faa51c7aa93c3e97d6347591aeabf6",
       "bytes": 29192,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -173,7 +173,7 @@
           0.5299999713897705
         ]
       ],
-      "sha256": "6a6923184ac7938903192f479ef7e5e4ee95c5309ca351f4a37de1867c078266",
+      "sha256": "7218a65b62eb6ffd6b8b57660ccb0abc2dd00020ee556729e813e69f63987efb",
       "bytes": 52828,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -198,7 +198,7 @@
           0.4399999976158142
         ]
       ],
-      "sha256": "62f89a8c390a811c546f523a2157d754b2dfae0aade6472f7430d872886e25c2",
+      "sha256": "a16a750af8c62431d4bce86d1bb3568665201c85e5115908348135d43e6f60ac",
       "bytes": 30016,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -223,7 +223,7 @@
           0.5399999618530273
         ]
       ],
-      "sha256": "e3efd0681f6ff96b08cd0d882a979e46139632780ac7422c065e5bcbe8ad32ad",
+      "sha256": "8e5131dabb7c0d7458a94b73aec044a9b1a44a0a9c7415bc52939896470a34ed",
       "bytes": 40664,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -248,7 +248,7 @@
           0.4950000047683716
         ]
       ],
-      "sha256": "217aec45161b057825c4af0ee74d64833cc8d9ada744eb1e4520762ee4c9b08c",
+      "sha256": "918408a4a42464ad94f2998e79c46dbc75470b8311bbc2380fe794f1de140a02",
       "bytes": 49744,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -273,7 +273,7 @@
           0.47999998927116394
         ]
       ],
-      "sha256": "df088228540e352daefe54a7cdf422510337476016b2eb197f6d0cdc7370e95a",
+      "sha256": "4456b54ba1dc7bee3df330acb3b20d6d48b1905f2764b399a15e835383f47e1e",
       "bytes": 40288,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -298,7 +298,7 @@
           0.4399999976158142
         ]
       ],
-      "sha256": "d842533989b246e6bb8ded5f1921c62e0665fa40141fb2992bc9b0320f7189ef",
+      "sha256": "b3df043805598fbbf4207f9037c7c483082ae6e34445b43628fd085eafd739ed",
       "bytes": 33472,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -323,7 +323,7 @@
           0.41750001907348633
         ]
       ],
-      "sha256": "5a57b6c319e3972eb313e9a8c570c1f340cf6d346fd985627bdd9b44c0b8f2b9",
+      "sha256": "1da1dbfd8370728231315625e5721c0f44912a56276873f8fecbe20993bba831",
       "bytes": 49368,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -348,7 +348,7 @@
           0.41750001907348633
         ]
       ],
-      "sha256": "44ff5c52b3311f9c719e72ffe8b78991e4163bc883e3a0580ab45b584f393b91",
+      "sha256": "5e48e282e760271afd51d773cef4575eacb848b2b9448fea9105772fa5018b33",
       "bytes": 49352,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -373,7 +373,7 @@
           0.41750001907348633
         ]
       ],
-      "sha256": "88c6aa3684437abf8121a68748791cd8680d1a57016e59b9bdd453f27a86374d",
+      "sha256": "bfb7980753229d796099e78bcdce2e7f8e395856a8114952c0a6c618874ee53c",
       "bytes": 52092,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -398,7 +398,7 @@
           0.41750001907348633
         ]
       ],
-      "sha256": "c8f946a250963a500350e2ef9eb0b4d91a7dae68d46dc24b3474e1fe88a74331",
+      "sha256": "0a523c3f90fa26cb9df9e66c913ca8d2f7b4bd7d4e2b70ac9c52c24c3e20123d",
       "bytes": 49368,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -423,8 +423,8 @@
           0.6929999589920044
         ]
       ],
-      "sha256": "d5a7b98311fdeba6543f0dceca9552c7e66288df12fd61a398675e7979817665",
-      "bytes": 14408,
+      "sha256": "cf53b48e83c82471088599a5d0fc6f8418f5e4b06f6a39d0c69f31a403af1637",
+      "bytes": 14428,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
@@ -473,8 +473,8 @@
           0.6929999589920044
         ]
       ],
-      "sha256": "37fb55941945e6812d599d7dfa0a04a6213e59cdb985f0f1188d277eb60e2482",
-      "bytes": 14408,
+      "sha256": "0aa697a884d38df0c74d6ea513af33cd682c720fe03b434fc250e456fa1e4b8e",
+      "bytes": 14428,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
@@ -523,8 +523,8 @@
           0.6929999589920044
         ]
       ],
-      "sha256": "53b3dfc7daab17608ca854ad0647ebc4aa1a224d6dc9caa9fdbd93d1bee3e259",
-      "bytes": 14412,
+      "sha256": "42643aaf487f72147e7d90499a974354567d0d37c3b5564764be3264e5e01355",
+      "bytes": 14432,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
@@ -573,8 +573,8 @@
           0.6929999589920044
         ]
       ],
-      "sha256": "36c0920d7fa3938608fb7c8b3407b0648bdd679070826e30f80fbf4494b88ab4",
-      "bytes": 14412,
+      "sha256": "6df18bab4146bf9ebc4561080720f5b62787cb811c7be2596e8bfae8329fe4d9",
+      "bytes": 14432,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
@@ -623,12 +623,912 @@
           0.22450000047683716
         ]
       ],
-      "sha256": "c8d537a8faa2116a4c55a6e9024fa0cd6a23e4bb5c8a28d590d9896c81db9384",
-      "bytes": 13700,
+      "sha256": "7d51c9ee029ff6125346b07df7052280411c8d7bf9510a55561ca5930c7f2381",
+      "bytes": 13720,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
       "object": "item-chip"
+    },
+    {
+      "id": "terrain-exit",
+      "triangles": 748,
+      "triangleCeiling": 2200,
+      "blenderBounds": [
+        [
+          -0.4699999988079071,
+          0.4699999988079071
+        ],
+        [
+          -0.18000000715255737,
+          0.25999999046325684
+        ],
+        [
+          0.0,
+          0.9599999785423279
+        ]
+      ],
+      "sha256": "313419c01d2269a448a43029c4311bcacb9b98fb40772e2da97251cf7dc2ed24",
+      "bytes": 46380,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-exit"
+    },
+    {
+      "id": "terrain-socket",
+      "triangles": 836,
+      "triangleCeiling": 2000,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.1599999964237213
+        ]
+      ],
+      "sha256": "a4df0509da5d088b75a9b5509ad12d9ba7d7f3ff7bb1bfb06968fd6ae93751d1",
+      "bytes": 51956,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-socket"
+    },
+    {
+      "id": "terrain-teleport",
+      "triangles": 748,
+      "triangleCeiling": 1800,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.13249999284744263
+        ]
+      ],
+      "sha256": "e071a7ece0e2fa2bb971389d6c885c1c7ecf4e07add3bd96d4d98edb939eb4ad",
+      "bytes": 46356,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-teleport"
+    },
+    {
+      "id": "terrain-water",
+      "triangles": 1484,
+      "triangleCeiling": 2200,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.10279422998428345
+        ]
+      ],
+      "sha256": "015e04df052f42735b7dd90cfc85128ea218bd01d3e8cd316fa1d7ac5bdd0db2",
+      "bytes": 30968,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-water"
+    },
+    {
+      "id": "terrain-ice",
+      "triangles": 404,
+      "triangleCeiling": 1400,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.10479423403739929
+        ]
+      ],
+      "sha256": "d24a44cc4ece1af11c0cae97c8fad7ebb867c1d9a0cccfb3a3b4d61e18601934",
+      "bytes": 11368,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-ice"
+    },
+    {
+      "id": "terrain-ice-26",
+      "triangles": 492,
+      "triangleCeiling": 1700,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.48750001192092896
+        ],
+        [
+          -0.48750001192092896,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "88332ad657c6da12b0fbf4e98aed3a52186d53fe71c867342023e00b08b2c6db",
+      "bytes": 17308,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-ice-26"
+    },
+    {
+      "id": "terrain-ice-27",
+      "triangles": 492,
+      "triangleCeiling": 1700,
+      "blenderBounds": [
+        [
+          -0.48750001192092896,
+          0.47999998927116394
+        ],
+        [
+          -0.48750001192092896,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "b37b7934a453b4bcbaeb34f95c6014ab16db4838e9ac042bf4a068802e3571e8",
+      "bytes": 17308,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-ice-27"
+    },
+    {
+      "id": "terrain-ice-28",
+      "triangles": 492,
+      "triangleCeiling": 1700,
+      "blenderBounds": [
+        [
+          -0.48750001192092896,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.48750001192092896
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "8378511cf95203879c9606854a239d01927a07b546d90522a1ccfdd900b5640e",
+      "bytes": 17308,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-ice-28"
+    },
+    {
+      "id": "terrain-ice-29",
+      "triangles": 492,
+      "triangleCeiling": 1700,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.48750001192092896
+        ],
+        [
+          -0.47999998927116394,
+          0.48750001192092896
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "7a4e3543cdd0bdd6875f86bdc24bc69268099b678c2eae62134ec62c81a2320c",
+      "bytes": 17308,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-ice-29"
+    },
+    {
+      "id": "terrain-thin-6",
+      "triangles": 44,
+      "triangleCeiling": 250,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.42250001430511475,
+          0.48750001192092896
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "3ec450f353741341fc26c30613fa0971e69014b6256aeab5879ad2cec8dcf105",
+      "bytes": 3680,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-thin-6"
+    },
+    {
+      "id": "terrain-thin-7",
+      "triangles": 44,
+      "triangleCeiling": 250,
+      "blenderBounds": [
+        [
+          -0.48750001192092896,
+          -0.42250001430511475
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "73c1a20d9ca532a9f0c180790f0a0044b8759d3209cb9796228ead2238ea6c13",
+      "bytes": 3680,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-thin-7"
+    },
+    {
+      "id": "terrain-thin-8",
+      "triangles": 44,
+      "triangleCeiling": 250,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.48750001192092896,
+          -0.42250001430511475
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "52d7e830531786c1e6cc46a535202c184cff47a40c437bbf18555aa34f6888a5",
+      "bytes": 3680,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-thin-8"
+    },
+    {
+      "id": "terrain-thin-9",
+      "triangles": 44,
+      "triangleCeiling": 250,
+      "blenderBounds": [
+        [
+          0.42250001430511475,
+          0.48750001192092896
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "407964d7ea3b6861d234add5b79dbc40e0ffd6609edb47b6a2458eca3692dda1",
+      "bytes": 3680,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-thin-9"
+    },
+    {
+      "id": "terrain-thin-48",
+      "triangles": 88,
+      "triangleCeiling": 250,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.48750001192092896
+        ],
+        [
+          -0.48750001192092896,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.30000001192092896
+        ]
+      ],
+      "sha256": "02a87c1f4a0a271fb21f2ababa278fb6744cb5a787fb43d0076bb3643c9b6ee6",
+      "bytes": 6252,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-thin-48"
+    },
+    {
+      "id": "terrain-fire",
+      "triangles": 1720,
+      "triangleCeiling": 4500,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.697782576084137
+        ]
+      ],
+      "sha256": "7563509a98beeb61d5349d1fc511ad592c9b37a2447ca1bb147c73e7eedfa42f",
+      "bytes": 44804,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-fire"
+    },
+    {
+      "id": "terrain-force-13",
+      "triangles": 396,
+      "triangleCeiling": 1300,
+      "blenderBounds": [
+        [
+          -0.48000001907348633,
+          0.48000001907348633
+        ],
+        [
+          -0.48000001907348633,
+          0.48000001907348633
+        ],
+        [
+          0.0,
+          0.1274999976158142
+        ]
+      ],
+      "sha256": "0314f6db93cc1085c261929ebb9c0a42f1ff4c384a1f5d734898c9eca5812b4b",
+      "bytes": 25824,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-force-13"
+    },
+    {
+      "id": "terrain-force-18",
+      "triangles": 396,
+      "triangleCeiling": 1300,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.1274999976158142
+        ]
+      ],
+      "sha256": "eb20ca58818bc3d43e4220b217d1e04637268e563a8b8f0468cb4e5d26567742",
+      "bytes": 25824,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-force-18"
+    },
+    {
+      "id": "terrain-force-19",
+      "triangles": 396,
+      "triangleCeiling": 1300,
+      "blenderBounds": [
+        [
+          -0.48000001907348633,
+          0.48000001907348633
+        ],
+        [
+          -0.48000001907348633,
+          0.48000001907348633
+        ],
+        [
+          0.0,
+          0.1274999976158142
+        ]
+      ],
+      "sha256": "90159dfff97759ec0b5ff17bae71b8a711746d4d4c514158bdf1d8a4c88b14c4",
+      "bytes": 25824,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-force-19"
+    },
+    {
+      "id": "terrain-force-20",
+      "triangles": 396,
+      "triangleCeiling": 1300,
+      "blenderBounds": [
+        [
+          -0.48000001907348633,
+          0.48000001907348633
+        ],
+        [
+          -0.48000001907348633,
+          0.48000001907348633
+        ],
+        [
+          0.0,
+          0.1274999976158142
+        ]
+      ],
+      "sha256": "ab0e538206a995e73e16056a04141e9e8e57d0aa1ed5c08bb601f1cd1dde7ab0",
+      "bytes": 25824,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-force-20"
+    },
+    {
+      "id": "terrain-force-50",
+      "triangles": 396,
+      "triangleCeiling": 1300,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.1274999976158142
+        ]
+      ],
+      "sha256": "e9da39ef2a198ba8d4ac5ebb0d4793464ae8698ffa2d8109ce42e5c719533103",
+      "bytes": 25824,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-force-50"
+    },
+    {
+      "id": "terrain-button-35",
+      "triangles": 320,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          0.0,
+          0.20500001311302185
+        ]
+      ],
+      "sha256": "b960a5f0e462a6109c6177beb1a71da5e6e8c3be758446760884585e7dc0af92",
+      "bytes": 16768,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-button-35"
+    },
+    {
+      "id": "terrain-button-36",
+      "triangles": 320,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          0.0,
+          0.20500001311302185
+        ]
+      ],
+      "sha256": "bc263a91e580c0cb7207c2e935756aeea19d72b0d3fd498ff6644621690edbab",
+      "bytes": 16764,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-button-36"
+    },
+    {
+      "id": "terrain-button-39",
+      "triangles": 320,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          0.0,
+          0.20500001311302185
+        ]
+      ],
+      "sha256": "dea2e40de601a82840131b81e6296ecd042356afc9aeeb98c0cd768083735d04",
+      "bytes": 16748,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-button-39"
+    },
+    {
+      "id": "terrain-button-40",
+      "triangles": 320,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          -0.33000001311302185,
+          0.33000001311302185
+        ],
+        [
+          0.0,
+          0.20500001311302185
+        ]
+      ],
+      "sha256": "61b56c8ae4770ea18fd5ac9e8459652dc030f78601797473667538c054b8fcba",
+      "bytes": 16764,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-button-40"
+    },
+    {
+      "id": "terrain-dirt",
+      "triangles": 3284,
+      "triangleCeiling": 4000,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.13500000536441803
+        ]
+      ],
+      "sha256": "00747a379521d88f3a6e069b04a313aa6cd1fbcbb83bdd843ee7c1917d8b8efb",
+      "bytes": 63236,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-dirt"
+    },
+    {
+      "id": "terrain-block",
+      "triangles": 264,
+      "triangleCeiling": 1200,
+      "blenderBounds": [
+        [
+          -0.4350000023841858,
+          0.4350000023841858
+        ],
+        [
+          -0.4424999952316284,
+          0.4424999952316284
+        ],
+        [
+          -0.004999995231628418,
+          0.7350000143051147
+        ]
+      ],
+      "sha256": "254a2e4013b961ed765234d2a1cbc18b8059ebe2be6ffe05c8ef88cc1112f001",
+      "bytes": 16968,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-block"
+    },
+    {
+      "id": "terrain-hint",
+      "triangles": 576,
+      "triangleCeiling": 1700,
+      "blenderBounds": [
+        [
+          -0.3400000035762787,
+          0.3400000035762787
+        ],
+        [
+          -0.3400000035762787,
+          0.3400000035762787
+        ],
+        [
+          0.009999997913837433,
+          0.17311474680900574
+        ]
+      ],
+      "sha256": "876425be36c3eb61f6751e0f72c93c07731aeb94197211d35c4992759310e18e",
+      "bytes": 19632,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-hint"
+    },
+    {
+      "id": "terrain-bomb",
+      "triangles": 932,
+      "triangleCeiling": 1900,
+      "blenderBounds": [
+        [
+          -0.24500012397766113,
+          0.24500003457069397
+        ],
+        [
+          -0.24500006437301636,
+          0.24500000476837158
+        ],
+        [
+          0.034999996423721313,
+          0.7070000171661377
+        ]
+      ],
+      "sha256": "06ab0eb23841061dfc4ab2db816942578dc1e7938b9e6c1a5aa19c98ae00482c",
+      "bytes": 20604,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-bomb"
+    },
+    {
+      "id": "terrain-trap",
+      "triangles": 368,
+      "triangleCeiling": 1300,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.32999998331069946
+        ]
+      ],
+      "sha256": "33b37346a832cf811a4fb6c577603ccf6e0370551cc3e7e3aa3fd5a2c8c9e472",
+      "bytes": 24892,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-trap"
+    },
+    {
+      "id": "terrain-cloner",
+      "triangles": 484,
+      "triangleCeiling": 1500,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.14900000393390656
+        ]
+      ],
+      "sha256": "e47a2a13aa54637707d90737d26ae58dba402595c4b8caeebdf2fa3d44102541",
+      "bytes": 29788,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-cloner"
+    },
+    {
+      "id": "terrain-toggle-open",
+      "triangles": 308,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.14249999821186066
+        ]
+      ],
+      "sha256": "0c99223bbb276734bc9c390462fc57cbcf35084e6cef7d7a34d892bfe8456ede",
+      "bytes": 19908,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-toggle-open"
+    },
+    {
+      "id": "terrain-toggle-closed",
+      "triangles": 352,
+      "triangleCeiling": 1000,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.6225000023841858
+        ]
+      ],
+      "sha256": "6f81244000d72cdc3204b02661044b88e061fca34c1a1a161cae6209c1622a7e",
+      "bytes": 22476,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-toggle-closed"
+    },
+    {
+      "id": "terrain-blue-wall",
+      "triangles": 44,
+      "triangleCeiling": 150,
+      "blenderBounds": [
+        [
+          -0.4749999940395355,
+          0.4749999940395355
+        ],
+        [
+          -0.4749999940395355,
+          0.4749999940395355
+        ],
+        [
+          0.0,
+          0.6800000071525574
+        ]
+      ],
+      "sha256": "a1a199cfca40742d241801a4803b317c2871cd5e4f6be1ac6c8a35ff5c180109",
+      "bytes": 3656,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-blue-wall"
+    },
+    {
+      "id": "terrain-popup",
+      "triangles": 308,
+      "triangleCeiling": 1200,
+      "blenderBounds": [
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          -0.47999998927116394,
+          0.47999998927116394
+        ],
+        [
+          0.0,
+          0.13749998807907104
+        ]
+      ],
+      "sha256": "8d2338f8ba648fb78fc960a138b3d00b645b013a78a0208865647af32cdda9ff",
+      "bytes": 20696,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-popup"
+    },
+    {
+      "id": "terrain-thief",
+      "triangles": 904,
+      "triangleCeiling": 1600,
+      "blenderBounds": [
+        [
+          -0.3499999940395355,
+          0.3499999940395355
+        ],
+        [
+          -0.3499999940395355,
+          0.3499999940395355
+        ],
+        [
+          0.002499997615814209,
+          0.13199999928474426
+        ]
+      ],
+      "sha256": "7ec0576fc4f4971c077cc17ded8bea6973e007931e00803c2dbf1f9ef3148f7d",
+      "bytes": 23116,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-thief"
+    },
+    {
+      "id": "terrain-gravel",
+      "triangles": 528,
+      "triangleCeiling": 1100,
+      "blenderBounds": [
+        [
+          -0.4496614336967468,
+          0.4565596878528595
+        ],
+        [
+          -0.39786091446876526,
+          0.40177997946739197
+        ],
+        [
+          0.0,
+          0.10999999940395355
+        ]
+      ],
+      "sha256": "c63cc06921335208e5329a5b30cf9728472ea5d7c2827add4f90c51e4b92672d",
+      "bytes": 32732,
+      "status": "CALIBRATION_STATIC",
+      "clips": [],
+      "runtimeIntegrated": false,
+      "object": "terrain-gravel"
     }
   ]
 }

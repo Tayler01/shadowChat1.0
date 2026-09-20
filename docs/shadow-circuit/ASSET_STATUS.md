@@ -1,13 +1,47 @@
 # Shadow Circuit asset status
 
-Updated 2026-09-20 for the initial live testing milestone. The selected Classic Circuit Console image governs the green PCB, silver tiles, green explorer and colored keyhole locks.
+Updated 2026-09-20 for the reference-polish testing build.
 
-Twenty-five static Blender models are integrated: floor, wall, explorer, all nine monster roles, four boot types, four keys, four locks and IC chip. Editable recipes are in `tools/shadow-circuit/blender/`; the detailed scene, GLBs, contact sheet and hash/triangle manifest are in `assets-source/shadow-circuit/circuit-kit-v2/`. Earlier kits are preserved as history.
+The selected Classic Circuit Console image governs the PCB, silver/green
+console controls, pale floors, darker beveled wall/door bodies, colored keyhole
+locks, and square blue spiral exit.
 
-The detailed explorer is 27,456 triangles. A separate 14,276-triangle gameplay LOD retains the detailed authoring source. `export_runtime_hero.py` makes the LOD; `prepare-visual-assets.mjs` quantizes runtime positions/normals and gzip-compresses the bounded GLB files as `.glbz`. The 25 runtime files total 338,878 bytes. Detailed source and decompressed runtime files pass Khronos validation with zero errors/warnings. No external textures or model network requests are needed.
+All 61 rendered templates now come from validated Blender exports. The kit
+includes the explorer, all nine monster roles, four boots, four keys, four
+locks, IC chip, floor, wall and 36 terrain/mechanism templates. The old runtime
+placeholder construction was removed. `terrain_reference.py` authors the exit,
+socket, teleport pad, water/ice/fire, conveyors, buttons, thin walls, dirt/block,
+hint, bomb, trap, cloner, toggles, blue wall, popup, thief and gravel. Invisible
+gameplay tiles intentionally remain invisible.
 
-Selected branding source PNGs, generation prompts and character turnaround are retained in `assets-source/shadow-circuit/branding/`. Runtime WebP menu, logo, launcher and PCB assets are prepared by the same script. The launcher follows the host Games card crop; actual gameplay uses the PCB background. Buttons are working HTML controls with raised rounded borders.
+Sources, contact sheet, SHA/triangle manifest and separate explorer LOD remain
+in `assets-source/shadow-circuit/circuit-kit-v2/`. The explorer has refined eye
+depth, heavier glasses, swept hair strands and slimmer sleeves. Exact facial
+likeness and animation acceptance remain open; these are static meshes, not
+the package's complete skeletal animation/VFX deliverables.
 
-The new explorer is closer to the selected reference, but exact facial/hair likeness is not accepted. Static meshes do not fulfill the package's animation/HD roster. Several terrain mechanisms, VFX, animation clips and other planned deliverables remain provisional or unbuilt. See root `design-qa.md` for the visual comparison and limits.
+`prepare-visual-assets.mjs` quantizes and compresses runtime GLBs. The 61 files
+total approximately 524 KB. `publish-assets.ps1 -Publish` uploads explicitly
+authorized, content-addressed assets to public `game-assets/shadow-circuit/`
+and writes the runtime manifest. All bytes are SHA-256 verified before decode.
+The bucket has no client-write policies; only server-side publishing can
+change it. Never ship the CLI server credential. Preserve old release hashes
+for rollback.
 
-Audio includes the authored Circuit Steps score plus a bounded local MIDI player. The supplied CHIP01/CHIP02 MIDI scores are readable privately; synthesized instruments are not an original WAV recording. Original campaign/music files remain ignored and are not shipped publicly. No paid generation service was used.
+This avoids raising the 100 MB site budget or degrading unrelated games.
+The frontend build is approximately 95.04 MiB; game models/audio are lazy
+network assets. Offline-first availability is not yet promised.
+
+The supplied 149-level original campaign and actual CHIP01 / CHIP02 scores
+are authorized for the deployed personal test. Recordings use FluidSynth and
+GeneralUser GS; source MIDIs, MP3s and licensing notes are retained under
+`assets-source/shadow-circuit/original-authorized/`. WAV masters remain in
+`output/shadow-circuit/music-tools/`. This is the original composition with
+General MIDI instrumentation, not a device-identical historic recording.
+
+Rotation, loading, dialogs, submenus and gameplay use the selected PCB artwork,
+raised silver/green rounded controls and matching console frames. The level
+introduction presents the actual runtime character, settles to the fixed
+gameplay view, then counts down 3-2-1 before input/ticks. Reduced motion omits
+the flyover. See root `design-qa.md` and `TEST_REPORT.md` for reviewed evidence
+and physical-device limitations.

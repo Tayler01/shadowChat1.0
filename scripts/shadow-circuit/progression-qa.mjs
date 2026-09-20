@@ -8,7 +8,7 @@ for(const [name,type] of [['android',chromium],['iphone',webkit]]){
   const browser=await type.launch({headless:true})
   try{
     const page=await browser.newPage({viewport:{width:844,height:390},hasTouch:true,isMobile:true})
-    await page.route(url=>url.hostname.endsWith('.supabase.co'),route=>route.fulfill({contentType:'application/json',body:route.request().url().includes('/auth/')?'{}':'[]'}))
+    await page.route(url=>(url.hostname.endsWith('.supabase.co')&&!url.pathname.startsWith('/storage/v1/object/public/game-assets/')),route=>route.fulfill({contentType:'application/json',body:route.request().url().includes('/auth/')?'{}':'[]'}))
     await page.goto('http://127.0.0.1:4175/?view=games&localPreview=shadow-circuit')
     await page.getByRole('button',{name:'Levels',exact:true}).click()
     await page.getByRole('button',{name:'Unlock level 2: A Bridge of Stone',exact:true}).click()

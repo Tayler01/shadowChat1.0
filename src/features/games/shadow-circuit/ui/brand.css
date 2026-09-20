@@ -1,4 +1,24 @@
 /* Selected Classic Circuit Console art, with live accessible controls. */
+.circuit-root button{border:3px solid #cdd4c9;border-top-color:#f6faef;border-bottom-color:#7d8977;border-radius:11px;background:linear-gradient(165deg,#e0e4dd,#aeb6a8);box-shadow:0 4px 0 #596650,0 6px 0 #142413,0 8px 12px #0005,inset 0 1px 2px #fff;color:#17271a;font-weight:700}
+.circuit-root button:active{transform:translateY(3px);box-shadow:0 1px 0 #596650,0 3px 0 #142413,inset 0 2px 6px #253d2544}
+.circuit-root .circuit-primary{background:linear-gradient(155deg,#45d332,#039219 70%,#076916);color:#f4fff0;border:3px solid #d9e6ce;border-top-color:#f4ffe8;border-bottom-color:#859e75;border-radius:11px;box-shadow:0 4px 0 #476940,0 6px 0 #102910,0 9px 12px #0006,inset 0 2px 3px #d7ffb777;text-shadow:0 1px 2px #154a17}
+.circuit-root .circuit-primary:hover{background:#20b82c}
+.circuit-root .circuit-panel,.circuit-root .circuit-modal{border:4px solid #b5c1ae;border-top-color:#edf2e6;border-bottom-color:#617359;border-radius:17px;background:linear-gradient(#073b24ee,#041f16f5),url('../assets/branding/gameplay-pcb.webp') center/cover;color:#ecf4e5;box-shadow:0 7px 0 #44563d,0 10px 0 #14200f,0 24px 50px #0009,inset 0 1px 2px #fff5}
+.circuit-panel-logo{width:112px;height:68px;object-fit:contain;object-position:left center;display:block}
+.circuit-panel-heading>div{display:flex;align-items:center;gap:18px}.circuit-panel-heading h2{margin:8px 0!important}
+.circuit-root .circuit-copy,.circuit-panel p,.circuit-modal p,.circuit-guide p,.circuit-codes dd,.circuit-record span{color:#c5d8be}
+.circuit-root .circuit-eyebrow,.circuit-modal .circuit-eyebrow,.circuit-panel .circuit-eyebrow,.circuit-guide article>svg,.circuit-codes dt,.circuit-root .circuit-file{color:#94e774}
+.circuit-root a{color:#b5f28d}.circuit-mode{background:#092b19;color:#a6ef80;border:1px solid #446e37;border-radius:6px;padding:8px}
+.circuit-root .circuit-level-locked{background:linear-gradient(#9da79c,#848e81);border-color:#b1bbab;color:#303b30;box-shadow:0 4px 0 #4b5847,0 6px 0 #142413}
+.circuit-root .circuit-level-locked small{color:#303b30}.circuit-level-list{gap:13px;padding-bottom:8px}
+.circuit-root .circuit-rotate{background:linear-gradient(#00231040,#001408aa),url('../assets/branding/gameplay-pcb.webp') center/cover;overflow:auto;padding:max(22px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-left)) max(24px,env(safe-area-inset-bottom))}
+.circuit-rotate-console{width:min(370px,100%);padding:24px;border:4px solid #d5ddcd;border-bottom-color:#75876a;border-radius:20px;background:#052719e8;box-shadow:0 7px 0 #41583a,0 12px 0 #0c190d,0 22px 40px #000a;display:flex;flex-direction:column;align-items:center}
+.circuit-rotate-console>img{width:100%;max-height:31dvh;object-fit:contain;margin-bottom:18px}.circuit-rotate-console h2{color:#f0f8e8;font-size:27px;margin:16px 0 4px}.circuit-rotate-console>svg{color:#a5ee80}.circuit-rotate-console p{color:#c8debc!important}.circuit-rotate-console button{width:100%;margin-top:13px}
+.circuit-root .circuit-hud{border-radius:12px;background:linear-gradient(155deg,#d1d6cd,#a0ab98);border:3px solid #e2e9db;border-bottom-color:#6e7f61;box-shadow:0 5px 0 #34432d,0 9px 15px #0007}.circuit-root .circuit-hud .circuit-eyebrow{color:#263921}
+.circuit-root .circuit-canvas{border:4px solid #909b87;border-top-color:#dce3d4;border-bottom-color:#4c5a45;border-radius:9px;box-shadow:0 6px 0 #263a20,0 12px 30px #001307aa}
+.circuit-introduction{position:absolute;inset:65px 180px 22px;z-index:5;display:flex;align-items:center;justify-content:flex-end;flex-direction:column;gap:12px;pointer-events:none}.circuit-introduction button{pointer-events:auto}.circuit-intro-title{background:#032716df;border:2px solid #a2c18f;border-radius:8px;padding:8px 18px;color:#ecfce3;font-weight:800;text-shadow:0 2px #001706}
+.circuit-countdown{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#f6ffee;text-shadow:0 3px 0 #3b622b,0 6px 16px #001305}.circuit-countdown b{font-size:clamp(64px,13vh,130px);line-height:1.1}.circuit-countdown span{font-size:16px;letter-spacing:.2em;background:#042a19dd;padding:5px 12px;border-radius:6px}
+.circuit-root[data-screen='cinematic'] .circuit-hud{opacity:.3}
 .circuit-root .circuit-menu-atmosphere{background:#033516}
 .circuit-root{background:linear-gradient(#00230c55,#001b0d77),#033516 url('../assets/branding/gameplay-pcb.webp') center/cover}
 .circuit-menu-atmosphere img{width:100%;height:100%;object-fit:cover;object-position:center}
@@ -23,7 +43,7 @@
 .circuit-root .circuit-level-locked{background:#afb3ad;color:#626a60;border-style:solid;border-color:#a0a79b}
 .circuit-level-locked .circuit-level-number,.circuit-level-locked small{color:#515a4d}
 .circuit-level-locked>svg{color:#375832;flex-shrink:0}
-.circuit-root .circuit-loading{background:#02331cea}
+.circuit-root .circuit-loading{background:linear-gradient(#02331c88,#001a0ddc),url('../assets/branding/gameplay-pcb.webp') center/cover}
 .circuit-loading .circuit-modal{width:min(450px,90%);background:#053923;color:#e9f6e4;border:4px solid #a6b69d;box-shadow:0 8px 0 #52664a,0 24px 60px #000b}
 .circuit-loading img{height:min(22vh,210px);width:100%;object-fit:contain}
 .circuit-root .circuit-loading p{color:#c8ddc0}
@@ -41,3 +61,30 @@
 }
 @media(max-width:600px) and (orientation:portrait){.circuit-root .circuit-brand-menu{width:100%;padding:55px 12vw 25px;background:#003014bf}.circuit-brand-logo{max-height:42vh}.circuit-brand-menu .circuit-menu-actions{width:100%}.circuit-root .circuit-launch{font-size:24px}.circuit-menu-atmosphere img{object-position:70% center}}
 @media(forced-colors:active){.circuit-root .circuit-launch,.circuit-root .circuit-brand-links button{background:ButtonFace;color:ButtonText;border:2px solid ButtonText}.circuit-brand-menu h1:after{content:'Shadow Circuit';color:CanvasText;font-size:32px;line-height:1}.circuit-brand-logo{display:none}}
+.circuit-high-contrast .circuit-panel,.circuit-high-contrast .circuit-modal,.circuit-high-contrast .circuit-rotate-console{background:#031008;color:#fff;border-color:#fff}.circuit-high-contrast .circuit-copy,.circuit-high-contrast .circuit-panel p,.circuit-high-contrast .circuit-modal p{color:#fff}
+@media(max-height:500px) and (orientation:landscape){.circuit-panel-logo{width:82px;height:58px}.circuit-panel-heading>div{gap:12px}.circuit-introduction{inset:62px 175px 16px}.circuit-intro-title{padding:4px 10px;font-size:12px}}
+/* Two independent thumb consoles leave the chamber unobstructed. */
+.circuit-root .circuit-controls{inset:62px max(18px,env(safe-area-inset-right)) max(15px,env(safe-area-inset-bottom)) max(18px,env(safe-area-inset-left));display:block;pointer-events:none}
+.circuit-movement-console,.circuit-camera-console{position:absolute;bottom:0;width:calc(var(--circuit-control)*3 + 28px);pointer-events:auto;display:flex;flex-direction:column;gap:9px;align-items:center}
+.circuit-movement-console{left:0}.circuit-camera-console{right:0}.circuit-control-label{font-size:10px;letter-spacing:.2em;color:#d9f1cb;font-weight:800;text-shadow:0 1px 4px #001c0d;pointer-events:none}
+.circuit-root .circuit-pad{display:grid;grid-template:repeat(3,var(--circuit-control))/repeat(3,var(--circuit-control));gap:4px;padding:9px;background:linear-gradient(145deg,#0c402cd9,#041e16eb);border:2px solid #759066;border-radius:22px;box-shadow:inset 0 2px 8px #001509,0 6px 0 #071e11;touch-action:none;user-select:none;-webkit-user-select:none}
+.circuit-root .circuit-direction{min-height:44px;background:linear-gradient(155deg,#e2e7dc,#a3b39b);border:3px solid #cbd9c2;border-top-color:#f5ffed;border-bottom-color:#718366;border-radius:10px;box-shadow:0 4px 0 #405438;color:#223b1c;padding:0;touch-action:none}
+.circuit-root .circuit-direction-held{background:linear-gradient(#51e23d,#119d25);color:#f6fff1;border-color:#d5ffb8;box-shadow:0 1px 0 #314f2b,inset 0 2px 7px #15482399;transform:translateY(3px)}
+.circuit-root .circuit-pad-center{border:1px solid #345f35;background:#092a1b;color:#8dbd75;border-radius:11px;pointer-events:none}
+.circuit-camera-console .circuit-pad{--circuit-control:46px}.circuit-camera-console{width:166px}.circuit-zoom{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:100%}.circuit-root .circuit-zoom button{min-width:44px;min-height:44px;padding:4px}
+.circuit-root .circuit-aux{position:absolute;top:5px;left:0;display:flex;gap:8px}.circuit-root .circuit-aux button{width:60px;height:50px;border-radius:11px;padding:4px;min-height:44px}
+.circuit-mirror .circuit-movement-console{left:auto;right:0}.circuit-mirror .circuit-camera-console{right:auto;left:0}.circuit-root .circuit-mirror .circuit-aux{left:auto;right:0}
+.circuit-root .circuit-hud{top:max(7px,env(safe-area-inset-top));left:max(154px,calc(env(safe-area-inset-left) + 140px));right:max(78px,calc(env(safe-area-inset-right) + 66px));width:auto;padding:4px 10px;min-height:44px;display:flex;flex-direction:row;justify-content:space-between;align-items:center;gap:10px;border-radius:10px}
+.circuit-hud>div:first-child{display:flex;align-items:center;gap:12px}.circuit-hud .circuit-level-counter{margin:0;padding:0;border:0;gap:7px;font-size:9px;color:#253c20}.circuit-hud .circuit-level-counter b{font-size:20px;border-radius:4px;padding:3px}
+.circuit-root .circuit-hud strong{margin:0;font-size:23px;gap:6px;white-space:nowrap}.circuit-hud strong small{color:#253c20;font-size:9px;letter-spacing:.03em}
+.circuit-root .circuit-inventory{display:flex;gap:5px;padding:0;border:0;background:none;border-radius:0;align-items:center}.circuit-hud .circuit-time{display:flex;gap:6px;font-size:9px}.circuit-hud .circuit-time small{color:#253c20}.circuit-hud .circuit-time b{font-size:20px;min-width:47px;padding:3px;border-radius:4px}.circuit-hud .circuit-key{min-width:29px;min-height:29px;font-size:10px;padding:2px;border-radius:4px;gap:1px}.circuit-hud .circuit-key svg{width:16px;height:16px}.circuit-hud .circuit-boots{font-size:14px;white-space:nowrap}
+.circuit-root .circuit-hint{right:auto;left:50%;transform:translateX(-50%);top:auto;bottom:17px;width:min(280px,calc(100% - 410px));padding:7px 9px;border:2px solid #98b086;border-radius:8px;background:#073521e8;color:#e3f6d7;font-size:11px;pointer-events:none}
+.circuit-root .circuit-topline .circuit-edition{display:none}
+.circuit-root .circuit-canvas{left:50%;width:min(calc(100vw - 410px),calc(100dvh - 80px));height:min(calc(100vw - 410px),calc(100dvh - 80px))}
+.circuit-root .circuit-campaign-status{font-size:10px;font-weight:750;letter-spacing:.1em;color:#d3edc6;margin:0;text-align:center;flex-shrink:0}
+.circuit-root .circuit-brand-menu h1{flex:1 1 0;max-height:52vh;display:flex;justify-content:center;align-items:center}.circuit-brand-menu .circuit-brand-logo{height:100%;max-height:100%;object-fit:contain}
+@media(max-width:1100px){.circuit-root .circuit-hud .circuit-eyebrow{display:none}.circuit-root .circuit-hud{gap:5px;padding:3px 7px}.circuit-hud>div:first-child{gap:9px}}
+@media(max-height:420px) and (orientation:landscape){circuit-root .circuit-controls{bottom:max(13px,env(safe-area-inset-bottom))}.circuit-camera-console .circuit-pad{--circuit-control:44px}.circuit-camera-console{width:160px}}
+@media(max-width:760px) and (orientation:landscape){.circuit-hud .circuit-key{min-width:24px}.circuit-hud .circuit-key svg{width:13px}.circuit-hud strong small{font-size:8px}.circuit-root .circuit-hud{left:135px;right:64px}.circuit-hud .circuit-level-counter{gap:3px}.circuit-hud .circuit-level-counter b,.circuit-hud .circuit-time b{font-size:17px}.circuit-hud>div:first-child{gap:5px}.circuit-root .circuit-inventory{gap:3px}}
+
+.circuit-root[data-large-controls="true"] .circuit-camera-console .circuit-pad{--circuit-control:60px}.circuit-root[data-large-controls="true"] .circuit-camera-console{width:208px}.circuit-root[data-large-controls="true"] .circuit-zoom button{min-height:60px}

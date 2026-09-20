@@ -8,13 +8,13 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]){
  const browser=await type.launch({headless:true,...(process.env.SHADOW_CIRCUIT_QA_FULL_CHROMIUM==='true'&&name==='chromium'?{channel:'chromium'}:{}),...(name==='chromium'&&process.env.SHADOW_CIRCUIT_QA_HARDWARE!=='true'?{args:['--use-angle=swiftshader']}: {})});
  try {
  page=await browser.newPage({viewport:process.env.SHADOW_CIRCUIT_ORIGINAL_DESKTOP==='true'?{width:1280,height:800}:{width:844,height:390},hasTouch:true,isMobile:name==='webkit'});const errors=[];page.on('pageerror',e=>errors.push(e.message));
- await page.addInitScript(()=>{const fetch=window.fetch.bind(window);window.fetch=(input,init)=>{const u=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,location.href);return u.hostname.endsWith('.supabase.co')?Promise.resolve(new Response(u.pathname.startsWith('/auth/')?'{}':'[]',{headers:{'content-type':'application/json'}})):fetch(input,init)}});
+ await page.addInitScript(()=>{const fetch=window.fetch.bind(window);window.fetch=(input,init)=>{const u=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,location.href);return (u.hostname.endsWith('.supabase.co')&&!u.pathname.startsWith('/storage/v1/object/public/game-assets/'))?Promise.resolve(new Response(u.pathname.startsWith('/auth/')?'{}':'[]',{headers:{'content-type':'application/json'}})):fetch(input,init)}});
  await page.goto('http://127.0.0.1:4175/?view=games&localPreview=shadow-circuit&privateCampaign=mscc');
- await page.getByText('Your original 149-level campaign is loaded locally.',{exact:false}).waitFor();
+ await page.waitForFunction(()=>document.querySelector('.circuit-launch-primary')?.disabled===false);
  await page.getByRole('button',{name:'Levels',exact:true}).click();
  const count=await page.locator('.circuit-level-list>button').count();
  await page.getByRole('button',{name:/^01 LESSON 1 /}).click();await page.getByRole('button',{name:'Enter chamber',exact:true}).click();
- await page.waitForTimeout(500);await page.screenshot({path:out+'/'+name+'-lesson1.png'});
+ await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]').dataset.screen==='playing');await page.screenshot({path:out+'/'+name+'-lesson1.png'});
  for(let i=0;i<route.directions.length;i++){
    moveIndex=i;console.log(name,i,route.trace[i].cell);
    await page.getByRole('button',{name:'Move '+['up','right','down','left'][route.directions[i]],exact:true}).tap();

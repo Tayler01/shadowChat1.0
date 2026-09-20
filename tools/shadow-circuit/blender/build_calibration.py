@@ -7,6 +7,7 @@ import bpy
 import json
 import math
 import hashlib
+import uuid
 from pathlib import Path
 from mathutils import Vector
 
@@ -29,7 +30,7 @@ scene.render.fps = 24
 scene.frame_end = 48
 
 PALETTE = {
-    'obsidian': ('#b8b8b8', .1, .6), 'edge': ('#858585', .1, .5),
+    'obsidian': ('#b8b8b8', .1, .6), 'edge': ('#60645f', .18, .48),
     'bronze': ('#dddddd', .45, .32), 'cloth': ('#289837', 0, .8),
     'blue': ('#12cbe0', .3, .28), 'eye': ('#f6f6e8', .1, .25),
     'red': ('#e62f28', .3, .35), 'rubber': ('#1c2227', 0, .7),
@@ -38,6 +39,8 @@ PALETTE = {
     'pants': ('#166329', 0, .65), 'pack': ('#463a25', 0, .7),
     'hair-light': ('#8b633d', 0, .45), 'orange': ('#ff7024', .1, .32),
     'purple': ('#894cd1', .25, .28), 'pink': ('#e3718f', .1, .4),
+    'portal': ('#0755ec', .25, .22), 'light-blue': ('#8bffff', .2, .2),
+    'earth': ('#95663e', 0, .85), 'water': ('#008cba', .3, .22),
 }
 materials = {}
 for name, (color, metal, rough) in PALETTE.items():
@@ -107,9 +110,11 @@ def export_asset(asset_id, ceiling):
     if triangles > ceiling:
         raise ValueError(f'{asset_id}: {triangles} > {ceiling} triangles')
     path = OUT / f'{asset_id}.glb'
-    bpy.ops.export_scene.gltf(filepath=str(path), export_format='GLB', use_selection=True,
+    temporary = OUT / f'{asset_id}-{uuid.uuid4().hex}.glb'
+    bpy.ops.export_scene.gltf(filepath=str(temporary), export_format='GLB', use_selection=True,
                               export_apply=True, export_yup=True, export_animations=False,
                               export_extras=True, export_texcoords=False, export_cameras=False, export_lights=False)
+    temporary.replace(path)
     assets.append({'id': asset_id, 'triangles': triangles, 'triangleCeiling': ceiling,
                    'blenderBounds': bounds, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                    'bytes': path.stat().st_size, 'status': 'CALIBRATION_STATIC',
@@ -122,10 +127,8 @@ box('tile-edge-west', (-.47, 0, .004), (.012, .94, .008), 'bronze')
 box('tile-edge-north', (0, -.47, .004), (.94, .012, .008), 'bronze')
 export_asset('tile-floor', 120)
 
-box('wall-plinth', (0, 0, .06), (.96, .96, .12), 'obsidian')
-box('wall-stone', (0, 0, .39), (.88, .88, .56), 'edge', .045)
-box('wall-trim', (0, 0, .7), (.93, .93, .055), 'bronze')
-box('wall-top', (0, 0, .73), (.81, .81, .03), 'obsidian')
+box('wall-plinth', (0, 0, .04), (.965, .965, .08), 'rubber', .025)
+box('wall-stone', (0, 0, .38), (.95, .95, .72), 'edge', .055)
 export_asset('tile-wall', 120)
 
 exec((Path(__file__).parent/'hero_reference.py').read_text(encoding='utf-8'))
@@ -223,12 +226,14 @@ for side in (-1, 1):
         box(f'pin-{side}-{pin}', (side*.225, (pin-2.5)*.078, .13), (.15, .036, .034), 'bronze')
 export_asset('item-chip', 600)
 
+exec((Path(__file__).parent/'terrain_reference.py').read_text(encoding='utf-8'))
+
 # Contact sheet camera: everything shown in a shared, reproducible lighting setup.
 for index, asset in enumerate(assets):
     obj = bpy.data.objects[asset['object']]
     obj.hide_set(False)
-    obj.location.x = (index % 5 - 2) * 1.45
-    obj.location.y = (index // 5) * 1.65
+    obj.location.x = (index % 8 - 3.5) * 1.45
+    obj.location.y = (index // 8) * 1.65
     bpy.ops.object.text_add(location=(obj.location.x, obj.location.y-.66, .02))
     label = bpy.context.object
     label.name = 'label-' + asset['id']
@@ -236,7 +241,7 @@ for index, asset in enumerate(assets):
     label.data.align_x = 'CENTER'
     label.data.size = .115
     label.data.materials.append(materials['bronze'])
-box('presentation-ground', (0, 3, -.22), (12, 12, .1), 'rubber')
+box('presentation-ground', (0, 5, -.22), (15, 17, .1), 'rubber')
 for name, location, energy, color, size in [
     ('warm-key', (-3, -4, 7), 850, (1, .82, .6), 5),
     ('cool-fill', (4, 1, 5), 650, (.53, .74, 1), 4),
@@ -252,9 +257,9 @@ for name, location, energy, color, size in [
     light.rotation_euler = (Vector((0, .6, 0))-light.location).to_track_quat('-Z', 'Y').to_euler()
 bpy.ops.object.camera_add(location=(4, -8, 12))
 camera = bpy.context.object
-camera.rotation_euler = (Vector((0, 3.2, .25))-camera.location).to_track_quat('-Z', 'Y').to_euler()
+camera.rotation_euler = (Vector((0, 5, .25))-camera.location).to_track_quat('-Z', 'Y').to_euler()
 camera.data.type = 'ORTHO'
-camera.data.ortho_scale = 12
+camera.data.ortho_scale = 17
 scene.camera = camera
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'calibration.blend'))
 scene.render.filepath = str(OUT/'contact-sheet.png')

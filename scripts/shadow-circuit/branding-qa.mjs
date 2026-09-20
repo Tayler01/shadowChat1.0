@@ -11,12 +11,12 @@ for(const [name,type,size] of [['desktop',chromium,{width:1672,height:941}],['an
     const errors=[];page.on('pageerror',e=>errors.push(e.message))
     await page.addInitScript(()=>{
       const fetch=window.fetch.bind(window)
-      window.fetch=(input,init)=>{const u=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,location.href);return u.hostname.endsWith('.supabase.co')?Promise.resolve(new Response(u.pathname.startsWith('/auth/')?'{}':'[]',{headers:{'content-type':'application/json'}})):fetch(input,init)}
+      window.fetch=(input,init)=>{const u=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,location.href);return (u.hostname.endsWith('.supabase.co')&&!u.pathname.startsWith('/storage/v1/object/public/game-assets/'))?Promise.resolve(new Response(u.pathname.startsWith('/auth/')?'{}':'[]',{headers:{'content-type':'application/json'}})):fetch(input,init)}
       window.__audioQa={contexts:[],voices:0,supported:!!(window.AudioContext??window.webkitAudioContext)}
       if(!window.__audioQa.supported)return
       const prototype=(window.AudioContext??window.webkitAudioContext).prototype
-      const create=prototype.createOscillator
-      prototype.createOscillator=function(){window.__audioQa.voices++;if(!window.__audioQa.contexts.includes(this))window.__audioQa.contexts.push(this);return create.call(this)}
+      const create=prototype.createBufferSource
+      prototype.createBufferSource=function(){window.__audioQa.voices++;if(!window.__audioQa.contexts.includes(this))window.__audioQa.contexts.push(this);return create.call(this)}
     })
     await page.goto('http://127.0.0.1:4175/?view=games&localPreview=shadow-circuit')
     await page.getByRole('button',{name:'Play',exact:true}).waitFor()
@@ -29,7 +29,7 @@ for(const [name,type,size] of [['desktop',chromium,{width:1672,height:941}],['an
     const audioSupported=await page.evaluate(()=>window.__audioQa.supported)
     await page.getByRole('button',{name:'Play',exact:true}).click()
     await page.getByRole('button',{name:'Enter chamber',exact:true}).click({timeout:30000})
-    await page.waitForTimeout(650)
+    await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]').dataset.screen==='playing');await page.waitForTimeout(650)
     if(audioSupported)await page.waitForFunction(()=>window.__audioQa.voices>0,{timeout:5000}).catch(async()=>{throw new Error('Music not scheduled: '+JSON.stringify(await page.evaluate(()=>({contexts:window.__audioQa.contexts.map(c=>c.state),screen:document.querySelector('[data-testid="shadow-circuit"]').dataset.screen,voices:window.__audioQa.voices}))))})
     await page.getByRole('button',{name:'Move right',exact:true}).click()
     await page.waitForTimeout(350)

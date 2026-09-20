@@ -1,53 +1,53 @@
 [
   {
     "name": "door-blue.glb",
-    "sourceBytes": 14408,
-    "runtimeBytes": 2831
+    "sourceBytes": 14428,
+    "runtimeBytes": 2871
   },
   {
     "name": "door-green.glb",
-    "sourceBytes": 14412,
-    "runtimeBytes": 2828
+    "sourceBytes": 14432,
+    "runtimeBytes": 2869
   },
   {
     "name": "door-red.glb",
-    "sourceBytes": 14408,
-    "runtimeBytes": 2828
+    "sourceBytes": 14428,
+    "runtimeBytes": 2869
   },
   {
     "name": "door-yellow.glb",
-    "sourceBytes": 14412,
-    "runtimeBytes": 2826
+    "sourceBytes": 14432,
+    "runtimeBytes": 2867
   },
   {
     "name": "enemy-ball.glb",
     "sourceBytes": 29192,
-    "runtimeBytes": 7906
+    "runtimeBytes": 7905
   },
   {
     "name": "enemy-blob.glb",
     "sourceBytes": 40288,
-    "runtimeBytes": 16575
+    "runtimeBytes": 16574
   },
   {
     "name": "enemy-bug.glb",
     "sourceBytes": 46964,
-    "runtimeBytes": 13082
+    "runtimeBytes": 12923
   },
   {
     "name": "enemy-fireball.glb",
     "sourceBytes": 17432,
-    "runtimeBytes": 5025
+    "runtimeBytes": 5021
   },
   {
     "name": "enemy-glider.glb",
     "sourceBytes": 30016,
-    "runtimeBytes": 9474
+    "runtimeBytes": 9475
   },
   {
     "name": "enemy-paramecium.glb",
     "sourceBytes": 33472,
-    "runtimeBytes": 9924
+    "runtimeBytes": 9923
   },
   {
     "name": "enemy-tank.glb",
@@ -62,37 +62,37 @@
   {
     "name": "enemy-walker.glb",
     "sourceBytes": 49744,
-    "runtimeBytes": 17313
+    "runtimeBytes": 17306
   },
   {
     "name": "hero-explorer.glb",
-    "sourceBytes": 271632,
-    "runtimeBytes": 144113
+    "sourceBytes": 271916,
+    "runtimeBytes": 143485
   },
   {
     "name": "item-boot-0.glb",
     "sourceBytes": 49368,
-    "runtimeBytes": 11127
+    "runtimeBytes": 11124
   },
   {
     "name": "item-boot-1.glb",
     "sourceBytes": 49352,
-    "runtimeBytes": 11103
+    "runtimeBytes": 11102
   },
   {
     "name": "item-boot-2.glb",
     "sourceBytes": 52092,
-    "runtimeBytes": 12355
+    "runtimeBytes": 12352
   },
   {
     "name": "item-boot-3.glb",
     "sourceBytes": 49368,
-    "runtimeBytes": 11124
+    "runtimeBytes": 11122
   },
   {
     "name": "item-chip.glb",
-    "sourceBytes": 13700,
-    "runtimeBytes": 2584
+    "sourceBytes": 13720,
+    "runtimeBytes": 2619
   },
   {
     "name": "key-blue.glb",
@@ -115,13 +115,193 @@
     "runtimeBytes": 6113
   },
   {
+    "name": "terrain-block.glb",
+    "sourceBytes": 16968,
+    "runtimeBytes": 2886
+  },
+  {
+    "name": "terrain-blue-wall.glb",
+    "sourceBytes": 3656,
+    "runtimeBytes": 1082
+  },
+  {
+    "name": "terrain-bomb.glb",
+    "sourceBytes": 20604,
+    "runtimeBytes": 7218
+  },
+  {
+    "name": "terrain-button-35.glb",
+    "sourceBytes": 16768,
+    "runtimeBytes": 2839
+  },
+  {
+    "name": "terrain-button-36.glb",
+    "sourceBytes": 16764,
+    "runtimeBytes": 2842
+  },
+  {
+    "name": "terrain-button-39.glb",
+    "sourceBytes": 16748,
+    "runtimeBytes": 2835
+  },
+  {
+    "name": "terrain-button-40.glb",
+    "sourceBytes": 16764,
+    "runtimeBytes": 2839
+  },
+  {
+    "name": "terrain-cloner.glb",
+    "sourceBytes": 29788,
+    "runtimeBytes": 3938
+  },
+  {
+    "name": "terrain-dirt.glb",
+    "sourceBytes": 63236,
+    "runtimeBytes": 23249
+  },
+  {
+    "name": "terrain-exit.glb",
+    "sourceBytes": 46380,
+    "runtimeBytes": 6903
+  },
+  {
+    "name": "terrain-fire.glb",
+    "sourceBytes": 44804,
+    "runtimeBytes": 11432
+  },
+  {
+    "name": "terrain-force-13.glb",
+    "sourceBytes": 25824,
+    "runtimeBytes": 4205
+  },
+  {
+    "name": "terrain-force-18.glb",
+    "sourceBytes": 25824,
+    "runtimeBytes": 4210
+  },
+  {
+    "name": "terrain-force-19.glb",
+    "sourceBytes": 25824,
+    "runtimeBytes": 4143
+  },
+  {
+    "name": "terrain-force-20.glb",
+    "sourceBytes": 25824,
+    "runtimeBytes": 4146
+  },
+  {
+    "name": "terrain-force-50.glb",
+    "sourceBytes": 25824,
+    "runtimeBytes": 4209
+  },
+  {
+    "name": "terrain-gravel.glb",
+    "sourceBytes": 32732,
+    "runtimeBytes": 7792
+  },
+  {
+    "name": "terrain-hint.glb",
+    "sourceBytes": 19632,
+    "runtimeBytes": 5629
+  },
+  {
+    "name": "terrain-ice-26.glb",
+    "sourceBytes": 17308,
+    "runtimeBytes": 5424
+  },
+  {
+    "name": "terrain-ice-27.glb",
+    "sourceBytes": 17308,
+    "runtimeBytes": 5427
+  },
+  {
+    "name": "terrain-ice-28.glb",
+    "sourceBytes": 17308,
+    "runtimeBytes": 5427
+  },
+  {
+    "name": "terrain-ice-29.glb",
+    "sourceBytes": 17308,
+    "runtimeBytes": 5425
+  },
+  {
+    "name": "terrain-ice.glb",
+    "sourceBytes": 11368,
+    "runtimeBytes": 4766
+  },
+  {
+    "name": "terrain-popup.glb",
+    "sourceBytes": 20696,
+    "runtimeBytes": 3502
+  },
+  {
+    "name": "terrain-socket.glb",
+    "sourceBytes": 51956,
+    "runtimeBytes": 7505
+  },
+  {
+    "name": "terrain-teleport.glb",
+    "sourceBytes": 46356,
+    "runtimeBytes": 5896
+  },
+  {
+    "name": "terrain-thief.glb",
+    "sourceBytes": 23116,
+    "runtimeBytes": 8363
+  },
+  {
+    "name": "terrain-thin-48.glb",
+    "sourceBytes": 6252,
+    "runtimeBytes": 1480
+  },
+  {
+    "name": "terrain-thin-6.glb",
+    "sourceBytes": 3680,
+    "runtimeBytes": 1132
+  },
+  {
+    "name": "terrain-thin-7.glb",
+    "sourceBytes": 3680,
+    "runtimeBytes": 1112
+  },
+  {
+    "name": "terrain-thin-8.glb",
+    "sourceBytes": 3680,
+    "runtimeBytes": 1130
+  },
+  {
+    "name": "terrain-thin-9.glb",
+    "sourceBytes": 3680,
+    "runtimeBytes": 1111
+  },
+  {
+    "name": "terrain-toggle-closed.glb",
+    "sourceBytes": 22476,
+    "runtimeBytes": 3320
+  },
+  {
+    "name": "terrain-toggle-open.glb",
+    "sourceBytes": 19908,
+    "runtimeBytes": 3181
+  },
+  {
+    "name": "terrain-trap.glb",
+    "sourceBytes": 24892,
+    "runtimeBytes": 3663
+  },
+  {
+    "name": "terrain-water.glb",
+    "sourceBytes": 30968,
+    "runtimeBytes": 14789
+  },
+  {
     "name": "tile-floor.glb",
     "sourceBytes": 5760,
     "runtimeBytes": 1432
   },
   {
     "name": "tile-wall.glb",
-    "sourceBytes": 7200,
-    "runtimeBytes": 1585
+    "sourceBytes": 6640,
+    "runtimeBytes": 1372
   }
 ]

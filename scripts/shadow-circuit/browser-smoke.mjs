@@ -9,11 +9,12 @@ await mkdir(directory,{recursive:true})
 const report=[]
 const solutions=JSON.parse(await readFile('tools/shadow-circuit/authored-solutions.json','utf8')).routes
 for(const [name,browserType,size] of [['chromium',chromium,{width:844,height:390}],['webkit',webkit,{width:844,height:390}]]) {
-  const browser=await browserType.launch({headless:true,...(name==='chromium'?{args:['--use-angle=swiftshader']}: {})})
+  if(process.env.SHADOW_CIRCUIT_QA_BROWSER&&name!==process.env.SHADOW_CIRCUIT_QA_BROWSER)continue
+  const browser=await browserType.launch({headless:true,...(name==='chromium'?{channel:'chromium',args:['--use-angle=swiftshader']}: {})})
   const context=await browser.newContext({viewport:size,hasTouch:true,isMobile:true,deviceScaleFactor:1})
   // This local game check must not exercise the live host backend. Authenticated
   // chat/RLS integration requires the repository's separate two-account smoke.
-  await context.route(url=>url.hostname.endsWith('.supabase.co'),route=>route.fulfill({
+  await context.route(url=>(url.hostname.endsWith('.supabase.co')&&!url.pathname.startsWith('/storage/v1/object/public/game-assets/')),route=>route.fulfill({
     status:200,contentType:'application/json',body:route.request().url().includes('/auth/')?'{}':'[]',
     headers:{'access-control-allow-origin':new URL(base).origin,'access-control-allow-credentials':'true','access-control-allow-methods':'GET,POST,PATCH,PUT,DELETE,OPTIONS','access-control-allow-headers':route.request().headers()['access-control-request-headers']??'authorization,apikey,content-type,x-client-info'},
   }))
@@ -23,7 +24,7 @@ for(const [name,browserType,size] of [['chromium',chromium,{width:844,height:390
     const originalFetch=globalThis.fetch.bind(globalThis)
     globalThis.fetch=(input,init)=>{
       const url=new URL(typeof input==='string'?input:input instanceof URL?input.href:input.url,location.href)
-      return url.hostname.endsWith('.supabase.co')?Promise.resolve(new Response(url.pathname.startsWith('/auth/')?'{}':'[]',{headers:{'content-type':'application/json'}})):originalFetch(input,init)
+      return (url.hostname.endsWith('.supabase.co')&&!url.pathname.startsWith('/storage/v1/object/public/game-assets/'))?Promise.resolve(new Response(url.pathname.startsWith('/auth/')?'{}':'[]',{headers:{'content-type':'application/json'}})):originalFetch(input,init)
     }
     const resources={buffer:new Set(),texture:new Set(),program:new Set(),shader:new Set(),framebuffer:new Set(),renderbuffer:new Set()}
     for(const klass of [globalThis.WebGLRenderingContext,globalThis.WebGL2RenderingContext]) {
@@ -52,6 +53,7 @@ for(const [name,browserType,size] of [['chromium',chromium,{width:844,height:390
     await page.getByRole('button',{name:/01.*The Circuit Vestibule/}).click()
     await page.getByRole('button',{name:'Enter chamber',exact:true}).waitFor({timeout:30000})
     await page.getByRole('button',{name:'Enter chamber',exact:true}).click()
+      await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]')?.getAttribute('data-screen')==='playing')
     await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]')?.getAttribute('data-screen')==='playing')
     const initial=await root.getAttribute('data-cell')
     await page.getByRole('button',{name:'Move right',exact:true}).tap()
@@ -66,7 +68,7 @@ for(const [name,browserType,size] of [['chromium',chromium,{width:844,height:390
     await page.getByRole('button',{name:'Rotate camera right',exact:true}).click()
     await page.getByRole('button',{name:'Resume expedition',exact:true}).click()
     await page.setViewportSize({width:390,height:844})
-    await page.getByText('A wider view awaits',{exact:true}).waitFor()
+    await page.getByText('Rotate to explore',{exact:true}).waitFor()
     await page.screenshot({path:`${directory}/${name}-portrait.png`})
     await page.setViewportSize(size)
     await page.getByRole('button',{name:'Resume expedition',exact:true}).waitFor()
@@ -81,6 +83,7 @@ for(const [name,browserType,size] of [['chromium',chromium,{width:844,height:390
     result.reloadRestored=true
     if(process.env.SHADOW_CIRCUIT_QA_FULL==='true') {
       await page.getByRole('button',{name:'Enter chamber',exact:true}).click()
+      await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]')?.getAttribute('data-screen')==='playing')
       await page.getByRole('button',{name:'Pause game',exact:true}).click()
       await page.getByRole('button',{name:'Main menu',exact:true}).click()
       result.inputOnlyClears=[]
@@ -89,6 +92,7 @@ for(const [name,browserType,size] of [['chromium',chromium,{width:844,height:390
         await page.getByRole('button',{name:'Levels',exact:true}).click()
         await page.getByRole('button',{name:new RegExp(level.title)}).click()
         await page.getByRole('button',{name:'Enter chamber',exact:true}).click()
+      await page.waitForFunction(()=>document.querySelector('[data-testid="shadow-circuit"]')?.getAttribute('data-screen')==='playing')
         let expected=level.actors.find(actor=>actor.kind==='player').cell
         for(const direction of expandRoute(solution.steps)) {
           expected+=[-level.width,1,level.width,-1][direction]
