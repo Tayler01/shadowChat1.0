@@ -1,6 +1,6 @@
 # Shadow Circuit implementation status
 
-Authorized 2026-09-19: implement the package. Updated 2026-09-20: the user explicitly authorized a first live testing build on main and manual Netlify production fallback if GitHub deployment remains blocked. No paid service or source-content substitution. On September 20 the user confirmed permission to deploy original campaign/music/assets for personal testing. Initial release 25930141 is live; a reference-polish update is in verification.
+Authorized 2026-09-19: implement the package. Updated 2026-09-20: the user explicitly authorized a first live testing build on main and manual Netlify production fallback if GitHub deployment remains blocked. No paid service or source-content substitution. On September 20 the user confirmed permission to deploy original campaign/music/assets for personal testing. Reference-polish release 6bda008f was deployed and hosted Chromium/WebKit checks passed. September 21 adds right-side movement, invisible continuous camera gestures, and aligned header spacing; deployment identity is recorded in the release evidence.
 
 ## Plan and phase gates
 

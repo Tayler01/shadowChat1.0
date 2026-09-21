@@ -1,3 +1,9 @@
+## September 21 Shadow Circuit camera gestures
+
+- Passed desktop/Android Chromium (including headed), narrow 667x375, large controls/130% text, and iPhone WebKit. WebKit software rendering triggered the existing frame-stall pause; intentional resume was verified. This is not a sustained-performance pass.
+- Targeted browser coverage: continuous drag, pointer capture beyond the half-screen boundary, tilt bounds, independent movement/pinch input, cancellation, left-handed swap and portrait/pause cleanup. Chromium uses browser-injected multi-touch; Windows WebKit pinch coverage uses synthetic PointerEvents because its runner lacks multi-touch injection. Neither is physical-device proof.
+- Header checks cover desktop, 844x390 phone landscape, narrow landscape and 130% text/large touch controls. Evidence: output/playwright/shadow-circuit-gestures and output/shadow-circuit/gesture-*. No remote messages or uploaded test media are created by this game-only harness.
+
 ## September 20 Shadow Circuit reference-polish mobile pass
 
 - Reviewed actual Android/Chromium and iPhone/WebKit 844x390 rendering, 390x844 branded rotation gate, original Lesson 1 and Lesson 3. Full-surface movement pad, independent camera D-pad/zoom, compact HUD and raised controls replace the earlier small arrows/flat panels.

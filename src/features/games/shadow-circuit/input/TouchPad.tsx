@@ -1,15 +1,15 @@
 import {useRef,useState} from 'react'
-import {ArrowBigUp,ArrowBigRight,ArrowBigDown,ArrowBigLeft,Compass,Move} from 'lucide-react'
+import {ArrowBigUp,ArrowBigRight,ArrowBigDown,ArrowBigLeft,Move} from 'lucide-react'
 import {padSector} from './intentBuffer.ts'
 import type {Direction} from '../core/types.ts'
 export type PadIntent={phase:'start'|'steer'|'end'|'cancel';pointer:number;direction:Direction|null}
-export function TouchPad({camera=false,onIntent}:{camera?:boolean;onIntent:(intent:PadIntent)=>void}){
+export function TouchPad({onIntent}:{onIntent:(intent:PadIntent)=>void}){
   const pointer=useRef<number|null>(null),direction=useRef<Direction|null>(null)
   const [active,setActive]=useState<Direction|null>(null)
   const select=(next:Direction|null)=>{direction.current=next;setActive(next)}
-  const labels=camera?['Tilt camera up','Rotate camera right','Tilt camera down','Rotate camera left']:['Move up','Move right','Move down','Move left']
+  const labels=['Move up','Move right','Move down','Move left']
   const end=(cancel=false)=>{if(pointer.current===null)return;onIntent({phase:cancel?'cancel':'end',pointer:pointer.current,direction:null});pointer.current=null;select(null)}
-  return <div className={`circuit-pad ${camera?'circuit-camera-pad':''}`} role="group" aria-label={camera?'Camera controls':'Movement controls'}
+  return <div className="circuit-pad" role="group" aria-label="Movement controls"
     onPointerDown={event=>{
       if(pointer.current!==null||(event.pointerType==='mouse'&&event.button!==0))return
       const rect=event.currentTarget.getBoundingClientRect()
@@ -30,6 +30,6 @@ export function TouchPad({camera=false,onIntent}:{camera?:boolean;onIntent:(inte
       onClick={event=>{if(event.detail===0){onIntent({phase:'start',pointer:-2,direction:i as Direction});onIntent({phase:'end',pointer:-2,direction:null})}}}>
       <Icon size={30} fill="currentColor" strokeWidth={1.5}/>
     </button>)}
-    <span className="circuit-pad-center" aria-hidden="true">{camera?<Compass size={24}/>:<Move size={24}/>}</span>
+    <span className="circuit-pad-center" aria-hidden="true"><Move size={24}/></span>
   </div>
 }

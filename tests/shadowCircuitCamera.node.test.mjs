@@ -10,7 +10,7 @@ test('following across a level preserves tilt, distance and each manually select
   const engine=new NullEngine(),scene=new Scene(engine)
   try {
     const camera=new ArcRotateCamera('test',Math.PI/2,.52,11.8,new Vector3(4,.1,4),scene)
-    for(let heading=0;heading<4;heading++){
+    for(const heading of [0,.013,.46,1,1.89,2.6,3,3.99]){
       camera.alpha=Math.PI/2+heading*Math.PI/2
       const expected=[camera.alpha,camera.beta,camera.radius]
       for(const [x,z] of [[5,4],[5,12],[20,12],[20,26],[4,4]]){

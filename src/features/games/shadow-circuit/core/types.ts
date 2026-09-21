@@ -23,7 +23,7 @@ export const DELTAS = [[0, -1], [1, 0], [0, 1], [-1, 0]] as const
 export const left = (d: Direction) => ((d + 3) % 4) as Direction
 export const right = (d: Direction) => ((d + 1) % 4) as Direction
 export const reverse = (d: Direction) => ((d + 2) % 4) as Direction
-export const screenDirection = (d: Direction, quarterTurns: number) => ((d + quarterTurns) % 4) as Direction
+export const screenDirection = (d: Direction, quarterTurns: number) => (((d + Math.round(quarterTurns)) % 4 + 4) % 4) as Direction
 export const TICK_MS = 50
 export const MOVE_TICKS = 4
 export const ENEMY_KINDS: readonly ActorKind[] = ['bug', 'fireball', 'ball', 'tank', 'glider', 'teeth', 'walker', 'blob', 'paramecium']

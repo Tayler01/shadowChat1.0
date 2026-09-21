@@ -1,3 +1,10 @@
+## September 21 Shadow Circuit gesture camera and header spacing
+
+- Default movement pad is on the right. The entire opposite half is an invisible camera surface, apart from navigation buttons: captured one-finger drag gives continuous 360-degree orbit and horizon-to-overhead tilt; two fingers pinch zoom without changing orbit. Direct distance-based tracking stops on release. The optional left-handed layout swaps both areas.
+- Independent pointer ownership supports moving while adjusting the camera. Pinch membership changes rebase without a jump; cancellation, pause, portrait and unmount clear input. Camera updates no longer restart the simulation frame effect. Grid movement maps to the nearest screen-facing cardinal direction.
+- Navigation, level/chips, timer/inventory and pause now share one responsive header grid, with aligned heights, consistent gaps, safe-area insets and an icon-only back button on narrow landscape screens. Large Comfort controls are retained. Focus has continuous sliders/reset; the guide explains the new gestures.
+- Camera math and follow invariants pass; full release checks and rendered browser evidence are recorded in output/shadow-circuit/gesture-*. Physical iPhone/Android gesture feel remains an external acceptance check.
+
 ## September 20 Shadow Circuit reference polish and original campaign
 
 - User confirmed permission to deploy supplied original campaign/music/assets for personal testing. The build loads all 149 original levels plus three authored fixtures, preserves sequential locks/original passwords, and labels the original campaign on the menu.

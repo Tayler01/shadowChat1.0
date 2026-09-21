@@ -1,7 +1,7 @@
 export type DeviceCheckpoint = { levelId: string; runId: string; state: string; hash: string; revision: number }
 export type DeviceResult = { runId: string; levelId: string; contentHash: string; ruleset: string; elapsed: number; moves: number; assisted: boolean }
-export type CircuitSettings = { music: boolean; sfx: boolean; mirror: boolean; largeControls: boolean; quality: 'balanced' | 'battery' }
-export const DEFAULT_SETTINGS: CircuitSettings = { music: true, sfx: true, mirror: false, largeControls: false, quality: 'balanced' }
+export type CircuitSettings = { music: boolean; sfx: boolean; leftHanded: boolean; largeControls: boolean; quality: 'balanced' | 'battery' }
+export const DEFAULT_SETTINGS: CircuitSettings = { music: true, sfx: true, leftHanded: false, largeControls: false, quality: 'balanced' }
 export type DeviceProfile = { version: 1; checkpoint: DeviceCheckpoint | null; previous: DeviceCheckpoint | null; results: DeviceResult[]; settings: CircuitSettings; unlocked:string[] }
 const fresh = ():DeviceProfile => ({version:1,checkpoint:null,previous:null,results:[],settings:{...DEFAULT_SETTINGS},unlocked:[]})
 let opening: Promise<IDBDatabase> | null = null

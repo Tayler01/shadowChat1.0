@@ -1,4 +1,5 @@
 import { Engine } from '@babylonjs/core/Engines/engine'
+import { MIN_TILT, MAX_TILT } from '../input/cameraGesture.ts'
 import { followCamera } from './followCamera'
 import { Scene } from '@babylonjs/core/scene'
 import { ArcRotateCamera } from '@babylonjs/core/Cameras/arcRotateCamera'
@@ -43,6 +44,7 @@ export async function createCircuitScene(canvas: HTMLCanvasElement, level: Circu
   const cameraTarget = (x:number,z:number) => new Vector3(level.width<9?(level.width-1)/2:Math.max(4,Math.min(level.width-5,x)),.1,level.height<9?(level.height-1)/2:Math.max(4,Math.min(level.height-5,z)))
   const center = cameraTarget(player.cell % level.width, Math.floor(player.cell / level.width))
   const camera = new ArcRotateCamera('circuit-camera', Math.PI / 2, .64, 11.8, center, scene)
+  camera.lowerBetaLimit=MIN_TILT;camera.upperBetaLimit=MAX_TILT
   camera.mode=Camera.ORTHOGRAPHIC_CAMERA
   camera.orthoLeft=-4.5;camera.orthoRight=4.5;camera.orthoTop=4.5;camera.orthoBottom=-4.5
   camera.fov = .76; camera.minZ = .1; camera.maxZ = 75
@@ -96,7 +98,7 @@ export async function createCircuitScene(canvas: HTMLCanvasElement, level: Circu
   return {
     update,configure,
     introduce(progress){introduction=progress},
-    view(nextTilt,nextZoom){tilt=Math.max(.25,Math.min(1.12,nextTilt));zoom=Math.max(2.5,Math.min(6,nextZoom))},
+    view(nextTilt,nextZoom){tilt=Math.max(MIN_TILT,Math.min(MAX_TILT,nextTilt));zoom=Math.max(2.5,Math.min(6,nextZoom))},
     frame(now,moving){
       if(disposed)return
       const dt=last?Math.min((now-last)/1000,.05):.016;last=now
@@ -129,7 +131,7 @@ export async function createCircuitScene(canvas: HTMLCanvasElement, level: Circu
       }
       scene.render()
     },
-    rotate(next){heading=next;camera.alpha=Math.PI/2+heading*Math.PI/2;scene.render()},
+    rotate(next){heading=next},
     resize(){engine.resize()},
     metrics:()=>({meshes:scene.meshes.length,vertices:scene.getTotalVertices(),fps:engine.getFps(),width:engine.getRenderWidth(),height:engine.getRenderHeight()}),
     dispose(){if(disposed)return;disposed=true;engine.onContextLostObservable.remove(contextObserver);scene.dispose();engine.dispose()},
