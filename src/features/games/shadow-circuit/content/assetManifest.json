@@ -194,9 +194,9 @@
     },
     {
       "id": "terrain-exit",
-      "bytes": 6903,
-      "sha256": "0030dd7c90573ecec28dc1415353076be559451f842f35f64e44222739dc1561",
-      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/0030dd7c90573ecec28dc1415353076be559451f842f35f64e44222739dc1561/terrain-exit.glbz"
+      "bytes": 18702,
+      "sha256": "491c7c7207101843d4fb1945d528ca14003f3c14aaa38dfd3fc96be55c20822d",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/491c7c7207101843d4fb1945d528ca14003f3c14aaa38dfd3fc96be55c20822d/terrain-exit.glbz"
     },
     {
       "id": "terrain-fire",
@@ -206,33 +206,33 @@
     },
     {
       "id": "terrain-force-13",
-      "bytes": 4205,
-      "sha256": "ba32d791e12d0596616c02dfcca912d7e0660b92c312aaefab25a99cd1b2affa",
-      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/ba32d791e12d0596616c02dfcca912d7e0660b92c312aaefab25a99cd1b2affa/terrain-force-13.glbz"
+      "bytes": 4209,
+      "sha256": "34903a377d1abbc614a9416f491ba008882f2075b7ec194087b295216d4dccbd",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/34903a377d1abbc614a9416f491ba008882f2075b7ec194087b295216d4dccbd/terrain-force-13.glbz"
     },
     {
       "id": "terrain-force-18",
-      "bytes": 4210,
-      "sha256": "da0e75afdbd17717113118553c285d962fd3f057446953f97cb8d76ee0fc9a1a",
-      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/da0e75afdbd17717113118553c285d962fd3f057446953f97cb8d76ee0fc9a1a/terrain-force-18.glbz"
+      "bytes": 4206,
+      "sha256": "3e4c5a7a1c88581670a0dc26c39ee85ad7453abe1248e1fe4d019370a9f22282",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/3e4c5a7a1c88581670a0dc26c39ee85ad7453abe1248e1fe4d019370a9f22282/terrain-force-18.glbz"
     },
     {
       "id": "terrain-force-19",
-      "bytes": 4143,
-      "sha256": "2c0d0981e6db806f976f2d0c2b2e54be046d24fcd5735291be09071e51168dee",
-      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/2c0d0981e6db806f976f2d0c2b2e54be046d24fcd5735291be09071e51168dee/terrain-force-19.glbz"
+      "bytes": 4146,
+      "sha256": "d49384d385969524ae9359fd8f8d598ef85153fec24d64ac5d584c4b50c6ae2a",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/d49384d385969524ae9359fd8f8d598ef85153fec24d64ac5d584c4b50c6ae2a/terrain-force-19.glbz"
     },
     {
       "id": "terrain-force-20",
-      "bytes": 4146,
-      "sha256": "d0bb09c86f0bd0e3f340765627a375194e7670ab13fa0dd6c5e57ea1e6a9e33c",
-      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/d0bb09c86f0bd0e3f340765627a375194e7670ab13fa0dd6c5e57ea1e6a9e33c/terrain-force-20.glbz"
+      "bytes": 4143,
+      "sha256": "56bfc3c3df977a00373c6f0bebda2888de6416b6632e90db39d606ae2c000a83",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/56bfc3c3df977a00373c6f0bebda2888de6416b6632e90db39d606ae2c000a83/terrain-force-20.glbz"
     },
     {
       "id": "terrain-force-50",
-      "bytes": 4209,
-      "sha256": "e54dea63c200ed3ebe03342924696239c182665f760dd877325c2277ded3a4b5",
-      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/e54dea63c200ed3ebe03342924696239c182665f760dd877325c2277ded3a4b5/terrain-force-50.glbz"
+      "bytes": 5609,
+      "sha256": "17299a98912f39d1d8e3c4aed363c2730822ec8c21bd973c6739448162ef9d06",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/17299a98912f39d1d8e3c4aed363c2730822ec8c21bd973c6739448162ef9d06/terrain-force-50.glbz"
     },
     {
       "id": "terrain-gravel",
@@ -290,9 +290,9 @@
     },
     {
       "id": "terrain-teleport",
-      "bytes": 5896,
-      "sha256": "30db573c693103906ca268e6602fbfe2fda98ce929ea42bfb9ad7cfbf8a2fcb1",
-      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/30db573c693103906ca268e6602fbfe2fda98ce929ea42bfb9ad7cfbf8a2fcb1/terrain-teleport.glbz"
+      "bytes": 6886,
+      "sha256": "216fb7b70f4f711024a7fc4410ae42b25bfd8f18394550d4f713bf0e83db444d",
+      "url": "https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/public/game-assets/shadow-circuit/216fb7b70f4f711024a7fc4410ae42b25bfd8f18394550d4f713bf0e83db444d/terrain-teleport.glbz"
     },
     {
       "id": "terrain-thief",

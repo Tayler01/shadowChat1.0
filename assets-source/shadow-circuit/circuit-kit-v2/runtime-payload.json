@@ -161,8 +161,8 @@
   },
   {
     "name": "terrain-exit.glb",
-    "sourceBytes": 46380,
-    "runtimeBytes": 6903
+    "sourceBytes": 123428,
+    "runtimeBytes": 18702
   },
   {
     "name": "terrain-fire.glb",
@@ -172,27 +172,27 @@
   {
     "name": "terrain-force-13.glb",
     "sourceBytes": 25824,
-    "runtimeBytes": 4205
+    "runtimeBytes": 4209
   },
   {
     "name": "terrain-force-18.glb",
     "sourceBytes": 25824,
-    "runtimeBytes": 4210
+    "runtimeBytes": 4206
   },
   {
     "name": "terrain-force-19.glb",
     "sourceBytes": 25824,
-    "runtimeBytes": 4143
+    "runtimeBytes": 4146
   },
   {
     "name": "terrain-force-20.glb",
     "sourceBytes": 25824,
-    "runtimeBytes": 4146
+    "runtimeBytes": 4143
   },
   {
     "name": "terrain-force-50.glb",
-    "sourceBytes": 25824,
-    "runtimeBytes": 4209
+    "sourceBytes": 36100,
+    "runtimeBytes": 5609
   },
   {
     "name": "terrain-gravel.glb",
@@ -241,8 +241,8 @@
   },
   {
     "name": "terrain-teleport.glb",
-    "sourceBytes": 46356,
-    "runtimeBytes": 5896
+    "sourceBytes": 35840,
+    "runtimeBytes": 6886
   },
   {
     "name": "terrain-thief.glb",

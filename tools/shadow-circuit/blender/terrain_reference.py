@@ -13,13 +13,18 @@ def plate(name, material='edge'):
     box(name,(0,0,.045),(.96,.96,.09),material,.025)
 
 # The exit is an upright blue square spiral with a machined surround, like the reference.
-box('exit-foot',(0,.04,.05),(.94,.44,.10),'edge',.035)
+box('exit-foot',(0,0,.05),(.94,.94,.10),'edge',.035)
+box('exit-floor-blue',(0,0,.108),(.85,.85,.025),'portal',.018)
 box('exit-metal',(0,.11,.49),(.94,.14,.94),'bronze',.035)
 box('exit-blue',(0,.021,.49),(.85,.055,.85),'portal',.018)
 points=[(-.36,.0,.13),(-.36,.0,.85),(.36,.0,.85),(.36,.0,.13),(-.25,.0,.13),(-.25,.0,.74),(.25,.0,.74),(.25,.0,.24),(-.14,.0,.24),(-.14,.0,.63),(.14,.0,.63),(.14,.0,.35),(-.03,.0,.35),(-.03,.0,.52),(.035,.0,.52)]
 for a,b in zip(points,points[1:]):
     box('luminous-square-spiral',tuple((x+y)/2 for x,y in zip(a,b)),(max(.026,abs(b[0]-a[0])+.024),.018,max(.026,abs(b[2]-a[2])+.024)),'light-blue',.004)
-export_asset('terrain-exit',2200)
+    # A matching floor mark and rear face stay recognizable from any free-camera angle.
+    box('exit-floor-spiral',((a[0]+b[0])/2,(a[2]+b[2])/2-.49,.131),(max(.026,abs(b[0]-a[0])+.024),max(.026,abs(b[2]-a[2])+.024),.018),'light-blue',.004)
+    box('exit-rear-spiral',((a[0]+b[0])/2,.224,(a[2]+b[2])/2),(max(.026,abs(b[0]-a[0])+.024),.018,max(.026,abs(b[2]-a[2])+.024)),'light-blue',.004)
+box('exit-rear-blue',(0,.199,.49),(.85,.035,.85),'portal',.018)
+export_asset('terrain-exit',2400)
 
 plate('socket-base');frame('socket-rim',.115)
 box('socket-recess',(0,0,.106),(.45,.64,.03),'rubber',.025)
@@ -29,8 +34,14 @@ for side in (-1,1):
 box('socket-interior',(0,0,.124),(.26,.44,.014),'edge',.012)
 export_asset('terrain-socket',2000)
 
-plate('teleport-pad','portal');frame('teleport-frame',.10)
-for size in (.66,.44,.22):frame('teleport-square',.10,'light-blue',size)
+# Original Windows tile 0x29 is a cyan circular pad, distinct from the blue
+# square-spiral exit (0x15). Keep that silhouette and color distinction in 3D.
+disc('teleport-dark-foot',(0,0,.035),.46,.07,'rubber')
+disc('teleport-silver-rim',(0,0,.075),.425,.055,'bronze')
+disc('teleport-cyan-well',(0,0,.107),.365,.035,'blue')
+bpy.ops.mesh.primitive_torus_add(major_segments=32,minor_segments=6,major_radius=.382,minor_radius=.023,location=(0,0,.12))
+finish(bpy.context.object,'teleport-light-ring','light-blue')
+disc('teleport-center-glow',(0,0,.128),.26,.012,'light-blue')
 export_asset('terrain-teleport',1800)
 
 plate('water-basin','water')
@@ -59,12 +70,20 @@ for i in range(5):
     curve_mesh('flame-heart',[(x,y-.055,.12),(x+.02,y-.055,.24),(x,y-.055,.36)],.033,'yellow')
 export_asset('terrain-fire',4500)
 
-for tile,angle in ((13,math.pi),(18,0),(19,-math.pi/2),(20,math.pi/2),(50,0)):
+for tile,angle in ((13,0),(18,math.pi),(19,math.pi/2),(20,-math.pi/2),(50,0)):
     plate('conveyor','rubber');frame('conveyor-frame',.095,'edge')
-    for y in (-.22,.20):
-        for side in (-1,1):
-            obj=box('conveyor-chevron',(side*.145,y,.102),(.41,.115,.035),'green',.012);obj.rotation_euler.z=side*math.pi/4
-    # Blender +Z maps to glTF +Y, preserving rotation about the up axis.
+    if tile==50:
+        # Four outward arrows mean random force; never advertise one fixed way.
+        for turn in (0,math.pi/2,math.pi,3*math.pi/2):
+            for side in (-1,1):
+                x=side*.065;y=-.27
+                obj=box('random-force-chevron',(math.cos(turn)*x-math.sin(turn)*y,math.sin(turn)*x+math.cos(turn)*y,.102),(.18,.055,.035),'green',.006)
+                obj.rotation_euler.z=side*math.pi/4+turn
+    else:
+        for y in (-.22,.20):
+            for side in (-1,1):
+                obj=box('conveyor-chevron',(side*.145,y,.102),(.41,.115,.035),'green',.012);obj.rotation_euler.z=side*math.pi/4
+    # The base chevron points Blender -Y, exported as runtime +Z (south).
     for obj in parts:
         obj.location=Vector((math.cos(angle)*obj.location.x-math.sin(angle)*obj.location.y,math.sin(angle)*obj.location.x+math.cos(angle)*obj.location.y,obj.location.z))
         obj.rotation_euler.z+=angle

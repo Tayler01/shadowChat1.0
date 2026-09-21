@@ -1,3 +1,9 @@
+## September 21 Shadow Circuit directional terrain polish
+
+- Audited normalized top/bottom terrain across all 149 original levels: no missing model mappings. Fixed reverse-facing chevrons on all four force-floor models (4,098 tiles in 62 levels); random force now advertises four directions (111 tiles in 7 levels).
+- Rebuilt the teleporter as a cyan circular pad, distinct from the blue square-spiral exit, following bitmap 308 in the supplied original executable. The exit repeats its spiral on the floor and rear face for free-camera visibility. No original level layouts or force movement rules changed.
+- Basic checks: 122 game tests including exported arrow geometry versus simulation, thin-wall/corner-ice collision orientation, and portal silhouette/color; source GLB validation; lint, app TypeScript and build. Browser evidence: output/playwright/shadow-circuit-terrain. Campaign report: output/shadow-circuit/terrain-audit/report.json. Physical-device feel and all-level solutions remain user testing; no full campaign certification is claimed.
+
 ## September 21 Shadow Circuit camera gestures
 
 - Passed desktop/Android Chromium (including headed), narrow 667x375, large controls/130% text, and iPhone WebKit. WebKit software rendering triggered the existing frame-stall pause; intentional resume was verified. This is not a sustained-performance pass.

@@ -1,6 +1,25 @@
 # Shadow Circuit asset status
 
-Updated 2026-09-20 for the reference-polish testing build.
+Updated 2026-09-21 for the terrain-direction polish.
+
+Seven terrain models were regenerated: four force-floor directions, random force,
+the teleporter and the exit. The exit now repeats its spiral on the floor and
+rear face so overhead/rear camera views keep a readable destination. The force chevrons previously pointed opposite to movement;
+they now match the simulator and source DAT directions. Random force uses four
+outward arrows. The teleporter is a low cyan circular disc, distinct from the
+upright royal-blue square-spiral exit. These silhouettes/colors were checked
+against bitmap resource 308 extracted from the supplied CHIPS.EXE (exit 0x15,
+teleporter 0x29). Original reference extraction is retained in
+output/shadow-circuit/original-art/. The historical full-kit contact sheet and
+calibration.blend predate these seven corrected exports; current runtime review
+is in output/playwright/shadow-circuit-terrain/. Rebuild them with
+rebuild_directional_terrain.py; the full builder also includes the corrected recipe.
+
+The all-149-level top/bottom terrain audit found no missing model mappings.
+It counts 4,098 fixed force tiles across 62 levels, 111 random-force tiles across
+7 levels, and 147 teleporters across 30 levels. Geometry tests compare arrow tips
+to actual simulation movement and thin-wall/corner-ice geometry to blocked edges.
+This checks visual direction/coverage, not full campaign solutions or exact MS parity.
 
 The selected Classic Circuit Console image governs the PCB, silver/green
 console controls, pale floors, darker beveled wall/door bodies, colored keyhole

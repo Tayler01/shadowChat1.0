@@ -632,24 +632,24 @@
     },
     {
       "id": "terrain-exit",
-      "triangles": 748,
-      "triangleCeiling": 2200,
+      "triangles": 2068,
+      "triangleCeiling": 2400,
       "blenderBounds": [
         [
           -0.4699999988079071,
           0.4699999988079071
         ],
         [
-          -0.18000000715255737,
-          0.25999999046325684
+          -0.4699999988079071,
+          0.4699999988079071
         ],
         [
           0.0,
           0.9599999785423279
         ]
       ],
-      "sha256": "313419c01d2269a448a43029c4311bcacb9b98fb40772e2da97251cf7dc2ed24",
-      "bytes": 46380,
+      "sha256": "0fd58ae3a0d24b61b21be95cbc1b47a8a6be14bfadcceced789008d065f9b1c4",
+      "bytes": 123428,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
@@ -682,24 +682,24 @@
     },
     {
       "id": "terrain-teleport",
-      "triangles": 748,
+      "triangles": 752,
       "triangleCeiling": 1800,
       "blenderBounds": [
         [
-          -0.47999998927116394,
-          0.47999998927116394
+          -0.46000000834465027,
+          0.46000000834465027
         ],
         [
-          -0.47999998927116394,
-          0.47999998927116394
+          -0.46000000834465027,
+          0.46000000834465027
         ],
         [
           0.0,
-          0.13249999284744263
+          0.13991858065128326
         ]
       ],
-      "sha256": "e071a7ece0e2fa2bb971389d6c885c1c7ecf4e07add3bd96d4d98edb939eb4ad",
-      "bytes": 46356,
+      "sha256": "9ad45050d17cf7eb06af7f9a93ec1b0fdeb909b988284c25366695a7dcd5e284",
+      "bytes": 35840,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
@@ -1011,19 +1011,19 @@
       "triangleCeiling": 1300,
       "blenderBounds": [
         [
-          -0.48000001907348633,
-          0.48000001907348633
+          -0.47999998927116394,
+          0.47999998927116394
         ],
         [
-          -0.48000001907348633,
-          0.48000001907348633
+          -0.47999998927116394,
+          0.47999998927116394
         ],
         [
           0.0,
           0.1274999976158142
         ]
       ],
-      "sha256": "0314f6db93cc1085c261929ebb9c0a42f1ff4c384a1f5d734898c9eca5812b4b",
+      "sha256": "aa5e5496da8786ac8936d027281a9245af90efdf76f13e841674ec154fcfe652",
       "bytes": 25824,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -1036,19 +1036,19 @@
       "triangleCeiling": 1300,
       "blenderBounds": [
         [
-          -0.47999998927116394,
-          0.47999998927116394
+          -0.48000001907348633,
+          0.48000001907348633
         ],
         [
-          -0.47999998927116394,
-          0.47999998927116394
+          -0.48000001907348633,
+          0.48000001907348633
         ],
         [
           0.0,
           0.1274999976158142
         ]
       ],
-      "sha256": "eb20ca58818bc3d43e4220b217d1e04637268e563a8b8f0468cb4e5d26567742",
+      "sha256": "f1304ec11ed867a30052dff7abe7bc129844d7094295737cd9a7b6a78fd9911c",
       "bytes": 25824,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -1073,7 +1073,7 @@
           0.1274999976158142
         ]
       ],
-      "sha256": "90159dfff97759ec0b5ff17bae71b8a711746d4d4c514158bdf1d8a4c88b14c4",
+      "sha256": "c275e21b5af902ed8f46ce066d7d41483749870933344ef4816c59d646a04572",
       "bytes": 25824,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -1098,7 +1098,7 @@
           0.1274999976158142
         ]
       ],
-      "sha256": "ab0e538206a995e73e16056a04141e9e8e57d0aa1ed5c08bb601f1cd1dde7ab0",
+      "sha256": "a72d36170268506811ae8ca412e3d47ac400491b473c43784941f06dc7594c5b",
       "bytes": 25824,
       "status": "CALIBRATION_STATIC",
       "clips": [],
@@ -1107,7 +1107,7 @@
     },
     {
       "id": "terrain-force-50",
-      "triangles": 396,
+      "triangles": 572,
       "triangleCeiling": 1300,
       "blenderBounds": [
         [
@@ -1123,8 +1123,8 @@
           0.1274999976158142
         ]
       ],
-      "sha256": "e9da39ef2a198ba8d4ac5ebb0d4793464ae8698ffa2d8109ce42e5c719533103",
-      "bytes": 25824,
+      "sha256": "74f3605dd40c141b4ac58f1a9eb25f4899664caa670fb80354f1e4a76cbad233",
+      "bytes": 36100,
       "status": "CALIBRATION_STATIC",
       "clips": [],
       "runtimeIntegrated": false,
