@@ -1,0 +1,10 @@
+/* Invisible left-side camera gestures overlay the full-width 3D room. */
+[data-checkers-renderer] { --checkers-camera-width: clamp(112px, 22%, 240px); }
+.checkers-camera-surface { position: absolute; z-index: 2; inset: 0 auto 0 0; width: var(--checkers-camera-width); touch-action: none; user-select: none; -webkit-user-select: none; background: transparent; border: 0; }
+.checkers-camera-surface:focus-visible { outline: 2px solid #f0d381; outline-offset: -4px; }
+.checkers-camera-surface[aria-disabled='true'] { pointer-events: none; }
+.checkers-player-viewport { position: absolute; inset: 0; }
+.checkers-corner-controls { position: absolute; z-index: 10; top: max(.5rem, env(safe-area-inset-top)); right: max(.5rem, env(safe-area-inset-right)); display: flex; gap: .3rem; }
+.checkers-corner-controls button { display: flex; align-items: center; justify-content: center; background: #100c09e8; border-radius: 50%; }
+.checkers-camera-help { position: absolute; z-index: 11; top: .5rem; right: max(.5rem, env(safe-area-inset-right)); width: min(23rem, calc(100% - 1rem)); max-height: calc(100% - 1rem); overflow: auto; border: 1px solid #b9934c66; border-radius: .75rem; background: #100c09; color: #d2c3a8; padding: .75rem; box-shadow: 0 12px 40px #0008; font-size: .8rem; }
+.checkers-camera-help p { margin: .6rem 0; }

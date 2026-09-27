@@ -1,3 +1,4 @@
+import './checkers-camera.css'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Accessibility, HelpCircle, Expand, Volume2, VolumeX, X } from 'lucide-react'
 import type { CameraDelta } from '../../shadow-circuit/input/cameraGesture'
