@@ -1,6 +1,6 @@
 # Shadow Checkers Unity rebuild
 
-Started September 13, 2026. The initial replacement was deployed with user authorization that day. September 24 material, sound, room-tour and prop polish is local; it has not been pushed or deployed. Routine screenshots remain disabled except focused visual validation. Future release work follows the main-only production workflow.
+Started September 13, 2026. The updated study, sound, room tour, touch controls and recovery fixes were manually deployed with explicit user authorization on September 27 as build `bdde5246d73f254f03f04f8c9067b1fbf684f3de`. GitHub remains unavailable; this release used the authorized Netlify CLI exception. Routine screenshots remain disabled except focused visual validation. Physical-phone testing and final reference-level visual acceptance remain open.
 
 ## Accepted visual direction
 
@@ -11,6 +11,18 @@ User supplied three chess reference photographs on September 13. They establish 
 September 24 clarification: close detail is required across the tabletop books, shelf books, table wood grain, candleholders, wax, drinking vessel and maps. These must hold up during the room reveal and board close-up, not merely form distant silhouettes. Keep worn leather/tooling and individual page edges, directional wood grain, worked and tarnished metal, wax drips and translucency, and parchment/engraving detail as explicit acceptance items. Smooth mobile operation remains part of that acceptance.
 
 ## Checkpoints
+
+### Manual production testing release (September 27)
+
+Published to `https://shadochat.online` with Netlify deploy `6ab8a42a9c6ca3bd2a6de905`. Public health and all four versioned Unity manifest URLs match build `bdde5246d73f254f03f04f8c9067b1fbf684f3de`; the Unity frame returns 200/SAMEORIGIN. The required-restart release notice is published. No GitHub push was attempted, per the user's manual-deploy instruction. The existing main checkout contains unrelated staged/unstaged Runner work and was preserved; source checkpoints are on the current branch.
+
+Release checks: lint, TypeScript, 252 Jest suites (1,457 passing tests, 16 todo), 58 standard Node tests plus 11 Checkers delivery/lifecycle tests, docs integrity, dependency audit (zero vulnerabilities), function manifest and production Netlify build passed. Production feature flags exposed a tighter size limit than the preview; camera CSS now loads with its game component, and five existing 2D WebP assets were recompressed at unchanged dimensions (536,158 bytes saved). The 3D room/assets and size budgets are unchanged. Final production payload is 95.31 MiB. Layout WebKit `layout-webkit-1790485067166` and real Unity camera `camera-webkit-1790485179592` pass after the CSS split.
+
+Applied only migration `20260925053123_shadow_checkers_continuation_integrity.sql` after a linked dry run confirmed it was the sole pending migration. The post-apply dry run is empty; linked security contract, function inventory and continuation RPC grants/row-lock guards pass. PostgreSQL fixture passed 31 assertions. Existing advisory findings remain (including disabled leaked-password protection); the Checkers migration did not change Auth configuration.
+
+The first upload exposed missing Linux Sharp binaries in the prebuilt Windows media-function ZIP. Corrected the bundle with lockfile-integrity-verified `@img/sharp-linux-x64@0.35.4` and `@img/sharp-libvips-linux-x64@1.3.3`, then republished the unchanged frontend. The final live media route returns its expected 405 method guard, and production health passes. For future Windows manual releases, verify these Linux binaries in the function ZIP before publishing; retain `output/repair-checkers-release-functions.ps1` and the locked archives as release evidence.
+
+Hosted headed WebKit/iPhone emulation `multiplayer-1790485580354` passes two real Unity touch moves, server persistence, recipient realtime turn changes, themed notices, match chat, portrait/landscape containment and camera controls. Exact test-session cleanup passed. The harness now dismisses late release notes and uses the supported room-reveal skip control for transport testing; opening-tour timing has separate local coverage. No screenshots were taken. This does not certify physical iPhone/Android performance, sound, installed-PWA behavior, or hosted concurrent continuation transactions.
 
 ### Recover the running player after host refresh (September 27)
 
@@ -388,7 +400,7 @@ The first iPhone/WebKit run passed authoritative touch moves and chat, but its W
 
 `native/shadow-checkers-unity` contains original editable Blender assets and Unity 6000.3.24f1 source. Unity owns the scene, camera, rendering and raycast input. ShadowChat owns authenticated data access, realtime subscriptions, legal moves and the existing social screens. A same-origin iframe isolates the Web runtime and releases it when leaving a match. The versioned bridge accepts only its own frame, origin, revision and current legal choices. No credentials are sent to Unity.
 
-The original board remains available as explicit accessible controls and as a recovery option if WebGL cannot load. Runtime files load only upon entering a match. The prepared local migration `20260925053123_shadow_checkers_continuation_integrity.sql` addresses continuation retry/cosmetic/queue integrity; it has not been applied to production and still requires hosted validation.
+The original board remains available as explicit accessible controls and as a recovery option if WebGL cannot load. Runtime files load only upon entering a match. Migration `20260925053123_shadow_checkers_continuation_integrity.sql` addresses continuation retry/cosmetic/queue integrity and was applied September 27. Hosted concurrent continuation acceptance remains open.
 
 ## Evidence
 

@@ -1,3 +1,10 @@
+## September 27 Shadow Checkers production testing release
+
+- Manual production build bdde5246d73f254f03f04f8c9067b1fbf684f3de / Netlify 6ab8a42a9c6ca3bd2a6de905 is live, with matching health/Unity assets and restart notice. Full release checks passed; production bundle remains below the unchanged 100 MB limit.
+- Post-CSS-split layout-webkit-1790485067166 and camera-webkit-1790485179592 pass. Hosted headed iPhone/WebKit multiplayer-1790485580354 passes actual Unity touch moves for both seats, authoritative persistence/realtime, themed notices, match chat, rotation containment, overhead/reset and exact cleanup. Intro is deliberately skipped using its normal control for this transport smoke.
+- First hosted attempt was blocked by late release notes; the harness now dismisses them before skipping the reveal. Initial manual upload omitted Linux Sharp; corrected final deployment returns expected media 405 and passes production health. No screenshots taken.
+- Desktop WebKit emulation is not physical iPhone/Android, audio, thermal, installed-PWA or concurrent continuation proof. User is testing the released build on phones next.
+
 ## September 27 Shadow Checkers host readiness handshake
 
 - Actual Unity Fast Refresh red/green: refresh-1790483423891 fails when the host watchdog expires its retained iframe; refresh-1790483494645 passes with the same iframe/time origin and a second ready acknowledgment. Only the post-start watchdog is accelerated; source bytes remain unchanged.

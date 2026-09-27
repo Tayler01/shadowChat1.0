@@ -1,3 +1,10 @@
+## September 27 Shadow Checkers manual testing release
+
+- User explicitly requested manual Netlify deployment while GitHub remains unavailable. Live build bdde5246d73f254f03f04f8c9067b1fbf684f3de, final deploy 6ab8a42a9c6ca3bd2a6de905; health, Unity manifest and required-restart release notice verified. No GitHub push; unrelated main-checkout Runner work preserved.
+- Full release checks pass: 252 Jest suites/1,457 tests, 69 Node tests, lint/types/docs/audit/functions and production build. Production-only budget failure resolved by lazily loading camera CSS and saving 536,158 bytes from five same-dimension 2D WebPs; native 3D assets unchanged.
+- Applied the sole pending Checkers continuation migration; empty linked dry run, security contract and exact function inventory verified. Corrected the manual Windows function bundle with verified Linux Sharp binaries; live media method guard and production health pass.
+- Hosted headed WebKit multiplayer-1790485580354 passes real touch moves, persistence/realtime, notices/chat, landscape and camera controls; exact cleanup verified, no screenshots. Physical phones, final fidelity and hosted continuation concurrency remain open.
+
 ## September 27 Shadow Checkers live-update readiness recovery
 
 - Reproduced Fast Refresh expiring an already running Unity player: the new host effect lost its startup-ready flag. Added requestReady/ready handshake in UnityBoard and frame.js; the host sends current state, never an old frame snapshot. Actual-player red/green refresh QA retains the same iframe after the fix.

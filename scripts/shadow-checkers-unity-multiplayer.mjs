@@ -85,6 +85,13 @@ try {
     if (await dismiss.isVisible().catch(() => false)) await dismiss.click()
     await page.locator('iframe[data-ready="true"]').waitFor({ timeout: 120000 })
     await page.waitForFunction(() => window.__checkersProjection?.squares?.length === 64)
+    // Release notes may arrive after the initial dismissal and pause the reveal.
+    const releaseClose = page.getByRole('button', { name: 'Close update notes', exact: true })
+    if (await releaseClose.isVisible().catch(() => false)) await releaseClose.click()
+    // Camera-tour timing has separate native/browser coverage. This smoke proves
+    // hosted input and transport, using the player's supported skip action.
+    const skipReveal = page.getByRole('button', { name: 'Skip room reveal', exact: true })
+    if (await skipReveal.isVisible().catch(() => false)) await skipReveal.click()
     await page.waitForFunction(() => window.__checkersEvents.some(e => e.type === 'cinematic' && e.busy === false))
   }
   const foregroundPlayer = async page => {
