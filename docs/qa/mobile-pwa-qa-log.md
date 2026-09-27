@@ -1,3 +1,145 @@
+## September 27 Shadow Checkers host readiness handshake
+
+- Actual Unity Fast Refresh red/green: refresh-1790483423891 fails when the host watchdog expires its retained iframe; refresh-1790483494645 passes with the same iframe/time origin and a second ready acknowledgment. Only the post-start watchdog is accelerated; source bytes remain unchanged.
+- Ten frame lifecycle and 25 screen/board tests pass. Accelerated Windows WebKit resume-webkit-1790483546588 passes navigation/capture and real WebGL-loss retry with the latest pieces/move preserved and overhead working. This is desktop browser evidence, not physical-phone PWA or GPU/thermal proof.
+- Lint/types/build/scoped whitespace checks pass, payload 99,794,928 bytes under unchanged budget. Foreground ready-handshake-20260927; no push/deploy. Prior MeshCollider message's independent engine cause is not established.
+
+## September 27 Shadow Checkers invisible gesture overlay
+
+- Actual Unity camera-chromium-1790482916976 and camera-webkit-1790483020586 pass: transparent/empty/borderless left overlay, full-width iframe, full-height gestures, all default playable square centers clear at 915x412 and 667x320, drag/tilt/zoom/reset/overhead, 44 px corner targets. Chromium injected pinch passes; WebKit keyboard zoom is not physical Safari pinch proof. Reviewed controls.png.
+- Themed resign/cancel dialogs: 25 screen/board tests pass, including focus return, pending duplicate rejection and retry after failure. layout-chromium-1790482943887 and layout-webkit-1790483056416 pass four landscape/text profiles, 44 px actions and exact dispatch. ending-chromium-1790483091884 passes actual Unity capture/result/rematch after cancelling resignation.
+- Lint/types/app build pass; app payload 99,794,656 bytes under unchanged 100 MB limit. Local only, no push/deploy. Real-device/PWA/audio/performance and final art/hosted continuation acceptance remain open.
+
+## September 27 Shadow Checkers optical flame energy
+
+- Linear HDR diagnostic renders eight isolated flames at 32 times, comparing normalized glow against local-light energy before tone mapping. Red evidence: flame-energy-before-20260927.json, candle mismatch 3.5854%. Corrected MedievalStudyEffects.cs: flame-energy-checks.json passes at 0.0182% candle / 1.363% hearth; 45 source-alignment and pause/reduced-motion checks also pass.
+- Accelerated Windows WebKit material-webkit-1790482411342 passes opening/overhead/reset. Unity/lint/types/app build and console pass; app 99,793,027 bytes within unchanged budget. Foreground revision candle-energy-20260927. No push/deployment. These are local rendered-source/desktop-browser checks, not physical-device or full room-GI proof.
+
+## September 27 Shadow Checkers shadow batching
+
+- Chromium render-chromium-2-1790481694981: 511 draws/frame versus 758 before; 190 depth/shadow draws versus 437. Actual GL trace now confirms instanced shadow draws. Landscape reviewed; contact shadows and reflections remain. Cadence 30.75 submissions/sec, 38.9 ms p95, no >50 ms intervals; desktop submission metrics are not physical-phone GPU/performance proof.
+- Accelerated Windows WebKit material-webkit-1790481790996 passes opening/overhead/reset, capture and kinging. Native optical flame/light check passes all 45 samples and pause/reduced-motion checks. Unity/lint/types/app build pass, 99,794,303-byte app payload within unchanged budget. No push/deployment; physical iPhone/Android/PWA/audio/thermal and final photographic-fidelity acceptance remain open.
+
+## September 26 Shadow Checkers player menu reachability
+
+- Accelerated Windows WebKit ending-webkit-1790481089504 also passes menu dismissal with zero square events/unchanged revision, then capture/result/rematch. Final lint/types/build pass; app payload 99,792,519 bytes. No additional screenshot or Unity rebuild was needed for the invisible input shield.
+- Reproduced native iframe tap-through in ending-chromium-1790480902674: open menu remained visible, one square event selected a checker (revision 2 to 3). Outside-tap shield fixes it: ending-chromium-1790480998964 closes the menu with zero square events and unchanged revision, then passes capture/result/rematch. Fourteen screen tests pass.
+- Active-match identities/characters/counts were hidden. Restored them in a scrollable game menu with safe-area-aware height, 44 px targets and Escape focus return.
+- layout-chromium-1790480403699 and layout-webkit-1790480451043 pass 667x320 (100% and 130%), 844x390 (130%), and 915x412 (100%). Both player cards fit; all action targets scroll into an unobstructed viewport position.
+- Actual Unity Chromium ending-chromium-1790480524882 passes capture/king/reduced-motion results and rematch dispatch. Final label/portrait fixture ending-chromium-1790480685796 passes; player-menu.png reviewed. These are desktop browser emulations with isolated data, not physical-device or server settlement proof. No push/deployment.
+
+## September 26 Shadow Checkers room grain cost
+
+- Accelerated Windows WebKit opening/overhead/reset passes: material-webkit-1790479907450. No real iPhone/Android test was performed.
+- Reused the existing mipmapped oak photograph with independent room detail coordinates and wood-only masks. Both room meshes retain one submesh each; no new lights, renderers or texture assets.
+- Chromium render-chromium-2-1790479862999: unchanged 758 draws/frame, 32.72 submissions/sec, 38.8 ms p95, zero >50 ms intervals. Landscape image reviewed. App 99,791,567 bytes is below 100 MB with only 208,433 bytes remaining. These are desktop-host measurements, not phone GPU/thermal proof. No push/deployment.
+
+## September 26 Shadow Checkers moving candle sources
+
+- Accelerated Windows WebKit opening/overhead/reset passes: material-webkit-1790479165576. Pause and reduced motion here are covered by the native optical diagnostic, not an actual iPhone lifecycle test.
+- Synchronized source position with rendered flame lean/height. Native optical readback passes 45 samples; pause/reduced-motion clock behavior passes. This checks luminous-source alignment, not full room GI or shadows from every candle.
+- Chromium render-chromium-2-1790479123546: unchanged 758 draws/frame, 32.37 submissions/sec, 38.8 ms p95 and zero intervals above 50 ms. App 99,553,088 bytes remains within the 100 MB budget. Desktop submission measurements do not establish physical-phone GPU or thermal performance. No push/deployment.
+
+## September 26 Shadow Checkers charcoal lighting cost
+
+- Natural charcoal/end-grain changes retain one renderer and the same 758 draws/frame. Chromium desktop profile render-chromium-2-1790478415965: 31.60 submissions/sec, 38.7 ms p95, zero >50 ms intervals. This measures submission timing, not GPU completion or phone thermal behavior.
+- Accelerated Windows WebKit opening/overhead/reset passes: material-webkit-1790478487167. App 99,557,564 bytes stays within the unchanged 100 MB budget. Physical iPhone/Android validation remains open. No push/deployment.
+
+## September 26 Shadow Checkers hearth material cost
+
+- Added one shared dynamically lit stone renderer (8,149 vertices), 1K color and 512 px normal texture imports. App build 99,557,903 bytes; budget unchanged. Reviewed native stone close-up and actual Chromium seated render.
+- render-chromium-2-1790477634119 measures 758 draws/frame (eight above previous), 31.35 submissions/sec, 38.5 ms p95, no intervals over 50 ms on desktop Intel Arc. material-webkit-1790477652339 passes opening, overhead and reset in accelerated Windows WebKit.
+- These results do not prove physical-phone GPU/thermal/memory performance or photo-reference visual acceptance. No push/deployment.
+## September 26 Shadow Checkers steep-angle controls
+
+- Native camera previously stopped at 41.53 degrees despite increasing requested tilt. Constrained arc now reaches 65 degrees, with optical zoom at the height limit. 216 native poses and 1,200 picking checks pass.
+- Browser camera regressions pass at 915x412 and 667x320, including continued tilt past the former plateau and responsive zoom: camera-chromium-1790476777529 and camera-webkit-1790476790688. Chromium uses actual CDP pinch; WebKit uses pointer drag and keyboard zoom. No new screenshot was needed.
+- Lint/types/build pass. No production deployment. Physical phone/PWA input, sustained GPU/thermal behavior and audio remain unverified.
+## September 26 Shadow Checkers left-side camera and flame lighting
+
+- Camera UI checks pass in Chromium and accelerated Windows WebKit at 915x412 and 667x320: full-height gesture zone separated from the board, reset framing of all 64 squares and 44 px corner buttons. Chromium exercised actual two-finger CDP touch; WebKit exercised pointer drag and keyboard zoom because mobile wheel injection is unsupported. Evidence: camera-chromium-1790475719398, camera-webkit-1790475879928.
+- Final synchronized-room-lighting build passes WebKit opening/overhead/reset (material-webkit-1790476189397). Chromium capture/kinging/pause passed before the final room-shader-only refinement (material-chromium-1790475895549). Final render-chromium-2-1790476172345: 30.71 WebGL submissions/sec, 750 draws/frame, 38.8 ms p95, no intervals above 50 ms on desktop Intel Arc.
+- Native timing samples match candle/light and room-light uniforms and freeze on pause. App 98,861,661 bytes. These are desktop browser results, not physical iPhone/Android/PWA pinch, GPU, thermal or audio proof. No push/deployment.
+## September 26 Shadow Checkers graphics recovery
+
+- Forced actual WebGL context loss after a double capture. Verified failed iframe removal, disabled camera controls, Retry with unchanged pieces/latest move, completed presentation and working overhead framing. Chromium/Pixel 7 and accelerated Windows WebKit/iPhone 13 layouts pass with no page errors: resume-chromium-1790474301950 and resume-webkit-1790474342597.
+- Seven lifecycle and thirteen host/bridge tests pass; app build 98,784,382 bytes, source/dist frame hash matched. No native player rebuild, push or deployment.
+- Physical-phone memory pressure, OS process eviction, sustained GPU/thermal load and PWA audio remain **not verified**. The forced extension event tests graphics loss/retry, not every phone failure mode.
+
+## September 26 Shadow Checkers cached-page recovery
+
+- Fixed unconditional Unity/audio teardown on persisted pagehide. Cached pages now pause and request fresh host state on pageshow; final unload and delayed-start cleanup remain explicit. Five lifecycle unit tests and twelve host/bridge tests pass.
+- scripts/shadow-checkers-resume-qa.mjs passes in Chromium/Pixel 7 and accelerated Windows WebKit/iPhone 13 layouts. Synthetic persisted events exercise the actual Unity player, and a capture works after real browser Back navigation. Evidence: resume-chromium-1790473870886 and resume-webkit-1790473906341. No page errors or extra screenshots.
+- Both actual returns reloaded instead of using the back/forward cache. Physical iPhone/Android retained-cache restoration, OS sleep/process eviction, PWA audio and sustained GPU/thermal behavior remain **not verified**. No push/deployment.
+
+## September 25 Shadow Checkers ASTC texture delivery
+
+- All ten study texture imports use ASTC 6x6 with unchanged dimensions/mips. Theoretical texture storage is 6,925,520 bytes, versus 61,865,976 bytes as RGBA32; excludes render targets and is not measured physical allocation. Audit: `output/shadow-checkers-unity/astc-textures.json`.
+- Desktop Chromium and accelerated Windows WebKit do not expose ASTC; both pass the fallback path's entrance/overhead/reset, capture, kinging and pause/resume (`material-chromium-1790323442121`, `material-webkit-1790323542807`). Chromium visual reviewed. Runtime profile now records extension support and actual texture-upload formats; this host used RGBA8/sRGB8-alpha storage, with 30.61 submissions/sec and 33.4 ms p95 (`render-chromium-2-1790323635871`).
+- Physical iPhone/Android gate remains **not run**: verify actual ASTC capability and native ASTC texture uploads, inspect fire/map/book/marble quality, then record sustained play, background/foreground recovery, GPU memory if available and thermal behavior. Browser device presets do not provide this evidence. Build 10,474,272 bytes; app 94.16 MiB, checks/hashes pass. Local preview only; no push/deployment.
+
+## September 25 Shadow Checkers seated view and raised-piece picking
+
+- Lowered final perspective camera and fixed a reproduced tap error where the visible top of a far-side piece projected off the board. Native production-picker checks cover 192 normal/king hits and 768 empty destinations, both player orientations, three landscape aspects and reset/left/right/overhead modes. All 960 pass (`output/shadow-checkers-unity/pointer-checks.json`).
+- Real Unity browser fixtures pass opening, overhead/reset, touch-driven double capture, kinging and pause/resume in Chromium/Pixel 7 and accelerated Windows WebKit/iPhone 13 at 915 x 412. Zero page errors. Evidence: `material-chromium-1790319324571` and `material-webkit-1790319423884` under `output/playwright/shadow-checkers-unity/`.
+- Unity 11,679,671 bytes; app 95.31 MiB; lint, TypeScript, build and four source/dist hashes pass. These tests do not establish physical-thumb accuracy, iPhone audio/PWA behavior or sustained phone GPU/thermal performance. No push/deployment; final reference-photo fidelity remains open.
+## September 25 Shadow Checkers final-capture/result timing
+
+- `scripts/shadow-checkers-ending-qa.mjs` passed in Chromium/Pixel 7 and accelerated Windows WebKit/iPhone 13 at 844 x 390: final double capture, final capture-to-king, paused presentation, reduced motion, result dismissal and exact-match rematch dispatch. These fixtures use the production screen, real Unity player and engine, with only auth/data transport isolated. They never change ranked server statistics.
+- Evidence: `ending-chromium-1790313850126` and `ending-webkit-1790313914230` under `output/playwright/shadow-checkers-unity/`. Winning results remained absent throughout the deliberate pause and appeared only after Unity's matching `presented` event. Final capture/landing/crown sound events preceded acknowledgement. The reduced-motion fixture completed without waiting for normal animation duration.
+- Eighteen screen/host tests, lint, application TypeScript and app build passed. Unity build: 11,696,620 bytes. App: 95.36 MiB within unchanged budget; all source/dist player hashes match. Landscape picker fixture passed again (`layout-chromium-1790313819195`). Foreground preview updated to `ending-presentation-20260925`.
+- No push/deployment. Windows browser emulation does not establish physical-phone PWA, audio/thermal/GPU behavior, server ranked continuation or final photo-reference fidelity.
+
+## September 25 Shadow Checkers landscape dialog validation
+
+- Real production screen/Comfort provider with isolated auth, match data, action dispatch and Unity frame: 667 x 320 at 100%/130% text, 844 x 390 at 130%, and 915 x 412 at 100%, Chromium and Windows WebKit. All picker controls and result totals fit; eight character choices and confirmation remain tappable; create/dismiss/rematch dispatch checks pass. Original 440px character dialog prevented confirmation on the smallest profile.
+- Evidence under `output/playwright/shadow-checkers-unity/`: baseline `layout-chromium-1790313254309` (failed confirmation), final `layout-chromium-1790313535525` and `layout-webkit-1790313478395`. Focused result screenshots reviewed before/after the opacity and artwork-cropping correction. No unnecessary scene screenshots.
+- Lint, application TypeScript, 12 existing screen tests, documentation integrity (237 files) and app build passed. Payload is 95.36 MiB within the unchanged 100,000,000-byte budget.
+- This is browser layout/dispatch evidence only: it mocks the Unity frame and data hooks, creates no real matches, and does not establish physical-phone safe areas, keyboard/PWA behavior, ranked continuation or 3D performance. Native player unchanged; no push/deployment.
+
+## September 25 Shadow Checkers rounded library player
+
+- Updated library models preserve the original shared atlas, add curved spines/raised bands and horizontal stacks, and correct shelf/pillar contact. Native close-up reviewed; affected mesh vertex count is slightly lower overall.
+- Finished player passed Chromium/Pixel 7 and accelerated Windows WebKit/iPhone 13 landscape fixtures: opening, all squares framed overhead, reset, double capture, kinging and pause/resume; no page errors. Evidence: `material-chromium-1790312673072` and `material-webkit-1790312612419` under `output/playwright/shadow-checkers-unity/`.
+- Unity build 11,695,252 bytes; packaged app 95.35 MiB within the unchanged budget. All four source/dist player hashes match; lint and TypeScript passed. Foreground preview uses `rounded-library-20260925`. Physical-phone visuals/performance, PWA/audio and final reference fidelity remain unverified. No push/deployment.
+
+- Isolated accelerated-WebKit render probe measured 30.83 submissions/second, 32 ms median / 34 ms p95, zero intervals over 50 ms and 654 draws/frame (`render-webkit-2-1790312858695`). A competing foreground Unity preview lowered the earlier sample to 21.45; releasing that additional renderer recovered the target cadence. The foreground preview was restored afterward. Keep active-renderer conditions explicit in comparisons.
+
+## September 25 Shadow Checkers Windows WebKit compositor comparison
+
+- Earlier roughly 10 FPS runs used Playwright 1.61.1's Windows `--disable-accelerated-compositing` flag. Default Unity-loop CPU median was 9 ms; bypassing draws still yielded 9.82 attempted frames/second. A real tap did not change the result.
+- Removing only that flag using `node scripts/shadow-checkers-render-profile.mjs --webkit --accelerated` yielded 30.97 submitted frames/second; an independent visual run yielded 30.98, 32 ms median / 34 ms p95, zero intervals over 50 ms, unchanged 1830 x 640 canvas and 654 draws/frame. Evidence: `render-webkit-2-1790311410123` and `render-webkit-2-1790311476233` under `output/playwright/shadow-checkers-unity/`. Actual image reviewed.
+- Accelerated WebKit opening, overhead, reset, paused double capture and paused kinging passed without page errors: `material-webkit-1790311513960`. Production player is unchanged; the comparison is opt-in and no global browser defaults were modified.
+- This isolates a Windows test-port compositor limitation. Neither configuration proves physical-phone GPU/frame rate, thermal, PWA or audio behavior. The Windows port's "Apple GPU" string is not actual iPhone hardware. No push/deployment.
+
+## September 25 Shadow Checkers render submissions and combined board
+
+- Measured actual WebGL draw submissions with `scripts/shadow-checkers-render-profile.mjs`, separately from browser animation callbacks. Baseline WebKit at DPR 2: 970 draws/frame, 9.57 submissions/second (`render-webkit-2-1790308935809`). DPR 1.5: 9.95 submissions/second (`render-webkit-1.5-1790308967886`), insufficient benefit to justify lowering detail.
+- Combined board and instanced materials: 654 draws/frame at unchanged 1830 x 640 resolution, 9.87 submissions/second, 102 ms median and 110 ms p95 (`render-webkit-2-1790309810227`). The 32.6% reduction in drawing work does not establish a meaningful WebKit FPS improvement. Actual image reviewed; no loss of bevels, material cuts, shadows or reflections observed.
+- Final isolated Chromium submission probe (`render-chromium-2-1790310133276`): 654 draws/frame, 29.997 submissions/second, 33.3 ms median, 33.4 ms p95, zero sampled submission intervals above 50 ms. Sampling lasted eight seconds; it is not a sustained thermal or physical-device test.
+- Final Chromium and WebKit fixtures passed opening/overhead/reset, paused double capture and paused crowning, correct resumed turn and no page errors: `material-chromium-1790309861017`, `material-webkit-1790309969419`. Final native WebGL build is 11,653,520 bytes; app build 95.31 MiB. Lint, TypeScript and four source/dist player hashes pass.
+- The measurements are desktop submission cadence, not GPU completion timing, physical iPhone/Android sustained performance or installed-PWA acceptance. Production resolution remains at DPR cap 2. No push or deployment. Real-device performance and remaining feature-parity validation are still open.
+
+## September 24 Shadow Checkers continuous entrance, overhead and pause
+
+- Final local player passed headed Chromium/Pixel 7 and WebKit/iPhone 13 landscape fixtures: opening, all 64 squares framed overhead, reset, double capture and kinging. Both engines pause during capture/kinging, hold the busy lock without new landing/sound/ready events, then resume to the correct turn. Overhead screenshots were reviewed; the ceiling no longer blacks out the board.
+- Evidence: `material-chromium-1790308376214` and `material-webkit-1790308457332` under `output/playwright/shadow-checkers-unity/`. Native live-transform pause probe passed 17 checks in `output/shadow-checkers-unity/presentation-pause.json`. A separate rendered engraving probe confirmed zero visible glyph pixels through its opaque blocker (`engraving-depth.json`).
+- Native WebGL build: 11,630,668 bytes. App: 95.29 MiB within the unchanged budget. Lint, TypeScript, 21 targeted tests, audio lifecycle checks and source/dist payload hashes passed.
+- `tour-audio-1790308597884` verifies a 12.119-second entrance, original two-minute music decoding/looping at 0.11 gain, and Play/Mute. Sampled recording review confirms window-side entry, full wall map, room sweep and final board framing.
+- Desktop browser animation cadence remains distinct from Unity FPS and real-phone performance. Chromium: 11.1 ms median, 11.2 ms p95, zero of 239 samples above 50 ms. Windows WebKit: 74 ms median, 92 ms p95, 120 of 239 above 50 ms. Its functional tests pass, but this is not smooth-iPhone evidence. Physical-device GPU/thermal/PWA/audio acceptance and final reference-level realism remain open. No push or deployment.
+
+## September 24 Shadow Checkers foreground detail and audio
+
+- Final local Unity data `3dc46534323192524d2f842d098648dd.data.unityweb` passed actual canvas touch opening, double capture and kinging fixtures in headed Android/Chromium and iPhone/WebKit emulation, without page errors. WebKit landscape render reviewed. Evidence: `material-chromium-1790306016932` and `material-webkit-1790305877481` under `output/playwright/shadow-checkers-unity/`.
+- Actual Chromium playback verified the original two-minute soundtrack's smaller stereo delivery file, quiet 0.11 gain, loop, Play/Mute and a 9.12-second room pan (`tour-audio-1790306096757`). Prior contact/fire playback checks remain applicable; the sound behavior was unchanged by this prop pass.
+- Final app payload is 95.24 MiB within the unchanged build budget; source/dist Unity and music hashes match. This is local validation, not a production deploy or physical-phone PWA/audio/thermal/performance claim.
+- Browser animation cadence is diagnostic, not Unity frame rate. Chromium's 239 samples had a 11.2 ms p95 and none above 50 ms. Windows WebKit's first sample was uneven during the app build; its follow-up without that build (`material-webkit-1790306148112`) remained uneven: 72 ms median, 90 ms p95, 120/239 above 50 ms. Gameplay still passed. Do not claim smooth iPhone performance from these results; native-device profiling and presentation pause/resume validation remain open.
+
+## September 24 Shadow Checkers hosted WebKit
+
+- Current production passed headed WebKit/iPhone 13 emulation: both players' canvas touches persisted moves, realtime turns and match chat updated, portrait-to-landscape containment and camera controls worked. Exact test-session cleanup passed; no screenshots.
+- Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790296822651/summary.json`. Canonical QA now handles late release notes, foreground settling and closed-page diagnostic capture. Actual iPhone/Android sound, thermal performance and installed-PWA behavior remain unverified.
+
 ## September 21 Shadow Circuit directional terrain polish
 
 - Audited normalized top/bottom terrain across all 149 original levels: no missing model mappings. Fixed reverse-facing chevrons on all four force-floor models (4,098 tiles in 62 levels); random force now advertises four directions (111 tiles in 7 levels).

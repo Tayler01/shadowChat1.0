@@ -60,6 +60,28 @@ describe('Shadow Checkers engine', () => {
     expect(result.state.pieces).toEqual([{ id: 'p1', owner: 'player_one', row: 3, col: 2, king: false }])
     expect(result.move.captures).toHaveLength(1)
     expect(result.state.stats.player_one.captures).toBe(1)
+    expect(result.state.turn).toBe('player_one')
+  })
+
+  it('keeps the winning player as the final turn when black captures the last piece', () => {
+    const state = board([
+      { id: 'p2', owner: 'player_two', row: 2, col: 1, king: false },
+      { id: 'p1', owner: 'player_one', row: 3, col: 2, king: false },
+    ], 'player_two')
+    const result = applyMove(state, 'player_two', 'p2', [{ row: 2, col: 1 }, { row: 4, col: 3 }])
+    expect(result.state).toMatchObject({ turn: 'player_two', winner: 'player_two', loser: 'player_one', winReason: 'all_pieces_captured' })
+    expect(() => validateMove(result.state, 'player_two', 'p2', [{ row: 4, col: 3 }, { row: 5, col: 4 }])).toThrow()
+  })
+
+  it('keeps the winning turn when a move blocks every opponent move', () => {
+    const state = board([
+      { id: 'king', owner: 'player_one', row: 6, col: 3, king: true },
+      { id: 'block-left', owner: 'player_one', row: 7, col: 0, king: false },
+      { id: 'block-jump', owner: 'player_one', row: 5, col: 2, king: false },
+      { id: 'p2', owner: 'player_two', row: 6, col: 1, king: false },
+    ])
+    const result = applyMove(state, 'player_one', 'king', [{ row: 6, col: 3 }, { row: 7, col: 2 }])
+    expect(result.state).toMatchObject({ turn: 'player_one', winner: 'player_one', loser: 'player_two', winReason: 'no_legal_moves' })
   })
 
   it('mandatory capture blocks a normal move', () => {

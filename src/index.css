@@ -1702,6 +1702,87 @@ html, body, #root {
   }
 }
 
+.checkers-picker-overlay {
+  padding: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom)) max(0.75rem, env(safe-area-inset-left));
+}
+
+.checkers-picker-overlay > [role='dialog'] {
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Keep all eight portraits, confirmation and result statistics in landscape. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .checkers-board-dialog,
+  .checkers-character-dialog {
+    max-width: 56rem;
+    padding: 0.75rem;
+  }
+
+  .checkers-picker-overlay h2 {
+    font-size: 1.25rem;
+    line-height: 1.25;
+  }
+
+  .checkers-board-choice {
+    display: grid;
+    grid-template-columns: min(18vw, 7rem) minmax(0, 1fr);
+    grid-template-rows: 1fr 1fr;
+    column-gap: 0.75rem;
+    padding: 0.5rem;
+  }
+
+  .checkers-board-choice > :first-child {
+    grid-row: 1 / 3;
+  }
+
+  .checkers-board-choice > span {
+    margin-top: 0;
+    align-self: center;
+  }
+
+  .checkers-character-picker {
+    padding: 0.5rem;
+  }
+
+  .checkers-character-picker > p {
+    display: none; /* The dialog header already names this step. */
+  }
+
+  .checkers-character-picker > div {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 0.375rem;
+  }
+
+  .checkers-character-picker button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .checkers-character-dialog > :last-child {
+    margin-top: 0.5rem;
+  }
+
+  .checkers-result-card {
+    display: grid;
+    grid-template-columns: 30% minmax(0, 1fr);
+    max-width: 48rem;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+
+  .checkers-result-card > img {
+    height: 100%;
+    min-height: 0;
+    object-fit: contain;
+  }
+
+  .checkers-result-card > div {
+    padding: 0.75rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -3877,3 +3958,14 @@ html[data-comfort-contrast='high'] {
     opacity: 1;
   }
 }
+
+/* Invisible left-side camera gestures overlay the full-width 3D room. */
+[data-checkers-renderer] { --checkers-camera-width: clamp(112px, 22%, 240px); }
+.checkers-camera-surface { position: absolute; z-index: 2; inset: 0 auto 0 0; width: var(--checkers-camera-width); touch-action: none; user-select: none; -webkit-user-select: none; background: transparent; border: 0; }
+.checkers-camera-surface:focus-visible { outline: 2px solid #f0d381; outline-offset: -4px; }
+.checkers-camera-surface[aria-disabled='true'] { pointer-events: none; }
+.checkers-player-viewport { position: absolute; inset: 0; }
+.checkers-corner-controls { position: absolute; z-index: 10; top: max(.5rem, env(safe-area-inset-top)); right: max(.5rem, env(safe-area-inset-right)); display: flex; gap: .3rem; }
+.checkers-corner-controls button { display: flex; align-items: center; justify-content: center; background: #100c09e8; border-radius: 50%; }
+.checkers-camera-help { position: absolute; z-index: 11; top: .5rem; right: max(.5rem, env(safe-area-inset-right)); width: min(23rem, calc(100% - 1rem)); max-height: calc(100% - 1rem); overflow: auto; border: 1px solid #b9934c66; border-radius: .75rem; background: #100c09; color: #d2c3a8; padding: .75rem; box-shadow: 0 12px 40px #0008; font-size: .8rem; }
+.checkers-camera-help p { margin: .6rem 0; }

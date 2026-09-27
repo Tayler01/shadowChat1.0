@@ -55,14 +55,14 @@
     if (!['slide', 'place', 'capture', 'crown'].includes(cue) || !enabled || paused || disposed || active.size > 5) return
     if (cue === 'slide') {
       // Some moves are lifted cleanly; avoid the same scrape on every move.
-      if (Math.random() < .72) source(buffers.get('stone-slide'), .20 + Math.random() * .035, .92 + Math.random() * .14)
+      if (Math.random() < .55) source(buffers.get('stone-slide'), .09 + Math.random() * .02, .98 + Math.random() * .06)
       return
     }
     let index = Math.floor(Math.random() * 3)
     if (index >= lastVariant && lastVariant >= 0) index++
     lastVariant = index
-    const gain = cue === 'crown' ? .32 : cue === 'capture' ? .18 : .25
-    source(buffers.get(`stone-place-${index}`), gain * (.9 + Math.random() * .15), (cue === 'crown' ? .85 : .97) + Math.random() * .06)
+    const gain = cue === 'crown' ? .28 : cue === 'capture' ? .17 : .23
+    source(buffers.get(`stone-place-${index}`), gain * (.92 + Math.random() * .12), .98 + Math.random() * .04)
   }
   window.ShadowStudyAudio = {
     configure, unlock, play,

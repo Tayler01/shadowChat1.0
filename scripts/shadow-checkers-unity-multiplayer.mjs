@@ -58,6 +58,8 @@ try {
     const context = await browser.newContext({ ...(iphone ? devices['iPhone 13'] : android ? devices['Pixel 7'] : { viewport: { width: 1360, height: 1000 } }), serviceWorkers: 'block' })
     await context.addInitScript(({ key, session }) => { localStorage.setItem(key, JSON.stringify(session)) }, { key: `sb-${ref}-auth-token`, session: account.session })
     const page = await context.newPage()
+    page.setDefaultTimeout(45000)
+    page.setDefaultNavigationTimeout(45000)
     pages.push(page)
     await page.addInitScript(() => {
       window.__checkersProjection = null
@@ -85,8 +87,16 @@ try {
     await page.waitForFunction(() => window.__checkersProjection?.squares?.length === 64)
     await page.waitForFunction(() => window.__checkersEvents.some(e => e.type === 'cinematic' && e.busy === false))
   }
-  const clickSquare = async (page, row, col) => {
+  const foregroundPlayer = async page => {
     await page.bringToFront()
+    // Release notes can arrive after Unity finishes loading. Closing them and
+    // allowing the hidden player to resume prevents a lost first touch.
+    const releaseClose = page.getByRole('button', { name: 'Close update notes', exact: true })
+    if (await releaseClose.isVisible().catch(() => false)) await releaseClose.click()
+    await page.waitForTimeout(750)
+  }
+  const clickSquare = async (page, row, col) => {
+    await foregroundPlayer(page)
     await page.locator('iframe[title="Shadow Checkers 3D board"]').scrollIntoViewIfNeeded()
     const point = await page.evaluate(({ row, col }) => window.__checkersProjection.squares.find(p => p.row === row && p.col === col), { row, col })
     const bounds = await page.locator('iframe[title="Shadow Checkers 3D board"]').boundingBox()
@@ -137,9 +147,11 @@ try {
   report.checks.push('Temporary match chat reached the other player')
   for(const page of pages) {
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Page overflows phone width')
-    await page.bringToFront()
+    await foregroundPlayer(page)
     await page.getByRole('button', {name:'Close match chat',exact:true}).click()
+    await page.getByRole('button', { name: 'Camera help', exact: true }).click()
     await page.getByRole('button',{name:'Overhead',exact:true}).click()
+    await page.getByRole('button', { name: 'Camera help', exact: true }).click()
     await page.getByRole('button',{name:'Reset table camera',exact:true}).click()
     await page.waitForTimeout(800)
     if (screenshots) await page.screenshot({path:`${output}/study-${pages.indexOf(page)+1}.png`})
@@ -152,11 +164,13 @@ try {
   report.error = error.message
   for (const [index, page] of pages.entries()) {
     if (screenshots) await page.screenshot({ path: `${output}/failure-player-${index + 1}.png`, fullPage: true }).catch(() => {})
-    await writeFile(`${output}/failure-player-${index + 1}.json`, JSON.stringify(await page.evaluate(() => ({events:window.__checkersEvents, text:document.body.innerText}))))
+    const failure = await page.evaluate(() => ({ events: window.__checkersEvents, text: document.body.innerText }))
+      .catch(() => ({ unavailable: 'Page closed before failure capture' }))
+    await writeFile(`${output}/failure-player-${index + 1}.json`, JSON.stringify(failure))
   }
   throw error
 } finally {
-  await browser?.close()
+  await browser?.close().catch(() => {})
   if (created?.sessionId) {
     const deletion = await admin.from('game_sessions').delete().eq('id', created.sessionId)
     if (deletion.error) report.cleanupError = deletion.error.message

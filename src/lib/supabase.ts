@@ -1500,6 +1500,7 @@ export interface GameSessionPresence {
 export interface ShadowCheckersMatch {
   id: string
   session_id: string
+  continuation_match_id?: string | null
   status: ShadowCheckersMatchStatus
   player_one_id: string
   player_two_id?: string | null

@@ -1,6 +1,6 @@
 {
-  "loaderUrl": "Build/c88f4d6d0f167d809f2c59ebff17026e.loader.js",
-  "dataUrl": "Build/f7c60571bb7192567d88c37c9bf16320.data.unityweb",
-  "frameworkUrl": "Build/98d5c21ca69cfbe7c68071ec403570fe.framework.js.unityweb",
-  "codeUrl": "Build/e75b8be9880d68277db2ff347ddfda70.wasm.unityweb"
+    "loaderUrl": "Build/78251175bc9e332e40e4f65df13c80db.loader.js?v=ad408d8c0dfa4369ad21386261f53f7bcf47d2a94b976b2bc38b29d2ee5056a7",
+    "dataUrl": "Build/b466c9daf70de56e59c726f091045bf6.data.unityweb?v=892298922975ab39fd2f009906878654e66936384045bf30e489520fd7af4133",
+    "frameworkUrl": "Build/6c975c47763daceb4dcd52b666bb356c.framework.js.unityweb?v=3462c93bb39a7c3293ddf54a0b4b526397af709651abb4d3cb6b57576ab5e0dc",
+    "codeUrl": "Build/4580f15bc1ab0bec0c8d9ae3927ea5c3.wasm.unityweb?v=afc5800b6179b0b6c50290e9cf992dd6155f03d9be0fa6571e10879c9636bdbd"
 }

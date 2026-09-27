@@ -7,10 +7,23 @@ public class PlanarBoardReflection : MonoBehaviour
     Camera source, mirror;
     RenderTexture texture;
     bool rendering;
+    readonly Plane[] viewPlanes=new Plane[6];
+    // Only the two tile meshes sample this texture. Include their bevels and
+    // a small margin so reflection rendering resumes before an edge is visible.
+    static readonly Bounds reflectiveBoard=new Bounds(new Vector3(0,.175f,0),new Vector3(8.3f,.3f,8.3f));
+    bool BoardInView()
+    {
+        GeometryUtility.CalculateFrustumPlanes(source,viewPlanes);
+        return GeometryUtility.TestPlanesAABB(viewPlanes,reflectiveBoard);
+    }
     void OnEnable() { source=GetComponent<Camera>(); }
     void OnPreCull()
     {
         if(rendering || source==null) return;
+        if(!BoardInView()) {
+            Shader.SetGlobalFloat("_HasBoardReflection",0);
+            return;
+        }
         if(mirror==null)
         {
             var o=new GameObject("Board reflection camera"); o.hideFlags=HideFlags.HideAndDontSave;

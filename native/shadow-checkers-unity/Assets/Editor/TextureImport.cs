@@ -7,7 +7,12 @@ public class TextureImport : AssetPostprocessor
         if(!assetPath.StartsWith("Assets/Resources/Models/")) return;
         var model=(ModelImporter)assetImporter;
         model.meshCompression=ModelImporterMeshCompression.Medium;
-        model.isReadable=assetPath.Contains("Token");
+        // Keep small wax rims and embossed lettering intact across room-sized bounds.
+        if(assetPath.Contains("StudyMetals") || assetPath.Contains("StudyLeather") || assetPath.Contains("StudyPaper") || assetPath.Contains("StudyMaps") || assetPath.Contains("StudyBindings") || assetPath.Contains("StudyStone"))
+            model.meshCompression=ModelImporterMeshCompression.Low;
+        if(assetPath.Contains("StudyWax"))
+            model.meshCompression=ModelImporterMeshCompression.Off;
+        model.isReadable=assetPath.Contains("Token") || assetPath.Contains("BoardTile");
         model.importAnimation=false;model.importCameras=false;model.importLights=false;
         model.materialImportMode=ModelImporterMaterialImportMode.None;
     }
@@ -22,8 +27,17 @@ public class TextureImport : AssetPostprocessor
         // Keep the 2K source/native imports; constrain the downloaded web runtime.
         var web=texture.GetPlatformTextureSettings("WebGL");
         web.name="WebGL"; web.overridden=true;
-        web.maxTextureSize=assetPath.Contains("Lightmap")?2048:assetPath.Contains("Rough") || assetPath.Contains("SilverMarble")?512:1024;
-        web.format=TextureImporterFormat.Automatic;
+        // Foreground maps/books have dedicated detail now; the remaining small
+        // furnishings no longer need a 2K lighting atlas.
+        bool detailedAtlas=assetPath.Contains("StudyArchitectureLightmap") || assetPath.Contains("BookSpines") || assetPath.Contains("StudyMap");
+        bool fineNormal=assetPath.Contains("Rough") || assetPath.Contains("SilverMarble") || assetPath.Contains("OakNormal") || assetPath.Contains("HearthStoneNormal");
+        web.maxTextureSize=detailedAtlas?2048:fineNormal?512:1024;
+        // One shared, mipmapped grain map for the table folios and library.
+        if(assetPath.Contains("LeatherRough")) web.maxTextureSize=256;
+        if(assetPath.Contains("StudyPortrait")) web.maxTextureSize=512;
+        // Preserve resolution with a mobile-native format. Desktop browsers that
+        // lack ASTC use Unity's decoded fallback; verify that path in browser QA.
+        web.format=TextureImporterFormat.ASTC_6x6;
         web.textureCompression=TextureImporterCompression.CompressedHQ;
         texture.SetPlatformTextureSettings(web);
     }

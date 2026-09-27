@@ -31,13 +31,28 @@ public static class ShadowCheckersBuild
         AssetDatabase.SaveAssets();
     }
     [MenuItem("ShadowChat/Build Web")]
+    public static void BuildWebFromMenu()
+    {
+        SessionState.EraseString("ShadowCheckersBuildRequest");
+        BuildWeb();
+    }
     public static void BuildWeb()
     {
+        // MCP can retry a long command after its response times out. Keep the
+        // request guard inside the build entry point, across assembly reloads.
+        // A deliberate retry uses a new request id; menu/batch builds need none.
+        string request=SessionState.GetString("ShadowCheckersBuildRequest","");
+        if(request.Length>0) {
+            if(SessionState.GetString("ShadowCheckersBuildStarted","")==request) return;
+            SessionState.SetString("ShadowCheckersBuildStarted",request);
+        }
         string statusRoot=Path.GetFullPath(Path.Combine(Application.dataPath,"../../../output/shadow-checkers-unity"));
         Directory.CreateDirectory(statusRoot);string marker=Path.Combine(statusRoot,"build.running");
         File.WriteAllText(marker,DateTime.UtcNow.ToString("O"));
         try {
         foreach(var path in Directory.GetFiles("Assets/Resources/Textures","*.jpg"))
+            AssetDatabase.ImportAsset(path.Replace('\\','/'),ImportAssetOptions.ForceUpdate);
+        foreach(var path in Directory.GetFiles("Assets/Resources/Textures","*.png"))
             AssetDatabase.ImportAsset(path.Replace('\\','/'),ImportAssetOptions.ForceUpdate);
         foreach(var path in Directory.GetFiles("Assets/Resources/Models","*.fbx"))
             AssetDatabase.ImportAsset(path.Replace('\\','/'),ImportAssetOptions.ForceUpdate);
@@ -47,8 +62,14 @@ public static class ShadowCheckersBuild
         PlayerSettings.companyName="ShadowChat";
         PlayerSettings.productName="Shadow Checkers";
         PlayerSettings.colorSpace=ColorSpace.Linear;
-        PlayerSettings.WebGL.compressionFormat=WebGLCompressionFormat.Gzip;
+        // Lossless delivery compression keeps the detailed study within the app
+        // download budget. Retain fallback for local previews without CDN headers.
+        PlayerSettings.WebGL.compressionFormat=WebGLCompressionFormat.Brotli;
         PlayerSettings.WebGL.decompressionFallback=true;
+        // Unity 6 Personal permits an optional splash. The host already supplies
+        // the themed loading screen, so avoid a second splash and its texture.
+        PlayerSettings.SplashScreen.show=false;
+        PlayerSettings.SplashScreen.showUnityLogo=false;
         PlayerSettings.WebGL.nameFilesAsHashes=true;
         PlayerSettings.WebGL.initialMemorySize=64;
         PlayerSettings.WebGL.maximumMemorySize=256;
@@ -67,16 +88,51 @@ public static class ShadowCheckersBuild
         string root=Path.GetFullPath(Path.Combine(Application.dataPath,"../../.."));
         string destination=Path.Combine(root,"public/games/shadow-checkers/unity");
         var report=BuildPipeline.BuildPlayer(new BuildPlayerOptions {scenes=new[]{"Assets/Scenes/ShadowCheckers.unity"},target=BuildTarget.WebGL,locationPathName=destination,options=BuildOptions.None});
-        if(report.summary.result!=BuildResult.Succeeded) throw new Exception("Unity build failed: "+report.summary.result);
-        var files=Directory.GetFiles(Path.Combine(destination,"Build")).Select(Path.GetFileName).ToArray();
-        Func<string,string> asset=suffix=>"Build/"+files.Single(name=>name.EndsWith(suffix));
-        File.WriteAllText(Path.Combine(destination,"build-manifest.json"),JsonUtility.ToJson(new WebManifest {
-            loaderUrl=asset(".loader.js"),dataUrl=asset(".data.unityweb"),frameworkUrl=asset(".framework.js.unityweb"),codeUrl=asset(".wasm.unityweb")
-        },true));
-        Directory.CreateDirectory(Path.Combine(root,"output/shadow-checkers-unity"));
-        File.WriteAllText(Path.Combine(root,"output/shadow-checkers-unity/build.json"),"{\"result\":\"Succeeded\",\"bytes\":"+report.summary.totalSize+"}");
-        Debug.Log("SHADOW_CHECKERS_WEB_BUILD_SUCCEEDED");
+        PublishWebManifest(report);
         } finally {File.Delete(marker);}
+    }
+
+    // Can finish a successful compilation if a file lock interrupted packaging.
+    // Replacing the file avoids truncating a manifest mapped by the preview server.
+    public static void PublishWebManifest(BuildReport report)
+    {
+        if(report==null) throw new Exception("No completed Unity build report");
+        if(report.summary.result!=BuildResult.Succeeded) throw new Exception("Unity build failed: "+report.summary.result);
+        string root=Path.GetFullPath(Path.Combine(Application.dataPath,"../../.."));
+        string destination=Path.Combine(root,"public/games/shadow-checkers/unity");
+        if(report.summary.platform!=BuildTarget.WebGL || !string.Equals(Path.GetFullPath(report.summary.outputPath).Replace('\\','/').TrimEnd('/'),destination.Replace('\\','/').TrimEnd('/'),StringComparison.OrdinalIgnoreCase))
+            throw new Exception("Latest build is not the Shadow Checkers web player");
+        var files=Directory.GetFiles(Path.Combine(destination,"Build")).Select(Path.GetFileName).ToArray();
+        // Unity hashes the uncompressed input, so gzip and Brotli can otherwise
+        // reuse a cache URL. Version the bytes actually delivered to the browser.
+        Func<string,string> asset=suffix=> {
+            string name=files.Single(file=>file.EndsWith(suffix));
+            using(var sha=System.Security.Cryptography.SHA256.Create())
+            using(var stream=File.OpenRead(Path.Combine(destination,"Build",name)))
+                return "Build/"+name+"?v="+BitConverter.ToString(sha.ComputeHash(stream)).Replace("-","").ToLowerInvariant();
+        };
+        var manifest=new WebManifest {
+            loaderUrl=asset(".loader.js"),dataUrl=asset(".data.unityweb"),frameworkUrl=asset(".framework.js.unityweb"),codeUrl=asset(".wasm.unityweb")
+        };
+        WriteAtomically(Path.Combine(destination,"build-manifest.json"),JsonUtility.ToJson(manifest,true));
+        string indexPath=Path.Combine(destination,"index.html"),index=File.ReadAllText(indexPath);
+        foreach(string url in new[]{manifest.loaderUrl,manifest.dataUrl,manifest.frameworkUrl,manifest.codeUrl}) {
+            string versioned=url.Substring("Build/".Length),name=versioned.Split('?')[0];
+            index=System.Text.RegularExpressions.Regex.Replace(index,System.Text.RegularExpressions.Regex.Escape(name)+@"(?:\?v=[a-f0-9]+)?",versioned);
+        }
+        WriteAtomically(indexPath,index);
+        Directory.CreateDirectory(Path.Combine(root,"output/shadow-checkers-unity"));
+        WriteAtomically(Path.Combine(root,"output/shadow-checkers-unity/build.json"),"{\"result\":\"Succeeded\",\"bytes\":"+report.summary.totalSize+"}");
+        Debug.Log("SHADOW_CHECKERS_WEB_BUILD_SUCCEEDED");
+    }
+
+    static void WriteAtomically(string path,string content)
+    {
+        string pending=path+"."+Guid.NewGuid().ToString("N")+".tmp";
+        try {
+            File.WriteAllText(pending,content);
+            if(File.Exists(path)) File.Replace(pending,path,null); else File.Move(pending,path);
+        } finally {if(File.Exists(pending)) File.Delete(pending);}
     }
 
     [MenuItem("ShadowChat/Preview game")]

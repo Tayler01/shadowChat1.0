@@ -193,6 +193,7 @@ export function applyMove(state: CheckersBoardState, player: CheckersPlayer, pie
 
   const nextState: CheckersBoardState = {
     ...nextStateBase,
+    turn: winner ? player : nextPlayer,
     winner,
     loser,
     winReason,
