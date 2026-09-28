@@ -130,6 +130,15 @@
 .checkers-invite-accepted button,
 .checkers-invite-unavailable button { min-height: 44px; padding: 8px 10px; color: #f7dfb0; background: transparent; border: 1px solid #76654b; border-radius: 6px; cursor: pointer; }
 
+@media (orientation: landscape) {
+  body:has(.shadow-checkers-match-surface) .checkers-invite-accepted {
+    top: max(12px, env(safe-area-inset-top));
+    right: auto;
+    bottom: auto;
+    left: max(12px, env(safe-area-inset-left));
+  }
+}
+
 @media (max-height: 450px) and (min-width: 600px) {
   .checkers-invite-backdrop { padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
   .checkers-invite-card {

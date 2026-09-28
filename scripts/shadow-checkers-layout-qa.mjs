@@ -13,12 +13,15 @@ await writeFile(`${output}/index.html`, `<!doctype html><html><head><meta name="
 await writeFile(`${output}/fixture.tsx`, `
 import React from 'react'
 import { createRoot } from 'react-dom/client'
+import { createPortal } from 'react-dom'
 import { ShadowCheckersScreen } from '/src/features/games/shadow-checkers/ShadowCheckersScreen'
 import { ComfortProvider } from '/src/hooks/useComfortPreferences'
 import { createInitialBoard, serializeBoard } from '/src/features/games/shadow-checkers/engine/checkers'
 import '/src/index.css'
+import '/src/features/games/shadow-checkers/components/shadow-checkers-invitations.css'
 const result = new URLSearchParams(location.search).has('result')
 const active = new URLSearchParams(location.search).has('active')
+const accepted = new URLSearchParams(location.search).has('accepted')
 const waiting = new URLSearchParams(location.search).has('waiting')
 const playerOne = { id:'player-one', username:'player_one', display_name:'Player One' }
 const playerTwo = { id:'player-two', username:'player_two', display_name:'Player Two' }
@@ -28,7 +31,7 @@ const match = { id:'match-1', session_id:'session-1', status:result?'completed':
 window.fixtureCalls=[]
 window.failNextChat=false
 window.checkersFixture={sessions:[],matches:waiting?[match]:active||result?[]:[match,{...match,id:'match-2'},{...match,id:'match-3'}],activeMatch:result||active?match:null,queue:[],moves:[],chat:[1,2,3,4,5].map(index=>({id:'chat-'+index,user:playerTwo,body:'Message '+index})),leaderboard:[1,2,3,4,5].map(index=>({user_id:'rank-'+index,wins:6-index,losses:index,total_games:6,user:{display_name:'Rank '+index}})),selectedMatchId:result||active?match.id:null,loading:false,busy:null,error:null,actions:Object.fromEntries(['create','join','submitMove','resign','cancel','queue','leaveQueue','rematch','nextChallenger','postChat','selectMatch'].map(action=>[action,async(...args)=>{window.fixtureCalls.push({action,args});if(action==='postChat'&&window.failNextChat){window.failNextChat=false;throw new Error('Connection lost')}}]))}
-createRoot(document.getElementById('root')).render(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+createRoot(document.getElementById('root')).render(<ComfortProvider><ShadowCheckersScreen />{accepted && createPortal(<div className="checkers-invite-accepted" role="status"><span>Player Two joined your Shadow Checkers match.</span><button type="button">Open match</button><button type="button" aria-label="Dismiss match notice">×</button></div>,document.body)}</ComfortProvider>)
 `)
 const report = { engine, inspect, scope:'Real interface; mocked auth, match data, actions and Unity frame. No backend/gameplay/performance proof.', profiles:[], errors:[] }
 const browser = await (engine === 'webkit' ? webkit : chromium).launch({ headless:false })
@@ -44,8 +47,8 @@ try {
         ['src/features/games/shadow-checkers/hooks/useShadowCheckersInvitations.ts','export function useShadowCheckersInvitations(){return {eligibleUsers:[{user_id:"player-two",display_name:"Player Two"}],outgoing:[],busy:null,error:null,send:async(...args)=>{window.fixtureCalls.push({action:"invite",args});return {direction:"outgoing"}},cancel:async()=>{}}}'],
       ]) await context.route(`**/${path}*`, route=>route.fulfill({contentType:'text/javascript',body}))
       await context.route('**/games/shadow-checkers/unity/frame.html*', route=>route.fulfill({contentType:'text/html',body:`<!doctype html><body style="background:#19160f;color:#b9a16f">Isolated layout fixture<script>
-        addEventListener('message',event=>{if(event.origin===location.origin && event.data?.type==='snapshot')parent.postMessage({version:1,type:'presented',revision:event.data.value.revision},location.origin)})
-        setTimeout(()=>parent.postMessage({version:1,type:'ready'},location.origin),${branding ? 1500 : 0})
+        addEventListener('message',event=>{if(event.origin!==location.origin)return;if(event.data?.type==='snapshot')parent.postMessage({version:1,type:'presented',revision:event.data.value.revision},location.origin);if(event.data?.type==='camera'&&event.data.value==='reset')parent.postMessage({version:1,type:'cinematic',busy:false},location.origin)})
+        setTimeout(()=>{parent.postMessage({version:1,type:'ready'},location.origin);setTimeout(()=>parent.postMessage({version:1,type:'cinematic',busy:true,stage:'intro'},location.origin),50)},${branding ? 1500 : 0})
       </script></body>`}))
       await context.addInitScript(scale=>localStorage.setItem('shadowchat:comfort-preferences:v1',JSON.stringify({textScale:scale})),profile.scale)
       const page = await context.newPage()
@@ -149,7 +152,19 @@ try {
       await page.waitForFunction(()=>window.fixtureCalls.some(call=>call.action==='create'))
       entry.create=await page.evaluate(()=>window.fixtureCalls.find(call=>call.action==='create'))
       assert.deepEqual(entry.create.args,['cinder-crown','cinematic'])
-      await page.goto(`http://127.0.0.1:4195/${output}/index.html?active=1`)
+      await page.goto(`http://127.0.0.1:4195/${output}/index.html?active=1${profile.width===915?'&accepted=1':''}`)
+      if (profile.width===915) {
+        const acceptedNotice=page.locator('.checkers-invite-accepted')
+        const skip=page.getByRole('button',{name:'Skip room reveal'})
+        await acceptedNotice.waitFor()
+        await skip.waitFor()
+        await measure(acceptedNotice.getByRole('button',{name:'Open match'}),'accepted match action',true)
+        await measure(skip,'Skip room reveal despite accepted toast',true)
+        const noticeBox=await acceptedNotice.boundingBox(),skipBox=await skip.boundingBox()
+        assert(noticeBox && skipBox && noticeBox.y+noticeBox.height<skipBox.y,'accepted toast must clear bottom-right Skip control')
+        await skip.click()
+        await skip.waitFor({state:'hidden'})
+      }
       if (branding && profile.width === 667 && profile.scale === 130) {
         await page.getByRole('img',{name:'Shadow Checkers'}).evaluate(img=>img.decode())
         await page.getByText('Preparing your table').waitFor()
