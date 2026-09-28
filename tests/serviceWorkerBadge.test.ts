@@ -479,6 +479,39 @@ describe('service worker app badge handling', () => {
     expect(closeOther).not.toHaveBeenCalled()
   })
 
+  it('closes a v2 Shadow Checkers turn by its entity id and exact event id', async () => {
+    const { listeners, notifications } = loadServiceWorker()
+    const closeRequested = jest.fn()
+    const closeNewerTurn = jest.fn()
+    const pending: Promise<unknown>[] = []
+
+    notifications.push(
+      {
+        close: closeRequested,
+        data: { eventId: 'event-a', entityId: 'match-a', type: 'shadow_checkers_turn' },
+        tag: 'checkers:match-a',
+      },
+      {
+        close: closeNewerTurn,
+        data: { eventId: 'event-b', entityId: 'match-a', type: 'shadow_checkers_turn' },
+        tag: 'checkers:match-a',
+      },
+    )
+    listeners.message({
+      data: {
+        eventId: 'event-a',
+        matchId: 'match-a',
+        notificationType: 'shadow_checkers_turn',
+        type: 'SHADOWCHAT_NOTIFICATIONS_CLEAR',
+      },
+      waitUntil: (task: Promise<unknown>) => pending.push(task),
+    })
+
+    await Promise.allSettled(pending)
+    expect(closeRequested).toHaveBeenCalledTimes(1)
+    expect(closeNewerTurn).not.toHaveBeenCalled()
+  })
+
   it('closes only notifications for the Shado Live room that was opened', async () => {
     const { listeners, notifications } = loadServiceWorker()
     const closeRequested = jest.fn()

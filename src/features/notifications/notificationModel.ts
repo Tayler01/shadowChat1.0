@@ -138,6 +138,14 @@ const getFallbackRoute = (
       item: matchId,
     }).toString()}`
   }
+  if (event.type === 'shadow_checkers_invite') {
+    const invitationId = asString(payload.invite_id ?? payload.invitation_id) ?? event.entity_id
+    return `/?${new URLSearchParams({
+      view: 'games',
+      experience: 'shadow-checkers',
+      invite: invitationId,
+    }).toString()}`
+  }
   return '/?view=catchup'
 }
 
@@ -170,6 +178,7 @@ const getDefaultTitle = (
       return asString(payload.opponent_name)
         ? `Your move against ${asString(payload.opponent_name)}`
         : 'Your move in Shadow Checkers'
+    case 'shadow_checkers_invite': return `${actor} invited you to Shadow Checkers`
     default: return 'New ShadowChat update'
   }
 }
@@ -214,6 +223,8 @@ export const isNotificationPresentationCandidate = (
   visibleSinceMs: number,
   nowMs = Date.now(),
 ) => {
+  // The invitation host presents Join/Decline; the generic banner would be a duplicate.
+  if (event.type === 'shadow_checkers_invite') return false
   if (
     event.read_at ||
     event.presented_at ||
@@ -323,6 +334,7 @@ export const isNotificationTypeEnabled = (
     case 'shado_live_participant_removed':
       return preferences.shado_live_in_app_enabled !== false
     case 'shadow_checkers_turn': return preferences.checkers_turn_enabled !== false
+    case 'shadow_checkers_invite': return true
     default: return false
   }
 }

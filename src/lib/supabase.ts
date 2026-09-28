@@ -1411,6 +1411,24 @@ export type ShadowCheckersPlayerSlot = 'player_one' | 'player_two'
 export type ShadowCheckersMatchStatus = 'waiting' | 'active' | 'completed' | 'cancelled'
 export type ShadowCheckersBoardSkin = 'classic' | 'cinematic'
 export type ShadowCheckersWinReason = 'all_pieces_captured' | 'no_legal_moves' | 'resignation'
+export type ShadowCheckersInvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled'
+
+export interface ShadowCheckersInvitation {
+  id: string
+  inviter_id: string
+  invitee_id: string
+  inviter_character_key: string
+  board_skin: ShadowCheckersBoardSkin
+  status: ShadowCheckersInvitationStatus
+  session_id: string | null
+  match_id: string | null
+  expires_at: string
+  created_at: string
+  updated_at: string
+  responded_at: string | null
+  inviter?: BasicUser | null
+  invitee?: BasicUser | null
+}
 
 export interface GameSession {
   id: string

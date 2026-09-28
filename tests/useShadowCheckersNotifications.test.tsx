@@ -2,7 +2,11 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { useShadowCheckers } from '../src/features/games/shadow-checkers/hooks/useShadowCheckers'
 
 const mockTriggerTurnPush = jest.fn(async (_matchId: string) => ({ deliveredCount: 1 }))
-const mockMarkTurnRead = jest.fn(async (_matchId: string) => undefined)
+const mockMarkTurnRead = jest.fn(async (
+  _matchId: string,
+  _moveCount: number,
+  _isCurrent: () => boolean,
+) => undefined)
 const mockRequestBadgeRefresh = jest.fn()
 const mockCreate = jest.fn(async () => ({ sessionId: 'session-1', matchId: 'match-1' }))
 const mockJoin = jest.fn(async (_sessionId: string, _characterKey: string) => ({ sessionId: 'session-1', matchId: 'match-1' }))
@@ -76,7 +80,8 @@ jest.mock('../src/features/games/shadow-checkers/api/shadowCheckersApi', () => (
   rematchShadowCheckersMatch: (matchId: string) => mockRematch(matchId),
   startShadowCheckersNextChallenger: (matchId: string) => mockNextChallenger(matchId),
   postShadowCheckersChatMessage: jest.fn(async () => ({})),
-  markShadowCheckersTurnRead: (matchId: string) => mockMarkTurnRead(matchId),
+  markShadowCheckersTurnRead: (matchId: string, moveCount: number, isCurrent: () => boolean) =>
+    mockMarkTurnRead(matchId, moveCount, isCurrent),
 }))
 
 describe('Shadow Checkers notification integration', () => {
@@ -90,9 +95,26 @@ describe('Shadow Checkers notification integration', () => {
     renderHook(() => useShadowCheckers('match-1'))
 
     await waitFor(() => {
-      expect(mockMarkTurnRead).toHaveBeenCalledWith('match-1')
+      expect(mockMarkTurnRead).toHaveBeenCalledWith('match-1', 4, expect.any(Function))
       expect(mockRequestBadgeRefresh).toHaveBeenCalled()
     })
+  })
+
+  test('does not read a turn until the match tab becomes visible', async () => {
+    const originalVisibility = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    try {
+      const { result } = renderHook(() => useShadowCheckers('match-1'))
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      expect(mockMarkTurnRead).not.toHaveBeenCalled()
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      act(() => document.dispatchEvent(new Event('visibilitychange')))
+      await waitFor(() => expect(mockMarkTurnRead).toHaveBeenCalledWith(
+        'match-1', 4, expect.any(Function),
+      ))
+    } finally {
+      if (originalVisibility) Object.defineProperty(document, 'visibilityState', originalVisibility)
+    }
   })
 
   test('server-confirmed turn-changing actions request compatibility push delivery', async () => {

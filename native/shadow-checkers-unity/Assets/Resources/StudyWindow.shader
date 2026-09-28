@@ -10,6 +10,7 @@ Shader "ShadowChat/StudyWindow"
             #include "UnityCG.cginc"
             struct Input { float4 vertex:POSITION; float2 uv:TEXCOORD0; };
             half _Branch;
+            float _StudyTime;
             struct Varying { float4 position:SV_POSITION; float2 uv:TEXCOORD0; float3 world:TEXCOORD1; };
             Varying vert(Input v) {
                 Varying o; o.position=UnityObjectToClipPos(v.vertex); o.uv=v.uv; o.world=mul(unity_ObjectToWorld,v.vertex).xyz; return o;
@@ -30,6 +31,20 @@ Shader "ShadowChat/StudyWindow"
                 float2 edge=min(uv,1-uv);
                 float grime=smoothstep(0,.07,min(edge.x,edge.y*3.58));
                 sky*=lerp(.65,1,grime)*(1+wave*.02);
+                // Sparse exterior trails cross a pane over minutes. Both the
+                // position and the pause state come from the shared room clock.
+                float lane=floor(uv.x*13);
+                float seed=frac(sin(lane*127.17)*43758.5453);
+                float drift=frac(uv.x*13)-(.38+.24*seed+.012*sin(uv.y*22+seed*6));
+                float head=1.2-1.4*frac(_StudyTime/165+seed);
+                float relative=uv.y-head;
+                float footprintX=max(.018,fwidth(drift));
+                float footprintY=max(.018,fwidth(relative));
+                float droplet=exp(-pow(relative/footprintY,2));
+                float trail=smoothstep(.018,.08,relative)*(1-smoothstep(.24,.34,relative));
+                float width=exp(-pow(drift/footprintX,2))*saturate(.035/(footprintX+.001));
+                float wet=(droplet*.8+trail*.24)*width;
+                sky+=wet*float3(.018,.023,.028);
                 return half4(sky,1);
             }
             ENDCG

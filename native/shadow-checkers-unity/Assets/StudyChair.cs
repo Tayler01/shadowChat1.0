@@ -65,9 +65,14 @@ public sealed class StudyChair : MonoBehaviour
                         float dx=px-ButtonX(row,column),dy=py-(2.92f+row*.64f);
                         dent+=Mathf.Exp(-(dx*dx+dy*dy)/.038f)*.15f;
                     }
-                    float z=1.04f+(py-2.5f)*.085f+(side==0?-.10f-edge*.16f+dent:.13f);
+                    float fold=.018f*Mathf.Sin(py*13f+px*2.4f)*edge;
+                    float z=1.04f+(py-2.5f)*.085f+(side==0?-.10f-edge*.16f+dent+fold:.13f);
                     vertices.Add(new Vector3(px,py+.20f*Mathf.Sin(u*Mathf.PI)*v*v,z));
-                    uv.Add(new Vector2(u,v));colors.Add(tint*(.91f+.09f*edge));
+                    uv.Add(new Vector2(u,v));
+                    // Light catches cracked high spots and rubbed outer edges.
+                    float grain=.94f+.035f*Mathf.Sin(px*18.7f+py*11.3f)*Mathf.Sin(py*23.1f);
+                    float rubbed=1f+.18f*Mathf.Pow(1-edge,3);
+                    colors.Add(tint*grain*rubbed);
                     if(x<columns&&y<rows) {
                         int a=first+y*(columns+1)+x,b=a+1,c=a+columns+1,d=c+1;
                         indices.AddRange(side==0?new[]{a,c,b,b,c,d}:new[]{a,b,c,b,d,c});
@@ -135,10 +140,22 @@ public sealed class StudyChair : MonoBehaviour
         }
         foreach(float z in new[]{-1.04f,1.04f})frame.Box(new Vector3(0,1.94f,z),new Vector3(2.89f,.39f,.25f),.06f,oak,identity);
         frame.Box(new Vector3(0,.65f,0),new Vector3(2.84f,.14f,.14f),.04f,oak,identity);
+        // Narrow inset rails and carved stops give the frame depth without a
+        // separate draw call or dense sculpting across the chair silhouette.
+        foreach(float x in new[]{-1.44f,1.44f}) {
+            frame.Box(new Vector3(x,4.06f,.98f),new Vector3(.09f,2.60f,.075f),.024f,oak*.79f,Quaternion.Euler(5,0,0));
+            foreach(float y in new[]{2.60f,5.31f})
+                frame.Box(new Vector3(x,y,1.02f),new Vector3(.38f,.10f,.11f),.025f,oak,identity);
+        }
+        frame.Box(new Vector3(0,2.51f,.99f),new Vector3(2.68f,.09f,.10f),.025f,oak*.86f,identity);
         // Continuous curved molding, with a fine bead carved along its front.
         frame.Crest(oak,.14f,.18f,1.33f);frame.Crest(oak,.028f,.035f,1.155f);
         upholstery.Back(hide);
         upholstery.Box(new Vector3(0,2.19f,-.02f),new Vector3(2.85f,.38f,2.23f),.16f,hide,identity);
+        // Discrete welt seams follow the padded panel rather than printing a
+        // fabric grid over its surface.
+        foreach(float x in new[]{-1.32f,1.32f})
+            upholstery.Box(new Vector3(x,3.92f,.90f),new Vector3(.025f,2.55f,.025f),.008f,hide*1.28f,Quaternion.Euler(5,0,0));
         var button=new[]{new Vector2(.053f,0),new Vector2(.061f,.02f),new Vector2(.038f,.043f)};
         for(int row=0;row<4;row++)for(int column=0;column<3;column++) {
             float x=ButtonX(row,column),y=2.92f+row*.64f,u=(x+1.4f)/2.8f,v=(y-2.5f)/2.85f;

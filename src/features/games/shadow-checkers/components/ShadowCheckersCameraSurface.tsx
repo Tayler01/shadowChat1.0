@@ -35,7 +35,7 @@ export function ShadowCheckersCameraSurface({ disabled, onChange, onReset }: {
       if (disabled) return
       const rect = event.currentTarget.getBoundingClientRect()
       const delta = gesture.current.move(event.pointerId, { x: event.clientX, y: event.clientY }, rect.width, rect.height)
-      if (delta) { onChange({ ...delta, turn: (delta.turn ?? 0) * .35, tilt: (delta.tilt ?? 0) * .55 }); event.preventDefault() }
+      if (delta) { onChange({ ...delta, turn: (delta.turn ?? 0) * -.35, tilt: (delta.tilt ?? 0) * -.55 }); event.preventDefault() }
     }}
     onPointerUp={event => gesture.current.end(event.pointerId)}
     onPointerCancel={event => gesture.current.end(event.pointerId)}
@@ -43,7 +43,7 @@ export function ShadowCheckersCameraSurface({ disabled, onChange, onReset }: {
     onContextMenu={event => event.preventDefault()}
     onKeyDown={event => {
       if (disabled) return
-      const keys: Record<string, CameraDelta> = { ArrowLeft: { turn: -.04 }, ArrowRight: { turn: .04 }, ArrowUp: { tilt: -.025 }, ArrowDown: { tilt: .025 }, '+': { zoomRatio: .96 }, '=': { zoomRatio: .96 }, '-': { zoomRatio: 1.04 } }
+      const keys: Record<string, CameraDelta> = { ArrowLeft: { turn: .04 }, ArrowRight: { turn: -.04 }, ArrowUp: { tilt: .025 }, ArrowDown: { tilt: -.025 }, '+': { zoomRatio: .96 }, '=': { zoomRatio: .96 }, '-': { zoomRatio: 1.04 } }
       if (event.key === 'Home') { onReset(); event.preventDefault(); event.stopPropagation() }
       else if (keys[event.key]) { onChange(keys[event.key]); event.preventDefault(); event.stopPropagation() }
     }} />

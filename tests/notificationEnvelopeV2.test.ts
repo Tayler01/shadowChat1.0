@@ -76,6 +76,23 @@ const presentation = (
 })
 
 describe('notification envelope v2', () => {
+  test('brands Checkers invitations as a games notification with a decision action', () => {
+    const source = event({
+      type: 'shadow_checkers_invite',
+      category: 'games',
+      entity_id: '33333333-3333-4333-8333-333333333333',
+      route: '/?view=games&experience=shadow-checkers&invite=33333333-3333-4333-8333-333333333333',
+    })
+    const envelope = buildNotificationEnvelopeV2(source, presentation(source))
+    expect(envelope).toMatchObject({
+      category: 'shadow_checkers',
+      soundId: 'checkers_move',
+      androidChannelKey: 'games_v1',
+      badgeCategory: 'games',
+    })
+    expect(getNotificationPrimaryActionLabel(source.type)).toBe('Join or Decline')
+  })
+
   test('maps a DM into one canonical rich, actionable envelope', () => {
     const source = event()
     const envelope = buildNotificationEnvelopeV2(source, presentation(source))

@@ -61,6 +61,13 @@ import {
   markNotificationEventRead,
 } from './features/notifications/notificationApi'
 import { requestAppBadgeRefresh } from './lib/appBadge'
+import { ShadowCheckersInvitationsProvider } from './features/games/shadow-checkers/hooks/useShadowCheckersInvitations'
+
+const ShadowCheckersInviteHost = lazy(() =>
+  import('./features/games/shadow-checkers/components/ShadowCheckersInvitations').then(module => ({
+    default: module.ShadowCheckersInviteHost,
+  }))
+)
 
 const DirectMessagesView = lazy(() =>
   import('./components/dms/DirectMessagesView').then(module => ({
@@ -948,6 +955,8 @@ function App() {
     <SoundEffectsProvider>
       <NotificationCoordinatorProvider>
         <AuthGuard>
+          <ShadowCheckersInvitationsProvider>
+          <Suspense fallback={null}><ShadowCheckersInviteHost /></Suspense>
           <ClientResetProvider>
             <MessagesProvider>
               <HypeProvider>
@@ -957,6 +966,7 @@ function App() {
               </HypeProvider>
             </MessagesProvider>
           </ClientResetProvider>
+          </ShadowCheckersInvitationsProvider>
         </AuthGuard>
       <Toaster
       position={isDesktop ? 'top-right' : 'top-center'}

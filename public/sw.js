@@ -213,7 +213,15 @@ const notificationMatchesClearRequest = (notification, request) => {
     return false
   }
 
-  if (request.matchId && data.matchId !== request.matchId) {
+  if (request.matchId && (
+    data.matchId || (notificationType === 'shadow_checkers_turn' ? data.entityId : null)
+  ) !== request.matchId) {
+    return false
+  }
+
+  if (request.invitationId && (
+    data.invitationId || (notificationType === 'shadow_checkers_invite' ? data.entityId : null)
+  ) !== request.invitationId) {
     return false
   }
 
@@ -375,6 +383,8 @@ self.addEventListener('notificationclick', (event) => {
     }
   } else if (!envelopeV2 && data.type === 'shadow_checkers_turn' && data.matchId) {
     targetUrl = `/?view=games&experience=shadow-checkers&item=${encodeURIComponent(data.matchId)}`
+  } else if (!envelopeV2 && data.type === 'shadow_checkers_invite' && data.invitationId) {
+    targetUrl = `/?view=games&experience=shadow-checkers&invite=${encodeURIComponent(data.invitationId)}`
   }
   targetUrl = normalizeSameOriginRoute(targetUrl)
   if (action === 'mark_read') {

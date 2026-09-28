@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { GamesHome } from '../src/features/games/GamesHome'
+import { ComfortProvider } from '../src/hooks/useComfortPreferences'
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({ user: { id: 'user-1' } }),
@@ -39,7 +40,7 @@ jest.mock('../src/components/layout/MobileAppHeader', () => ({
 }))
 
 test('shows which Play experiences own the bottom navigation unread count', () => {
-  render(<GamesHome currentView="games" onViewChange={jest.fn()} />)
+  render(<ComfortProvider><GamesHome currentView="games" onViewChange={jest.fn()} /></ComfortProvider>)
 
   expect(screen.getByTestId('play-unread-Shado Live')).toHaveTextContent('2')
   expect(screen.getByLabelText('2 unread Shado Live updates')).toBeInTheDocument()

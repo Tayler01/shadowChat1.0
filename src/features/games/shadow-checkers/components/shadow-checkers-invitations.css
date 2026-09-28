@@ -1,0 +1,161 @@
+.checkers-invite-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgb(4 4 6 / 78%);
+  overflow: auto;
+}
+
+.checkers-invite-card {
+  width: min(100%, 460px);
+  max-height: min(calc(100dvh - 32px), 680px);
+  overflow: auto;
+  padding: clamp(20px, 5vw, 34px);
+  color: #f3e8d0;
+  background: linear-gradient(155deg, #1e1b1b, #09090c 70%);
+  border: 1px solid #b28b49;
+  border-radius: 18px;
+  box-shadow: 0 22px 70px rgb(0 0 0 / 68%), inset 0 1px rgb(255 237 188 / 12%);
+  text-align: center;
+}
+
+.checkers-invite-crest {
+  color: #d8af67;
+  font-size: 3rem;
+  line-height: 1;
+  text-shadow: 0 0 22px rgb(216 175 103 / 30%);
+}
+
+.checkers-invite-eyebrow {
+  margin: 10px 0 6px;
+  color: #d2ad70;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.checkers-invite-card h2 {
+  margin: 8px 0 16px;
+  color: #f7e8c4;
+  font-family: Georgia, serif;
+  font-size: clamp(1.65rem, 4vw, 2.2rem);
+}
+
+.checkers-invite-copy,
+.checkers-invite-count,
+.checkers-invite-expiry {
+  color: #ddd0ba;
+  line-height: 1.5;
+}
+
+.checkers-invite-count,
+.checkers-invite-expiry { font-size: .85rem; }
+.checkers-invite-label { display: block; margin: 20px 0 7px; text-align: left; font-weight: 700; }
+.checkers-invite-select { width: 100%; min-height: 44px; padding: 8px 12px; border: 1px solid #84704e; border-radius: 8px; background: #17151a; color: #f6edd9; }
+.checkers-invite-actions { display: flex; gap: 10px; margin-top: 22px; }
+.checkers-invite-actions button { flex: 1; min-height: 46px; padding: 10px 16px; border-radius: 9px; font-weight: 700; cursor: pointer; }
+.checkers-invite-primary { color: #17110a; background: #d6ab61; border: 1px solid #f2d497; }
+.checkers-invite-secondary { color: #f0e3c9; background: #252127; border: 1px solid #76654b; }
+.checkers-invite-later { color: #d7c6a7; background: transparent; border: 1px solid #584d3e; }
+.checkers-invite-actions button:disabled { opacity: .65; cursor: wait; }
+.checkers-invite-actions button:focus-visible,
+.checkers-invite-picker button:focus-visible,
+.checkers-invite-select:focus-visible,
+.checkers-invite-picker select:focus-visible,
+.checkers-invite-accepted button:focus-visible,
+.checkers-invite-unavailable button:focus-visible { outline: 3px solid #f0c77d; outline-offset: 3px; }
+.checkers-invite-error { color: #ffb4a7; font-size: .9rem; }
+
+.checkers-invite-picker { padding: 12px; color: #eee0c4; background: rgb(9 8 12 / 72%); border: 1px solid rgb(195 154 88 / 42%); border-radius: 12px; }
+.checkers-invite-picker label { display: block; margin-bottom: 8px; font-size: .9rem; font-weight: 700; }
+.checkers-invite-picker-row { display: flex; gap: 8px; }
+.checkers-invite-picker select { flex: 1; min-width: 0; min-height: 44px; padding: 8px; color: #f6edd9; background: #17151a; border: 1px solid #84704e; border-radius: 8px; }
+.checkers-invite-picker button { min-width: 86px; min-height: 44px; padding: 8px 12px; color: #17110a; font-weight: 700; background: #d6ab61; border: 1px solid #f2d497; border-radius: 8px; cursor: pointer; }
+.checkers-invite-picker button:disabled { opacity: .6; cursor: not-allowed; }
+.checkers-invite-picker-toast {
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 11998;
+  width: max-content;
+  max-width: min(92vw, 500px);
+  padding: 9px 13px;
+  transform: translateX(-50%);
+  color: #d2ebc1;
+  background: #17151a;
+  border: 1px solid #748657;
+  border-radius: 9px;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 42%);
+  font-size: .85rem;
+  text-align: center;
+}
+.checkers-invite-picker-toast-error { color: #ffb4a7; border-color: #a85e56; }
+
+.checkers-invite-accepted,
+.checkers-invite-unavailable {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 11999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(90vw, 440px);
+  padding: 12px 14px;
+  color: #f3e8d0;
+  background: #17151a;
+  border: 1px solid #b28b49;
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
+}
+.checkers-invite-reminder {
+  position: fixed;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 11997;
+  min-height: 44px;
+  padding: 10px 16px;
+  color: #f3e8d0;
+  background: #17151a;
+  border: 1px solid #b28b49;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+  cursor: pointer;
+}
+.checkers-invite-reminder:focus-visible { outline: 3px solid #f0c77d; outline-offset: 3px; }
+.checkers-invite-accepted button,
+.checkers-invite-unavailable button { min-height: 44px; padding: 8px 10px; color: #f7dfb0; background: transparent; border: 1px solid #76654b; border-radius: 6px; cursor: pointer; }
+
+@media (max-height: 450px) and (min-width: 600px) {
+  .checkers-invite-backdrop { padding: max(8px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left)); }
+  .checkers-invite-card {
+    display: grid;
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+    gap: 4px 16px;
+    width: min(100%, 620px);
+    max-height: calc(100dvh - 16px);
+    padding: 12px 16px;
+    text-align: left;
+  }
+  .checkers-invite-crest { grid-column: 1; grid-row: 1; font-size: 1.7rem; }
+  .checkers-invite-eyebrow { grid-column: 1; grid-row: 2; margin: 0; }
+  .checkers-invite-card h2 { grid-column: 1; grid-row: 3; margin: 0; font-size: clamp(1.35rem, 3vw, 1.75rem); }
+  .checkers-invite-copy { grid-column: 1; grid-row: 4; margin: 0; line-height: 1.35; }
+  .checkers-invite-count { grid-column: 1; grid-row: 5; margin: 0; }
+  .checkers-invite-label { grid-column: 2; grid-row: 1; align-self: end; margin: 0; }
+  .checkers-invite-select { grid-column: 2; grid-row: 2; }
+  .checkers-invite-expiry { grid-column: 2; grid-row: 3; margin: 0; }
+  .checkers-invite-error { grid-column: 2; grid-row: 4; margin: 0; }
+  .checkers-invite-actions { grid-column: 2; grid-row: 5; align-self: end; gap: 6px; margin: 0; }
+  .checkers-invite-actions button { min-height: 44px; padding: 7px 8px; }
+}
+
+@media (max-width: 420px) {
+  .checkers-invite-actions { flex-direction: column; }
+  .checkers-invite-accepted,
+  .checkers-invite-unavailable { left: 16px; flex-wrap: wrap; }
+}

@@ -4,9 +4,9 @@ import type { CheckersPosition } from '../engine/types'
 export const UNITY_BRIDGE_VERSION = 1
 export const UNITY_FRAME_URL = '/games/shadow-checkers/unity/frame.html'
 
-export function makeUnitySnapshot(props: ShadowCheckersBoardProps, revision: string, reducedMotion: boolean, highContrast: boolean, soundEnabled = false) {
+export function makeUnitySnapshot(props: ShadowCheckersBoardProps, revision: string, reducedMotion: boolean, highContrast: boolean, soundEnabled = false, ambienceEnabled = false) {
   return {
-    version: UNITY_BRIDGE_VERSION, revision, pieces: props.state.pieces, soundEnabled,
+    version: UNITY_BRIDGE_VERSION, revision, pieces: props.state.pieces, soundEnabled, ambienceEnabled,
     viewerSlot: props.viewerSlot ?? 'spectator', selectedPieceId: props.selectedPieceId ?? '',
     destinations: props.legalMoves.map(move => move.path[move.path.length - 1]),
     helpers: (props.helperMoves ?? []).flatMap(move => [move.path[0], ...move.captures, move.path[move.path.length - 1]]),

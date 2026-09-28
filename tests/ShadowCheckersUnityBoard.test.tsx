@@ -1,16 +1,18 @@
 import { fireEvent, render, screen, act } from '@testing-library/react'
+import { createRef } from 'react'
 import { ComfortProvider } from '../src/hooks/useComfortPreferences'
-import { ShadowCheckersUnityBoard } from '../src/features/games/shadow-checkers/components/ShadowCheckersUnityBoard'
+import { ShadowCheckersUnityBoard, type ShadowCheckersBoardControls } from '../src/features/games/shadow-checkers/components/ShadowCheckersUnityBoard'
 import { createInitialBoard, getLegalMoves } from '../src/features/games/shadow-checkers/engine/checkers'
 
 test('rejects messages from another frame and releases Unity for accessible controls', () => {
-  render(<ComfortProvider><ShadowCheckersUnityBoard state={createInitialBoard()} viewerSlot="player_one" legalMoves={[]} /></ComfortProvider>)
+  const controls = createRef<ShadowCheckersBoardControls>()
+  render(<ComfortProvider><ShadowCheckersUnityBoard ref={controls} state={createInitialBoard()} viewerSlot="player_one" legalMoves={[]} /></ComfortProvider>)
   const iframe = screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
   act(() => window.dispatchEvent(new MessageEvent('message', { origin: location.origin, source: window, data: { version: 1, type: 'ready' } })))
   expect(screen.getByText('Preparing your table')).toBeInTheDocument()
   act(() => window.dispatchEvent(new MessageEvent('message', { origin: location.origin, source: iframe.contentWindow, data: { version: 1, type: 'ready' } })))
   expect(screen.queryByText('Preparing your table')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Accessible board' }))
+  act(() => controls.current?.toggleAccessibleBoard())
   expect(screen.queryByTitle('Shadow Checkers 3D board')).not.toBeInTheDocument()
   expect(screen.getAllByRole('button', { name: /player_one piece/ })).toHaveLength(12)
 })
@@ -29,9 +31,10 @@ test('locks duplicate move input before React or server state changes', () => {
 })
 
 test('presentation completion requires the current snapshot from its own frame and falls back without Unity', () => {
+  const controls = createRef<ShadowCheckersBoardControls>()
   const state = createInitialBoard()
   const onPresentationComplete = jest.fn()
-  const { rerender } = render(<ComfortProvider><ShadowCheckersUnityBoard state={state} legalMoves={[]} onPresentationComplete={onPresentationComplete} /></ComfortProvider>)
+  const { rerender } = render(<ComfortProvider><ShadowCheckersUnityBoard ref={controls} state={state} legalMoves={[]} onPresentationComplete={onPresentationComplete} /></ComfortProvider>)
   const iframe = screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
   const post = jest.spyOn(iframe.contentWindow!, 'postMessage')
   const receive = (data: object, source: Window = iframe.contentWindow!) => act(() => {window.dispatchEvent(new MessageEvent('message', {origin:location.origin,source,data:{version:1,...data}}))})
@@ -44,10 +47,10 @@ test('presentation completion requires the current snapshot from its own frame a
   expect(onPresentationComplete).toHaveBeenLastCalledWith(state)
   onPresentationComplete.mockClear()
   const finished = {...state,winner:'player_one' as const}
-  rerender(<ComfortProvider><ShadowCheckersUnityBoard state={finished} legalMoves={[]} onPresentationComplete={onPresentationComplete} /></ComfortProvider>)
+  rerender(<ComfortProvider><ShadowCheckersUnityBoard ref={controls} state={finished} legalMoves={[]} onPresentationComplete={onPresentationComplete} /></ComfortProvider>)
   receive({type:'presented',revision})
   expect(onPresentationComplete).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button',{name:'Accessible board'}))
+  act(() => controls.current?.toggleAccessibleBoard())
   expect(onPresentationComplete).toHaveBeenLastCalledWith(finished)
   post.mockRestore()
 })
@@ -62,10 +65,11 @@ test('a Unity load failure releases results without waiting for an animation tim
 })
 
 test('graphics failure removes the old player and retry sends the latest match state', () => {
+  const controls = createRef<ShadowCheckersBoardControls>()
   const state = createInitialBoard()
   const onSelectPiece = jest.fn()
   const props = { state, viewerSlot: 'player_one' as const, legalMoves: [], onSelectPiece }
-  const { rerender } = render(<ComfortProvider><ShadowCheckersUnityBoard {...props} /></ComfortProvider>)
+  const { rerender } = render(<ComfortProvider><ShadowCheckersUnityBoard ref={controls} {...props} /></ComfortProvider>)
   const oldFrame = screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
   const oldWindow = oldFrame.contentWindow!
   const emit = (source: Window, data: object) => window.dispatchEvent(new MessageEvent('message', { origin: location.origin, source, data: { version: 1, ...data } }))
@@ -77,10 +81,10 @@ test('graphics failure removes the old player and retry sends the latest match s
   })
   expect(screen.queryByTitle('Shadow Checkers 3D board')).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Skip room reveal' })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Camera help' }))
+  act(() => controls.current?.openCameraHelp())
   expect(screen.getByRole('button', { name: 'Overhead' })).toBeDisabled()
   const updated = { ...state, pieces: state.pieces.slice(1) }
-  rerender(<ComfortProvider><ShadowCheckersUnityBoard {...props} state={updated} /></ComfortProvider>)
+  rerender(<ComfortProvider><ShadowCheckersUnityBoard ref={controls} {...props} state={updated} /></ComfortProvider>)
   fireEvent.click(screen.getByRole('button', { name: 'Retry 3D table' }))
   const newFrame = screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
   expect(newFrame).not.toBe(oldFrame)
@@ -96,8 +100,9 @@ test('graphics failure removes the old player and retry sends the latest match s
 })
 
 test('camera gestures are isolated from moves, suppressed during cinematics, and controls are in help', () => {
+  const controls = createRef<ShadowCheckersBoardControls>()
   const onSelectPiece = jest.fn()
-  render(<ComfortProvider><ShadowCheckersUnityBoard state={createInitialBoard()} legalMoves={[]} onSelectPiece={onSelectPiece}/></ComfortProvider>)
+  render(<ComfortProvider><ShadowCheckersUnityBoard ref={controls} state={createInitialBoard()} legalMoves={[]} onSelectPiece={onSelectPiece}/></ComfortProvider>)
   const iframe=screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
   const post=jest.spyOn(iframe.contentWindow!,'postMessage')
   const emit=(data:object)=>act(()=>window.dispatchEvent(new MessageEvent('message',{origin:location.origin,source:iframe.contentWindow,data:{version:1,...data}})))
@@ -105,7 +110,7 @@ test('camera gestures are isolated from moves, suppressed during cinematics, and
   const camera=screen.getByRole('group',{name:/Camera: drag/})
   expect(camera).toBeEmptyDOMElement()
   fireEvent.keyDown(camera,{key:'ArrowRight'})
-  expect(post).toHaveBeenLastCalledWith(expect.objectContaining({type:'cameraGesture',value:{turn:.04}}),location.origin)
+  expect(post).toHaveBeenLastCalledWith(expect.objectContaining({type:'cameraGesture',value:{turn:-.04}}),location.origin)
   expect(onSelectPiece).not.toHaveBeenCalled()
   expect(screen.queryByRole('button',{name:'Rotate table left'})).not.toBeInTheDocument()
   expect(screen.queryByRole('button',{name:'Overhead'})).not.toBeInTheDocument()
@@ -113,7 +118,7 @@ test('camera gestures are isolated from moves, suppressed during cinematics, and
   post.mockClear();fireEvent.keyDown(camera,{key:'ArrowRight'})
   expect(post).not.toHaveBeenCalled()
   emit({type:'cinematic',busy:false,stage:'ready'})
-  fireEvent.click(screen.getByRole('button',{name:'Camera help'}))
+  act(() => controls.current?.openCameraHelp())
   expect(camera).toHaveAttribute('aria-disabled','true')
   fireEvent.click(screen.getByRole('button',{name:'Reset table camera'}))
   expect(post).toHaveBeenLastCalledWith(expect.objectContaining({type:'camera',value:'reset'}),location.origin)

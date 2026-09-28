@@ -141,12 +141,38 @@ export async function fetchShadowCheckersLeaderboard(): Promise<ShadowCheckersSt
   return (data ?? []) as ShadowCheckersStats[]
 }
 
-export async function markShadowCheckersTurnRead(matchId: string) {
+export async function markShadowCheckersTurnRead(
+  matchId: string,
+  moveCount: number,
+  isCurrent: () => boolean = () => true,
+) {
   const workingClient = await client()
-  const { error } = await workingClient.rpc('mark_my_checkers_turn_read', {
-    target_match_id: matchId,
-  })
-  if (error) throw error
+  const { data: events, error: fetchError } = await workingClient
+    .from('notification_events')
+    .select('id')
+    .eq('type', 'shadow_checkers_turn')
+    .eq('entity_id', matchId)
+    .contains('payload', { move_count: moveCount })
+    .is('read_at', null)
+    .is('resolved_at', null)
+  if (fetchError) throw fetchError
+  if (!isCurrent()) return
+
+  const { clearNotificationEventFromSystemTray } = await import('../../../notifications/notificationApi')
+  for (const event of events ?? []) {
+    if (!isCurrent()) return
+    const { data: marked, error } = await workingClient.rpc('mark_my_notification_event_read', {
+      target_event_id: event.id,
+    })
+    if (error) throw error
+    if (marked === true) {
+      await clearNotificationEventFromSystemTray({
+        eventId: event.id,
+        matchId,
+        notificationType: 'shadow_checkers_turn',
+      })
+    }
+  }
 }
 
 export async function createShadowCheckersMatch(characterKey: string, boardSkin: 'classic' | 'cinematic' = 'classic') {

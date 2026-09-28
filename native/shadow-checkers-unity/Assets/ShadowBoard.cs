@@ -131,7 +131,11 @@ public partial class ShadowBoard : MonoBehaviour
         var light=new GameObject("Soft study key").AddComponent<Light>(); light.transform.SetParent(transform);
         light.type=LightType.Directional; light.color=new Color(.98f,.85f,.68f); light.intensity=.85f;
         light.transform.rotation=Quaternion.Euler(38,-45,0); light.shadows=LightShadows.Soft;
-        light.shadowStrength=.82f; light.shadowBias=.01f; light.shadowNormalBias=.035f;
+        // Leave room for quantized mobile shadow depths on rough stone. The
+        // former near-zero bias exposed self-shadow patches during camera motion.
+        // Preserve the same shadow map and light energy; phone motion QA remains
+        // necessary because desktop captures do not reproduce every GPU artifact.
+        light.shadowStrength=.82f; light.shadowBias=.05f; light.shadowNormalBias=.12f;
         var rim=new GameObject("Window fill").AddComponent<Light>(); rim.transform.SetParent(transform);
         rim.type=LightType.Directional; rim.color=new Color(.72f,.82f,1); rim.intensity=.22f;
         rim.transform.rotation=Quaternion.Euler(32,150,0);rim.renderMode=LightRenderMode.ForceVertex;
@@ -315,8 +319,9 @@ public partial class ShadowBoard : MonoBehaviour
                 child.GetComponent<MeshRenderer>().SetPropertyBlock(detail);
             }
         }
+        token.pickBounds.Encapsulate(PieceCarvings.Attach(token.root.transform, piece.king, piece.owner=="player_one"));
     }
-    void OnDestroy() {Font.textureRebuilt-=RefreshEngravingAtlas;Destroy(engravingMaterial);foreach(var meshes in tokenMeshes.Values) foreach(var mesh in meshes) Destroy(mesh);foreach(var mesh in boardMeshes) Destroy(mesh);}
+    void OnDestroy() {Font.textureRebuilt-=RefreshEngravingAtlas;Destroy(engravingMaterial);foreach(var meshes in tokenMeshes.Values) foreach(var mesh in meshes) Destroy(mesh);foreach(var mesh in boardMeshes) Destroy(mesh);PieceCarvings.Dispose();}
     IEnumerator MoveToken(Token token, Move move, Piece piece, bool crowned)
     {
         movingCount++;CinematicState(true,"move");

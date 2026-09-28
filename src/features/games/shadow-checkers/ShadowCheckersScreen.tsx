@@ -1,17 +1,20 @@
 import React from 'react'
+import './shadow-checkers-ui.css'
 import { useLandscapeGate } from '../shared/useLandscapeGate'
-import { ArrowLeft, Crown, Eye, HelpCircle, Loader2, MessageSquare, MoreHorizontal, Music, Plus, Shield, Swords, Trophy, Users, Volume2, VolumeX, X } from 'lucide-react'
+import { Accessibility, ArrowLeft, Crown, Eye, HelpCircle, Loader2, MessageSquare, MoreHorizontal, Music, Plus, Shield, Swords, Trophy, Users, Volume2, VolumeX, X } from 'lucide-react'
 import { CheckersNotice, type CheckersNoticeMessage } from './components/CheckersNotice'
 import { LoadingSpinner } from '../../../components/ui/LoadingSpinner'
 import { useAuth } from '../../../hooks/useAuth'
 import { useAdminAccess } from '../../../hooks/useAdminAccess'
 import { useDialogAccessibility } from '../../../hooks/useDialogAccessibility'
+import { useComfortPreferences } from '../../../hooks/useComfortPreferences'
 import { cn } from '../../../lib/utils'
 import { shouldShowLegacyAchievementBadges } from '../../../lib/achievementBadges'
 import type { ShadowCheckersMatch } from '../../../lib/supabase'
 import { SHADOW_CHECKERS_ASSETS, SHADOW_CHECKERS_CHARACTERS, getShadowCheckersCharacter } from './assets/manifest'
-import { ShadowCheckersUnityBoard } from './components/ShadowCheckersUnityBoard'
+import { ShadowCheckersUnityBoard, type ShadowCheckersBoardControls } from './components/ShadowCheckersUnityBoard'
 import { CheckersCrownBadge } from './components/CheckersCrownBadge'
+import { ShadowCheckersInvitePicker } from './components/ShadowCheckersInvitations'
 import { deserializeBoard, getLegalMoves, hasMandatoryCapture } from './engine/checkers'
 import type { CheckersBoardState, CheckersMove, CheckersPiece, CheckersPlayer } from './engine/types'
 import { useShadowCheckers } from './hooks/useShadowCheckers'
@@ -21,6 +24,9 @@ interface ShadowCheckersScreenProps {
   initialMatchId?: string
   onMatchRoute?: (action: 'push-item' | 'replace-item' | 'close-item', matchId?: string) => void
   musicPlaying?: boolean
+  musicEnabled?: boolean
+  masterSoundEnabled?: boolean
+  onToggleMasterSound?: () => void
   audioBlocked?: boolean
   onToggleMusic?: () => void
   unreadMatchCounts?: Record<string, number>
@@ -107,6 +113,9 @@ export function ShadowCheckersScreen({
   initialMatchId,
   onMatchRoute,
   musicPlaying = false,
+  musicEnabled = false,
+  masterSoundEnabled = true,
+  onToggleMasterSound,
   audioBlocked = false,
   onToggleMusic,
   unreadMatchCounts = {},
@@ -118,6 +127,15 @@ export function ShadowCheckersScreen({
   const notify = (tone: CheckersNoticeMessage['tone'], message: string) => setNotice({ id: ++noticeSequence.current, tone, message })
   const gameRoot = React.useRef<HTMLDivElement>(null)
   const [matchChatOpen, setMatchChatOpen] = React.useState(false)
+  const [chatFeedVisible, setChatFeedVisible] = React.useState(true)
+  const [chatSending, setChatSending] = React.useState(false)
+  const [chatError, setChatError] = React.useState<string | null>(null)
+  const [lobbyTab, setLobbyTab] = React.useState<'tables' | 'fame' | 'players'>('tables')
+  const [lobbyPage, setLobbyPage] = React.useState(0)
+  const [famePage, setFamePage] = React.useState(0)
+  const chatInputRef = React.useRef<HTMLInputElement>(null)
+  const boardControls = React.useRef<ShadowCheckersBoardControls>(null)
+  const { effectivePreferences, updatePreferences } = useComfortPreferences()
   const orientationLocked = React.useRef(false)
   const orientationSession = React.useRef(0)
   const requestLandscape = React.useCallback(async (gesture = false) => {
@@ -216,6 +234,11 @@ export function ShadowCheckersScreen({
   }, [moves, showLastMove, viewerSlot])
   const openMatches = React.useMemo(() => matches.filter(match => match.status === 'waiting'), [matches])
   const activeMatches = React.useMemo(() => matches.filter(match => match.status === 'active'), [matches])
+  const lobbyMatches = React.useMemo(() => [...openMatches, ...activeMatches], [openMatches, activeMatches])
+  const lobbyPageCount = Math.max(1, lobbyMatches.length)
+  const visibleLobbyMatches = lobbyMatches.slice(Math.min(lobbyPage, lobbyPageCount - 1), Math.min(lobbyPage, lobbyPageCount - 1) + 1)
+  const famePageCount = Math.max(1, leaderboard.length)
+  const visibleLeaders = leaderboard.slice(Math.min(famePage, famePageCount - 1), Math.min(famePage, famePageCount - 1) + 1)
   const myMatch = React.useMemo(() => matches.find(match => isPlayer(match, user?.id)) ?? null, [matches, user?.id])
   const activeBoardSkin = activeMatch ? normalizeBoardSkin(activeMatch.board_skin) : selectedBoardSkin
 
@@ -349,13 +372,24 @@ export function ShadowCheckersScreen({
     })()
   }
 
-  const handlePostChat = (event: React.FormEvent) => {
+  const handlePostChat = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!activeMatch) return
+    if (!activeMatch || chatSending) return
     const body = chatDraft.trim().slice(0, 120)
     if (!body) return
-    setChatDraft('')
-    void guarded(() => actions.postChat(activeMatch.id, body), 'Sent')
+    setChatSending(true)
+    setChatError(null)
+    try {
+      await actions.postChat(activeMatch.id, body)
+      setChatDraft('')
+      setMatchChatOpen(false)
+      chatInputRef.current?.blur()
+    } catch (error) {
+      setChatError(formatCheckersActionError(error, 'Message was not sent. Try again.'))
+      chatInputRef.current?.focus()
+    } finally {
+      setChatSending(false)
+    }
   }
 
   const handleConfirmCharacter = () => {
@@ -382,7 +416,7 @@ export function ShadowCheckersScreen({
         <section
           role="dialog"
           aria-modal="true"
-          className="max-h-[min(88vh,42rem)] w-full max-w-lg overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          className="max-h-[min(88vh,42rem)] w-full max-w-lg overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(0,0,0,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
           onMouseDown={event => event.stopPropagation()}
         >
           <div className="flex items-start justify-between gap-3">
@@ -442,7 +476,7 @@ export function ShadowCheckersScreen({
         return (
           <span
             key={index}
-            className={dark ? 'bg-[linear-gradient(135deg,#14171a,#050607)]' : 'bg-[linear-gradient(135deg,#a66f25,#e0bd6f)]'}
+            className={dark ? 'bg-[linear-gradient(135deg,#14110d,#000000)]' : 'bg-[linear-gradient(135deg,#a66f25,#e0bd6f)]'}
           />
         )
       })}
@@ -462,7 +496,7 @@ export function ShadowCheckersScreen({
           role="dialog"
           aria-modal="true"
           aria-label="Choose board"
-          className="checkers-board-dialog w-full max-w-lg rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          className="checkers-board-dialog w-full max-w-lg rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(0,0,0,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
           onMouseDown={event => event.stopPropagation()}
         >
           <div className="mb-3 flex items-start justify-between gap-3">
@@ -505,7 +539,7 @@ export function ShadowCheckersScreen({
           role="dialog"
           aria-modal="true"
           aria-label={characterModal.mode === 'create' ? 'Create public match' : 'Join match'}
-          className="checkers-character-dialog w-full max-w-md rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(5,6,7,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
+          className="checkers-character-dialog w-full max-w-md rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(0,0,0,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
           onMouseDown={event => event.stopPropagation()}
         >
           <div className="mb-3 flex items-start justify-between gap-3">
@@ -543,18 +577,24 @@ export function ShadowCheckersScreen({
           aria-label="Open Shadow Checkers menu"
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen(value => !value)}
-          className="relative z-[96] flex h-11 w-11 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10"
+          className="relative z-[96] flex h-11 w-11 items-center justify-center border-0 bg-transparent text-[#f0d381] drop-shadow-[0_2px_3px_#000] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f0d381]"
         >
           <MoreHorizontal className="h-5 w-5" />
         </button>
         {menuOpen && (
           <>
           <button type="button" tabIndex={-1} aria-label="Close Shadow Checkers menu" className="fixed inset-0 z-[90] cursor-default border-0 bg-transparent p-0" onClick={() => { setMenuOpen(false); menuRef.current?.querySelector<HTMLButtonElement>('button')?.focus() }} />
-          <div role="region" aria-label="Shadow Checkers menu" className="absolute right-0 top-[calc(100%+0.45rem)] z-[95] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-[0.95rem] border border-[#b9934c]/32 bg-[linear-gradient(180deg,rgba(23,21,17,0.98),rgba(5,5,6,0.98))] py-1.5 text-sm text-[#f6e0a2] shadow-[0_22px_70px_rgba(0,0,0,0.72)] backdrop-blur-md" style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 4rem)' }}>
+          <div role="region" aria-label="Shadow Checkers menu" className="absolute right-0 top-[calc(100%+0.45rem)] z-[95] w-72 max-w-[calc(100vw-2rem)] overflow-y-auto overscroll-contain rounded-[0.95rem] border border-[#b9934c]/32 bg-[linear-gradient(180deg,rgba(23,21,17,0.98),rgba(0,0,0,0.98))] py-1.5 text-sm text-[#f6e0a2] shadow-[0_22px_70px_rgba(0,0,0,0.72)] backdrop-blur-md" style={{ maxHeight: 'calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 4rem)' }}>
+            <p className="px-3 py-2 font-serif text-base tracking-[.12em] text-[#f0d381]">Shadow Checkers</p>
             {activeMatch && state && <section aria-label="Players at this table" className="mx-2 mb-1.5 space-y-2 border-b border-[#b9934c]/25 pb-2">
               <PlayerChip name={displayName(activeMatch.player_one, 'Player one')} characterKey={activeMatch.player_one_character_key} showCharacterName crown={shouldShowLegacyAchievementBadges(activeMatch.player_one) && activeMatch.player_one?.checkers_crown} detail={`Silver · ${formatPieceCount(state.pieces.filter(piece => piece.owner === 'player_one').length)}`} activeTurn={!state.winner && currentTurnSlot === 'player_one'} turnFlash={showYourTurnBanner && myTurn && viewerSlot === 'player_one'} />
               <PlayerChip name={displayName(activeMatch.player_two, 'Open seat')} characterKey={activeMatch.player_two_character_key} showCharacterName crown={shouldShowLegacyAchievementBadges(activeMatch.player_two) && activeMatch.player_two?.checkers_crown} detail={`Black · ${formatPieceCount(state.pieces.filter(piece => piece.owner === 'player_two').length)}`} muted={!activeMatch.player_two} activeTurn={!state.winner && currentTurnSlot === 'player_two'} turnFlash={showYourTurnBanner && myTurn && viewerSlot === 'player_two'} />
             </section>}
+            <button
+              type="button"
+              onClick={() => { if (selectedMatchId) handleSelectMatch(null); else onExit?.(); setMenuOpen(false) }}
+              className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/[0.08]"
+            ><ArrowLeft className="h-4 w-4 text-[#f0d381]" />{selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Exit to entertainment'}</button>
             <button
               type="button"
               onClick={() => {
@@ -566,16 +606,22 @@ export function ShadowCheckersScreen({
               <HelpCircle className="h-4 w-4 text-[#f0d381]" />
               Rules
             </button>
+            {hasActiveBoard && <button type="button" onClick={() => { boardControls.current?.openCameraHelp(); setMenuOpen(false) }} className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/[0.08]"><HelpCircle className="h-4 w-4 text-[#f0d381]" />Camera help</button>}
+            {hasActiveBoard && <button type="button" onClick={() => { boardControls.current?.toggleAccessibleBoard(); setMenuOpen(false) }} className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/[0.08]"><Accessibility className="h-4 w-4 text-[#f0d381]" />Toggle accessible board</button>}
+            <button type="button" aria-pressed={masterSoundEnabled} onClick={onToggleMasterSound} className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/[0.08]">{masterSoundEnabled ? <Volume2 className="h-4 w-4 text-[#f0d381]" /> : <VolumeX className="h-4 w-4 text-[#f0d381]" />}Master Sound: {masterSoundEnabled ? 'On' : 'Off'}</button>
+            <button type="button" aria-pressed={effectivePreferences.gameSfx} onClick={() => updatePreferences({ gameSfx: !effectivePreferences.gameSfx })} className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/[0.08]"><Volume2 className="h-4 w-4 text-[#f0d381]" />Piece Sounds: {effectivePreferences.gameSfx ? 'On' : 'Off'}</button>
+            {hasActiveBoard && <button type="button" aria-pressed={chatFeedVisible} onClick={() => setChatFeedVisible(value => !value)} className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/[0.08]"><MessageSquare className="h-4 w-4 text-[#f0d381]" />Chat Feed: {chatFeedVisible ? 'Shown' : 'Hidden'}</button>}
             <button
               type="button"
               onClick={() => {
                 onToggleMusic?.()
                 setMenuOpen(false)
               }}
+              aria-pressed={musicEnabled}
               className="flex min-h-11 w-full items-center gap-2 px-3 py-2.5 text-left hover:bg-white/[0.08]"
             >
-              {audioBlocked ? <Music className="h-4 w-4 text-[#f0d381]" /> : musicPlaying ? <VolumeX className="h-4 w-4 text-[#f0d381]" /> : <Volume2 className="h-4 w-4 text-[#f0d381]" />}
-              {audioBlocked ? 'Start Music' : musicPlaying ? 'Mute Music' : 'Play Music'}
+              <Music className="h-4 w-4 text-[#f0d381]" />
+              Music: {musicEnabled ? 'On' : 'Off'}{musicPlaying && masterSoundEnabled ? ' · Playing' : ''}{audioBlocked && musicEnabled ? ' · Tap to retry' : ''}
             </button>
             {hasActiveBoard && (
               <button
@@ -650,14 +696,14 @@ export function ShadowCheckersScreen({
         key={match.id}
         data-checkers-match-id={match.id}
         data-checkers-session-id={session?.id}
-        className="rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
+        className="rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-2 shadow-[0_18px_45px_rgba(0,0,0,0.35)]"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-[#f6e0a2]">
+            <p className="checkers-lobby-card-title text-sm font-semibold text-[#f6e0a2]">
               {match.status === 'waiting' ? 'Waiting for challenger' : 'Active match'}
             </p>
-            <p className="mt-1 text-xs text-[#b9a16f]">
+            <p className="checkers-lobby-card-names mt-1 text-xs text-[#b9a16f]">
               {displayName(match.player_one, 'Creator')} vs {match.player_two ? displayName(match.player_two) : 'Open seat'}
             </p>
           </div>
@@ -676,11 +722,11 @@ export function ShadowCheckersScreen({
             </span>
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <PlayerChip name={displayName(match.player_one, 'Creator')} characterKey={match.player_one_character_key} crown={shouldShowLegacyAchievementBadges(match.player_one) && match.player_one?.checkers_crown} />
-          <PlayerChip name={match.player_two ? displayName(match.player_two) : 'Open seat'} characterKey={match.player_two_character_key} crown={shouldShowLegacyAchievementBadges(match.player_two) && match.player_two?.checkers_crown} muted={!match.player_two} />
+        <div className="checkers-lobby-card-players mt-1 grid grid-cols-2 gap-1">
+          <PlayerChip compact name={displayName(match.player_one, 'Creator')} characterKey={match.player_one_character_key} crown={shouldShowLegacyAchievementBadges(match.player_one) && match.player_one?.checkers_crown} />
+          <PlayerChip compact name={match.player_two ? displayName(match.player_two) : 'Open seat'} characterKey={match.player_two_character_key} crown={shouldShowLegacyAchievementBadges(match.player_two) && match.player_two?.checkers_crown} muted={!match.player_two} />
         </div>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="mt-1 grid grid-cols-2 gap-1">
           {currentUserIsPlayer && (
             <CheckersButton onClick={() => handleSelectMatch(match.id)}>
               <Swords className="mr-2 h-4 w-4" />
@@ -720,67 +766,30 @@ export function ShadowCheckersScreen({
   }
 
   const renderLobby = () => (
-    <main className="relative z-10 min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)_+_1rem)] md:px-6">
-      <section className="mb-4 overflow-hidden rounded-[1.35rem] border border-[#b9934c]/35 bg-black/62 p-4 shadow-[0_24px_70px_rgba(0,0,0,0.55)] backdrop-blur-sm md:p-6">
-        <div className="grid gap-4">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#b9a16f]">Multiplayer checkers</p>
-            <img
-              src={SHADOW_CHECKERS_ASSETS.logo}
-              alt="Shadow Checkers"
-              className="mt-2 h-auto w-full max-w-[26rem] object-contain drop-shadow-[0_12px_30px_rgba(0,0,0,0.72)]"
-              loading="eager"
-            />
-            <h2 className="mt-3 text-2xl font-semibold text-[#f6e0a2] md:text-3xl">Public Duel Lobby</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#d9c79f]">
-              Create a public match, join an open table, or spectate a live board. Unfinished matches persist until a player wins, resigns, or the creator cancels.
-            </p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <CheckersButton loading={busy === 'create'} onClick={() => setBoardModalOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Public Match
-              </CheckersButton>
-              {myMatch && (
-                <CheckersButton variant="secondary" onClick={() => handleSelectMatch(myMatch.id)}>
-                  <Swords className="mr-2 h-4 w-4" />
-                  Continue Current Match
-                </CheckersButton>
-              )}
-            </div>
-          </div>
+    <main className="shadow-checkers-lobby relative z-10 flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-3 pb-[max(.4rem,env(safe-area-inset-bottom))] pt-2">
+      <div className="flex min-h-0 items-center gap-2 pr-[3rem]">
+        <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-[clamp(2.4rem,14vh,5.5rem)] w-[min(20vw,9rem)] shrink-0 object-contain" />
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <CheckersButton aria-label="Create Public Match" loading={busy === 'create'} onClick={() => setBoardModalOpen(true)}><Plus className="mr-1 h-4 w-4" />Create Match</CheckersButton>
+          {myMatch && <CheckersButton aria-label="Continue Current Match" variant="secondary" onClick={() => handleSelectMatch(myMatch.id)}><Swords className="mr-1 h-4 w-4" />Continue Match</CheckersButton>}
         </div>
+      </div>
+      <div role="tablist" aria-label="Shadow Checkers lobby" className="flex shrink-0 gap-2">
+        {([['tables', 'Tables'], ['fame', 'Hall of Fame'], ['players', 'Players']] as const).map(([tab, label]) => <button key={tab} type="button" role="tab" aria-selected={lobbyTab === tab} onClick={() => setLobbyTab(tab)} className={cn('min-h-11 rounded-lg border px-3 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f0d381]', lobbyTab === tab ? 'border-[#f0d381] bg-[#d7aa46]/20 text-[#f0d381]' : 'border-[#b9934c]/30 bg-black/50 text-[#d9c79f]')}>{label}</button>)}
+        {lobbyTab !== 'players' && (lobbyTab === 'tables' ? lobbyPageCount : famePageCount) > 1 && <div className="ml-auto flex items-center gap-1">
+          <button type="button" aria-label="Previous page" disabled={lobbyTab === 'tables' ? lobbyPage === 0 : famePage === 0} onClick={() => lobbyTab === 'tables' ? setLobbyPage(page => page - 1) : setFamePage(page => page - 1)} className="min-h-11 min-w-11 rounded-lg border border-[#b9934c]/30 bg-black/50 text-[#f0d381] disabled:opacity-45">‹</button>
+          <span className="min-w-10 text-center text-xs text-[#d9c79f]">{lobbyTab === 'tables' ? Math.min(lobbyPage, lobbyPageCount - 1) + 1 : Math.min(famePage, famePageCount - 1) + 1} / {lobbyTab === 'tables' ? lobbyPageCount : famePageCount}</span>
+          <button type="button" aria-label="Next page" disabled={lobbyTab === 'tables' ? lobbyPage >= lobbyPageCount - 1 : famePage >= famePageCount - 1} onClick={() => lobbyTab === 'tables' ? setLobbyPage(page => page + 1) : setFamePage(page => page + 1)} className="min-h-11 min-w-11 rounded-lg border border-[#b9934c]/30 bg-black/50 text-[#f0d381] disabled:opacity-45">›</button>
+        </div>}
+      </div>
+      <section role="tabpanel" className="min-h-0 flex-1 overflow-hidden rounded-xl border border-[#b9934c]/30 bg-black/60 p-2">
+        {lobbyTab === 'tables' && (loading ? <div className="flex h-full items-center justify-center"><LoadingSpinner size="lg" className="text-[#f0d381]" /></div> : <div className="flex h-full min-h-0 flex-col">
+          <h2 className="mb-1 text-sm font-semibold text-[#f0d381]">Open Matches &amp; Live Boards</h2>
+          <div className="min-h-0 flex-1 overflow-hidden">{lobbyMatches.length ? visibleLobbyMatches.map(renderLobbyCard) : <p className="self-center text-sm text-[#d9c79f]">No active tables yet. Create the first one.</p>}</div>
+        </div>)}
+        {lobbyTab === 'fame' && <HallOfFame leaderboard={visibleLeaders} rankOffset={Math.min(famePage, famePageCount - 1)} />}
+        {lobbyTab === 'players' && <div className="h-full overflow-hidden"><ShadowCheckersInvitePicker characterKey={selectedCharacter} boardSkin={selectedBoardSkin} /></div>}
       </section>
-
-      {loading ? (
-        <div className="flex justify-center py-10">
-          <LoadingSpinner size="lg" className="text-[#f0d381]" />
-        </div>
-      ) : (
-        <div className="grid gap-4 xl:grid-cols-[1fr_22rem]">
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Open Matches</h3>
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#2ecf72]/25 bg-[#0f3d21]/24 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9df0b8]">
-                <span className="h-2 w-2 rounded-full bg-[#2ecf72] shadow-[0_0_12px_rgba(46,207,114,0.8)]" />
-                Live
-              </span>
-            </div>
-            {openMatches.length === 0 && activeMatches.length === 0 && (
-              <div className="rounded-[1rem] border border-[#b9934c]/25 bg-black/50 p-5 text-center text-sm text-[#b9a16f]">
-                No active Shadow Checkers tables yet. Create the first one.
-              </div>
-            )}
-            {openMatches.map(renderLobbyCard)}
-            {activeMatches.length > 0 && (
-              <>
-                <h3 className="pt-3 text-sm font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Live Boards</h3>
-                {activeMatches.map(renderLobbyCard)}
-              </>
-            )}
-          </section>
-          <HallOfFame leaderboard={leaderboard} />
-        </div>
-      )}
     </main>
   )
 
@@ -808,7 +817,9 @@ export function ShadowCheckersScreen({
             <div className="relative h-full">
               <ShadowCheckersUnityBoard
                 key={activeMatch.id}
+                ref={boardControls}
                 fill
+                masterSoundEnabled={masterSoundEnabled}
                 onPresentationComplete={setPresentedBoard}
                 paused={rotateGate}
                 state={state}
@@ -852,46 +863,27 @@ export function ShadowCheckersScreen({
             </div>
           </section>
 
-          <aside hidden={!matchChatOpen} className={cn('shadow-checkers-match-chat-wrap absolute inset-y-0 right-0 z-40 w-[min(23rem,52vw)] min-h-0 flex-col gap-2 overflow-hidden border-l border-[#b9934c]/30 bg-[#080909] p-2', matchChatOpen ? 'flex' : 'hidden')}>
-            <section className="shadow-checkers-match-chat flex min-h-0 flex-1 flex-col rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-3">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Match Chat</h3>
-              <div className="mt-2 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-                {chat.length === 0 ? <p className="text-sm text-[#b9a16f]">Temporary live chat appears here.</p> : chat.map(message => (
-                  <div key={message.id} className="rounded-[0.7rem] bg-white/[0.045] px-3 py-2 text-xs text-[#d9c79f]">
-                    <span className="font-semibold text-[#f6e0a2]">{displayName(message.user)}:</span> {message.body}
-                  </div>
-                ))}
-              </div>
-              {activeMatch.status === 'active' && (
-                <form onSubmit={handlePostChat} className="mt-3 flex gap-2">
-                  <input
-                    value={chatDraft}
-                    onChange={event => setChatDraft(event.target.value.slice(0, 120))}
-                    placeholder="Say something"
-                    className="min-w-0 flex-1 rounded-[0.7rem] border border-[#b9934c]/25 bg-black/45 px-3 py-2 text-sm text-[#f6e0a2] placeholder:text-[#8d7c5f] focus:outline-none focus:ring-2 focus:ring-[#f0d381]/40"
-                  />
-                  <CheckersButton type="submit" className="px-3" loading={busy === 'chat'}>
-                    <MessageSquare className="h-4 w-4" />
-                  </CheckersButton>
-                </form>
-              )}
-            </section>
-            {queue.length > 0 && (
-              <section className="shrink-0 rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-3">
-                <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Queue</h3>
-                <p className="mt-2 text-sm text-[#d9c79f]">{queue.length} challenger{queue.length === 1 ? '' : 's'} waiting for next table.</p>
-              </section>
-            )}
-          </aside>
+          {chatFeedVisible && <section aria-label="Recent match chat" className="shadow-checkers-chat-feed pointer-events-none absolute bottom-[max(0.6rem,env(safe-area-inset-bottom))] right-2 z-20 w-[min(18rem,38vw)] space-y-1 rounded-xl border border-[#b9934c]/30 bg-black/55 p-2 text-xs text-[#f6e0a2] shadow-lg backdrop-blur-sm">
+            {chat.length === 0 ? <p className="text-[#d9c79f]">Match chat will appear here.</p> : chat.slice(-4).map(message => <p key={message.id} className="line-clamp-2 break-words"><strong className="text-[#f0d381]">{displayName(message.user)}:</strong> {message.body}</p>)}
+          </section>}
+          {matchChatOpen && activeMatch.status === 'active' && <section aria-label="Match chat composer" className="shadow-checkers-chat-composer absolute bottom-[max(0.6rem,env(safe-area-inset-bottom))] right-2 z-40 w-[min(22rem,48vw)] rounded-xl border border-[#b9934c]/45 bg-black/90 p-2 shadow-xl backdrop-blur-sm" onKeyDown={event => { if (event.key === 'Escape') { setMatchChatOpen(false); chatInputRef.current?.blur() } }}>
+            <form onSubmit={handlePostChat} className="flex items-center gap-1">
+              <input ref={chatInputRef} autoFocus aria-label="Match message" value={chatDraft} onChange={event => setChatDraft(event.target.value.slice(0, 120))} placeholder="Say something" className="min-h-11 min-w-0 flex-1 rounded-lg border border-[#b9934c]/35 bg-black/55 px-2 text-sm text-[#f6e0a2] focus:outline-none focus:ring-2 focus:ring-[#f0d381]" />
+              <button type="submit" disabled={chatSending || !chatDraft.trim()} aria-label="Send match message" className="flex min-h-11 min-w-11 items-center justify-center text-[#f0d381] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f0d381] disabled:opacity-50"><MessageSquare size={18} /></button>
+              <button type="button" aria-label="Close match chat" onClick={() => { setMatchChatOpen(false); chatInputRef.current?.blur() }} className="flex min-h-11 min-w-11 items-center justify-center text-[#f0d381] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f0d381]"><X size={18} /></button>
+            </form>
+            {chatError && <p role="alert" className="mt-1 text-xs text-red-100">{chatError}</p>}
+          </section>}
         </div>
       </main>
     )
   }
 
   return (
-    <div ref={gameRoot} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#030405] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-[#f6e0a2]">
+    <div ref={gameRoot} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-black pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] text-[#f6e0a2]">
       {!rotateGate && <CheckersNotice notice={notice} onDismiss={dismissNotice} />}
-      {rotateGate && <div className="absolute inset-0 z-[150] flex flex-col items-center justify-center gap-4 bg-[#030405] px-8 text-center" role="dialog" aria-modal="true" aria-label="Rotate phone to play">
+      {rotateGate && <div className="absolute inset-0 z-[150] flex flex-col items-center justify-center gap-3 bg-black px-8 text-center" role="dialog" aria-modal="true" aria-label="Rotate phone to play">
+        <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-16 max-w-[min(60vw,22rem)] object-contain" />
         <p className="text-2xl font-semibold text-[#f0d381]">Rotate your phone</p>
         <p className="max-w-xs text-sm text-[#d9c79f]">Shadow Checkers plays sideways. Turn your phone to enter the study.</p>
         <CheckersButton onClick={() => void requestLandscape(true)}>Enter landscape</CheckersButton>
@@ -900,17 +892,10 @@ export function ShadowCheckersScreen({
       <div className={cn('relative flex min-h-0 flex-1 flex-col', rotateGate && 'invisible')} aria-hidden={rotateGate || undefined}>
       <img src={SHADOW_CHECKERS_ASSETS.background} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.56]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(215,170,70,0.18),transparent_30%),linear-gradient(180deg,rgba(0,0,0,0.58),rgba(0,0,0,0.20)_42%,rgba(0,0,0,0.84))]" />
-      <header className="shadow-checkers-keyboard-collapse relative z-20 shrink-0 border-b border-[#b9934c]/35 bg-black/86 shadow-[0_16px_40px_rgba(0,0,0,0.58)]">
-        <div className="flex min-h-11 items-center gap-1.5 px-2 pt-[env(safe-area-inset-top)]">
-          <button type="button" aria-label={selectedMatchId ? 'Back to Shadow Checkers lobby' : 'Back to entertainment'} onClick={() => selectedMatchId ? handleSelectMatch(null) : onExit?.()} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-transparent bg-black/5 text-[#f0d381] hover:bg-white/10">
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-10 w-40 min-w-0 shrink object-contain" />
-          {activeMatch && state && <p className="min-w-0 flex-1 truncate text-center text-xs text-[#e6d2a8]" aria-live="polite">{state.winner ? 'Match complete' : myTurn ? 'Your turn' : `${displayName(currentTurnSlot === 'player_one' ? activeMatch.player_one : activeMatch.player_two)}’s turn`} · {state.pieces.filter(p => p.owner === 'player_one').length} silver / {state.pieces.filter(p => p.owner === 'player_two').length} black</p>}
-          {activeMatch && <button type="button" aria-label={matchChatOpen ? 'Close match chat' : 'Open match chat'} aria-expanded={matchChatOpen} onClick={() => setMatchChatOpen(open => !open)} className="flex h-11 min-w-11 items-center justify-center rounded-lg text-[#f0d381]"><MessageSquare className="h-5 w-5" /></button>}
-          {renderHeaderMenu()}
-        </div>
-      </header>
+      <div className="pointer-events-none absolute right-[max(.4rem,env(safe-area-inset-right))] top-[max(.3rem,env(safe-area-inset-top))] z-[60] flex items-center gap-1">
+        {activeMatch && <button type="button" aria-label={matchChatOpen ? 'Close match chat' : 'Open match chat'} aria-expanded={matchChatOpen} onClick={() => { setMatchChatOpen(open => !open); setChatError(null); if (matchChatOpen) chatInputRef.current?.blur() }} className="pointer-events-auto flex h-11 min-w-11 items-center justify-center border-0 bg-transparent text-[#f0d381] drop-shadow-[0_2px_3px_#000] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f0d381]"><MessageSquare className="h-5 w-5" /></button>}
+        <div className="pointer-events-auto">{renderHeaderMenu()}</div>
+      </div>
       {selectedMatchId && activeMatch ? renderMatch() : renderLobby()}
       {busy && (
         <div className="pointer-events-none fixed right-4 top-[calc(env(safe-area-inset-top)_+_5.2rem)] z-[70] inline-flex items-center gap-2 rounded-full border border-[#b9934c]/35 bg-black/82 px-3 py-2 text-xs text-[#d9c79f] shadow-[0_16px_40px_rgba(0,0,0,0.48)]">
@@ -932,7 +917,7 @@ export function ShadowCheckersScreen({
       {renderBoardChoiceDialog()}
       {renderCharacterDialog()}
       {confirmation && <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/75 p-3 backdrop-blur-sm" onMouseDown={event => { if (event.target === event.currentTarget && !confirmPending) setConfirmation(null) }}>
-        <div ref={confirmationRef} role="alertdialog" aria-modal="true" aria-labelledby={`${confirmationId}-title`} aria-describedby={`${confirmationId}-description`} aria-busy={confirmPending} className="max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] w-full max-w-sm overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,#17150f,#050607)] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]">
+        <div ref={confirmationRef} role="alertdialog" aria-modal="true" aria-labelledby={`${confirmationId}-title`} aria-describedby={`${confirmationId}-description`} aria-busy={confirmPending} className="max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)-2rem)] w-full max-w-sm overflow-y-auto rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,#17150f,#000000)] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b9a16f]">Shadow Checkers</p>
           <h2 id={`${confirmationId}-title`} className="mt-1 text-xl font-semibold">{confirmation.kind === 'resign' ? 'Leave this contest?' : confirmation.adminRemoval ? 'Remove this table?' : 'Cancel this table?'}</h2>
           <p id={`${confirmationId}-description`} className="mt-3 text-sm leading-6 text-[#d9c79f]">{confirmation.kind === 'resign' ? 'Resigning awards the win to your opponent.' : confirmation.adminRemoval ? 'This match will be removed from the lobby.' : 'This unfinished match will be removed from the lobby.'}</p>
@@ -958,6 +943,7 @@ function PlayerChip({
   activeTurn = false,
   turnFlash = false,
   showCharacterName = false,
+  compact = false,
 }: {
   name: string
   characterKey?: string | null
@@ -968,18 +954,20 @@ function PlayerChip({
   activeTurn?: boolean
   turnFlash?: boolean
   showCharacterName?: boolean
+  compact?: boolean
 }) {
   const character = getShadowCheckersCharacter(characterKey)
   return (
     <div
       className={cn(
-        'relative flex min-w-0 items-center gap-2 rounded-[0.85rem] border bg-white/[0.035] p-2.5 transition-[border-color,box-shadow,background] duration-200',
+        'relative flex min-w-0 items-center gap-2 rounded-[0.85rem] border bg-white/[0.035] transition-[border-color,box-shadow,background] duration-200',
+        compact ? 'p-1' : 'p-2.5',
         activeTurn ? 'border-[#f0d381]/80 bg-[#d7aa46]/12 shadow-[0_0_26px_rgba(215,170,70,0.22)]' : 'border-white/8',
         align === 'right' && 'flex-row-reverse text-right',
         muted && 'opacity-60'
       )}
     >
-      <img src={character.portrait} alt="" className="h-12 w-12 shrink-0 rounded-full border border-[#d7aa46]/28 object-cover" loading="lazy" />
+      <img src={character.portrait} alt="" className={cn('shrink-0 rounded-full border border-[#d7aa46]/28 object-cover', compact ? 'h-8 w-8' : 'h-12 w-12')} loading="lazy" />
       <CheckersCrownBadge active={crown} className="absolute right-1.5 top-1.5" />
       {turnFlash && !showCharacterName && (
         <img
@@ -998,22 +986,22 @@ function PlayerChip({
   )
 }
 
-function HallOfFame({ leaderboard }: { leaderboard: Array<{ user_id: string; wins: number; losses: number; total_games: number; user?: any }> }) {
+function HallOfFame({ leaderboard, rankOffset }: { leaderboard: Array<{ user_id: string; wins: number; losses: number; total_games: number; user?: any }>; rankOffset: number }) {
   return (
-    <section className="rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-4 shadow-[0_18px_45px_rgba(0,0,0,0.35)]">
+    <section className="flex h-full min-h-0 flex-col rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-2 shadow-[0_18px_45px_rgba(0,0,0,0.35)]">
       <div className="mb-3 flex items-center gap-2">
         <Trophy className="h-4 w-4 text-[#f0d381]" />
         <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#f0d381]">Hall of Fame</h3>
       </div>
-      <div className="max-h-[28rem] space-y-2 overflow-y-auto">
+      <div className="min-h-0 flex-1 space-y-1 overflow-hidden">
         {leaderboard.length === 0 ? (
           <p className="text-sm text-[#b9a16f]">Complete a match to enter the Hall of Fame.</p>
         ) : leaderboard.map((row, index) => {
           const winRate = row.total_games > 0 ? Math.round((row.wins / row.total_games) * 100) : 0
           return (
-            <div key={row.user_id} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-[0.8rem] border border-white/8 bg-white/[0.035] px-3 py-2">
+            <div key={row.user_id} data-checkers-rank={rankOffset + index + 1} className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-[0.8rem] border border-white/8 bg-white/[0.035] px-2 py-1">
               <span className="flex h-8 w-8 items-center justify-center rounded-full border border-[#d7aa46]/28 bg-[#d7aa46]/10 text-xs font-bold text-[#f0d381]">
-                {index === 0 ? <Crown className="h-4 w-4" /> : index + 1}
+                {rankOffset + index === 0 ? <Crown className="h-4 w-4" /> : rankOffset + index + 1}
               </span>
               <div className="min-w-0">
                 <p className="flex items-center gap-1 truncate text-sm font-semibold text-[#f6e0a2]">

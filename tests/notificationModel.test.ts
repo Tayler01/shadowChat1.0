@@ -52,6 +52,22 @@ describe('notification presentation policy', () => {
     )).toBe(false)
   })
 
+  it('routes Checkers invitations to the invite decision and leaves foreground presentation to the Join/Decline host', () => {
+    const now = Date.parse('2026-07-17T16:00:10.000Z')
+    const invitation = makeEvent({
+      type: 'shadow_checkers_invite',
+      category: 'games',
+      entity_id: 'invite-1',
+      route: null,
+      payload: { actor: { display_name: 'Jordan' }, invite_id: 'invite-1' },
+    })
+    const route = new URL(buildNotificationPresentation(invitation).route, 'https://shadochat.online')
+    expect(route.searchParams.get('view')).toBe('games')
+    expect(route.searchParams.get('experience')).toBe('shadow-checkers')
+    expect(route.searchParams.get('invite')).toBe('invite-1')
+    expect(isNotificationPresentationCandidate(invitation, now - 1_000, now)).toBe(false)
+  })
+
   it('applies master, type, snooze, and overnight quiet-hour preferences', () => {
     const event = makeEvent()
     expect(isNotificationTypeEnabled(event, { notifications_enabled: false })).toBe(false)

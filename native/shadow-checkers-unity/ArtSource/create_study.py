@@ -231,25 +231,44 @@ def bookshelf(x,z):
 bookshelf(-13.65,14);bookshelf(-8.15,14)
 print('STUDY_BOOKCASES_MODELED',flush=True)
 
-# Deep fireplace recess with layered masonry and carved mantel.
+# A deep opening reads from the room sweep: the fire sits behind the projecting
+# stone throat, while the mantel forms a continuous chimney breast above it.
 offset_x=3.5
-box('Soot behind the fire',(7,-1.0,14.4),(5.6,6.4,.3),stone,0)
+box('Soot behind the fire',(7,-1.0,14.55),(5.6,6.4,.2),stone,0)
+hearth_rng=random.Random(6814)
 for row in range(9):
     for column in range(5):
-        x=4.85+column*1.07+(row%2)*.16
-        box('Recessed hearth masonry',(x,-4.05+row*.65,14.18),(1.03,.61,.21),stone,.035)
+        x=4.87+column*1.07+(row%2)*.13+hearth_rng.uniform(-.035,.035)
+        y=-4.05+row*.65+hearth_rng.uniform(-.025,.025)
+        depth=hearth_rng.uniform(.14,.23)
+        box('Uneven firebox courses',(x,y,14.35-depth*.5),(1.00,hearth_rng.uniform(.56,.61),depth),stone,.025)
 box('Hearth slab',(7,-4.4,12.8),(7,.45,3.8),stone)
 for side in [-1,1]:
-    box('Stone fireplace jamb',(7+side*3.15,-1.4,13.4),(.65,6.3,1.5),stone)
-    for y in [-4.1,1.2]:box('Jamb capital',(7+side*3.15,y,13.2),(.95,.35,1.7),woodedge)
-    box('Carved mantel pillar',(7+side*3.4,3.4,13.7),(.38,4.1,.45),woodedge)
-for y,w,d in [(1.65,7.5,2),(2.0,7.9,2.15),(5.7,7.9,1.4)]:box('Hearth mantel moulding',(7,y,13.3),(w,.24,d),woodedge)
-frame('Hearth overmantel',(7,3.9,13.45),5.2,2.8,woodedge)
+    jamb_x=7+side*3.15
+    box('Deep stone fireplace jamb',(jamb_x,-1.4,13.35),(.70,6.3,2.05),stone,.055)
+    for y in [-4.1,1.2]:box('Worn jamb capital',(jamb_x,y,12.9),(1.04,.35,2.55),stone,.045)
+    for flute in [-.18,0,.18]:
+        box('Pillar carved flute',(7+side*3.42+flute,3.45,12.25),(.035,3.55,.045),wood,.012)
+    box('Carved mantel pillar',(7+side*3.4,3.4,12.45),(.49,4.1,.65),woodedge)
+    for y in [2.0,5.5]:box('Pillar collar',(7+side*3.4,y,12.42),(.66,.16,.8),woodedge)
+box('Mantel chimney breast',(7,3.77,13.47),(7.25,3.58,1.48),stone,.08)
+for y,w,d,z in [(1.65,7.55,2.75,12.95),(2.0,8.05,2.92,12.9),(5.7,8.05,2.15,13.0)]:
+    box('Projecting mantel cornice',(7,y,z),(w,.25,d),woodedge,.055)
+frame('Hearth overmantel',(7,3.9,12.62),5.2,2.8,woodedge)
+# A low relief compass rose gives the overmantel a finished decorative purpose.
+box('Carved overmantel field',(7,3.9,12.53),(4.40,2.06,.08),wood,.025)
+torus('Overmantel compass ring',(7,3.9,12.42),.68,.032,brass,(math.pi/2,0,0))
+for angle in range(8):
+    a=angle*math.tau/8
+    ornament=box('Overmantel compass ray',(7+.49*math.sin(a),3.9+.49*math.cos(a),12.38),(.075,.45,.035),brass,.012)
+    # The vertical wall is Blender's X/Z plane after p() maps study coordinates.
+    ornament.rotation_euler=(0,a,0)
+lathe('Overmantel compass boss',(7,3.9,12.36),[(0,0),(.12,.025),(.08,.06),(0,.07)],brass,12).rotation_euler=(math.pi/2,0,0)
 # Layered carved rosettes and scrolls break up the broad mantel face.
 for x in [4.6,5.8,7,8.2,9.4]:
-    for radius in [.18,.24]:torus('Carved mantel rosette',(x,1.9,12.15),radius,.032,woodedge,(math.pi/2,0,0))
+    for radius in [.18,.24]:torus('Carved mantel rosette',(x,1.9,11.39),radius,.032,woodedge,(math.pi/2,0,0))
 for side in [-1,1]:
-    for j in range(5):torus('Overmantel scrolling relief',(7+side*(.3+j*.36),3.7+math.sin(j*.7)*.35,13.19),.22-j*.02,.036,woodedge,(math.pi/2,0,0))
+    for j in range(5):torus('Overmantel scrolling relief',(7+side*(.9+j*.33),3.7+math.sin(j*.7)*.35,12.36),.20-j*.018,.028,woodedge,(math.pi/2,0,0))
 for z in [12.6,13.2,13.8]:
     o=lathe('Charred oak log',(7,-3.8,z),[(0,0),(.24,0),(.24,3.6),(0,3.6)],iron,12);o.rotation_euler=(0,math.pi/2,0);o.location.x-=1.8
 for x in [4.8,5.8,6.8,7.8,8.8]:

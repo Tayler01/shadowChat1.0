@@ -37,6 +37,14 @@ test('a refreshed host recovers ready state without replaying an old snapshot', 
   assert.equal(p.sent.length, sent, 'A disposed player must not claim readiness')
 })
 
+test('frame forwards piece and ambience settings independently', async () => {
+  const p = await player()
+  p.host('snapshot', { revision: 'quiet-pieces', soundEnabled: false, ambienceEnabled: true })
+  assert.deepEqual(p.audio.at(-1), [false, true, false])
+  p.host('snapshot', { revision: 'master-muted', soundEnabled: false, ambienceEnabled: false })
+  assert.deepEqual(p.audio.at(-1), [false, false, false])
+})
+
 test('a ready request during initialization waits for the real player', async () => {
   const p = await player({ pending: true })
   p.host('requestReady', null)
@@ -92,14 +100,14 @@ test('a cached page suspends and resumes the same player, then requests fresh ho
   p.window.emit('pagehide', { persisted: true })
   assert.deepEqual(p.stats(), { quits: 0, disposals: 0 })
   assert.deepEqual(p.calls.at(-1), ['ShadowBoard', 'SetPaused', 'true'])
-  assert.deepEqual(p.audio.at(-1), [true, true])
+  assert.deepEqual(p.audio.at(-1), [true, false, true])
   // A host visibility notification must not unpause a cached document.
   p.host('paused', false)
   assert.equal(p.calls.at(-1)[2], 'true')
   p.calls.length = 0; p.sent.length = 0
   p.window.emit('pageshow', { persisted: true })
   assert.deepEqual(p.calls, [['ShadowBoard', 'SetPaused', 'false']])
-  assert.deepEqual(p.audio.at(-1), [true, false])
+  assert.deepEqual(p.audio.at(-1), [true, false, false])
   assert.equal(p.sent.at(-1).type, 'ready')
   // A press begun before suspension must not submit a move after returning.
   p.pointer('pointerup')

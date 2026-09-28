@@ -59,6 +59,7 @@ export function useShadowCheckers(
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pageVisible, setPageVisible] = useState(() => document.visibilityState === 'visible')
   const channelRef = useRef<RealtimeChannel | null>(null)
   const refreshTimerRef = useRef<number | null>(null)
   const selectedMatchIdRef = useRef<string | null>(initialMatchId ?? null)
@@ -112,18 +113,31 @@ export function useShadowCheckers(
   const currentUserId = user?.id
 
   useEffect(() => {
+    const updateVisibility = () => setPageVisible(document.visibilityState === 'visible')
+    document.addEventListener('visibilitychange', updateVisibility)
+    return () => document.removeEventListener('visibilitychange', updateVisibility)
+  }, [])
+
+  useEffect(() => {
     if (
       !currentUserId
+      || !pageVisible
       || !selectedMatchId
       || activeMatchId !== selectedMatchId
       || activeMatchStatus !== 'active'
       || activeMatchTurnUserId !== currentUserId
+      || typeof activeMatchMoveCount !== 'number'
+      || !Number.isInteger(activeMatchMoveCount)
     ) {
       return
     }
 
     let cancelled = false
-    void markShadowCheckersTurnRead(selectedMatchId)
+    void markShadowCheckersTurnRead(
+      selectedMatchId,
+      activeMatchMoveCount,
+      () => !cancelled && document.visibilityState === 'visible',
+    )
       .then(() => {
         if (!cancelled) requestAppBadgeRefresh()
       })
@@ -140,6 +154,7 @@ export function useShadowCheckers(
     activeMatchStatus,
     activeMatchTurnUserId,
     currentUserId,
+    pageVisible,
     selectedMatchId,
   ])
 

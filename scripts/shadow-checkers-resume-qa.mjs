@@ -29,6 +29,10 @@ try {
   const url = 'http://127.0.0.1:4195/output/shadow-checkers-cinematic-preview.html?scenario=capture'
   await page.goto(url)
   await page.locator('iframe[data-ready=true]').waitFor({ timeout: 180000 })
+  const openCameraHelp=async()=>{
+    await page.getByRole('button',{name:'Open Shadow Checkers menu',exact:true}).click()
+    await page.getByRole('region',{name:'Shadow Checkers menu'}).getByRole('button',{name:'Camera help',exact:true}).click()
+  }
   await page.waitForFunction(() => window.unityEvents.some(event => event.type === 'cinematic' && event.stage === 'ready'))
   const frame = page.frames().find(item => item.url().includes('/games/shadow-checkers/unity/'))
   await frame.evaluate(() => {
@@ -36,7 +40,7 @@ try {
     const audio = window.ShadowStudyAudio
     const dispose = audio.dispose, configure = audio.configure
     audio.dispose = () => { window.lifecycleProbe.disposals++; return dispose() }
-    audio.configure = (enabled, paused) => { window.lifecycleProbe.pauses.push(paused); return configure(enabled, paused) }
+    audio.configure = (pieceEnabled, ambienceEnabled, paused) => { window.lifecycleProbe.pauses.push(paused); return configure(pieceEnabled, ambienceEnabled, paused) }
     window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }))
   })
   const hidden = await frame.evaluate(() => window.lifecycleProbe)
@@ -83,7 +87,7 @@ try {
     assert(supported, 'This browser must support actual WebGL context loss for this check')
     await page.getByRole('button', { name: 'Retry 3D table' }).waitFor()
     assert.equal(await page.locator('iframe').count(), 0, 'Failed player must be removed')
-    await page.getByRole('button', { name: 'Camera help', exact: true }).click()
+    await openCameraHelp()
     assert.equal(await page.getByRole('button', { name: 'Overhead', exact: true }).isEnabled(), false)
     await page.getByRole('button', { name: 'Close camera help', exact: true }).click()
     await page.getByRole('button', { name: 'Retry 3D table' }).click()
@@ -95,7 +99,7 @@ try {
     assert.deepEqual(restored.lastMove, snapshot.lastMove, 'Retry must preserve the latest move')
     await page.waitForFunction(count => window.unityEvents.filter(event => event.type === 'presented').length > count, presented)
     await page.getByText('Black to move', { exact: true }).waitFor()
-    await page.getByRole('button', { name: 'Camera help', exact: true }).click()
+    await openCameraHelp()
     await page.getByRole('button', { name: 'Overhead', exact: true }).click()
     await page.waitForFunction(() => window.projection.squares.every(square => square.x > 0 && square.x < 1 && square.y > 0 && square.y < 1))
     report.contextLossRecovery = 'real WebGL loss; new player presented the same captured position and working overhead view'

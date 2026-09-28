@@ -123,17 +123,57 @@ beforeEach(() => {
   })
 })
 
-test('prioritizes Shadow Checkers match chat during Android keyboard compression', () => {
+test('shows a compact feed and toggles the composer without a room header', () => {
+  render(<ShadowCheckersScreen />)
+  expect(screen.getByRole('region', { name: 'Recent match chat' })).toHaveTextContent('Nice jump')
+  expect(document.querySelector('.shadow-checkers-keyboard-collapse')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Open match chat' }))
+  expect(screen.getByPlaceholderText(/say something/i)).toBeInTheDocument()
+  fireEvent.click(screen.getAllByRole('button', { name: 'Close match chat' })[0])
+  expect(screen.queryByRole('region', { name: 'Match chat composer' })).not.toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Recent match chat' })).toBeInTheDocument()
+})
+
+test('chat send closes the composer only on success and preserves a failed draft', async () => {
+  const fixture = mockUseShadowCheckers()
+  fixture.actions.postChat.mockRejectedValueOnce(new Error('Connection lost'))
   render(<ShadowCheckersScreen />)
   fireEvent.click(screen.getByRole('button', { name: 'Open match chat' }))
-  const chatHeading = screen.getByRole('heading', { name: /match chat/i })
-  const chatPanel = chatHeading.closest('section')
+  const input = screen.getByRole('textbox', { name: 'Match message' })
+  fireEvent.change(input, { target: { value: 'Good move' } })
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send match message' })))
+  expect(input).toHaveValue('Good move')
+  expect(screen.getByRole('alert')).toHaveTextContent('Connection lost')
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Send match message' })))
+  expect(fixture.actions.postChat).toHaveBeenCalledWith('match-1', 'Good move')
+  expect(screen.queryByRole('region', { name: 'Match chat composer' })).not.toBeInTheDocument()
+  expect(screen.getByRole('region', { name: 'Recent match chat' })).toBeInTheDocument()
+})
 
-  expect(screen.getByPlaceholderText(/say something/i)).toBeInTheDocument()
-  expect(chatPanel).toHaveClass('shadow-checkers-match-chat')
-  expect(document.querySelector('.shadow-checkers-keyboard-collapse')).toBeInTheDocument()
-  expect(document.querySelector('.shadow-checkers-match-surface')).toBeInTheDocument()
-  expect(document.querySelector('.shadow-checkers-match-chat-wrap')).toBeInTheDocument()
+test('the menu owns room controls and can hide the feed independently', () => {
+  render(<ShadowCheckersScreen />)
+  expect(screen.queryByRole('button', { name: 'Study sound' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Open Shadow Checkers menu' }))
+  expect(screen.getByRole('button', { name: /master sound/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /piece sounds/i })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: /camera help/i })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: /chat feed: shown/i }))
+  expect(screen.queryByRole('region', { name: 'Recent match chat' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Open match chat' }))
+  expect(screen.getByRole('region', { name: 'Match chat composer' })).toBeInTheDocument()
+})
+
+test('lobby pages tables and opens Hall of Fame without page scrolling', () => {
+  const fixture = mockUseShadowCheckers()
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: null, selectedMatchId: null, matches: [activeMatch, { ...activeMatch, id: 'match-2' }] })
+  render(<ShadowCheckersScreen />)
+  expect(screen.getByRole('tab', { name: 'Tables' })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByText('1 / 2')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+  expect(screen.getByText('2 / 2')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: 'Hall of Fame' }))
+  expect(screen.getByRole('tab', { name: 'Hall of Fame' })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByText('Complete a match to enter the Hall of Fame.')).toBeInTheDocument()
 })
 
 test('themed resignation keeps focus and requires confirmation before dispatch', async () => {
@@ -243,6 +283,7 @@ test('opens an exact routed match and closes back to the Checkers lobby route', 
 
   expect(mockUseShadowCheckers).toHaveBeenCalledWith('match-1', expect.any(Function))
 
+  fireEvent.click(screen.getByRole('button', { name: 'Open Shadow Checkers menu' }))
   fireEvent.click(screen.getByRole('button', { name: /back to shadow checkers lobby/i }))
   expect(mockSelectMatch).toHaveBeenCalledWith(null)
   expect(onMatchRoute).toHaveBeenCalledWith('close-item', undefined)

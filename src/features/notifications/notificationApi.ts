@@ -97,12 +97,13 @@ export const markNotificationEventRead = async (eventId: string) => {
 
 export const clearNotificationEventFromSystemTray = async (message: {
   notificationType?: string
-  eventId: string
+  eventId?: string
   conversationId?: string | null
   messageId?: string | null
   imageId?: string | null
   commentId?: string | null
   matchId?: string | null
+  invitationId?: string | null
   roomId?: string | null
 }) => {
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return

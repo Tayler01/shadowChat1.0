@@ -22,8 +22,13 @@ try {
   })
   await page.goto('http://127.0.0.1:4195/output/shadow-checkers-cinematic-preview.html?camera-controls')
   await page.locator('iframe[data-ready=true]').waitFor({timeout:180000})
+  const menuToggle=page.getByRole('button',{name:'Open Shadow Checkers menu',exact:true})
+  const openCameraHelp=async()=>{
+    await menuToggle.click()
+    await page.getByRole('region',{name:'Shadow Checkers menu'}).getByRole('button',{name:'Camera help',exact:true}).click()
+  }
   const reset=async()=>{
-    await page.getByRole('button',{name:'Camera help',exact:true}).click()
+    await openCameraHelp()
     await page.getByRole('button',{name:'Reset table camera'}).click()
     await page.waitForTimeout(400)
   }
@@ -41,10 +46,10 @@ try {
   report.checks.push('actual pointer drag changes Unity projection without board input')
   await reset()
   await zone.focus()
-  for(let step=0;step<15;step++)await page.keyboard.press('ArrowDown')
+  for(let step=0;step<15;step++)await page.keyboard.press('ArrowUp')
   await page.waitForTimeout(150)
   const middleTilt=await projection()
-  for(let step=0;step<10;step++)await page.keyboard.press('ArrowDown')
+  for(let step=0;step<10;step++)await page.keyboard.press('ArrowUp')
   await page.waitForTimeout(150)
   assert.notDeepEqual(await projection(),middleTilt,'Tilt must continue past the old ceiling-induced plateau')
   const steepWidth=width(await projection())
@@ -82,13 +87,23 @@ try {
     assert.deepEqual(appearance,{text:'',background:'rgba(0, 0, 0, 0)',image:'none',border:'0px'},'Gesture area must have no visible panel, labels or border')
     assert((await projection()).every(p=>p.x>0&&p.x<1&&p.y>0&&p.y<1),'Reset view must show all squares')
     assert((await projection()).filter(p=>(p.row+p.col)%2===1).every(p=>board.x+p.x*board.width>left.x+left.width),'Default playable squares must clear the invisible camera area')
-    for(const name of ['Camera help','Study sound','Accessible board']){
-      const b=await page.getByRole('button',{name,exact:true}).boundingBox()
-      assert(b.width>=44&&b.height>=44&&b.x+b.width<=size.width&&b.y+b.height<=size.height)
+    assert.equal(await page.locator('header').count(),0,'Workshop room must have no top bar')
+    assert.equal(await page.getByRole('button',{name:'Study sound',exact:true}).count(),0,'No standalone sound control over room')
+    const b=await menuToggle.boundingBox()
+    assert(b.width>=44&&b.height>=44&&b.x+b.width<=size.width&&b.y+b.height<=size.height)
+    const look=await menuToggle.evaluate(element=>{const style=getComputedStyle(element);return {background:style.backgroundColor,border:style.borderTopWidth}})
+    assert.deepEqual(look,{background:'rgba(0, 0, 0, 0)',border:'0px'},'Menu icon must remain bare over the room')
+    await menuToggle.click()
+    for(const name of ['Camera help','Toggle accessible board','Master Sound: On','Play Music']){
+      const item=page.getByRole('region',{name:'Shadow Checkers menu'}).getByRole('button',{name,exact:true})
+      await item.evaluate(element=>element.scrollIntoView({block:'nearest'}))
+      const target=await item.boundingBox()
+      assert(target.width>=44&&target.height>=44&&target.x+target.width<=size.width&&target.y+target.height<=size.height,`${name}: menu target must fit`)
     }
-    report.checks.push(`${size.width}x${size.height}: invisible full-height camera overlay, full-width room, playable squares clear, 44px corner targets`)
+    await menuToggle.click()
+    report.checks.push(`${size.width}x${size.height}: invisible full-height camera overlay, full-width room, playable squares clear, bare 44px menu with accessible controls`)
   }
-  await page.getByRole('button',{name:'Camera help',exact:true}).click()
+  await openCameraHelp()
   await page.getByRole('button',{name:'Overhead',exact:true}).click()
   await page.waitForTimeout(300)
   assert((await projection()).every(p=>p.x>0&&p.x<1&&p.y>0&&p.y<1))

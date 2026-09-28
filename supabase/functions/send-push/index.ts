@@ -2279,6 +2279,7 @@ const isRecoveryEventPreferenceEnabled = (
   if (eventType === 'shadow_pin_reply') return preferences.shadow_pin_reply_enabled !== false
   if (eventType === 'presence_active') return preferences.presence_push_enabled !== false
   if (eventType === 'shadow_checkers_turn') return preferences.checkers_turn_enabled !== false
+  if (eventType === 'shadow_checkers_invite') return true
   if (eventType === 'connection_request' || eventType === 'connection_accepted') {
     return preferences.connection_notifications_enabled !== false
   }
@@ -2386,6 +2387,26 @@ const sendNotificationDeliveryRecovery = async (
           return { delivered: false, retryable: false }
         }
       }
+      if (job.event_type === 'shadow_checkers_invite') {
+        const { data: invitation, error: invitationError } = await supabase
+          .from('shadow_checkers_invitations')
+          .select('status, invitee_id, expires_at')
+          .eq('id', job.entity_id)
+          .maybeSingle()
+        if (invitationError) throw invitationError
+        if (
+          !invitation ||
+          invitation.status !== 'pending' ||
+          invitation.invitee_id !== job.user_id ||
+          Date.parse(invitation.expires_at) <= Date.now()
+        ) {
+          await updateNotificationDeliveryJob(supabase, job.job_id, {
+            status: 'cancelled',
+            last_error: 'Shadow Checkers invitation is no longer available',
+          })
+          return { delivered: false, retryable: false }
+        }
+      }
 
       const title = getTextValue(payload.title) || 'Shadow Chat'
       const body = getTextValue(payload.body)
@@ -2414,6 +2435,7 @@ const sendNotificationDeliveryRecovery = async (
         imageId: getTextValue(payload.image_id) || undefined,
         commentId: getTextValue(payload.comment_id) || undefined,
         matchId: isCheckers ? job.entity_id : undefined,
+        invitationId: job.event_type === 'shadow_checkers_invite' ? job.entity_id : undefined,
         moveCount: isCheckers ? eventMoveCount : undefined,
         badgeCount,
         unreadCount: badgeCount,

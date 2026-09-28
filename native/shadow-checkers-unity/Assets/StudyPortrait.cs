@@ -15,15 +15,22 @@ public sealed class StudyPortrait : MonoBehaviour
         // The wall battens project to X=-16.55; hang the frame in front of them.
         transform.localPosition = new Vector3(-16.40f, 3.2f, 3.6f);
         transform.localRotation = Quaternion.Euler(0, -90, 0);
+        transform.localScale = new Vector3(1.13f, 1.10f, 1f);
         Frame("Carved walnut frame", wood, new[] {
             new Vector3(2.10f,3.00f,.12f), new Vector3(2.10f,3.00f,-.10f),
-            new Vector3(2.04f,2.94f,-.22f), new Vector3(1.97f,2.87f,-.24f),
-            new Vector3(1.91f,2.81f,-.14f), new Vector3(1.86f,2.76f,-.13f)
+            new Vector3(2.06f,2.96f,-.17f), new Vector3(2.01f,2.91f,-.22f),
+            new Vector3(1.97f,2.87f,-.25f), new Vector3(1.92f,2.82f,-.18f),
+            new Vector3(1.86f,2.76f,-.13f)
         }, new Color(.48f,.35f,.24f));
         Frame("Aged brass sight edge", brass, new[] {
-            new Vector3(1.87f,2.77f,-.13f), new Vector3(1.84f,2.74f,-.16f),
+            new Vector3(1.87f,2.77f,-.13f), new Vector3(1.84f,2.74f,-.18f),
             new Vector3(1.80f,2.70f,-.07f)
         }, Color.white);
+        Frame("Walnut beaded inner fillet", wood, new[] {
+            new Vector3(1.92f,2.82f,-.19f), new Vector3(1.90f,2.80f,-.25f),
+            new Vector3(1.87f,2.77f,-.16f)
+        }, new Color(.62f,.49f,.34f));
+        CornerCarving(wood);
         var mesh = new Mesh { name = "Recessed oil canvas" };
         mesh.vertices = new[] { new Vector3(-1.8f,-2.7f,-.065f), new Vector3(-1.8f,2.7f,-.065f),
             new Vector3(1.8f,2.7f,-.065f), new Vector3(1.8f,-2.7f,-.065f) };
@@ -50,6 +57,29 @@ public sealed class StudyPortrait : MonoBehaviour
         var mesh=new Mesh { name=label };
         mesh.SetVertices(vertices);mesh.SetUVs(0,uv);mesh.SetColors(colors);mesh.SetTriangles(triangles,0);
         Attach(label,mesh,material,true);
+    }
+
+    void CornerCarving(Material material)
+    {
+        var vertices=new List<Vector3>();var uv=new List<Vector2>();
+        var colors=new List<Color>();var triangles=new List<int>();
+        // Four restrained eight-leaf corner bosses sit on the broad outside
+        // molding, with enough depth to survive the moving room camera.
+        foreach(float x in new[]{-2.0f,2.0f})foreach(float y in new[]{-2.90f,2.90f}) {
+            int center=vertices.Count;
+            vertices.Add(new Vector3(x,y,-.28f));uv.Add(new Vector2(.5f,.5f));colors.Add(new Color(.69f,.54f,.36f));
+            for(int petal=0;petal<8;petal++) {
+                float a=petal*Mathf.PI/4f;
+                vertices.Add(new Vector3(x+Mathf.Cos(a)*.083f,y+Mathf.Sin(a)*.083f,-.245f));
+                uv.Add(new Vector2(.5f+Mathf.Cos(a)*.5f,.5f+Mathf.Sin(a)*.5f));
+                colors.Add(new Color(.43f,.31f,.21f));
+            }
+            for(int petal=0;petal<8;petal++)
+                triangles.AddRange(new[]{center,center+1+(petal+1)%8,center+1+petal});
+        }
+        var mesh=new Mesh {name="Carved corner flowers"};
+        mesh.SetVertices(vertices);mesh.SetUVs(0,uv);mesh.SetColors(colors);mesh.SetTriangles(triangles,0);
+        Attach("Carved corner flowers",mesh,material,true);
     }
 
     static Vector3 Corner(Vector3 p,int index)

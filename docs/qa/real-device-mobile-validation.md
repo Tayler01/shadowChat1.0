@@ -110,6 +110,16 @@ Minimum real-device pass:
 | RD-032 | Both | Notification read and badge clearing | Create unread events in each badge category, locate each through its tab or Catch-Up, open the exact source, then inspect the OS tray and Home Screen icon. | Navigation and Home Screen counts share the same unread ledger, cap visually at 99, clear only on source read, and leave no ghost count or stale OS notification. | not run | | Include DM conversation counts, Pin/Catch-Up discovery, Checkers Play badge, app restart, and notification-tap routing. |
 | RD-033 | Both | Weather share and radar | Share the loaded weather card to General Chat, open the posted image, then run radar through several loops and a background/resume cycle. | Shared image is readable rather than black; radar advances about every 500 ms with no blank layer, large jump, or runaway hidden-tab work. | not run | | Browser automation passed nonblank 720x788 output; confirm installed-PWA rendering and real network behavior. |
 
+## Shadow Checkers closeout — September 27, 2026
+
+These checks target the new local closeout candidate after its backend/frontend rollout, not the earlier testing release. Browser checks do not fill in these results.
+
+| ID | Device | Flow | Expected result | Result |
+| --- | --- | --- | --- | --- |
+| RD-034 | iPhone and Android installed PWA | Rotate, landscape lobby, load game, pan/pinch, menu, open/send/close chat, background/return | Branded entrance; usable one-screen lobby; only Chat/menu over room; keyboard dismisses reliably; latest board retained. | not run |
+| RD-035 | Two controlled accounts on phones | Invite while foreground/background; join/decline/expire; take turns, tap push, read current turn | Correct private recipient/match; no duplicate game or stale alerts; foreground prompt and supported background push; exact turn/badge clearing. | not run |
+| RD-036 | iPhone and Android installed PWA | Master/music/piece toggles, lock/return, sustained full match, opening tour and fireplace camera movement | Preferences preserved; natural quiet soundtrack/effects; no objectionable blocky patches; responsive play without crash/heat regression; user accepts final visuals/audio. | not run |
+
 ## Known Emulator Gaps
 
 - iOS Home Screen status-bar and browser-chrome behavior.

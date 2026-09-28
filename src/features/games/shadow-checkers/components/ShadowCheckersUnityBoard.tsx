@@ -1,14 +1,21 @@
 import './checkers-camera.css'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { Accessibility, HelpCircle, Expand, Volume2, VolumeX, X } from 'lucide-react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { X } from 'lucide-react'
 import type { CameraDelta } from '../../shadow-circuit/input/cameraGesture'
 import { ShadowCheckersCameraSurface } from './ShadowCheckersCameraSurface'
 import { useComfortPreferences } from '../../../../hooks/useComfortPreferences'
 import { ShadowCheckersBoard, type ShadowCheckersBoardProps } from './ShadowCheckersBoard'
 import { chooseSquare, makeUnitySnapshot, parseSquareEvent, UNITY_BRIDGE_VERSION, UNITY_FRAME_URL } from '../unity/bridge'
+import { SHADOW_CHECKERS_ASSETS } from '../assets/manifest'
 
-export function ShadowCheckersUnityBoard(props: ShadowCheckersBoardProps & { fill?: boolean; paused?: boolean; onPresentationComplete?: (state: ShadowCheckersBoardProps['state']) => void }) {
-  const { isReducedMotion, effectivePreferences, updatePreferences } = useComfortPreferences()
+export interface ShadowCheckersBoardControls {
+  openCameraHelp: () => void
+  toggleAccessibleBoard: () => void
+  resetCamera: () => void
+}
+
+export const ShadowCheckersUnityBoard = forwardRef<ShadowCheckersBoardControls, ShadowCheckersBoardProps & { fill?: boolean; paused?: boolean; masterSoundEnabled?: boolean; onPresentationComplete?: (state: ShadowCheckersBoardProps['state']) => void }>(function ShadowCheckersUnityBoard(props, controlsRef) {
+  const { isReducedMotion, effectivePreferences } = useComfortPreferences()
   const frame = useRef<HTMLIFrameElement>(null)
   const [ready, setReady] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -19,14 +26,19 @@ export function ShadowCheckersUnityBoard(props: ShadowCheckersBoardProps & { fil
   const [immersive, setImmersive] = useState(false)
   const [cinematic, setCinematic] = useState('')
   const [cameraHelp, setCameraHelp] = useState(false)
+  useImperativeHandle(controlsRef, () => ({
+    openCameraHelp: () => setCameraHelp(true),
+    toggleAccessibleBoard: () => { setAccessible(current => !current); setCameraHelp(false); restart() },
+    resetCamera: () => camera('reset'),
+  }))
   const sequence = useRef(0)
   const submitted = useRef<string | null>(null)
   const latest = useRef(props)
   latest.current = props
-  const snapshot = useMemo(() => makeUnitySnapshot(props, String(++sequence.current), isReducedMotion, effectivePreferences.contrast === 'high', effectivePreferences.gameSfx),
+  const snapshot = useMemo(() => makeUnitySnapshot(props, String(++sequence.current), isReducedMotion, effectivePreferences.contrast === 'high', props.masterSoundEnabled !== false && effectivePreferences.gameSfx, props.masterSoundEnabled !== false && (effectivePreferences.gameMusic || effectivePreferences.gameSfx)),
     // Callback identities are kept in latest; snapshot changes track rendered state only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [props.state, props.viewerSlot, props.selectedPieceId, props.legalMoves, props.helperMoves, props.highlightedMove, props.disabled, props.showHints, props.boardSkin, isReducedMotion, effectivePreferences.contrast, effectivePreferences.gameSfx])
+    [props.state, props.viewerSlot, props.selectedPieceId, props.legalMoves, props.helperMoves, props.highlightedMove, props.disabled, props.showHints, props.boardSkin, props.masterSoundEnabled, isReducedMotion, effectivePreferences.contrast, effectivePreferences.gameMusic, effectivePreferences.gameSfx])
   const latestSnapshot = useRef(snapshot)
   latestSnapshot.current = snapshot
 
@@ -117,9 +129,9 @@ export function ShadowCheckersUnityBoard(props: ShadowCheckersBoardProps & { fil
   }
   const buttonClass = 'min-h-11 min-w-11 rounded-lg border border-[#b9934c]/25 bg-black/35 px-2.5 text-xs text-[#e6d2a8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f0d381] disabled:opacity-40'
   return (
-    <div className={immersive ? 'fixed inset-0 z-[100] flex h-[100dvh] w-screen flex-col bg-[#030609] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]' : props.fill ? 'relative flex h-full min-h-0 w-full flex-col' : 'relative mx-auto w-full max-w-[42rem]'} data-checkers-renderer={accessible ? 'accessible' : 'unity'} role={immersive ? 'dialog' : undefined} aria-modal={immersive || undefined} aria-label={immersive ? 'Shadow Checkers study' : undefined} onKeyDown={handleStudyKeys}>
+    <div className={`${immersive ? 'fixed inset-0 z-[100] flex h-[100dvh] w-screen flex-col bg-black p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]' : props.fill ? 'relative flex h-full min-h-0 w-full flex-col' : 'relative mx-auto w-full max-w-[42rem]'}${!ready ? ' z-30' : ''}`} data-checkers-renderer={accessible ? 'accessible' : 'unity'} role={immersive ? 'dialog' : undefined} aria-modal={immersive || undefined} aria-label={immersive ? 'Shadow Checkers study' : undefined} onKeyDown={handleStudyKeys}>
       {accessible ? <div className="mx-auto min-h-0 w-full flex-1 pt-12" style={props.fill ? { maxWidth: 'calc(100dvh - 112px)' } : undefined}><ShadowCheckersBoard {...props} boardSkin="classic" /></div> : (
-        <div className={immersive || props.fill ? 'relative min-h-0 flex-1 overflow-hidden bg-[#030609]' : 'relative aspect-square overflow-hidden rounded-xl bg-[#030609]'}>
+        <div className={immersive || props.fill ? 'relative min-h-0 flex-1 overflow-hidden bg-black' : 'relative aspect-square overflow-hidden rounded-xl bg-black'}>
           <ShadowCheckersCameraSurface disabled={!ready || Boolean(cinematic) || Boolean(props.paused) || cameraHelp} onChange={moveCamera} onReset={() => camera('reset')} />
           <div className="checkers-player-viewport">
           {!failure && <iframe key={attempt} ref={frame} src={UNITY_FRAME_URL} title="Shadow Checkers 3D board"
@@ -127,8 +139,8 @@ export function ShadowCheckersUnityBoard(props: ShadowCheckersBoardProps & { fil
           {ready && cinematic === 'intro' && <button type="button" onClick={() => camera('reset')} className={`${buttonClass} absolute bottom-3 right-3 bg-black/80`}>Skip room reveal</button>}
           {ready && cinematic === 'kinging' && <p role="status" className="pointer-events-none absolute inset-x-0 top-3 text-center font-serif text-lg tracking-widest text-[#f0d381]">Crowned</p>}
           {(!ready || failure) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-[#060b10] p-6 text-center" role="status" aria-live="polite">
-              <span className="text-[10px] uppercase tracking-[.3em] text-[#b9934c]">Shadow Checkers</span>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black p-6 pb-20 text-center" role="status" aria-live="polite">
+              <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-[clamp(2.5rem,16vh,5rem)] max-w-[min(55vw,18rem)] object-contain" />
               <p className="font-serif text-xl text-[#f6e0a2]">{failure ? 'The 3D table could not load' : 'Preparing your table'}</p>
               {!failure && <><progress max={100} value={progress} aria-label="Loading 3D table" className="h-1.5 w-40 accent-[#d7aa46]" /><span className="text-xs text-[#b9a16f]">{progress}% · first visit may take a moment</span></>}
               {failure && <><p className="text-sm text-[#b9a16f]">Retry the table or use accessible controls to keep playing.</p><button type="button" className={buttonClass} onClick={restart}>Retry 3D table</button></>}
@@ -137,12 +149,6 @@ export function ShadowCheckersUnityBoard(props: ShadowCheckersBoardProps & { fil
           </div>
         </div>
       )}
-      <div className="checkers-corner-controls" aria-label="Board view controls">
-        {!accessible && <button type="button" className={buttonClass} aria-label="Camera help" title="Camera help" aria-expanded={cameraHelp} onClick={() => setCameraHelp(current => !current)}><HelpCircle size={18}/></button>}
-        <button type="button" className={buttonClass} aria-label="Study sound" title={effectivePreferences.gameSfx ? 'Mute study sounds' : 'Enable study sounds'} aria-pressed={effectivePreferences.gameSfx} onClick={() => updatePreferences({gameSfx: !effectivePreferences.gameSfx})}>{effectivePreferences.gameSfx ? <Volume2 size={18}/> : <VolumeX size={18}/>}</button>
-        {!props.fill && <button type="button" className={buttonClass} aria-label={immersive ? 'Return to match' : 'Enter study'} title={immersive ? 'Return to match' : 'Enter study'} aria-pressed={immersive} onClick={() => setImmersive(current => !current)}><Expand size={18}/></button>}
-        <button type="button" className={buttonClass} aria-label={accessible ? 'Return to 3D' : 'Accessible board'} title={accessible ? 'Return to 3D' : 'Accessible board'} aria-pressed={accessible} onClick={() => { setAccessible(current => !current); setCameraHelp(false); restart() }}><Accessibility size={18}/></button>
-      </div>
       {cameraHelp && !accessible && <section className="checkers-camera-help" aria-label="Camera help panel" onKeyDown={event => { if(event.key === 'Escape'){event.stopPropagation();setCameraHelp(false)} }}>
         <div className="flex items-center justify-between gap-3"><h3 className="font-serif text-lg text-[#f0d381]">Around the table</h3><button type="button" className={buttonClass} aria-label="Close camera help" onClick={() => setCameraHelp(false)}><X size={18}/></button></div>
         <p>Drag over the left side of the room to look left, right, up or down. Spread two fingers to move closer; pinch together to pull back.</p>
@@ -152,4 +158,4 @@ export function ShadowCheckersUnityBoard(props: ShadowCheckersBoardProps & { fil
       <p className="sr-only" aria-live="polite">{props.state.winner ? 'Match complete.' : props.disabled ? 'Watching the table.' : 'Your turn. Select a piece, then its destination. Use Accessible board for keyboard controls.'}</p>
     </div>
   )
-}
+})

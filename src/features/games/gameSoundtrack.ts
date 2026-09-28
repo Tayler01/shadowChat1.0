@@ -113,6 +113,8 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
         await audioContext.resume()
       }
 
+      if (disposed || requestId !== playRequestId) return false
+
       const buffer = await loadBuffer(source)
       if (!buffer || disposed || requestId !== playRequestId) return false
       if (typeof document !== 'undefined' && document.hidden) return false

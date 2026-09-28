@@ -37,10 +37,15 @@ public sealed class StudyWindow : MonoBehaviour
             new[]{new Vector3(3.7f,2.3f,14.35f),new Vector3(3.8f,3.2f,14.32f),new Vector3(4.1f,3.8f,14.30f)},
             new[]{new Vector3(2.85f,5,14.48f),new Vector3(2.3f,6.1f,14.53f),new Vector3(2.05f,7.4f,14.55f)},
             new[]{new Vector3(3.2f,6.9f,14.51f),new Vector3(4.15f,7.6f,14.53f),new Vector3(4.95f,8.85f,14.56f)},
-            new[]{new Vector3(3.7f,7.23f,14.52f),new Vector3(3.55f,8.4f,14.6f),new Vector3(3.80f,9.2f,14.63f)}
+            new[]{new Vector3(3.7f,7.23f,14.52f),new Vector3(3.55f,8.4f,14.6f),new Vector3(3.80f,9.2f,14.63f)},
+            new[]{new Vector3(4.75f,5.65f,14.54f),new Vector3(5.15f,5.85f,14.54f),new Vector3(5.62f,5.72f,14.52f)},
+            new[]{new Vector3(4.3f,6.05f,14.57f),new Vector3(4.72f,6.3f,14.56f),new Vector3(5.02f,6.2f,14.55f)},
+            new[]{new Vector3(2.3f,6.1f,14.53f),new Vector3(1.97f,6.28f,14.55f),new Vector3(1.78f,6.72f,14.57f)},
+            new[]{new Vector3(4.55f,2.55f,14.32f),new Vector3(4.76f,3.10f,14.36f),new Vector3(4.68f,3.48f,14.39f)},
+            new[]{new Vector3(3.15f,9.6f,14.56f),new Vector3(2.93f,10.08f,14.59f),new Vector3(2.55f,10.3f,14.62f)}
         };
         for(int path=0;path<paths.Length;path++) {
-            var points=paths[path];float root=path==0?.085f:path==1||path==3?.05f:.028f;
+            var points=paths[path];float root=path==0?.085f:path==1||path==3?.05f:path<8?.028f:.016f;
             int segments=(points.Length-1)*4;
             for(int segment=0;segment<segments;segment++) {
                 var a=BranchPoint(points,segment/4f);var b=BranchPoint(points,(segment+1)/4f);var axis=(b-a).normalized;

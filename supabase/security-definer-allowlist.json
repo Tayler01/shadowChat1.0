@@ -1,7 +1,8 @@
 {
-  "reviewed_on": "2026-08-05",
-  "expected_total_security_definers": 149,
+  "reviewed_on": "2026-09-27",
+  "expected_total_security_definers": 154,
   "private_security_definers": [
+    "private.cancel_blocked_shadow_checkers_invitations()",
     "private.can_operator_access_moderation_case(uuid,uuid)",
     "private.can_operator_read_moderation_evidence(uuid,uuid)",
     "private.can_read_moderation_attachment(uuid,text)",
@@ -14,6 +15,7 @@
     "private.create_hype_activity_event()",
     "private.create_reaction_activity_event()",
     "private.create_shadow_checkers_turn_notification()",
+    "private.sync_shadow_checkers_invitation_notification()",
     "private.create_shadow_pin_comment_notification()",
     "private.create_shadow_pin_post_notifications()",
     "private.create_signup_invite(uuid,text)",
@@ -435,8 +437,12 @@
       "domain": "shadow_checkers",
       "justification": "Authoritative matchmaking, turn validation, chat, resign, rematch, and queue transitions must remain atomic across game rows.",
       "signatures": [
+        "accept_shadow_checkers_invitation(uuid,text)",
+        "cancel_shadow_checkers_invitation(uuid)",
         "cancel_shadow_checkers_match(uuid)",
         "create_shadow_checkers_match(text,text)",
+        "decline_shadow_checkers_invitation(uuid)",
+        "expire_my_shadow_checkers_invitations()",
         "join_shadow_checkers_match(uuid,text)",
         "leave_shadow_checkers_queue(uuid)",
         "mark_my_checkers_turn_read(uuid)",
@@ -444,6 +450,7 @@
         "queue_shadow_checkers_match(uuid,text)",
         "rematch_shadow_checkers_match(uuid)",
         "resign_shadow_checkers_match(uuid)",
+        "send_shadow_checkers_invitation(uuid,text,text)",
         "start_shadow_checkers_next_challenger(uuid)",
         "submit_shadow_checkers_move(uuid,text,jsonb)"
       ]

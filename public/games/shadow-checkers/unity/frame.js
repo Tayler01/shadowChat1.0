@@ -7,7 +7,7 @@
   let pageSuspended = false
   let disposed = false
   const isPaused = () => paused || pageSuspended || disposed || document.hidden
-  const updateAudio = () => window.ShadowStudyAudio.configure(Boolean(snapshot?.soundEnabled), isPaused() || !started)
+  const updateAudio = () => window.ShadowStudyAudio.configure(Boolean(snapshot?.soundEnabled), Boolean(snapshot?.ambienceEnabled), isPaused() || !started)
   const updatePresentation = () => {
     if (disposed) return
     updateAudio()

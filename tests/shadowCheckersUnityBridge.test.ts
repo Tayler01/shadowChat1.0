@@ -38,4 +38,6 @@ test('sends presentation-only state and the shared comfort policy', () => {
   expect(snapshot.destinations).toEqual([{ row: 4, col: 1 }])
   expect(snapshot).not.toHaveProperty('session')
   expect(snapshot).not.toHaveProperty('access_token')
+  expect(snapshot).toMatchObject({ soundEnabled: false, ambienceEnabled: false })
+  expect(makeUnitySnapshot(props(), 'r2', false, false, false, true)).toMatchObject({ soundEnabled: false, ambienceEnabled: true })
 })

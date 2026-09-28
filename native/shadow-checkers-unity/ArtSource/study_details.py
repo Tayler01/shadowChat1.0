@@ -9,6 +9,29 @@ import random
 from mathutils import Vector, Matrix
 
 
+def map_edge_tint(u, v, tabletop, refreshed=True):
+    distance = min(u, v, 1-u, 1-v)
+    irregular = .012 * math.sin(u*43+v*19) + .008 * math.sin(v*59-u*11)
+    if tabletop:
+        width, edge_color = .09, (.36, .19, .10)
+    elif refreshed:
+        width, edge_color = .16, (.43, .28, .17)
+    else:
+        width, edge_color = .13, (.68, .55, .38)
+    fade = max(0, min(1, (distance-irregular) / width))
+    return tuple(edge_color[i]*(1-fade)+fade for i in range(3))
+
+
+def paper_edge_multiplier(normal, world):
+    # Color the exposed cut edge, leaving page faces and faint line detail clear.
+    if abs(normal.z) >= .90:
+        return (1, 1, 1)
+    fore_edge = max(0, -normal.y)
+    mottling = .88 + .12 * math.sin(world.x*11+world.y*17+world.z*29)
+    char = (.22 + .32*fore_edge) * mottling
+    return (1-.53*char, 1-.76*char, 1-.95*char)
+
+
 def enrich_study(g):
     rng = random.Random(92426)
     groups = g['groups']
@@ -111,6 +134,23 @@ def enrich_study(g):
     for obj in groups['StudyBindings']:
         color = rng.choice([(.96, .69, .45), (.62, .78, .67), (.90, .46, .34), (.70, .55, .78), (.94, .85, .65)])
         paint(obj, color)
+    # A few incomplete, rubbed foil strokes suggest old titles at reading
+    # distance. The photographic atlas already supplies the binding ornament.
+    for index, obj in enumerate(list(groups['StudyBindings'])):
+        if index % 11 or not obj.name.startswith('Tooled leather spine'):
+            continue
+        points = [obj.matrix_world @ vertex.co for vertex in obj.data.vertices]
+        left, right = min(v.x for v in points), max(v.x for v in points)
+        bottom, top = min(v.z for v in points), max(v.z for v in points)
+        if top-bottom < .65 or right-left < .13:
+            continue
+        front = max(v.y for v in points)
+        for line, height in enumerate((.46,.54,.60)):
+            width = min((right-left)*(.48 if line != 1 else .33), .15)
+            x = (left+right)*.5 + (.017 if line == 1 else -.009)
+            y = bottom+(top-bottom)*height
+            stroke = box('Rubbed spine title stroke',(x,y,-front-.012),(width,.009,.006),brass,.002)
+            stroke['engraving'] = True
     for obj in groups['StudyLeather']:
         level = max(0, min(3, round((obj.location.z + .7) / .33)))
         paint(obj, palette[level])
@@ -127,6 +167,13 @@ def enrich_study(g):
                   [(0, 0), (.013, .008), (.018, .035), (.013, length * .7), (.008, length), (0, length + .018)], wax, 10)
         for ring_height, radius in [(.06, .38), (.12, .32), (.57, .14), (1.015, .24), (1.075, .24)]:
             torus('Engraved candlestick ring', (x, y + ring_height, z), radius, .009, brass)
+        for mark in range(8):
+            angle = mark * math.tau / 8
+            tick = box('Candlestick chased radial mark',
+                       (x+.285*math.cos(angle),y+.148,z+.285*math.sin(angle)),
+                       (.095,.006,.012),brass,0)
+            tick.rotation_euler[2] = angle
+            tick['engraving'] = True
         for bead in range(24):
             angle = bead * math.tau / 24
             lathe('Beaded candle foot', (x + .35 * math.cos(angle), y + .09, z + .35 * math.sin(angle)), [(0, 0), (.014, .009), (0, .023)], brass, 6)
@@ -145,9 +192,15 @@ def enrich_study(g):
         paint(obj, (1, .96, .85))
         maximum = max((v.co.z for v in obj.data.vertices), default=1)
         layer = obj.data.color_attributes['SurfaceTint']
+        uv = obj.data.uv_layers.get('UVMap') or obj.data.uv_layers.new(name='UVMap')
+        is_drip = obj.name.startswith(('Cooled wax drip', 'Fine wax run'))
         for loop in obj.data.loops:
             height = obj.data.vertices[loop.vertex_index].co.z
-            layer.data[loop.index].color[3] = max(0, min(1, (height / max(.01, maximum) - .55) / .45)) * (1 if obj.name.startswith('Hand dipped wax') else .2)
+            normalized = max(0, min(1, height / max(.01, maximum)))
+            # Wax does not sample a texture. Its UV0 stores an unambiguous drip
+            # flag and top-to-bottom shape, leaving alpha for candle glow.
+            uv.data[loop.index].uv = (-1, normalized) if is_drip else (0, 0)
+            layer.data[loop.index].color[3] = max(0, min(1, (normalized - .55) / .45)) * (1 if obj.name.startswith('Hand dipped wax') else .2)
 
     # Worked drinking vessel, rolled lip, chased bands and a dark wine meniscus.
     for height, radius in [(0.05, .325), (.70, .16), (.91, .34), (1.10, .365), (1.24, .38), (1.50, .34)]:
@@ -155,6 +208,12 @@ def enrich_study(g):
     for flute in range(16):
         angle = flute * math.tau / 16
         lathe('Goblet chased teardrop', (8.2 + .348 * math.cos(angle), -.955 + .96, -2.7 + .348 * math.sin(angle)), [(0, 0), (.016, .025), (.011, .10), (0, .16)], brass, 6)
+    for mark in range(12):
+        angle = mark * math.tau / 12
+        tick = box('Goblet shoulder engraving',
+                   (8.2+.363*math.cos(angle),-.955+1.17,-2.7+.363*math.sin(angle)),
+                   (.012,.07,.006),brass,0)
+        tick['engraving'] = True
     wine = g['material']('Dark red wine', (.065, .008, .014), .08)
     g['group'] = 'StudyWine'
     lathe('Wine surface and meniscus', (8.2, -.955 + 1.32, -2.7), [(.308, .016), (.304, .006), (.29, 0), (0, 0)], wine, 48)
@@ -162,6 +221,8 @@ def enrich_study(g):
     # Incised graduations follow the tilted armillary band in local space.
     equator = next(o for o in groups['StudyMetals'] if o.name.startswith('Armillary equator'))
     bpy.context.view_layer.update()
+    for height,radius in [(.11,.595),(.26,.385),(1.17,.235)]:
+        torus('Armillary pedestal engraved collar',(7.1,-.955+height,5.8),radius,.008,brass)
     for tick in range(72):
         angle = tick * math.tau / 72
         obj = box('Armillary engraved graduation', (0, 0, 0), (.026 if tick % 6 == 0 else .012, .002, .055 if tick % 6 == 0 else .025), brass, 0)
@@ -187,16 +248,31 @@ def enrich_study(g):
 
     # Curl table parchment at its edges; preserve the full source map UVs.
     for obj in groups['StudyMaps']:
-        if obj.name.startswith(('Desk parchment', 'Folded charts')):
+        tabletop = obj.name.startswith(('Desk parchment', 'Folded charts'))
+        if tabletop or obj.name.startswith('Mercator wall chart'):
             bpy.ops.object.select_all(action='DESELECT'); obj.select_set(True); bpy.context.view_layer.objects.active = obj
-            bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.mesh.subdivide(number_cuts=12); bpy.ops.object.mode_set(mode='OBJECT')
-            max_x = max(abs(v.co.x) for v in obj.data.vertices)
-            max_y = max(abs(v.co.y) for v in obj.data.vertices)
-            for vertex in obj.data.vertices:
-                edge = max(abs(vertex.co.x) / max_x, abs(vertex.co.y) / max_y)
-                vertex.co.z += .002 + .055 * max(0, (edge - .72) / .28) ** 2 * (.7 + .3 * math.sin(vertex.co.x * 4 + vertex.co.y * 2))
+            bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT'); bpy.ops.mesh.subdivide(number_cuts=12 if tabletop else 9); bpy.ops.object.mode_set(mode='OBJECT')
+            if tabletop:
+                max_x = max(abs(v.co.x) for v in obj.data.vertices)
+                max_y = max(abs(v.co.y) for v in obj.data.vertices)
+                for vertex in obj.data.vertices:
+                    edge = max(abs(vertex.co.x) / max_x, abs(vertex.co.y) / max_y)
+                    vertex.co.z += .002 + .055 * max(0, (edge - .72) / .28) ** 2 * (.7 + .3 * math.sin(vertex.co.x * 4 + vertex.co.y * 2))
+                    if abs(vertex.co.x) > max_x - .001:
+                        cut = .019 + .016*(.5+.5*math.sin(vertex.co.y*13+vertex.co.x*2))
+                        vertex.co.x -= math.copysign(cut, vertex.co.x)
+                    if abs(vertex.co.y) > max_y - .001:
+                        cut = .016 + .018*(.5+.5*math.sin(vertex.co.x*11-vertex.co.y*3))
+                        vertex.co.y -= math.copysign(cut, vertex.co.y)
             obj.data.update(); obj.select_set(False)
         paint(obj, (1, 1, 1))
+        if obj.data.uv_layers:
+            tint = obj.data.color_attributes['SurfaceTint']
+            uv = obj.data.uv_layers.active.data
+            for loop in obj.data.loops:
+                u, v = uv[loop.index].uv
+                # The worn border is narrow enough to leave map lines legible.
+                tint.data[loop.index].color = map_edge_tint(u, v, tabletop) + (1,)
 
     # Dedicated stone texels and baked crevice AO survive the wide room atlas.
     # Spatial UVs give the joined masonry a coherent, unstretched grain scale.
@@ -236,6 +312,15 @@ def enrich_study(g):
     for obj in groups['StudyPaper']:
         shade = rng.uniform(.88, 1)
         paint(obj, (shade, shade, shade * .96))
+        tint = obj.data.color_attributes['SurfaceTint']
+        normals = obj.matrix_world.to_3x3()
+        for face in obj.data.polygons:
+            normal = (normals @ face.normal).normalized()
+            for index in face.loop_indices:
+                world = obj.matrix_world @ obj.data.vertices[obj.data.loops[index].vertex_index].co
+                fade = paper_edge_multiplier(normal, world)
+                value = tint.data[index].color
+                tint.data[index].color = (value[0]*fade[0], value[1]*fade[1], value[2]*fade[2], value[3])
     for obj in groups['StudyMetals']:
         shade = rng.uniform(.70, 1)
         paint(obj, (.07,.055,.035) if obj.get('engraving') else (shade, shade * rng.uniform(.91, 1), shade * rng.uniform(.78, .95)))

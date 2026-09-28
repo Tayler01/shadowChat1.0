@@ -52,7 +52,9 @@ public static class MedievalStudy
         var leather=Surface("Embossed folio leather",Color.white,0,.30f);leather.SetFloat("_Micrograin",.30f);leather.SetFloat("_LeatherWear",1);
         leather.SetTexture("_LeatherGrain",leatherGrain);
         Detail(parent,"StudyLeather",leather);
-        var wax=Surface("Hand dipped beeswax",new Color(.76f,.65f,.44f),0,.38f);wax.SetFloat("_Micrograin",.08f);wax.SetFloat("_WaxGlow",.055f);
+        var wax=new Material(Resources.Load<Shader>("StudyWax"));wax.name="Hand dipped beeswax";
+        wax.color=new Color(.76f,.65f,.44f);wax.SetFloat("_Glossiness",.38f);
+        wax.SetFloat("_Micrograin",.08f);wax.SetFloat("_WaxGlow",.055f);
         Detail(parent,"StudyWax",wax);
         Detail(parent,"StudyMaps",Surface("Engraved parchment",new Color(.9f,.85f,.74f),0,.13f,"StudyMap"));
         Detail(parent,"StudyWine",Surface("Wine in worked goblet",new Color(.065f,.008f,.014f),0,.94f),false);

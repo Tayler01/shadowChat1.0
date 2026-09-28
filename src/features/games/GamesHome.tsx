@@ -24,6 +24,7 @@ import { SHADO_LIVE_ASSETS } from '../entertainment/shado-live/assets/manifest'
 import { SHADO_LIVE_PROTOTYPE_ENABLED, SHADO_LIVE_REAL_ENABLED, SHADOW_CIRCUIT_ENABLED } from '../../config/featureFlags'
 import { MobileAppHeader } from '../../components/layout/MobileAppHeader'
 import { useAppBadgeState } from '../../hooks/useAppBadgeState'
+import { useComfortPreferences } from '../../hooks/useComfortPreferences'
 import type { AppView } from '../../types/navigation'
 import type { PlayExperience, PlayRouteAction } from '../../lib/appRouting'
 
@@ -149,13 +150,17 @@ export function GamesHome({
   onPlayRoute,
 }: GamesHomeProps) {
   const badgeState = useAppBadgeState()
+  const { effectivePreferences, updatePreferences } = useComfortPreferences()
   const [selectedEntertainment, setSelectedEntertainment] = useState<SelectedEntertainment>(() => (
     initialExperience ?? readLocalPreviewEntertainment()
   ))
   const [musicPlaying, setMusicPlaying] = useState(false)
   const [audioBlocked, setAudioBlocked] = useState(false)
+  const [masterSoundEnabled, setMasterSoundEnabled] = useState(true)
   const soundtrackRef = useRef<GameSoundtrackController | null>(null)
   const currentMusicSourceRef = useRef<string | null>(null)
+  const musicRequestedRef = useRef(false)
+  const musicRequestIdRef = useRef(0)
 
   const getSoundtrack = useCallback(() => {
     soundtrackRef.current ??= createGameSoundtrackController(0.42)
@@ -165,7 +170,11 @@ export function GamesHome({
   const playMusic = useCallback(async (source?: string) => {
     if (!source) return
 
+    const requestId = ++musicRequestIdRef.current
+    musicRequestedRef.current = true
     currentMusicSourceRef.current = source
+    setMusicPlaying(false)
+    setAudioBlocked(false)
 
     if (typeof document !== 'undefined' && document.hidden) {
       setMusicPlaying(false)
@@ -176,18 +185,23 @@ export function GamesHome({
     const soundtrack = getSoundtrack()
     soundtrack.setVolume(source === SHADOW_CHECKERS_ASSETS.music ? 0.11 : 0.42)
     const played = await soundtrack.play(source)
-    if (currentMusicSourceRef.current !== source) return
+    if (requestId !== musicRequestIdRef.current || !musicRequestedRef.current) return
 
     setMusicPlaying(played)
     setAudioBlocked(!played)
   }, [getSoundtrack])
 
   const pauseMusic = useCallback((options: { closeContext?: boolean } = {}) => {
+    musicRequestIdRef.current += 1
+    musicRequestedRef.current = false
+    currentMusicSourceRef.current = null
     soundtrackRef.current?.stop(options)
     setMusicPlaying(false)
+    setAudioBlocked(false)
   }, [])
 
   const stopMusicForBackground = useCallback(() => {
+    musicRequestIdRef.current += 1
     soundtrackRef.current?.stop({ closeContext: true })
     setMusicPlaying(false)
     setAudioBlocked(false)
@@ -218,7 +232,7 @@ export function GamesHome({
   }
 
   const enterShadowCheckers = () => {
-    void playMusic(SHADOW_CHECKERS_ASSETS.music)
+    if (effectivePreferences.gameMusic && masterSoundEnabled) void playMusic(SHADOW_CHECKERS_ASSETS.music)
     setAudioBlocked(false)
     openExperience('shadow-checkers')
   }
@@ -293,17 +307,32 @@ export function GamesHome({
   }
 
   const toggleMusic = () => {
+    if (selectedEntertainment === 'shadow-checkers') {
+      if (!effectivePreferences.gameMusic) {
+        updatePreferences({ gameMusic: true })
+        if (masterSoundEnabled) void playMusic(SHADOW_CHECKERS_ASSETS.music)
+      } else if (audioBlocked) {
+        if (masterSoundEnabled) void playMusic(SHADOW_CHECKERS_ASSETS.music)
+      } else {
+        updatePreferences({ gameMusic: false })
+        pauseMusic()
+      }
+      return
+    }
     if (musicPlaying) {
       pauseMusic()
       return
     }
-    const source =
-      selectedEntertainment === 'shadow-checkers'
-        ? SHADOW_CHECKERS_ASSETS.music
-        : selectedEntertainment === 'shadow-runner'
-          ? SHADOW_RUNNER_ASSETS.music
-          : SHADOW_WAR_ASSETS.music
+    const source = selectedEntertainment === 'shadow-runner'
+      ? SHADOW_RUNNER_ASSETS.music
+      : SHADOW_WAR_ASSETS.music
     void playMusic(source)
+  }
+
+  const toggleMasterSound = () => {
+    if (masterSoundEnabled) pauseMusic()
+    else if (effectivePreferences.gameMusic) void playMusic(SHADOW_CHECKERS_ASSETS.music)
+    setMasterSoundEnabled(!masterSoundEnabled)
   }
 
   const playShadowRunnerMusic = useCallback(() => {
@@ -319,6 +348,15 @@ export function GamesHome({
   }, [initialExperience])
 
   useEffect(() => {
+    if (selectedEntertainment !== 'shadow-checkers') return
+    if (!masterSoundEnabled || !effectivePreferences.gameMusic) {
+      if (musicRequestedRef.current) pauseMusic()
+    } else if (!musicRequestedRef.current) {
+      void playMusic(SHADOW_CHECKERS_ASSETS.music)
+    }
+  }, [selectedEntertainment, masterSoundEnabled, effectivePreferences.gameMusic, pauseMusic, playMusic])
+
+  useEffect(() => {
     return () => {
       soundtrackRef.current?.dispose()
       soundtrackRef.current = null
@@ -327,20 +365,27 @@ export function GamesHome({
   }, [onImmersiveChange])
 
   useEffect(() => {
+    const resumeRequestedMusic = () => {
+      if (!document.hidden && musicRequestedRef.current && currentMusicSourceRef.current) {
+        void playMusic(currentMusicSourceRef.current)
+      }
+    }
     const handleVisibilityChange = () => {
       if (document.hidden) {
         stopMusicForBackground()
-      }
+      } else resumeRequestedMusic()
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('pagehide', stopMusicForBackground)
+    window.addEventListener('pageshow', resumeRequestedMusic)
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('pagehide', stopMusicForBackground)
+      window.removeEventListener('pageshow', resumeRequestedMusic)
     }
-  }, [stopMusicForBackground])
+  }, [stopMusicForBackground, playMusic])
 
   const pickerCardClass = 'group relative h-[8.25rem] w-full shrink-0 overflow-hidden rounded-[2rem] border border-[rgba(215,170,70,0.42)] bg-[#050403] text-left shadow-[0_24px_60px_rgba(0,0,0,0.48)] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-0.5 hover:border-[rgba(239,202,114,0.68)] focus:outline-none focus:ring-2 focus:ring-[rgba(239,202,114,0.55)] md:h-[10rem]'
   const pickerCardContentClass = 'relative flex h-full items-center gap-4 px-5 py-4 md:px-8'
@@ -383,6 +428,9 @@ export function GamesHome({
             musicPlaying={musicPlaying}
             audioBlocked={audioBlocked}
             onToggleMusic={toggleMusic}
+            musicEnabled={effectivePreferences.gameMusic}
+            masterSoundEnabled={masterSoundEnabled}
+            onToggleMasterSound={toggleMasterSound}
             unreadMatchCounts={Object.fromEntries(
               badgeState.gameDestinations
                 .filter(destination => destination.experience === 'shadow-checkers')

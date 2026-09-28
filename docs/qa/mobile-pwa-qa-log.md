@@ -1,3 +1,11 @@
+## September 27 Shadow Checkers closeout candidate — local only
+
+- Landscape layout reports `layout-chromium-1790552946284` and `layout-webkit-1790552986595` cover the revised lobby/menu/feed/composer, small landscape, enlarged text, simulated keyboard, failed-send retention and dismissal. These fixtures do not prove hosted transport or real mobile keyboards.
+- Actual Unity camera reports `camera-chromium-1790553587774` and `camera-webkit-1790553607999` pass navigation, tilt/zoom, input separation and 44 px controls. Chromium injects two-finger touch; WebKit keyboard zoom is not Safari finger-pinch proof. Fixed the menu overlapping camera-help dismissal.
+- `resume-chromium-1790553443275` and `resume-webkit-1790553501121` pass capture, real WebGL context loss and retry with the latest pieces/move retained. Actual history return did not use the browser cache in these runs; synthetic lifecycle coverage is recorded separately.
+- `render-chromium-2-1790553727232`: desktop Intel Arc, DPR 2, 915×412, 521 draws/frame, 30.62 submitted frames/sec, 33.4 ms p95 submission interval, zero >50 ms intervals in eight seconds, no page errors. Latest prior shadow-batched baseline was 511 draws/frame. These are submission metrics, not GPU completion/physical-phone/thermal proof.
+- All new UI/art/invitation changes remain local. Physical-phone fireplace patches during camera movement, audio feel/autoplay, real keyboard dismissal, invitation/turn push, sustained play and final visual acceptance remain open.
+
 ## September 27 Shadow Checkers production testing release
 
 - Manual production build bdde5246d73f254f03f04f8c9067b1fbf684f3de / Netlify 6ab8a42a9c6ca3bd2a6de905 is live, with matching health/Unity assets and restart notice. Full release checks passed; production bundle remains below the unchanged 100 MB limit.

@@ -437,6 +437,16 @@ const typePolicies: Record<string, NotificationTypePolicy> = {
     badge: 'games',
     actionLabel: 'Play Turn',
   },
+  shadow_checkers_invite: {
+    category: 'shadow_checkers',
+    eyebrow: 'Shadow Checkers invitation',
+    groupKey: entityGroup('checkers-invite'),
+    priority: 'high',
+    soundId: 'checkers_move',
+    channel: 'games_v1',
+    badge: 'games',
+    actionLabel: 'Join or Decline',
+  },
   shadow_war_turn: {
     category: 'shadow_war',
     eyebrow: 'Shadow War',

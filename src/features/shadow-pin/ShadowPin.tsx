@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import './shadow-pin-actions.css'
 import type {
   CSSProperties,
   FormEvent,
