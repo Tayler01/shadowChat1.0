@@ -1,3 +1,16 @@
+## September 27 Shadow Checkers chat follow-up — 10:03 PM ET
+
+- Live build `c3523dadeacc960878b71b5d12b0fbd30181c402`, Netlify `6ab9cab96d8fcedc0386d2d1`. Verified exact health/11 assets, Linux media guard, production health and restart broadcast after manual deployment.
+- `layout-webkit-1790560393203` and `layout-chromium-1790560506456` cover transparent feed, visible Send, input font at least 16px, keyboard-height containment and scale 1 on send/close across four profiles. Final hide-feed-while-composing state passes targeted WebKit/Chromium preview checks and 20 Jest tests; reviewed `layout-webkit-1790560640584/chat-composer-landscape.png`.
+- Notice-positioning reports `layout-webkit-1790559834632` and `layout-chromium-1790559947723` verify unobstructed Skip at 915×412. Hosted transport proof below was on the preceding build, before these presentation-only follow-ups. Physical iPhone/PWA focus zoom is not reproduced or certified by desktop WebKit; user retest remains required.
+
+## September 27 Shadow Checkers closeout release — 9:38 PM ET
+
+- Production build `b298f52bc4b6e9539640a3cd26fee3edd51be6b7`, Netlify `6ab9c48ad00735ff94c5c11f`, is live with matching health and Unity assets, working Linux media function and restart notice. Release verification is recorded in `output/checkers-closeout-live-verification.json`.
+- Final layout report `layout-webkit-1790558611751` verifies whole visible cards and rank entries within the panel at 667×320 and 130% text. Final camera reports `camera-chromium-1790557724609` and `camera-webkit-1790557738396` verify inverted drag/arrows, zoom, invisible input zone and menu isolation.
+- Final native render report `render-chromium-2-1790558475130`: 567 draws/frame, 30.46 submissions/sec, 33.4 ms p95 interval, zero >50 ms intervals over eight seconds on desktop Intel Arc. These are not phone/GPU-completion/thermal measurements.
+- Hosted report `shadow-checkers-invite-hosted-1790560134591/summary.json` passes private invite, distinct-character Join into one match, both players' Unity moves, recipient turn event/read and live compact chat. Exact QA cleanup verified zero sessions/matches/moves/chat/invitations/events/jobs. The test dismissed the accepted-match notice to bypass the discovered Skip overlap; a separate CSS follow-up addresses it. The user's phone found input zoom, unclear Send and unwanted chat panel styling; these require a follow-up and phone retest. Physical installed-PWA push, audio mix/autoplay, real keyboard dismissal, sustained play and the user's camera-moving fireplace artifact remain unverified.
+
 ## September 27 Shadow Checkers closeout candidate — local only
 
 - Landscape layout reports `layout-chromium-1790552946284` and `layout-webkit-1790552986595` cover the revised lobby/menu/feed/composer, small landscape, enlarged text, simulated keyboard, failed-send retention and dismissal. These fixtures do not prove hosted transport or real mobile keyboards.

@@ -1,6 +1,21 @@
 # Shadow Checkers finish checklist
 
-September 27, 2026. Working checklist from the user's physical-phone walkthrough. The goal has resumed for implementation. The previous build is deployed for testing; the closeout changes below remain local until validation and release. These are acceptance requirements, not claims of completed implementation.
+September 27, 2026. Working checklist from the user's physical-phone walkthrough. The goal is active. The closeout update is now deployed for phone testing; acceptance requirements below remain open where hosted or physical-device evidence is still needed.
+
+## Phone chat follow-up published — September 27, 10:03 PM ET
+
+- Published `c3523dadeacc960878b71b5d12b0fbd30181c402`, Netlify `6ab9cab96d8fcedc0386d2d1`, following the user's immediate republish request. This includes the accepted-notice positioning fix from `c7f84840`.
+- Chat now has a visible gold Send button, input text computed at 16px minimum in the checked profiles, and plain recent messages without a panel/bubbles. The feed hides while composing and returns on send/close. No browser zoom-disabling restriction was added.
+- Focused 20 Jest tests, full lint/types, production build, and Chromium/WebKit layout checks pass. Input is 16px at standard scale and 20.8px at 130%; Send targets are at least 44px and emulated viewport scale remains 1 through focus/send/close. Physical iPhone/PWA keyboard zoom still needs user retest.
+- Exact hosted health and 11 game assets match, media function returns expected 405, production health passes, and the fresh required-restart notice is broadcast. Payload remains within unchanged limits: 1,267,128 initial bytes and 99,971,448 total bytes. No GitHub push.
+
+## Production checkpoint — September 27, 9:38 PM ET
+
+- Published the user-authorized manual Netlify update at `https://shadochat.online`: source/build `b298f52bc4b6e9539640a3cd26fee3edd51be6b7`, deploy `6ab9c48ad00735ff94c5c11f`. No GitHub push was performed. Backend migration and `send-push` were deployed first.
+- Fresh final lint, TypeScript, documentation checks, production build and all 254 Jest suites pass (1,468 tests; 16 pre-existing TODOs). Initial payload is 1,267,128 bytes and total deploy payload is 99,971,193 bytes, within unchanged limits.
+- Public health matches the exact source/build, all seven checked Unity assets match local SHA-256 values, and the Linux-compatible media function returns its expected 405 method guard. Production health passes; paused News monitoring remains disabled. The standard required-restart release notice is published and broadcast.
+- Final small-landscape/enlarged-text tests now assert entire visible match cards and Hall of Fame rows fit their panels. Actual Unity camera inversion checks pass in Chromium and WebKit. Final native art includes neutral metal relief, faction-colored outer glow only, and restrained worn/scorched map and folio edges.
+- Hosted two-account invitation/turn/chat verification passed on this build: private invite, distinct-character acceptance into one match, authoritative moves by both players, recipient turn-read and compact chat delivery. Report `output/playwright/shadow-checkers-invite-hosted-1790560134591/summary.json` verifies zero remaining QA sessions, matches, moves, chat, invitations, events and delivery jobs. The test dismissed the accepted-match notice normally to bypass its discovered overlap with Skip; the follow-up fixes that positioning. Physical iPhone/Android audio, background push, keyboard, sustained performance and fireplace-artifact comparison remain open; this is a testing release, not final goal acceptance.
 
 ## Local implementation checkpoint — September 27 evening
 
@@ -77,7 +92,7 @@ Checkboxes below remain acceptance gates where they include hosted or physical-d
 6. **Physical-phone acceptance and final release**
    - [ ] Complete iPhone and Android landscape/installed-PWA checks, including pan/pinch, background/return, sound and a sustained match for responsiveness, heat and crashes.
    - [ ] Fix remaining release-blocking defects and rerun affected checks plus required release gates.
-   - [ ] Manually deploy to Netlify while GitHub deployment remains unavailable; verify exact live assets, Linux-compatible function bundles and production health.
+   - [x] Manually deploy to Netlify while GitHub deployment remains unavailable; verify exact live assets, Linux-compatible function bundles and production health. Published September 27 at the production checkpoint above.
    - [ ] Repeat a short live phone check and record remaining optional enhancements separately before marking the goal complete.
 
 ## Execution constraints

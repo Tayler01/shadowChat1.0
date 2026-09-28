@@ -1,3 +1,14 @@
+## September 27 Shadow Checkers phone chat follow-up published
+
+- Published `c3523dadeacc960878b71b5d12b0fbd30181c402` / Netlify `6ab9cab96d8fcedc0386d2d1` after the user's phone report: visible Send, 16px-minimum checked input, plain message feed, feed hidden only while composing, and accepted-notice placement clear of Skip. Files: `ShadowCheckersScreen.tsx`, `shadow-checkers-ui.css`, invitation CSS, Screen tests and layout QA script.
+- Full lint/types/build, 20 focused tests and both browser layout checks pass; exact public health and 11 asset hashes match, Linux media guard and production health pass. Restart notice published; no GitHub push. Physical iPhone keyboard zoom retest remains open.
+
+## September 27 Shadow Checkers closeout published for phone testing
+
+- Manually published `b298f52bc4b6e9539640a3cd26fee3edd51be6b7` to `https://shadochat.online`, Netlify deploy `6ab9c48ad00735ff94c5c11f`, after the authorized backend-first rollout. No GitHub push. Exact hosted health and seven Unity asset hashes match; Linux media function returns expected 405 and production health passes. Required-restart release notice is published.
+- Final lint/type/docs/build and 254 Jest suites pass: 1,468 tests, 16 existing TODOs. Unchanged budgets pass at 1,267,128 initial bytes and 99,971,193 total bytes. Small-screen card/Hall-of-Fame clipping corrected and verified at 667×320 with enlarged text.
+- Hosted two-account invite/Join/same-match/moves/turn-read/chat QA passed on this build; exact cleanup verifies zero remaining test rows. The accepted notice covered Skip before manual dismissal, and the user's new phone report identified unclear Send, input-induced zoom and unwanted chat panel styling. Follow-up fixes are being verified. Physical phone audio/push/keyboard/performance, fireplace shimmer and user visual acceptance remain open; the goal remains active.
+
 ## September 27 Shadow Checkers closeout implementation
 
 - Added real raised shield/star and crown metalwork to the existing marble tokens. The user's correction keeps the crest and band neutral silver, marble visible through open detail, and blue/amber emission confined to the outside ring. Actual Unity Play-mode review and 240 raised-piece/960 destination picking checks pass with no carving shader errors. Retained instancing and single-pass relief lighting reduce the first prototype's 679 draw submissions to 567; final desktop sampling is 30.46 submissions/sec with 33.4 ms p95 intervals and no >50 ms intervals. This is not phone/thermal proof. The final native build is 11,777,792 bytes, including narrow scorched map/folio borders and subtly worn tabletop map silhouettes. A same-dimension, visually reviewed fallback-board recompression saves another 29,146 bytes for the unchanged delivery budget.
