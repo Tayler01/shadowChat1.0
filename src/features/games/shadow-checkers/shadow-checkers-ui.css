@@ -8,16 +8,23 @@
   }
 }
 
-html[data-comfort-transparency='solid'] .shadow-checkers-chat-feed,
 html[data-comfort-transparency='solid'] .shadow-checkers-chat-composer {
   background: #000;
   backdrop-filter: none;
 }
 
-html[data-comfort-contrast='high'] .shadow-checkers-chat-feed,
 html[data-comfort-contrast='high'] .shadow-checkers-chat-composer {
   border-color: #f0d381;
   background: #000;
+}
+
+.shadow-checkers-chat-feed {
+  text-shadow: 0 1px 2px #000, 0 0 8px #000;
+}
+
+html[data-comfort-contrast='high'] .shadow-checkers-chat-feed {
+  color: #fff5d6;
+  text-shadow: 0 1px 2px #000, 0 0 12px #000;
 }
 
 .checkers-picker-overlay {

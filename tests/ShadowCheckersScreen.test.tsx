@@ -125,10 +125,14 @@ beforeEach(() => {
 
 test('shows a compact feed and toggles the composer without a room header', () => {
   render(<ShadowCheckersScreen />)
-  expect(screen.getByRole('region', { name: 'Recent match chat' })).toHaveTextContent('Nice jump')
+  const feed = screen.getByRole('region', { name: 'Recent match chat' })
+  expect(feed).toHaveTextContent('Nice jump')
+  expect(feed.className).not.toMatch(/bg-|rounded-|border-/)
   expect(document.querySelector('.shadow-checkers-keyboard-collapse')).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Open match chat' }))
-  expect(screen.getByPlaceholderText(/say something/i)).toBeInTheDocument()
+  expect(screen.queryByRole('region', { name: 'Recent match chat' })).not.toBeInTheDocument()
+  expect(screen.getByPlaceholderText(/say something/i)).toHaveAttribute('enterKeyHint', 'send')
+  expect(screen.getByRole('button', { name: 'Send match message' })).toHaveTextContent('Send')
   fireEvent.click(screen.getAllByRole('button', { name: 'Close match chat' })[0])
   expect(screen.queryByRole('region', { name: 'Match chat composer' })).not.toBeInTheDocument()
   expect(screen.getByRole('region', { name: 'Recent match chat' })).toBeInTheDocument()

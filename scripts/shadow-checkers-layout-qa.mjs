@@ -6,6 +6,7 @@ import assert from 'node:assert/strict'
 
 const inspect = process.argv.includes('--inspect')
 const branding = process.argv.includes('--branding')
+const chatPreview = process.argv.includes('--chat-preview')
 const engine = process.argv.includes('--webkit') ? 'webkit' : 'chromium'
 const output = `output/playwright/shadow-checkers-unity/layout-${engine}-${Date.now()}`
 await mkdir(output, { recursive: true })
@@ -173,6 +174,10 @@ try {
       await assertNoPageScroll('match page bounds')
       assert.equal(await page.locator('header').count(),0,'match must have no top bar')
       const recent=page.getByRole('region',{name:'Recent match chat'})
+      const feedStyle=await recent.evaluate(el=>({background:getComputedStyle(el).backgroundColor,border:getComputedStyle(el).borderTopWidth,messageBackground:getComputedStyle(el.querySelector('p')).backgroundColor}))
+      assert.equal(feedStyle.background,'rgba(0, 0, 0, 0)','recent messages must be plain text with no feed card')
+      assert.equal(feedStyle.border,'0px','recent messages must have no feed border')
+      assert.equal(feedStyle.messageBackground,'rgba(0, 0, 0, 0)','individual messages must have no bubbles')
       if (await page.getByText('Preparing your table').isVisible()) {
         assert.equal(await recent.evaluate(el=>{const r=el.getBoundingClientRect();const top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return top===el||el.contains(top)}),false,'Loading panel must cover the recent feed until the table is ready')
       }
@@ -181,6 +186,7 @@ try {
       const chatToggle=page.getByRole('button',{name:'Open match chat'})
       await measure(chatToggle,'chat toggle',true)
       await chatToggle.click()
+      assert.equal(await recent.count(),0,'plain text feed must clear while the compact composer is open')
       if (await page.getByText('Preparing your table').isVisible()) {
         const note = await page.getByText(/first visit may take a moment/).boundingBox()
         const composerTop = await page.getByRole('region',{name:'Match chat composer'}).boundingBox()
@@ -191,7 +197,18 @@ try {
       await measure(composer,'compact composer')
       const draft=composer.getByRole('textbox',{name:'Match message'})
       await measure(draft,'message input',true)
+      const fontSize=await draft.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))
+      entry.composerInputFontPx=fontSize
+      assert(fontSize>=16,`focused message input below iOS no-zoom threshold: ${fontSize}px`)
+      const sendButton=composer.getByRole('button',{name:'Send match message'})
+      assert.equal((await sendButton.textContent()).trim(),'Send','submit action must have visible Send text')
+      await measure(sendButton,'visible Send action',true)
+      assert.equal(await page.evaluate(()=>visualViewport?.scale??1),1,'opening composer must not zoom viewport')
       await draft.fill('Browser chat')
+      if (chatPreview) {
+        await page.screenshot({path:`${output}/chat-composer-landscape.png`})
+        break
+      }
       await page.evaluate(platform=>{
         document.documentElement.dataset.shadowchatKeyboard='open'
         document.documentElement.dataset.shadowchatMobilePlatform=platform
@@ -212,9 +229,11 @@ try {
       await composer.getByRole('button',{name:'Send match message'}).click()
       await composer.waitFor({state:'hidden'})
       assert.equal(await page.evaluate(()=>document.activeElement?.tagName==='INPUT'),false,'successful send dismisses keyboard focus')
+      assert.equal(await page.evaluate(()=>visualViewport?.scale??1),1,'successful send must leave viewport at normal scale')
       await page.getByRole('button',{name:'Open match chat'}).click()
       await page.getByRole('button',{name:'Close match chat'}).first().click()
       await composer.waitFor({state:'hidden'})
+      assert.equal(await page.evaluate(()=>visualViewport?.scale??1),1,'closing composer must leave viewport at normal scale')
       await assertNoPageScroll('match after chat bounds')
       const menuToggle=page.getByRole('button',{name:'Open Shadow Checkers menu'})
       await measure(menuToggle,'match menu toggle',true)
