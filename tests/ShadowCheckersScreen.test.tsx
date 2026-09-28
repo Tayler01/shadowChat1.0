@@ -8,13 +8,14 @@ import { SHADOW_CHECKERS_CHARACTERS } from '../src/features/games/shadow-checker
 
 const mockUseShadowCheckers = jest.fn()
 const mockSelectMatch = jest.fn()
+let mockCurrentUserId = 'player-one'
 
 const render = (ui: ReactElement) => renderBase(<ComfortProvider>{ui}</ComfortProvider>)
 
 jest.mock('../src/hooks/useAuth', () => ({
   useAuth: () => ({
     user: {
-      id: 'player-one',
+      id: mockCurrentUserId,
       username: 'player_one',
       display_name: 'Player One',
     },
@@ -84,6 +85,7 @@ const activeMatch: ShadowCheckersMatch = {
 }
 
 beforeEach(() => {
+  mockCurrentUserId = 'player-one'
   mockSelectMatch.mockReset()
   mockUseShadowCheckers.mockReset()
   mockUseShadowCheckers.mockReturnValue({
@@ -122,6 +124,34 @@ beforeEach(() => {
       selectMatch: mockSelectMatch,
     },
   })
+})
+
+test('the host sends the opponent seat on entry and on same-board role changes', () => {
+  mockCurrentUserId = 'player-two'
+  const { rerender } = render(<ShadowCheckersScreen />)
+  const iframe = screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
+  const post = jest.spyOn(iframe.contentWindow!, 'postMessage')
+  act(() => window.dispatchEvent(new MessageEvent('message', { origin: location.origin, source: iframe.contentWindow, data: { version: 1, type: 'ready' } })))
+  const snapshots = () => post.mock.calls.filter(call => call[0].type === 'snapshot').map(call => call[0].value)
+  const latestSnapshot = () => { const sent = snapshots(); return sent[sent.length - 1] }
+  const first = latestSnapshot()
+  expect(first.viewerSlot).toBe('player_two')
+
+  mockCurrentUserId = 'viewer'
+  rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  const spectator = latestSnapshot()
+  expect(spectator.viewerSlot).toBe('spectator')
+  expect(spectator.pieces).toEqual(first.pieces)
+  expect(spectator.revision).not.toBe(first.revision)
+
+  mockCurrentUserId = 'player-two'
+  rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  const second = latestSnapshot()
+  expect(second.viewerSlot).toBe('player_two')
+  expect(second.pieces).toEqual(first.pieces)
+  expect(second.revision).not.toBe(spectator.revision)
+  expect(screen.getByTitle('Shadow Checkers 3D board')).toBe(iframe)
+  post.mockRestore()
 })
 
 test('shows a compact feed and toggles the composer without a room header', () => {

@@ -23,7 +23,7 @@ public partial class ShadowBoard : MonoBehaviour
     [Serializable] class Projection { public int row; public int col; public float x; public float y; }
     [Serializable] class Pointer {public float x;public float y;}
     [Serializable] class ProjectionEvent { public int version = 1; public string type = "projection"; public string revision; public Projection[] squares; }
-    class Token { public GameObject root; public Piece piece; public Coroutine motion; public Bounds pickBounds; }
+    class Token { public GameObject root; public Piece piece; public Coroutine motion; public bool moving; public Bounds pickBounds; }
 
     [DllImport("__Internal")] static extern void ShadowChatEvent(string payload);
     readonly Dictionary<string, Token> tokens = new Dictionary<string, Token>();
@@ -259,19 +259,27 @@ public partial class ShadowBoard : MonoBehaviour
             {
                 bool changed=token.piece.row!=piece.row || token.piece.col!=piece.col;
                 bool crowned=piece.king && !token.piece.king;
-                if(changed)
+                // A reused board can acquire a new seat without any logical move.
+                // Reorient its existing meshes together with picking/highlights.
+                if(flip)
                 {
-                    if(token.motion!=null) StopCoroutine(token.motion);
+                    StopTokenMotion(token);
+                    token.root.transform.position=Square(piece.row,piece.col);
+                    token.root.transform.localRotation=Quaternion.identity;
+                }
+                else if(changed)
+                {
+                    StopTokenMotion(token);
                     if(next.reducedMotion) {token.root.transform.position=Square(piece.row,piece.col);Sound(crowned?"crown":"place");}
                     else token.motion=StartCoroutine(MoveToken(token,next.lastMove,piece,crowned));
                 }
-                if(piece.king!=token.piece.king && (!changed || next.reducedMotion)) CreateTokenModel(token,piece);
+                if(piece.king!=token.piece.king && (flip || !changed || next.reducedMotion)) CreateTokenModel(token,piece);
                 token.piece=piece;
             }
         }
         foreach(var id in new List<string>(tokens.Keys)) if(!ids.Contains(id))
         {
-            var token=tokens[id]; tokens.Remove(id);
+            var token=tokens[id]; tokens.Remove(id); StopTokenMotion(token);
             if(next.reducedMotion) Destroy(token.root); else StartCoroutine(CaptureToken(token.root,CaptureDelay(next.lastMove,token.piece)));
         }
         RefreshHighlights();
@@ -322,9 +330,23 @@ public partial class ShadowBoard : MonoBehaviour
         token.pickBounds.Encapsulate(PieceCarvings.Attach(token.root.transform, piece.king, piece.owner=="player_one"));
     }
     void OnDestroy() {Font.textureRebuilt-=RefreshEngravingAtlas;Destroy(engravingMaterial);foreach(var meshes in tokenMeshes.Values) foreach(var mesh in meshes) Destroy(mesh);foreach(var mesh in boardMeshes) Destroy(mesh);PieceCarvings.Dispose();}
+    void FinishTokenMotion(Token token)
+    {
+        token.motion=null;
+        if(!token.moving) return;
+        token.moving=false;movingCount=Mathf.Max(0,movingCount-1);
+        CinematicState(movingCount>0,"ready");
+    }
+    void StopTokenMotion(Token token)
+    {
+        if(token.motion!=null) StopCoroutine(token.motion);
+        // Unity does not guarantee iterator finally runs on StopCoroutine.
+        // Explicit, idempotent cleanup prevents a seat change locking input.
+        FinishTokenMotion(token);
+    }
     IEnumerator MoveToken(Token token, Move move, Piece piece, bool crowned)
     {
-        movingCount++;CinematicState(true,"move");
+        token.moving=true;movingCount++;CinematicState(true,"move");
         var path=move!=null && move.pieceId==piece.id && move.path!=null?move.path:new[]{new Position {row=piece.row,col=piece.col}};
         int start=path.Length>1?1:0;
         try {
@@ -350,7 +372,7 @@ public partial class ShadowBoard : MonoBehaviour
             // The final victim's flight can outlast the mover's landing.
             while(capturingCount>0) yield return null;
         } finally {
-            token.motion=null;movingCount=Mathf.Max(0,movingCount-1);CinematicState(movingCount>0,"ready");
+            FinishTokenMotion(token);
         }
     }
     void Ring(int row,int col, Material material, float radius, bool diamond=false)

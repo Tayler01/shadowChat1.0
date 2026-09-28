@@ -102,6 +102,31 @@ try {
     if (await releaseClose.isVisible().catch(() => false)) await releaseClose.click()
     await page.waitForTimeout(750)
   }
+  const homeRowProjection = async (page, ownRows, opponentRows, advanceFromRow, advanceToRow) => page.evaluate(({ ownRows, opponentRows, advanceFromRow, advanceToRow }) => {
+    const squares = window.__checkersProjection?.squares ?? []
+    const meanY = rows => {
+      const rowSquares = squares.filter(square => rows.includes(square.row))
+      return rowSquares.length ? rowSquares.reduce((sum, square) => sum + square.y, 0) / rowSquares.length : NaN
+    }
+    return {
+      revision: window.__checkersProjection?.revision,
+      ownHomeY: meanY(ownRows),
+      opponentHomeY: meanY(opponentRows),
+      nearAdvanceY: meanY([advanceFromRow]),
+      farAdvanceY: meanY([advanceToRow]),
+    }
+  }, { ownRows, opponentRows, advanceFromRow, advanceToRow })
+  await foregroundPlayer(pages[0])
+  await foregroundPlayer(pages[1])
+  const playerOneProjection = await homeRowProjection(pages[0], [5, 6, 7], [0, 1, 2], 5, 4)
+  const playerTwoProjection = await homeRowProjection(pages[1], [0, 1, 2], [5, 6, 7], 2, 3)
+  for (const [seat, projection] of [['player_one', playerOneProjection], ['player_two', playerTwoProjection]]) {
+    assert(projection.revision && Number.isFinite(projection.ownHomeY) && Number.isFinite(projection.opponentHomeY), `${seat} projection is incomplete`)
+    assert(projection.ownHomeY > projection.opponentHomeY + .03, `${seat} own home rows are not visibly nearer the bottom of the camera: ${JSON.stringify(projection)}`)
+    assert(projection.nearAdvanceY > projection.farAdvanceY + .005, `${seat} forward logical row does not project away from the camera: ${JSON.stringify(projection)}`)
+  }
+  report.projectionOrientation = { player_one: playerOneProjection, player_two: playerTwoProjection }
+  report.checks.push('Both players project their own home rows nearest the camera and advance in opposed logical row directions')
   const clickSquare = async (page, row, col) => {
     await foregroundPlayer(page)
     await page.locator('iframe[title="Shadow Checkers 3D board"]').scrollIntoViewIfNeeded()
@@ -144,7 +169,7 @@ try {
   await clickSquare(pages[1], 3, 0)
   for (let attempt = 0; attempt < 30; attempt++) { if ((await fetchBoard()).move_count === 2) break; await new Promise(resolve => setTimeout(resolve, 500)) }
   assert((await fetchBoard()).move_count === 2, 'Recipient live update/input failed')
-  report.checks.push('Recipient realtime turn update, flipped camera, and reply move')
+  report.checks.push('Recipient realtime turn update and reply move from the opposed seat')
   const message = `Unity QA ${Date.now()}`
   await pages[0].getByRole('button',{name:'Open match chat'}).click()
   await pages[1].getByRole('button',{name:'Open match chat'}).click()

@@ -112,11 +112,11 @@ Minimum real-device pass:
 
 ## Shadow Checkers closeout — September 27, 2026
 
-These checks target the new local closeout candidate after its backend/frontend rollout, not the earlier testing release. Browser checks do not fill in these results.
+These checks target the deployed closeout update. Browser checks do not fill in physical-device results. On September 27, after the chat patch's restart prompt, the user confirmed all three reported issues work on their phone: visible Send, normal screen zoom while using chat, and messages without bubbles. Device model, OS and installed-PWA versus browser mode were not specified; this confirms that narrow flow on one phone, not both platform checklists.
 
 | ID | Device | Flow | Expected result | Result |
 | --- | --- | --- | --- | --- |
-| RD-034 | iPhone and Android installed PWA | Rotate, landscape lobby, load game, pan/pinch, menu, open/send/close chat, background/return | Branded entrance; usable one-screen lobby; only Chat/menu over room; keyboard dismisses reliably; latest board retained. | not run |
+| RD-034 | iPhone and Android installed PWA | Rotate, landscape lobby, load game, pan/pinch, menu, open/send/close chat, background/return | Branded entrance; usable one-screen lobby; only Chat/menu over room; keyboard dismisses reliably; latest board retained. | partial: user confirms Send, normal zoom and plain chat after restart on one unspecified phone; other flows/platforms remain open |
 | RD-035 | Two controlled accounts on phones | Invite while foreground/background; join/decline/expire; take turns, tap push, read current turn | Correct private recipient/match; no duplicate game or stale alerts; foreground prompt and supported background push; exact turn/badge clearing. | not run |
 | RD-036 | iPhone and Android installed PWA | Master/music/piece toggles, lock/return, sustained full match, opening tour and fireplace camera movement | Preferences preserved; natural quiet soundtrack/effects; no objectionable blocky patches; responsive play without crash/heat regression; user accepts final visuals/audio. | not run |
 

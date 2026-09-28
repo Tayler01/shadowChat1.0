@@ -1,3 +1,9 @@
+## September 27 Shadow Checkers continuation release — 10:26 PM ET
+
+- Published `47b07751782a13f8fa48460b8f0c7e980209a2b1`, Netlify `6ab9d01510b8d67a73d93cd6`: queue-leave/status, correct queued-loser waiting action, and explicit invite/queue appearance choices. Full lint/types/build/docs and 254 suites pass (1,471 tests, 16 existing TODOs); Chromium/WebKit layout coverage and one reviewed 667×320/130% invitation screen pass. Public health/11 assets and Linux function/production health verified, restart notice broadcast.
+- User confirmed Send, normal zoom and bubble-free chat on their physical phone after the preceding patch. Device/platform/install mode unknown; RD-034 is partial, not fully passed.
+- Production SQL rollback proof completed a natural 35-move game, settled statistics once, rejected terminal replay, and returned one rematch continuation to both callers. Zero exact test rows remain and crown is unchanged. Report: `output/playwright/shadow-checkers-complete-sequence/result.json`. This does not prove a committed full game, browser results/reconnect or third-player queue handoff.
+
 ## September 27 Shadow Checkers chat follow-up — 10:03 PM ET
 
 - Live build `c3523dadeacc960878b71b5d12b0fbd30181c402`, Netlify `6ab9cab96d8fcedc0386d2d1`. Verified exact health/11 assets, Linux media guard, production health and restart broadcast after manual deployment.
