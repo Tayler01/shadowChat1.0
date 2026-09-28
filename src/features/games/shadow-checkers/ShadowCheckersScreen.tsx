@@ -163,7 +163,7 @@ export function ShadowCheckersScreen({
   const [selectedCharacter, setSelectedCharacter] = React.useState(SHADOW_CHECKERS_CHARACTERS[0].key)
   const [selectedBoardSkin, setSelectedBoardSkin] = React.useState<ShadowCheckersBoardSkin>('classic')
   const [boardModalOpen, setBoardModalOpen] = React.useState(false)
-  const [characterModal, setCharacterModal] = React.useState<null | { mode: 'create' } | { mode: 'join'; sessionId: string; takenCharacter?: string | null }>(null)
+  const [characterModal, setCharacterModal] = React.useState<null | { mode: 'create' } | { mode: 'join'; sessionId: string; takenCharacter?: string | null } | { mode: 'queue'; sessionId: string }>(null)
   const [selectedPieceId, setSelectedPieceId] = React.useState<string | null>(null)
   const [showHints, setShowHints] = React.useState(true)
   const [showLastMove, setShowLastMove] = React.useState(true)
@@ -194,6 +194,7 @@ export function ShadowCheckersScreen({
     matches,
     activeMatch,
     queue,
+    myQueuedSessionIds,
     moves,
     chat,
     leaderboard,
@@ -235,8 +236,11 @@ export function ShadowCheckersScreen({
   const openMatches = React.useMemo(() => matches.filter(match => match.status === 'waiting'), [matches])
   const activeMatches = React.useMemo(() => matches.filter(match => match.status === 'active'), [matches])
   const lobbyMatches = React.useMemo(() => [...openMatches, ...activeMatches], [openMatches, activeMatches])
-  const lobbyPageCount = Math.max(1, lobbyMatches.length)
-  const visibleLobbyMatches = lobbyMatches.slice(Math.min(lobbyPage, lobbyPageCount - 1), Math.min(lobbyPage, lobbyPageCount - 1) + 1)
+  const queuedWaitingSessions = React.useMemo(() => myQueuedSessionIds.filter(sessionId => !lobbyMatches.some(match => match.session_id === sessionId)), [lobbyMatches, myQueuedSessionIds])
+  const lobbyPageCount = Math.max(1, lobbyMatches.length + queuedWaitingSessions.length)
+  const visibleLobbyPage = Math.min(lobbyPage, lobbyPageCount - 1)
+  const visibleQueuedWaitingSession = queuedWaitingSessions[visibleLobbyPage]
+  const visibleLobbyMatch = lobbyMatches[visibleLobbyPage - queuedWaitingSessions.length]
   const famePageCount = Math.max(1, leaderboard.length)
   const visibleLeaders = leaderboard.slice(Math.min(famePage, famePageCount - 1), Math.min(famePage, famePageCount - 1) + 1)
   const myMatch = React.useMemo(() => matches.find(match => isPlayer(match, user?.id)) ?? null, [matches, user?.id])
@@ -400,6 +404,10 @@ export function ShadowCheckersScreen({
       void guarded(() => actions.create(selectedCharacter, selectedBoardSkin), 'Match created')
       return
     }
+    if (currentModal.mode === 'queue') {
+      void guarded(() => actions.queue(currentModal.sessionId, selectedCharacter), 'Joined queue')
+      return
+    }
     void guarded(() => actions.join(currentModal.sessionId, selectedCharacter), 'Joined match')
   }
 
@@ -538,14 +546,14 @@ export function ShadowCheckersScreen({
         <section
           role="dialog"
           aria-modal="true"
-          aria-label={characterModal.mode === 'create' ? 'Create public match' : 'Join match'}
+          aria-label={characterModal.mode === 'create' ? 'Create public match' : characterModal.mode === 'queue' ? 'Queue for match' : 'Join match'}
           className="checkers-character-dialog w-full max-w-md rounded-[1.1rem] border border-[#d7aa46]/35 bg-[linear-gradient(180deg,rgba(20,18,14,0.98),rgba(0,0,0,0.98))] p-4 text-[#f6e0a2] shadow-[0_26px_90px_rgba(0,0,0,0.72)]"
           onMouseDown={event => event.stopPropagation()}
         >
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#b9a16f]">Choose character</p>
-              <h2 className="mt-1 text-2xl font-semibold">{characterModal.mode === 'create' ? 'Create Public Match' : 'Join Match'}</h2>
+              <h2 className="mt-1 text-2xl font-semibold">{characterModal.mode === 'create' ? 'Create Public Match' : characterModal.mode === 'queue' ? 'Join Challenger Queue' : 'Join Match'}</h2>
             </div>
             <button type="button" aria-label="Close character picker" onClick={() => setCharacterModal(null)} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[#f0d381] hover:bg-white/10">
               <X className="h-5 w-5" />
@@ -556,8 +564,8 @@ export function ShadowCheckersScreen({
             <CheckersButton variant="ghost" onClick={() => setCharacterModal(null)}>
               Cancel
             </CheckersButton>
-            <CheckersButton loading={busy === 'create' || busy === 'join'} onClick={handleConfirmCharacter}>
-              {characterModal.mode === 'create' ? 'Create Match' : 'Join Match'}
+            <CheckersButton loading={busy === 'create' || busy === 'join' || busy === 'queue'} onClick={handleConfirmCharacter}>
+              {characterModal.mode === 'create' ? 'Create Match' : characterModal.mode === 'queue' ? 'Join Queue' : 'Join Match'}
             </CheckersButton>
           </div>
         </section>
@@ -658,7 +666,8 @@ export function ShadowCheckersScreen({
                 Resign
               </button>
             )}
-            {canContinueFromResult && activeMatch && (
+            {canContinueFromResult && state?.winner !== viewerSlot && queue.length > 0 && <p role="status" className="px-3 py-2 text-xs text-[#d9c79f]">A challenger is queued. The winner will start the next match.</p>}
+            {canContinueFromResult && activeMatch && (state?.winner === viewerSlot || queue.length === 0) && (
               <button
                 type="button"
                 onClick={() => {
@@ -746,9 +755,11 @@ export function ShadowCheckersScreen({
             </CheckersButton>
           )}
           {canQueue && session && (
-            <CheckersButton variant="secondary" loading={busy === 'queue'} onClick={() => void guarded(() => actions.queue(session.id, selectedCharacter), 'Joined queue')}>
+            <CheckersButton variant="secondary" loading={busy === 'queue' || busy === 'leaveQueue'} onClick={() => myQueuedSessionIds.includes(session.id)
+              ? void guarded(() => actions.leaveQueue(session.id), 'Left queue')
+              : setCharacterModal({ mode: 'queue', sessionId: session.id })}>
               <Shield className="mr-2 h-4 w-4" />
-              Queue
+              {myQueuedSessionIds.includes(session.id) ? 'Leave Queue' : 'Queue'}
             </CheckersButton>
           )}
           {canCancel && (
@@ -785,7 +796,11 @@ export function ShadowCheckersScreen({
       <section role="tabpanel" className="min-h-0 flex-1 overflow-hidden rounded-xl border border-[#b9934c]/30 bg-black/60 p-2">
         {lobbyTab === 'tables' && (loading ? <div className="flex h-full items-center justify-center"><LoadingSpinner size="lg" className="text-[#f0d381]" /></div> : <div className="flex h-full min-h-0 flex-col">
           <h2 className="mb-1 text-sm font-semibold text-[#f0d381]">Open Matches &amp; Live Boards</h2>
-          <div className="min-h-0 flex-1 overflow-hidden">{lobbyMatches.length ? visibleLobbyMatches.map(renderLobbyCard) : <p className="self-center text-sm text-[#d9c79f]">No active tables yet. Create the first one.</p>}</div>
+          <div className="min-h-0 flex-1 overflow-hidden">{visibleQueuedWaitingSession ? <article data-checkers-queue-session={visibleQueuedWaitingSession} className="flex items-center justify-between gap-2 rounded-[1rem] border border-[#b9934c]/25 bg-black/58 p-2">
+            <div className="min-w-0"><p className="text-sm font-semibold text-[#f6e0a2]">Waiting for next match</p>
+              <p className="text-xs text-[#d9c79f]">The winner will start the next match.</p></div>
+            <CheckersButton variant="secondary" loading={busy === 'leaveQueue'} onClick={() => void guarded(() => actions.leaveQueue(visibleQueuedWaitingSession), 'Left queue')}>Leave Queue</CheckersButton>
+          </article> : visibleLobbyMatch ? renderLobbyCard(visibleLobbyMatch) : <p className="self-center text-sm text-[#d9c79f]">No active tables yet. Create the first one.</p>}</div>
         </div>)}
         {lobbyTab === 'fame' && <HallOfFame leaderboard={visibleLeaders} rankOffset={Math.min(famePage, famePageCount - 1)} />}
         {lobbyTab === 'players' && <div className="h-full overflow-hidden"><ShadowCheckersInvitePicker characterKey={selectedCharacter} boardSkin={selectedBoardSkin} /></div>}

@@ -91,6 +91,7 @@ beforeEach(() => {
     matches: [activeMatch],
     activeMatch,
     queue: [],
+    myQueuedSessionIds: [],
     moves: [],
     chat: [
       {
@@ -360,11 +361,23 @@ describe('original feature controls around the Unity board', () => {
     const actions = showLobby({ matches: [watchedMatch], sessions: [{ id: watchedMatch.session_id }] })
     const onMatchRoute = jest.fn()
     render(<ShadowCheckersScreen onMatchRoute={onMatchRoute} />)
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Queue' })) })
-    expect(actions.queue).toHaveBeenCalledWith('session-1', 'obsidian-sentinel')
+    fireEvent.click(screen.getByRole('button', { name: 'Queue' }))
+    const picker = screen.getByRole('dialog', { name: 'Queue for match' })
+    fireEvent.click(within(picker).getByRole('button', { name: 'Corvin' }))
+    await act(async () => { fireEvent.click(within(picker).getByRole('button', { name: 'Join Queue' })) })
+    expect(actions.queue).toHaveBeenCalledWith('session-1', 'cinder-crown')
     fireEvent.click(screen.getByRole('button', { name: 'Spectate' }))
     expect(actions.selectMatch).toHaveBeenCalledWith('match-1')
     expect(onMatchRoute).toHaveBeenCalledWith('push-item', 'match-1')
+  })
+
+  test('authoritative queue rows enable Leave Queue, including after a table completes', async () => {
+    const state = mockUseShadowCheckers()
+    mockUseShadowCheckers.mockReturnValue({ ...state, matches: [], activeMatch: null, sessions: [], selectedMatchId: null, myQueuedSessionIds: ['session-completed'] })
+    render(<ShadowCheckersScreen />)
+    expect(screen.getByText('Waiting for next match')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Leave Queue' })) })
+    expect(state.actions.leaveQueue).toHaveBeenCalledWith('session-completed')
   })
 
   test('a spectator receives a disabled Unity snapshot and cannot submit square input', () => {
@@ -391,7 +404,6 @@ describe('original feature controls around the Unity board', () => {
   test.each([
     ['player_one', false, 'Victory', 'Rematch', 'rematch'],
     ['player_one', true, 'Victory', 'Next Challenger', 'nextChallenger'],
-    ['player_two', true, 'Defeat', 'Rematch', 'rematch'],
   ] as const)('shows %s results (queue=%s) and routes the continuation action', async (winner, queued, title, label, action) => {
     const state = mockUseShadowCheckers()
     const board = createInitialBoard()
@@ -425,5 +437,20 @@ describe('original feature controls around the Unity board', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: label })) })
     expect(state.actions[action]).toHaveBeenCalledWith('match-1')
     expect(state.actions[action === 'rematch' ? 'nextChallenger' : 'rematch']).not.toHaveBeenCalled()
+  })
+
+  test('the losing player waits for the queued challenger instead of offering a forbidden rematch', () => {
+    const state = mockUseShadowCheckers()
+    const board = createInitialBoard()
+    board.winner = 'player_two'
+    board.winReason = 'all_pieces_captured'
+    mockUseShadowCheckers.mockReturnValue({ ...state,
+      activeMatch: { ...activeMatch, status: 'completed', board_state: serializeBoard(board) },
+      queue: [{ id: 'queue-1', user_id: 'challenger' }],
+    })
+    render(<ShadowCheckersScreen />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Shadow Checkers menu' }))
+    expect(screen.getByText(/A challenger is queued/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Rematch' })).not.toBeInTheDocument()
   })
 })

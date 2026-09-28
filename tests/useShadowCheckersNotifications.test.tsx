@@ -13,6 +13,8 @@ const mockJoin = jest.fn(async (_sessionId: string, _characterKey: string) => ({
 const mockSubmitMove = jest.fn(async (_matchId: string, _pieceId: string, _path: unknown[]) => ({ matchId: 'match-1', completed: false }))
 const mockRematch = jest.fn(async (_matchId: string) => ({ sessionId: 'session-2', matchId: 'match-2' }))
 const mockNextChallenger = jest.fn(async (_matchId: string) => ({ sessionId: 'session-3', matchId: 'match-3' }))
+const mockFetchMyQueuedSessions = jest.fn(async (_userId: string): Promise<string[]> => [])
+let mockCurrentUserId = 'player-one'
 
 const activeMatch = {
   id: 'match-1',
@@ -32,7 +34,7 @@ channel.on.mockReturnValue(channel)
 channel.subscribe.mockReturnValue(channel)
 
 jest.mock('../src/hooks/useAuth', () => ({
-  useAuth: () => ({ user: { id: 'player-one' } }),
+  useAuth: () => ({ user: { id: mockCurrentUserId } }),
 }))
 
 jest.mock('../src/hooks/useRealtimeRecovery', () => ({
@@ -68,6 +70,7 @@ jest.mock('../src/features/games/shadow-checkers/api/shadowCheckersApi', () => (
   fetchShadowCheckersMatch: jest.fn(async () => activeMatch),
   fetchShadowCheckersLeaderboard: jest.fn(async () => []),
   fetchShadowCheckersQueue: jest.fn(async () => []),
+  fetchMyShadowCheckersQueuedSessions: (userId: string) => mockFetchMyQueuedSessions(userId),
   fetchShadowCheckersMoves: jest.fn(async () => []),
   fetchShadowCheckersChat: jest.fn(async () => []),
   createShadowCheckersMatch: () => mockCreate(),
@@ -87,8 +90,43 @@ jest.mock('../src/features/games/shadow-checkers/api/shadowCheckersApi', () => (
 describe('Shadow Checkers notification integration', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockCurrentUserId = 'player-one'
+    mockFetchMyQueuedSessions.mockImplementation(async () => [])
     channel.on.mockReturnValue(channel)
     channel.subscribe.mockReturnValue(channel)
+  })
+
+  test('a prior account refresh cannot overwrite the current viewer queue', async () => {
+    let resolveOld!: (ids: string[]) => void
+    let resolveNew!: (ids: string[]) => void
+    mockFetchMyQueuedSessions.mockImplementation(userId => new Promise(resolve => {
+      if (userId === 'player-one') resolveOld = resolve
+      else resolveNew = resolve
+    }))
+    const { result, rerender } = renderHook(() => useShadowCheckers())
+    await waitFor(() => expect(resolveOld).toBeDefined())
+    mockCurrentUserId = 'player-two'
+    rerender()
+    expect(result.current.myQueuedSessionIds).toEqual([])
+    await waitFor(() => expect(resolveNew).toBeDefined())
+    await act(async () => resolveNew(['new-session']))
+    await waitFor(() => expect(result.current.myQueuedSessionIds).toEqual(['new-session']))
+    await act(async () => resolveOld(['old-session']))
+    expect(result.current.myQueuedSessionIds).toEqual(['new-session'])
+  })
+
+  test('own queue lookup runs on lobby return, not each selected-match refresh', async () => {
+    mockFetchMyQueuedSessions.mockResolvedValue(['session-queued'])
+    const { result } = renderHook(() => useShadowCheckers('match-1'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(mockFetchMyQueuedSessions).not.toHaveBeenCalled()
+    act(() => result.current.actions.selectMatch(null))
+    await waitFor(() => expect(result.current.myQueuedSessionIds).toEqual(['session-queued']))
+    expect(mockFetchMyQueuedSessions).toHaveBeenCalledWith('player-one')
+    const callsOnLobby = mockFetchMyQueuedSessions.mock.calls.length
+    act(() => result.current.actions.selectMatch('match-1'))
+    await waitFor(() => expect(result.current.selectedMatchId).toBe('match-1'))
+    expect(mockFetchMyQueuedSessions).toHaveBeenCalledTimes(callsOnLobby)
   })
 
   test('an exact routed current-turn match clears its durable alert and refreshes the badge', async () => {

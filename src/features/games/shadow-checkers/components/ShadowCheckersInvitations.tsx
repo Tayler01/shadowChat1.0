@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShadowCheckersBoardSkin } from '../../../../lib/supabase'
-import { SHADOW_CHECKERS_CHARACTERS, getShadowCheckersCharacter } from '../assets/manifest'
+import { SHADOW_CHECKERS_ASSETS, SHADOW_CHECKERS_CHARACTERS, getShadowCheckersCharacter } from '../assets/manifest'
 import { useShadowCheckersInvitations } from '../hooks/useShadowCheckersInvitations'
+import { useDialogAccessibility } from '../../../../hooks/useDialogAccessibility'
 import './shadow-checkers-invitations.css'
 
 const inviteIdFromLocation = () => new URLSearchParams(window.location.search).get('invite')
@@ -242,6 +243,14 @@ export function ShadowCheckersInvitePicker({
   const { eligibleUsers, outgoing, busy, error, send, cancel } = useShadowCheckersInvitations()
   const [selectedUserId, setSelectedUserId] = useState('')
   const [status, setStatus] = useState('')
+  const [optionsOpen, setOptionsOpen] = useState(false)
+  const [inviteCharacter, setInviteCharacter] = useState(characterKey)
+  const [inviteSkin, setInviteSkin] = useState<ShadowCheckersBoardSkin>(boardSkin)
+  const optionsRef = useDialogAccessibility<HTMLElement>({
+    open: optionsOpen,
+    dismissible: !busy,
+    onClose: () => setOptionsOpen(false),
+  })
 
   useEffect(() => {
     if (!status) return
@@ -256,7 +265,8 @@ export function ShadowCheckersInvitePicker({
     if (!selectedUserId) return
     setStatus('')
     try {
-      const result = await send(selectedUserId, characterKey, boardSkin)
+      const result = await send(selectedUserId, inviteCharacter, inviteSkin)
+      setOptionsOpen(false)
       setStatus(result.direction === 'incoming'
         ? 'This member invited you first. Answer their challenge to start.'
         : `Invitation sent to ${selectedUser?.display_name || selectedUser?.username || 'this member'}.`)
@@ -284,7 +294,7 @@ export function ShadowCheckersInvitePicker({
         <select
           id="checkers-invite-member"
           value={selectedUserId}
-          onChange={event => { setSelectedUserId(event.target.value); setStatus('') }}
+          onChange={event => { setSelectedUserId(event.target.value); setStatus(''); setOptionsOpen(false) }}
         >
           <option value="">{eligibleUsers.length ? 'Choose a member' : 'No eligible members online'}</option>
           {eligibleUsers.map(member => (
@@ -293,12 +303,38 @@ export function ShadowCheckersInvitePicker({
             </option>
           ))}
         </select>
-        <button type="button" onClick={() => { void (existing ? withdraw() : invite()) }} disabled={!selectedUserId || Boolean(busy)}>
+        <button type="button" onClick={() => { if (existing) void withdraw(); else setOptionsOpen(true) }} disabled={!selectedUserId || Boolean(busy)}>
           {busy ? 'Working…' : existing ? 'Withdraw' : 'Invite'}
         </button>
       </div>
     </section>
-    {typeof document !== 'undefined' && (status || error) && createPortal(
+    {typeof document !== 'undefined' && optionsOpen && selectedUser && createPortal(
+      <div className="checkers-invite-options-backdrop" onMouseDown={event => { if (event.target === event.currentTarget && !busy) setOptionsOpen(false) }}>
+        <section ref={optionsRef} role="dialog" aria-modal="true" aria-label="Choose private challenge" className="checkers-invite-options">
+          <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="checkers-invite-options-logo" />
+          <h2>Challenge {selectedUser.display_name || selectedUser.username || 'member'}</h2>
+          <div className="checkers-invite-options-grid">
+            <label>Board
+              <select aria-label="Invitation board" value={inviteSkin} onChange={event => setInviteSkin(event.target.value as ShadowCheckersBoardSkin)}>
+                <option value="cinematic">Cinematic</option>
+                <option value="classic">Classic</option>
+              </select>
+            </label>
+            <label>Your character
+              <select aria-label="Invitation character" value={inviteCharacter} onChange={event => setInviteCharacter(event.target.value)}>
+                {SHADOW_CHECKERS_CHARACTERS.map(character => <option key={character.key} value={character.key}>{character.name}</option>)}
+              </select>
+            </label>
+          </div>
+          {error && <p role="alert" className="checkers-invite-error">{error}</p>}
+          <div className="checkers-invite-options-actions">
+            <button type="button" onClick={() => setOptionsOpen(false)} disabled={Boolean(busy)}>Cancel</button>
+            <button type="button" onClick={() => { void invite() }} disabled={Boolean(busy)}>{busy ? 'Sending…' : 'Send Invitation'}</button>
+          </div>
+        </section>
+      </div>, document.body,
+    )}
+    {typeof document !== 'undefined' && !optionsOpen && (status || error) && createPortal(
       <div className={`checkers-invite-picker-toast ${error ? 'checkers-invite-picker-toast-error' : ''}`} role={error ? 'alert' : 'status'}>
         {error || status}
       </div>, document.body,

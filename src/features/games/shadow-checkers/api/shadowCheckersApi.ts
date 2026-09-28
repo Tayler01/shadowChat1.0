@@ -17,9 +17,29 @@ export interface ShadowCheckersSnapshot {
   matches: ShadowCheckersMatch[]
   activeMatch: ShadowCheckersMatch | null
   queue: GameSessionQueueEntry[]
+  myQueuedSessionIds: string[]
   moves: ShadowCheckersMove[]
   chat: ShadowCheckersChatMessage[]
   leaderboard: ShadowCheckersStats[]
+}
+
+export async function fetchMyShadowCheckersQueuedSessions(userId: string): Promise<string[]> {
+  const workingClient = await client()
+  const { data: queueRows, error } = await workingClient
+    .from('game_session_queue')
+    .select('session_id')
+    .eq('user_id', userId)
+    .in('status', ['queued', 'invited'])
+  if (error) throw error
+  const sessionIds = [...new Set((queueRows ?? []).map((row: { session_id: string }) => row.session_id))]
+  if (sessionIds.length === 0) return []
+  const { data: sessions, error: sessionsError } = await workingClient
+    .from('game_sessions')
+    .select('id')
+    .in('id', sessionIds)
+    .eq('game_type', 'shadow_checkers')
+  if (sessionsError) throw sessionsError
+  return (sessions ?? []).map((session: { id: string }) => session.id)
 }
 
 async function client() {

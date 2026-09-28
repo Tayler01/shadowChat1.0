@@ -24,6 +24,7 @@ const result = new URLSearchParams(location.search).has('result')
 const active = new URLSearchParams(location.search).has('active')
 const accepted = new URLSearchParams(location.search).has('accepted')
 const waiting = new URLSearchParams(location.search).has('waiting')
+const queued = new URLSearchParams(location.search).has('queued')
 const playerOne = { id:'player-one', username:'player_one', display_name:'Player One' }
 const playerTwo = { id:'player-two', username:'player_two', display_name:'Player Two' }
 const board = createInitialBoard()
@@ -31,7 +32,7 @@ if (result) { board.winner='player_one'; board.winReason='all_pieces_captured'; 
 const match = { id:'match-1', session_id:'session-1', status:result?'completed':waiting?'waiting':'active', player_one_id:playerOne.id, player_two_id:playerTwo.id, player_one:playerOne,player_two:playerTwo,player_one_character_key:'obsidian-sentinel',player_two_character_key:'amber-vow',board_skin:'classic',current_turn_user_id:playerOne.id,board_state:serializeBoard(board),move_count:31 }
 window.fixtureCalls=[]
 window.failNextChat=false
-window.checkersFixture={sessions:[],matches:waiting?[match]:active||result?[]:[match,{...match,id:'match-2'},{...match,id:'match-3'}],activeMatch:result||active?match:null,queue:[],moves:[],chat:[1,2,3,4,5].map(index=>({id:'chat-'+index,user:playerTwo,body:'Message '+index})),leaderboard:[1,2,3,4,5].map(index=>({user_id:'rank-'+index,wins:6-index,losses:index,total_games:6,user:{display_name:'Rank '+index}})),selectedMatchId:result||active?match.id:null,loading:false,busy:null,error:null,actions:Object.fromEntries(['create','join','submitMove','resign','cancel','queue','leaveQueue','rematch','nextChallenger','postChat','selectMatch'].map(action=>[action,async(...args)=>{window.fixtureCalls.push({action,args});if(action==='postChat'&&window.failNextChat){window.failNextChat=false;throw new Error('Connection lost')}}]))}
+window.checkersFixture={sessions:[{id:'session-1'}],matches:queued?[]:waiting?[match]:active||result?[]:[match,{...match,id:'match-2'},{...match,id:'match-3'}],activeMatch:result||active?match:null,queue:[],myQueuedSessionIds:queued?['session-completed']:[],moves:[],chat:[1,2,3,4,5].map(index=>({id:'chat-'+index,user:playerTwo,body:'Message '+index})),leaderboard:[1,2,3,4,5].map(index=>({user_id:'rank-'+index,wins:6-index,losses:index,total_games:6,user:{display_name:'Rank '+index}})),selectedMatchId:result||active?match.id:null,loading:false,busy:null,error:null,actions:Object.fromEntries(['create','join','submitMove','resign','cancel','queue','leaveQueue','rematch','nextChallenger','postChat','selectMatch'].map(action=>[action,async(...args)=>{window.fixtureCalls.push({action,args});if(action==='postChat'&&window.failNextChat){window.failNextChat=false;throw new Error('Connection lost')}}]))}
 createRoot(document.getElementById('root')).render(<ComfortProvider><ShadowCheckersScreen />{accepted && createPortal(<div className="checkers-invite-accepted" role="status"><span>Player Two joined your Shadow Checkers match.</span><button type="button">Open match</button><button type="button" aria-label="Dismiss match notice">×</button></div>,document.body)}</ComfortProvider>)
 `)
 const report = { engine, inspect, scope:'Real interface; mocked auth, match data, actions and Unity frame. No backend/gameplay/performance proof.', profiles:[], errors:[] }
@@ -125,6 +126,17 @@ try {
       await picker.getByRole('button',{name:'Invite'}).evaluate(element=>element.scrollIntoView({block:'nearest'}))
       await measure(picker.getByRole('button',{name:'Invite'}),'invite member action',true)
       await assertPanelFits('Players panel fits')
+      await memberSelect.selectOption('player-two')
+      await picker.getByRole('button',{name:'Invite'}).click()
+      const invitation=page.getByRole('dialog',{name:'Choose private challenge'})
+      await measure(invitation.getByRole('combobox',{name:'Invitation board'}),'invitation board choice',true)
+      await measure(invitation.getByRole('combobox',{name:'Invitation character'}),'invitation character choice',true)
+      await measure(invitation.getByRole('button',{name:'Send Invitation'}),'send invitation',true)
+      await invitation.getByRole('combobox',{name:'Invitation board'}).selectOption('cinematic')
+      await invitation.getByRole('combobox',{name:'Invitation character'}).selectOption('cinder-crown')
+      await invitation.getByRole('button',{name:'Send Invitation'}).click()
+      await page.waitForFunction(()=>window.fixtureCalls.some(call=>call.action==='invite'))
+      assert.deepEqual(await page.evaluate(()=>window.fixtureCalls.find(call=>call.action==='invite').args),['player-two','cinder-crown','cinematic'])
       await captureBrand('players')
       await assertNoPageScroll('Players page bounds')
       await page.getByRole('tab',{name:'Tables'}).click()
@@ -137,6 +149,15 @@ try {
       await assertPanelFits('paged table panel fits')
       await assertLastEntryFits('[data-checkers-match-id]','paged table card')
       await assertNoPageScroll('paged tables bounds')
+      await page.goto(`http://127.0.0.1:4195/${output}/index.html?queued=1`)
+      await page.getByText('Waiting for next match').waitFor()
+      await assertPanelFits('completed queue panel fits')
+      await assertLastEntryFits('[data-checkers-queue-session]','completed queue card')
+      await measure(page.getByRole('button',{name:'Leave Queue'}),'completed queue leave',true)
+      await page.getByRole('button',{name:'Leave Queue'}).click()
+      await page.waitForFunction(()=>window.fixtureCalls.some(call=>call.action==='leaveQueue'))
+      assert.deepEqual(await page.evaluate(()=>window.fixtureCalls.find(call=>call.action==='leaveQueue').args),['session-completed'])
+      await page.goto(`http://127.0.0.1:4195/${output}/index.html`)
       await page.getByRole('button',{name:'Create Public Match',exact:true}).click()
       const dialog=page.getByRole('dialog')
       await measure(dialog,'board dialog')

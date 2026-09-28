@@ -1,3 +1,9 @@
+## September 27 Shadow Checkers continuation parity and production rules proof
+
+- Corrected the queued loser's forbidden Rematch action, restored lobby queue status/Leave Queue including completed tables, and exposed explicit private-inviter board/character and queue character choices. New own-queue reads remain lobby-only; response generations/account ownership prevent stale viewer state. Scoped API/hook/Screen/picker/styles and regression/layout tests changed; no schema changes.
+- Full lint/types and 254 Jest suites pass (1,471 tests, 16 existing TODOs). Chromium/WebKit layout reports `layout-chromium-1790561894601` and `layout-webkit-1790561998328` verify invite choices/action args, completed-queue card containment and touch targets.
+- Production rollback proof replays 35 legal moves from the initial board, settles capture/king/win/loss totals once, rejects terminal replay, and resolves repeated rematch calls to one continuation. Exact cleanup is zero; crown ownership is unchanged. `output/playwright/shadow-checkers-complete-sequence/result.json` binds the SQL/sequence hashes. This is not a committed hosted game or browser/physical-device completion proof; an actual QA win would risk the live one-win champion's crown.
+
 ## September 27 Shadow Checkers phone chat follow-up published
 
 - Published `c3523dadeacc960878b71b5d12b0fbd30181c402` / Netlify `6ab9cab96d8fcedc0386d2d1` after the user's phone report: visible Send, 16px-minimum checked input, plain message feed, feed hidden only while composing, and accepted-notice placement clear of Skip. Files: `ShadowCheckersScreen.tsx`, `shadow-checkers-ui.css`, invitation CSS, Screen tests and layout QA script.

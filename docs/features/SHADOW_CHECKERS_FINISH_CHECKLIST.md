@@ -2,6 +2,12 @@
 
 September 27, 2026. Working checklist from the user's physical-phone walkthrough. The goal is active. The closeout update is now deployed for phone testing; acceptance requirements below remain open where hosted or physical-device evidence is still needed.
 
+## Completion audit and continuation corrections — September 27 evening
+
+- Auditing original-game parity found and corrected the queued loser's invalid Rematch action, missing lobby Leave Queue/status, and missing explicit private-inviter/queue appearance choices. Account-switch refreshes cannot restore another viewer's queue state; own-queue reads are limited to lobby refreshes, not added to each selected-match move. Source and Chromium/WebKit layout checks pass, including 667×320 at 130% text. Final lint/types and all 254 suites pass (1,471 tests, 16 existing TODOs); production packaging follows.
+- Current production SQL passed a natural 35-move game from the initial board with four multiple jumps and one king, terminal settlement, rejected terminal replay without duplicate statistics, and both players' rematch requests resolving to one continuation. This used authenticated-role claims inside one bounded transaction and explicitly rolled back. Exact postchecks show zero test game/notification/stat rows and an unchanged eligible crown owner. Evidence: `output/playwright/shadow-checkers-complete-sequence/result.json`, with hashes of the tested SQL and move sequence.
+- A committed QA finish was deliberately not run: the existing eligible champion has one win, so a new QA win could change a real member's crown. Rollback-only production SQL evidence does not certify browser result presentation, committed full-match play, a third-player queued handoff, or physical-device acceptance. Those broader requirements remain open below.
+
 ## Phone chat follow-up published — September 27, 10:03 PM ET
 
 - Published `c3523dadeacc960878b71b5d12b0fbd30181c402`, Netlify `6ab9cab96d8fcedc0386d2d1`, following the user's immediate republish request. This includes the accepted-notice positioning fix from `c7f84840`.
@@ -27,37 +33,37 @@ September 27, 2026. Working checklist from the user's physical-phone walkthrough
 - Full Jest checkpoint: 254 suites, 1,468 passing tests, 16 pre-existing TODOs. Lint, TypeScript, 58 infrastructure Node tests, 13 Checkers audio/lifecycle tests, function manifest and dependency audit pass. Invitation SQL QA passes 51 assertions including blocking, master notification preferences, sound choices, expiry and queued-push cancellation; separate continuation SQL QA passes 31 assertions. Invitation account-switch/expiry regressions are covered. The production build passed unchanged size limits before the user's additional carved-piece request; that native update and final integration checks are in progress.
 - The remaining straight-line finish is: finish production checks; review/release the backend and manual Netlify candidate; prove hosted invitations, notifications and full-match continuation; obtain iPhone/Android and visual/audio acceptance. Computer play remains future work.
 
-Checkboxes below remain acceptance gates where they include hosted or physical-device behavior; local implementation alone does not check them off.
+Checkboxes distinguish verified implementation from remaining acceptance. Checked interface items are supported by the source and Chromium/WebKit reports named above; they do not certify physical-phone behavior. Requirements that explicitly include physical devices, sustained performance, background push or final user approval stay open until that evidence exists.
 
 ## Current finish scope, in order
 
 1. **Minimal in-game controls, audio and chat**
    - [ ] Reproduce the reported quick-control/music failure on the phone; verify the replacement controls and menu actions.
-   - [ ] Remove the in-game top bar completely. Leave only Chat and the three-dot menu at the top right, with bare icons rather than visible circles/backgrounds. Retain generous invisible touch targets, readable contrast and keyboard focus indicators.
-   - [ ] Put exit/back, help/rules, camera help, accessibility and all sound controls in the compact game-branded context menu. No separate exit/back or sound icon remains over the room.
+   - [x] Remove the in-game top bar completely. Leave only Chat and the three-dot menu at the top right, with bare icons rather than visible circles/backgrounds. Retain generous invisible touch targets, readable contrast and keyboard focus indicators.
+   - [x] Put exit/back, help/rules, camera help, accessibility and all sound controls in the compact game-branded context menu. No separate exit/back or sound icon remains over the room.
    - [ ] Keep master sound in that menu for all game audio, including music, piece sounds and room ambience. This supersedes the earlier request for a top-right master-sound button.
    - [ ] Provide clearly distinct Piece Sounds and Music toggles in the menu. Master mute must preserve the individual choices.
    - [ ] Verify the original quiet soundtrack starts, mutes and recovers after background/return; finish the natural piece/fire sound mix.
-   - [ ] Replace the large opaque match-chat sidebar with a compact transparent/translucent feed over the room, visible by default. Show approximately three or four messages at a time with contrasting text; newer messages move older messages out of view without deleting chat history.
-   - [ ] Add a menu setting to hide/show the on-screen chat feed. Hiding it changes presentation, not other players' ability to send messages.
+   - [x] Replace the large opaque match-chat sidebar with a compact transparent/translucent feed over the room, visible by default. Show approximately three or four messages at a time with contrasting text; newer messages move older messages out of view without deleting chat history. Latest correction uses plain text without a panel or bubbles; composing temporarily hides the feed.
+   - [x] Add a menu setting to hide/show the on-screen chat feed. Hiding it changes presentation, not other players' ability to send messages.
    - [ ] Make the Chat icon open only a compact message composer. Support the phone keyboard and safe areas without the half-screen sidebar. On successful send, close the composer and dismiss the keyboard; retain the draft and recovery affordance if sending fails.
    - [ ] Fix the user's reported finicky chat dismissal on the physical phone. Verify one-tap close/toggle with the keyboard both open and closed, repeated open/close cycles, and no invisible overlay intercepting game input after dismissal. Distinguish closing the composer from hiding the message feed.
    - [ ] Keep feed/composer/menu placement clear of playable board input and the invisible camera gesture region. Verify focus, keyboard return, menu dismissal and both phone orientations through the landscape gate.
-   - [ ] Latest phone correction: invert both drag axes and all four directional camera controls; preserve pinch/wheel zoom direction. This is an inversion of the existing camera controls, not a new first-person camera mode.
+   - [x] Latest phone correction: invert both drag axes and all four directional camera controls; preserve pinch/wheel zoom direction. This is an inversion of the existing camera controls, not a new first-person camera mode. Actual Unity browser checks verify direction and input isolation; physical finger-pinch remains under phone acceptance.
 
 2. **Branded entrance and landscape lobby**
    - [ ] Preserve the rotation prompt's working behavior (confirmed by the user), while adding Shadow Checkers branding and the study's visual treatment. Use one consistent visual identity across rotation, lobby, loading and in-game menus.
-   - [ ] Use black backgrounds throughout the Checkers entrance/loading/lobby/menu surfaces instead of navy blue, retaining the gold branding and readable contrast.
-   - [ ] Replace the simplistic game-loading presentation with the same Checkers branding used for rotation and the lobby. Keep truthful loading progress, readable status and retry/recovery controls.
-   - [ ] Replace the vertically scrolling lobby with a fixed, single-screen landscape layout matching the new room.
-   - [ ] Remove the top bar and its back arrow completely, including during game loading; integrate rules, audio, navigation and a clear exit action into the single menu.
-   - [ ] Keep the primary actions and match navigation visible at phone size. Use bounded pages/tabs for longer lists, retaining usable touch targets and larger-text support.
-   - [ ] Make Hall of Fame a button/tab rather than a section reached by scrolling down.
+   - [x] Use black backgrounds throughout the Checkers entrance/loading/lobby/menu surfaces instead of navy blue, retaining the gold branding and readable contrast.
+   - [x] Replace the simplistic game-loading presentation with the same Checkers branding used for rotation and the lobby. Keep truthful loading progress, readable status and retry/recovery controls.
+   - [x] Replace the vertically scrolling lobby with a fixed, single-screen landscape layout matching the new room.
+   - [x] Remove the top bar and its back arrow completely, including during game loading; integrate rules, audio, navigation and a clear exit action into the single menu.
+   - [x] Keep the primary actions and match navigation visible at phone size. Use bounded pages/tabs for longer lists, retaining usable touch targets and larger-text support. Verified browser profiles include 667×320 and 130% text with complete card containment.
+   - [x] Make Hall of Fame a button/tab rather than a section reached by scrolling down.
    - [ ] Preserve continue-match, open matches and spectating in the reorganized interface.
 
 3. **Direct invitations and dependable turn notifications**
    - [ ] Show eligible members currently online across ShadowChat, respecting presence visibility and existing blocking rules.
-   - [ ] Let a player invite a selected member; deliver a themed invitation with Join and Decline actions that lead to the intended game.
+   - [x] Let a player invite a selected member; deliver a themed invitation with Join and Decline actions that lead to the intended game. Hosted Join into one intended match is verified; decline/expiry are covered by SQL and interface tests, with background notification acceptance separate below.
    - [ ] Handle repeated taps, declined/expired invitations and unavailable players without duplicate matches.
    - [ ] Audit and finish the existing Checkers turn-notification foundation. Its current code is not proof of dependable delivery.
    - [ ] Verify invitation/turn delivery while the recipient is elsewhere in ShadowChat and while the app is backgrounded, including supported installed-PWA push with permission enabled.

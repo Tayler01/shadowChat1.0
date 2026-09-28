@@ -15,6 +15,7 @@ import {
   fetchShadowCheckersMatch,
   fetchShadowCheckersMatches,
   fetchShadowCheckersMoves,
+  fetchMyShadowCheckersQueuedSessions,
   fetchShadowCheckersQueue,
   fetchShadowCheckersSessions,
   joinShadowCheckersMatch,
@@ -34,6 +35,7 @@ const emptySnapshot: ShadowCheckersSnapshot = {
   matches: [],
   activeMatch: null,
   queue: [],
+  myQueuedSessionIds: [],
   moves: [],
   chat: [],
   leaderboard: [],
@@ -55,6 +57,7 @@ export function useShadowCheckers(
 ) {
   const { user } = useAuth()
   const [snapshot, setSnapshot] = useState<ShadowCheckersSnapshot>(emptySnapshot)
+  const [snapshotOwnerId, setSnapshotOwnerId] = useState<string | null>(null)
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(() => initialMatchId ?? null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -63,8 +66,14 @@ export function useShadowCheckers(
   const channelRef = useRef<RealtimeChannel | null>(null)
   const refreshTimerRef = useRef<number | null>(null)
   const selectedMatchIdRef = useRef<string | null>(initialMatchId ?? null)
+  const currentUserIdRef = useRef(user?.id ?? null)
+  const refreshGenerationRef = useRef(0)
+  currentUserIdRef.current = user?.id ?? null
 
   const refresh = useCallback(async (nextSelectedMatchId = selectedMatchId) => {
+    const requestUserId = user?.id ?? null
+    const generation = ++refreshGenerationRef.current
+    const isCurrent = () => generation === refreshGenerationRef.current && requestUserId === currentUserIdRef.current
     try {
       const [sessions, matches, leaderboard] = await Promise.all([
         fetchShadowCheckersSessions(),
@@ -75,26 +84,28 @@ export function useShadowCheckers(
         ? matches.find(match => match.id === nextSelectedMatchId) ?? await fetchShadowCheckersMatch(nextSelectedMatchId)
         : null
       const activeSessionId = activeMatch?.session_id ?? null
-      const [queue, moves, chat] = activeMatch
-        ? await Promise.all([
-          activeSessionId ? fetchShadowCheckersQueue(activeSessionId) : Promise.resolve([]),
-          fetchShadowCheckersMoves(activeMatch.id),
-          fetchShadowCheckersChat(activeMatch.id),
-        ])
-        : [[], [], []]
+      const [queue, moves, chat, myQueuedSessionIds] = await Promise.all([
+        activeMatch && activeSessionId ? fetchShadowCheckersQueue(activeSessionId) : Promise.resolve([]),
+        activeMatch ? fetchShadowCheckersMoves(activeMatch.id) : Promise.resolve([]),
+        activeMatch ? fetchShadowCheckersChat(activeMatch.id) : Promise.resolve([]),
+        requestUserId && !nextSelectedMatchId ? fetchMyShadowCheckersQueuedSessions(requestUserId) : Promise.resolve([]),
+      ])
 
-      const next = { sessions, matches, activeMatch, queue, moves, chat, leaderboard }
-      setSnapshot(next)
-      setError(null)
+      const next = { sessions, matches, activeMatch, queue, myQueuedSessionIds, moves, chat, leaderboard }
+      if (isCurrent()) {
+        setSnapshot(next)
+        setSnapshotOwnerId(requestUserId)
+        setError(null)
+      }
       return next
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unable to load Shadow Checkers'
-      setError(message)
+      if (isCurrent()) setError(message)
       throw err
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [selectedMatchId])
+  }, [selectedMatchId, user?.id])
 
   useEffect(() => {
     void refresh().catch(() => {})
@@ -106,10 +117,11 @@ export function useShadowCheckers(
     setSelectedMatchId(nextInitialMatchId)
   }, [initialMatchId])
 
-  const activeMatchId = snapshot.activeMatch?.id
-  const activeMatchStatus = snapshot.activeMatch?.status
-  const activeMatchTurnUserId = snapshot.activeMatch?.current_turn_user_id
-  const activeMatchMoveCount = snapshot.activeMatch?.move_count
+  const visibleSnapshot = snapshotOwnerId === (user?.id ?? null) ? snapshot : emptySnapshot
+  const activeMatchId = visibleSnapshot.activeMatch?.id
+  const activeMatchStatus = visibleSnapshot.activeMatch?.status
+  const activeMatchTurnUserId = visibleSnapshot.activeMatch?.current_turn_user_id
+  const activeMatchMoveCount = visibleSnapshot.activeMatch?.move_count
   const currentUserId = user?.id
 
   useEffect(() => {
@@ -302,9 +314,9 @@ export function useShadowCheckers(
   }), [refresh, runAction])
 
   return {
-    ...snapshot,
+    ...visibleSnapshot,
     selectedMatchId,
-    loading,
+    loading: snapshotOwnerId === (user?.id ?? null) ? loading : true,
     busy,
     error,
     refresh,
