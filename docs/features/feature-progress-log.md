@@ -1,7 +1,7 @@
 ## September 30 native TestFlight refresh
 
 - Tayler resumed native testing and authorized publishing a fresh signed iPhone build. Build 16 updates Expo/React Native patches, suppresses the WebView keyboard accessory bar and supplies media permission descriptions while retaining the current hosted interface.
-- Mobile audit is clean; fresh install, dependency compatibility tests, lint/types, Expo Doctor 20/20 and iOS export passed. Signed build/Apple processing and physical-device acceptance remain separate gates. Photos video paste remains unresolved. [Release evidence](native-testflight-update-2026-09-30.md).
+- Mobile audit is clean; fresh install, dependency compatibility tests, lint/types, Expo Doctor 20/20 and iOS export passed. Signed compilation and Apple processing passed; Build 16 is VALID and IN_BETA_TESTING in the existing internal group. Apple's direct upload API bypassed stalled EAS submissions. The previous invitation is already accepted; no resend was sent. Physical-device acceptance and Photos video paste remain unresolved. [Release evidence](native-testflight-update-2026-09-30.md).
 
 ## September 30 video-size and PWA paste follow-up published
 
