@@ -1,6 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { CheckCircle2, Download, Sparkles, X } from 'lucide-react'
-import { PhoneInstallGuide } from '../../components/onboarding/PhoneInstallGuide'
 import { Button } from '../../components/ui/Button'
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner'
 import { useAuth } from '../../hooks/useAuth'
@@ -29,6 +28,10 @@ import type {
 
 const LazyFirstRunActivationJourney = lazy(() => import('./FirstRunActivationJourney').then(module => ({
   default: module.FirstRunActivationJourney,
+})))
+
+const PhoneInstallGuide = lazy(() => import('../../components/onboarding/PhoneInstallGuide').then(module => ({
+  default: module.PhoneInstallGuide,
 })))
 
 type FirstRunActivationCoordinatorProps = {
@@ -440,13 +443,15 @@ export function FirstRunActivationCoordinator({
       )}
 
       {installGuideOpen && (
-        <PhoneInstallGuide
-          open
-          canInstall={canInstall}
-          onClose={() => void finishInstall('later')}
-          onComplete={() => void finishInstall(isInstalledApp() ? 'installed' : 'later')}
-          onInstall={promptAndRecordInstall}
-        />
+        <Suspense fallback={<div className="fixed inset-0 z-[140] flex items-center justify-center bg-[var(--bg-app)]" role="status" aria-label="Opening phone setup"><LoadingSpinner /></div>}>
+          <PhoneInstallGuide
+            open
+            canInstall={canInstall}
+            onClose={() => void finishInstall('later')}
+            onComplete={() => void finishInstall(isInstalledApp() ? 'installed' : 'later')}
+            onInstall={promptAndRecordInstall}
+          />
+        </Suspense>
       )}
     </>
   )

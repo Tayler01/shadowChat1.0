@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../hooks/useAuth'
 import { usePwaInstallPrompt } from '../../hooks/usePwaInstallPrompt'
@@ -7,7 +7,11 @@ import {
   shouldShowPhoneInstallOnboarding,
 } from '../../lib/phoneInstallOnboarding'
 import { isNativeAppWebView } from '../../lib/nativeAppBridge'
-import { PhoneInstallGuide } from './PhoneInstallGuide'
+import { LoadingSpinner } from '../ui/LoadingSpinner'
+
+const PhoneInstallGuide = lazy(() => import('./PhoneInstallGuide').then(module => ({
+  default: module.PhoneInstallGuide,
+})))
 
 const isInstalledApp = () => {
   if (typeof window === 'undefined') {
@@ -57,7 +61,7 @@ export function PhoneInstallOnboarding() {
     }
   }, [profile])
 
-  if (!profile) {
+  if (!profile || !open) {
     return null
   }
 
@@ -86,12 +90,14 @@ export function PhoneInstallOnboarding() {
   }
 
   return (
-    <PhoneInstallGuide
-      open={open}
-      canInstall={canInstall}
-      onClose={closeAndRemember}
-      onComplete={closeAndRemember}
-      onInstall={handleNativeInstall}
-    />
+    <Suspense fallback={<div className="fixed inset-0 z-[140] flex items-center justify-center bg-[var(--bg-app)]" role="status" aria-label="Opening phone setup"><LoadingSpinner /></div>}>
+      <PhoneInstallGuide
+        open={open}
+        canInstall={canInstall}
+        onClose={closeAndRemember}
+        onComplete={closeAndRemember}
+        onInstall={handleNativeInstall}
+      />
+    </Suspense>
   )
 }
