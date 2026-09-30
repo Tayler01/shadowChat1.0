@@ -1,7 +1,8 @@
-## September 30 composer media follow-up in verification
+## September 30 composer media follow-up published
 
 - Tayler advanced the queued video paste work into this follow-up, along with inline thumbnails, shared caption/attachment Send, picker review, Pins loading bars and small keyboard-dismiss controls. [Implementation and platform investigation](composer-media-followup-2026-09-30.md) tracks verification and release.
-- The iPhone up/down/checkmark strip is Apple's native form accessory view. Current WebKit offers no PWA suppression API; a small app chevron/swipe closes the keyboard but cannot remove the system strip while typing. User reports an iOS update on the same day; physical baseline/current comparison remains open.
+- Web build `abb22931` is pushed to main and live through manual Netlify deploy `6abd3281fceefa3eb468e003`. Public health/media guards, hosted two-account smoke/cleanup, server health and the required-restart broadcast passed. Unchanged production budgets passed after deferring optional preview/image-viewer UI.
+- Tayler's installed-PWA test found the native up/down/checkmark strip in every keyboard-comparison variant. The supplied screenshot confirms Home Screen context. The editor workaround is unsuccessful on this phone; the existing native wrapper's accessory suppression is prepared separately for signed-client testing. Physical video-preview and broader installed-PWA acceptance remain open.
 
 ## September 30 chat smoothness published
 

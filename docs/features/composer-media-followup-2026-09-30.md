@@ -10,8 +10,8 @@ compact keyboard dismissal across General, DMs, reply threads and Pins.
 - [x] Preserve captions, reply targets and stable message IDs through retries.
 - [x] Stage pasted and selected videos before explicit Send.
 - [x] Add Pins media loading bars and shared compact keyboard gestures; chevrons sit beside attachment controls.
-- [ ] Complete source gates and practical mobile browser verification.
-- [ ] Publish the reviewed main build manually and verify the required restart notice.
+- [x] Complete source gates and practical mobile browser verification.
+- [x] Publish the reviewed main build manually and verify the required restart notice.
 - [ ] Obtain physical installed-PWA keyboard/clipboard acceptance.
 
 ## iPhone system toolbar investigation
@@ -56,6 +56,12 @@ browser context and input-event names; nothing is saved or sent. Confirm
 just whether its arrows become disabled. This tests the proposed editor workaround
 fairly on the actual iOS 27 device before a risky production editor replacement.
 
+At 12:09 PM ET Tayler reported that every tested combination still showed the
+whole toolbar. The supplied photo confirms the installed Home Screen context
+and a plaintext-only editor with no file picker. The editor/file-picker/form
+workaround is therefore unsuccessful on this phone. Native host suppression
+is the next prepared route; signed installation and physical proof remain open.
+
 ## Behavior and limits
 
 Previews share the neutral entry box, without a yellow focus box or visible
@@ -91,9 +97,31 @@ stopped (nine to zero); all eleven pre-existing user containers were preserved.
 
 The server `send-push` preview now says "Sent a video" instead of exposing JSON
 attachment metadata. Its shared helper and privacy tests pass; existing recovery
-jobs can retain historical previews until their expiration. Deploy this function
-before the caption-enabled client. No schema, auth or Storage policy change.
+jobs can retain historical previews until their expiration. The function was
+deployed before the caption-enabled client (ACTIVE version 113). No schema,
+auth or Storage policy change.
 
-Publication and public verification remain pending. Evidence lives under
-`output/playwright/composer-followup/` and `output/release-evidence/`; browser
-emulation is not physical-device toolbar removal proof.
+Published web build `abb22931fed8165c1a1b495533df17f3565cbe0d` is pushed to main
+and live at https://shadochat.online through manual Netlify deploy
+`6abd3281fceefa3eb468e003`. App/health/service-worker checks and media GET 405 /
+unauthenticated POST 401 passed. Active required-restart policy matches this
+build and was broadcast. Operations health passed with 13 active Functions
+and push ready; linked migrations and security contracts passed.
+
+The unchanged production bundle budgets passed after deferring optional preview
+and image-viewer UI: initial gzip 329.35 KiB, largest eager JS 479.00 KiB raw,
+464 published files / 95.36 MiB. Lint, app types and 88 relevant tests passed
+after this packaging change. Netlify account lookup was rate-limited during
+its build wrapper; a fresh local build with the same production flags passed,
+then the authenticated CLI published that artifact manually.
+
+Hosted two-account auth/resume-send/DM smoke passed. Cleanup removed one General
+message, two DMs and 25 notification events, repaired two read cursors and left
+zero test Storage objects. Hosted keyboard-comparison DOM checks passed 16
+cases in Chromium/WebKit; Tayler's physical report above establishes that these
+editor variants do not remove the native bar on his installed PWA.
+
+Evidence lives under `output/playwright/composer-followup/`,
+`output/playwright/composer-followup-production/` and `output/release-evidence/`.
+Ignored private QA backups and the unsigned native export remain local after
+automatic approval review rejected their cleanup. They were not published.
