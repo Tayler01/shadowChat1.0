@@ -37,6 +37,26 @@ const getActiveUsersSnapshot = (presenceByUserId: Record<string, PresenceSnapsho
 const activeUsersEqual = (left: PresenceSnapshot[], right: PresenceSnapshot[]) =>
   left.length === right.length && left.every((item, index) => item === right[index])
 
+const presenceSnapshotsEqual = (left: PresenceSnapshot, right: PresenceSnapshot) => {
+  const leftKeys = Object.keys(left)
+  const rightKeys = Object.keys(right)
+  return leftKeys.length === rightKeys.length && leftKeys.every(key =>
+    Object.is(left[key as keyof PresenceSnapshot], right[key as keyof PresenceSnapshot])
+  )
+}
+
+const presenceMapsEqual = (
+  left: Record<string, PresenceSnapshot>,
+  right: Record<string, PresenceSnapshot>
+) => {
+  const leftUserIds = Object.keys(left)
+  const rightUserIds = Object.keys(right)
+  return leftUserIds.length === rightUserIds.length && leftUserIds.every(userId => {
+    const nextPresence = right[userId]
+    return Boolean(nextPresence && presenceSnapshotsEqual(left[userId], nextPresence))
+  })
+}
+
 type PresenceStore = {
   subscribe: (listener: () => void) => () => void
   getPresenceByUserId: () => Record<string, PresenceSnapshot>
@@ -55,6 +75,8 @@ const createPresenceStore = (): PresenceStore => {
   }
 
   const setPresenceByUserId = (nextPresenceByUserId: Record<string, PresenceSnapshot>) => {
+    if (presenceMapsEqual(presenceByUserId, nextPresenceByUserId)) return
+
     const nextActiveUsers = getActiveUsersSnapshot(nextPresenceByUserId)
     presenceByUserId = nextPresenceByUserId
     activeUsers = activeUsersEqual(activeUsers, nextActiveUsers) ? activeUsers : nextActiveUsers

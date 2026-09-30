@@ -107,6 +107,7 @@ const normalizeEnvelopeV2 = (payload) => {
 
   return {
     expired: false,
+    schemaVersion: 2,
     eventId: candidate.eventId,
     eventIds: eventIds.length ? eventIds : [candidate.eventId],
     type: candidate.type,

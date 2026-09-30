@@ -1,29 +1,31 @@
 {
-  "title": "Mint Fizz and Silver Halo are live",
-  "summary": "Two new Shadow Chat themes are here: a fresh mint-green glass theme and a sleek graphite theme with silver/chrome accents.",
-  "restartPolicy": "required_restart",
+  "title": "Smoother conversations and easier sharing",
+  "summary": "This update improves reading position, attachment sharing, and notification reliability across Shadow Chat.",
+  "restartPolicy": "optional_restart",
   "severity": "feature",
   "sections": [
     {
-      "heading": "New Themes",
+      "heading": "Keep your place",
       "items": [
-        "Mint Fizz adds a light mint-glass look with aqua shine, soft lime glow, bubbly pearl surfaces, and fresh green accents.",
-        "Silver Halo adds a dark graphite-glass look with chrome ribbons, silver controls, and cool blue shine.",
-        "Both themes include generated backdrop, texture, and picker preview assets so each one feels like its own full look."
+        "General Chat, DMs, reply threads, and Pins discussions restore unread conversations more reliably, including messages beyond the latest page.",
+        "Loading history and receiving new messages preserve your reading position. Jump to latest brings you back when you are ready.",
+        "Opening a pinned General message takes you to its conversation context."
       ]
     },
     {
-      "heading": "Where To Find Them",
+      "heading": "Paste, preview, and send",
       "items": [
-        "Open Settings, then Color & Layout, and choose Mint Fizz or Silver Halo from the theme cards.",
-        "The update popup now previews new theme drops with theme artwork, so future launches can show the look before you switch."
+        "Paste images or files into the composer, or drag files in on desktop. Review your selections before sending.",
+        "Attachment progress, cancellation, and retry make interrupted uploads easier to handle.",
+        "Pins discussions support private file attachments alongside comments."
       ]
     },
     {
-      "heading": "Restart Required",
+      "heading": "Quieter, more dependable updates",
       "items": [
-        "Restarting or refreshing makes sure the new theme assets, picker cards, and popup styling load together.",
-        "Older app sessions will be prompted to restart before continuing."
+        "Push notifications respect preview privacy and conversation mute settings during retries.",
+        "A failed delivery on one device can retry without repeating successful deliveries on another.",
+        "Chat loading and background refreshes do less unnecessary work. Restart when convenient to load the update."
       ]
     }
   ]

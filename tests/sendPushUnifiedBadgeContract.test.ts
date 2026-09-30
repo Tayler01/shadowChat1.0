@@ -38,6 +38,7 @@ describe('send-push unified badge and presence contracts', () => {
 
     expect(badgeBlock).toContain("supabase.rpc('get_app_badge_state_v2'")
     expect(badgeBlock).toContain('badgestate?.total')
+    expect(badgeBlock).toContain('return undefined')
     expect(badgeBlock).toContain('math.min(99, math.max(0, math.floor(count)))')
     expect(badgeBlock).not.toContain('count_unread_dm_messages')
   })
@@ -181,7 +182,9 @@ describe('send-push unified badge and presence contracts', () => {
     const delivery = functionBlock('const deliverpushtosubscriptions', 'const getretryablefailurecount')
     expect(delivery).toContain('push_provider_concurrency')
     expect(delivery).toContain('abortsignal.timeout(push_provider_timeout_ms)')
-    expect(delivery).toContain(".eq('delivered', true)")
+    expect(delivery).toContain("'claim_notification_delivery_targets'")
+    expect(delivery).toContain("'complete_notification_delivery_targets'")
+    expect(delivery).toContain("target.status === 'delivered'")
     expect(delivery).toContain('deliveredsubscriptionids')
     expect(compact).toContain('push_fanout_concurrency')
   })

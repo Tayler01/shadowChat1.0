@@ -1,16 +1,15 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { BellRing, Film, Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { cn, processSlashCommand, slashCommands } from '../../lib/utils'
 import type { ChatMessage, ChatMessageType } from '../../lib/supabase'
-import { uploadVoiceMessage, uploadChatFile, uploadChatImageAsset } from '../../lib/supabase'
+import { uploadVoiceMessage, uploadChatFileAsset, uploadChatImageAsset, removeUnusedChatUploadAsset } from '../../lib/supabase'
 import type { EmojiClickData } from '../../types'
 import { RecordingIndicator } from '../ui/RecordingIndicator'
 import { useDraft } from '../../hooks/useDraft'
 import { useSuggestedReplies, useSuggestionsEnabled } from '../../hooks/useSuggestedReplies'
-import { GifPicker } from './GifPicker'
 import type { GifResult } from '../../lib/gifs'
 import toast from 'react-hot-toast'
 import { askQuestion } from '../../lib/ai'
@@ -23,16 +22,29 @@ import { getBlockedActionMessage } from '../../lib/moderation'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { isShadowPinImageShareUrl } from './shadowPinShareLinks'
 import {
+  CHAT_FILE_UPLOAD_RULE,
   getUploadErrorMessage,
   MESSAGE_MEDIA_UPLOAD_MAX_BYTES,
+  validateUpload,
   VOICE_RECORDING_MAX_SECONDS,
 } from '../../lib/uploadLimits'
+import { classifyComposerFile, extractClipboardFiles, extractDroppedFiles } from '../../lib/composerAttachments'
+import { useStagedAttachments } from '../../hooks/useStagedAttachments'
+import { StagedAttachmentList } from './StagedAttachmentList'
+import { measureChatInputFrame } from '../../lib/chatPerformance'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
+const GifPicker = React.lazy(() => import('./GifPicker').then(module => ({ default: module.GifPicker })))
 const HYPE_SEND_LONG_PRESS_MS = 650
 
 const shouldCollapseReplyPreview = (content: string) =>
   content.length > 160 || content.split(/\r?\n/).length > 3
+
+type ChatStagedUpload = {
+  path: string
+  publicUrl: string
+  thumbnailUrl?: string | null
+}
 
 interface MessageInputProps {
   onSendMessage: (
@@ -40,12 +52,15 @@ interface MessageInputProps {
     type?: ChatMessageType,
     fileUrl?: string,
     replyTo?: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
+    clientMessageId?: string,
+    onQueued?: () => void
   ) => Promise<ChatMessage | null | void> | ChatMessage | null | void
   placeholder?: string
   disabled?: boolean
   className?: string
   cacheKey?: string
+  identityKey?: string | null
   onUploadStatusChange?: (uploading: boolean) => void
   messages?: ChatMessage[]
   replyingTo?: ReplyTarget
@@ -60,6 +75,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   disabled = false,
   className = '',
   cacheKey = 'general',
+  identityKey,
   onUploadStatusChange = () => {},
   messages = [],
   replyingTo,
@@ -67,8 +83,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   typingChannel = 'general',
   enableGifPicker = false,
 }) => {
-  const { draft, setDraft, clear } = useDraft(cacheKey)
-  const [message, setMessage] = useState(draft)
+  const composerScopeKey = `${identityKey ?? ''}:${cacheKey}`
+  const { draft, setDraft, clear } = useDraft(cacheKey, identityKey)
+  const [composerState, setComposerState] = useState(() => ({ key: composerScopeKey, message: draft }))
+  const message = composerState.key === composerScopeKey ? composerState.message : draft
+  const setMessage = useCallback((value: string) => setComposerState({ key: composerScopeKey, message: value }), [composerScopeKey])
+  const messageRef = useRef(message)
+  messageRef.current = message
+  const submittingRef = useRef(false)
+  const submissionIdRef = useRef(0)
+  const scopeRef = useRef({ key: composerScopeKey, generation: 0 })
+  const composerEditVersionRef = useRef(0)
+  const replyIdRef = useRef(replyingTo?.id)
+  replyIdRef.current = replyingTo?.id
+  if (scopeRef.current.key !== composerScopeKey) {
+    scopeRef.current = { key: composerScopeKey, generation: scopeRef.current.generation + 1 }
+    submittingRef.current = false
+  }
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showGifPicker, setShowGifPicker] = useState(false)
   const [showSlashCommands, setShowSlashCommands] = useState(false)
@@ -100,7 +131,55 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setReplyPreviewExpanded(false)
   }, [replyingTo?.id])
   const audioChunksRef = useRef<Blob[]>([])
-  const submittingRef = useRef(false)
+  const attachmentReplyRef = useRef<{ id?: string } | null>(null)
+  const uploadStatusRef = useRef(onUploadStatusChange)
+  uploadStatusRef.current = onUploadStatusChange
+  const staged = useStagedAttachments<ChatStagedUpload>({
+    scopeKey: composerScopeKey,
+    validate: file => { validateUpload(file, CHAT_FILE_UPLOAD_RULE) },
+    upload: async (file, options) => {
+      const { kind } = classifyComposerFile(file)
+      return kind === 'image'
+        ? uploadChatImageAsset(file, 'chat', options)
+        : uploadChatFileAsset(file, options)
+    },
+    send: async (uploaded, file, clientMessageId) => {
+      const { kind, mimeType } = classifyComposerFile(file)
+      const meta = JSON.stringify({ name: file.name, size: file.size, type: mimeType })
+      const sent = await onSendMessage(
+        kind === 'image' ? '' : meta,
+        kind,
+        uploaded.publicUrl,
+        attachmentReplyRef.current ? attachmentReplyRef.current.id : replyingTo?.id,
+        uploaded.thumbnailUrl,
+        clientMessageId
+      )
+      return sent !== null
+    },
+    cleanup: async uploaded => removeUnusedChatUploadAsset(uploaded.path),
+    cleanupPath: uploaded => uploaded.path,
+    cleanupScopeKey: identityKey ?? undefined,
+    cleanupNamespace: 'chat',
+    cleanupPersisted: removeUnusedChatUploadAsset,
+    errorMessage: error => getUploadErrorMessage(error, 'Attachment failed. Try again.'),
+  })
+
+  useEffect(() => {
+    uploadStatusRef.current(staged.busy)
+  }, [staged.busy])
+
+  const sendStagedAttachments = async (id?: string) => {
+    const scopeGeneration = scopeRef.current.generation
+    const replyId = replyingTo?.id
+    const attachmentReply = { id: replyId }
+    attachmentReplyRef.current = attachmentReply
+    try {
+      const sent = id ? await staged.retry(id) : await staged.sendAll()
+      if (sent && scopeRef.current.generation === scopeGeneration && replyIdRef.current === replyId && (id ? staged.items.length <= 1 : true)) onCancelReply?.()
+    } finally {
+      if (attachmentReplyRef.current === attachmentReply) attachmentReplyRef.current = null
+    }
+  }
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
   const hypeRemaining = hype?.status?.remaining ?? 0
@@ -114,10 +193,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const setComposerMessage = useCallback((value: string) => {
     const nextMessage = normalizeComposerValue(value)
+    composerEditVersionRef.current += 1
+    messageRef.current = nextMessage
     setMessage(nextMessage)
     setDraft(nextMessage)
     return nextMessage
-  }, [setDraft])
+  }, [setDraft, setMessage])
 
   const isComposerVisible = useCallback(() => {
     const element = textareaRef.current
@@ -136,7 +217,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   useEffect(() => {
     setMessage(draft)
-  }, [draft])
+  }, [draft, setMessage])
 
   useEffect(() => {
     const pruneEmptyDraft = () => {
@@ -159,7 +240,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       window.removeEventListener('pagehide', pruneEmptyDraft)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [clear, isComposerVisible, message])
+  }, [clear, isComposerVisible, message, setMessage])
 
   // Handle typing indicators
   useEffect(() => {
@@ -227,12 +308,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
   }, [message])
 
-  const restoreComposerFocus = useCallback(() => {
+  const restoreComposerFocus = useCallback((stillCurrent: () => boolean = () => true) => {
     requestAnimationFrame(() => {
-      textareaRef.current?.focus()
+      if (stillCurrent()) textareaRef.current?.focus()
     })
     window.setTimeout(() => {
-      textareaRef.current?.focus()
+      if (stillCurrent()) textareaRef.current?.focus()
     }, 0)
   }, [])
 
@@ -244,10 +325,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
 
     submittingRef.current = true
+    const submissionId = ++submissionIdRef.current
+    const scopeGeneration = scopeRef.current.generation
+    const editVersion = composerEditVersionRef.current
+    const replyId = replyingTo?.id
+    const stillInScope = () => scopeRef.current.generation === scopeGeneration
+    let queued = false
+    const completeQueued = () => {
+      if (queued || !stillInScope()) return
+      queued = true
+      if (composerEditVersionRef.current === editVersion && messageRef.current.trim() === currentMessage) {
+        clear()
+        messageRef.current = ''
+        setMessage('')
+        stopTyping()
+        setShowSlashCommands(false)
+        if (textareaRef.current) textareaRef.current.style.height = 'auto'
+      }
+      if (replyIdRef.current === replyId) onCancelReply?.()
+      if (submissionIdRef.current === submissionId) submittingRef.current = false
+    }
 
     try {
       // Process slash commands
       const processedMessage = await processSlashCommand(currentMessage, messages)
+      if (!stillInScope()) return
       const finalMessage = processedMessage || currentMessage
 
       const aiMatch = !processedMessage && currentMessage.toLowerCase().startsWith('@ai')
@@ -257,25 +359,18 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         ? currentMessage
         : null
 
-      clear()
-      setMessage('')
-      stopTyping()
-      setShowSlashCommands(false)
-      restoreComposerFocus()
-
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto'
-      }
-
       const sent = await onSendMessage(
         shadowPinImageUrl ? '' : finalMessage,
         shadowPinImageUrl ? 'image' : 'text',
         shadowPinImageUrl || undefined,
-        replyingTo?.id
+        replyId,
+        undefined,
+        undefined,
+        completeQueued
       )
-      if (sent !== null) {
-        onCancelReply?.()
-      }
+      if (!stillInScope()) return
+      if (sent === null) return
+      completeQueued()
 
       if (aiMatch) {
         try {
@@ -285,6 +380,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         }
       }
     } catch (err) {
+      if (!stillInScope()) return
       console.error(err)
       const message =
         err instanceof Error && err.message
@@ -292,8 +388,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           : 'Failed to send message'
       toast.error(message)
     } finally {
-      submittingRef.current = false
-      restoreComposerFocus()
+      if (stillInScope() && submissionIdRef.current === submissionId) {
+        submittingRef.current = false
+        restoreComposerFocus(() => scopeRef.current.generation === scopeGeneration && submissionIdRef.current === submissionId)
+      }
     }
   }, [
     clear,
@@ -304,6 +402,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     onSendMessage,
     replyingTo?.id,
     restoreComposerFocus,
+    setMessage,
     stopTyping,
   ])
 
@@ -378,6 +477,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (cacheKey === 'general') measureChatInputFrame('general')
+    else if (cacheKey.startsWith('dm-')) measureChatInputFrame('dm')
+    else if (cacheKey.startsWith('general-thread:')) measureChatInputFrame('thread')
     const value = setComposerMessage(e.target.value)
 
     // Show slash commands as soon as the user types '/'
@@ -428,109 +530,76 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }
 
     submittingRef.current = true
+    const submissionId = ++submissionIdRef.current
+    const scopeGeneration = scopeRef.current.generation
+    const replyId = replyingTo?.id
+    const stillInScope = () => scopeRef.current.generation === scopeGeneration
     setShowGifPicker(false)
     try {
-      const sent = await onSendMessage('', 'image', gif.url, replyingTo?.id)
+      const sent = await onSendMessage('', 'image', gif.url, replyId)
+      if (!stillInScope()) return
       if (sent === null) {
         toast.error('Failed to send GIF')
         return
       }
-      onCancelReply?.()
+      if (replyIdRef.current === replyId) onCancelReply?.()
     } catch (err) {
+      if (!stillInScope()) return
       console.error(err)
       toast.error('Failed to send GIF')
     } finally {
-      submittingRef.current = false
-      restoreComposerFocus()
+      if (stillInScope() && submissionIdRef.current === submissionId) {
+        submittingRef.current = false
+        restoreComposerFocus(() => scopeRef.current.generation === scopeGeneration && submissionIdRef.current === submissionId)
+      }
     }
   }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (file) {
-      onUploadStatusChange(true)
-      ;(async () => {
-        try {
-          const asset = await uploadChatImageAsset(file, 'chat')
-          const sent = await onSendMessage('', 'image', asset.publicUrl, replyingTo?.id, asset.thumbnailUrl)
-          if (sent === null) {
-            toast.error('Failed to send image')
-            return
-          }
-          onCancelReply?.()
-        } catch (err) {
-          console.error(err)
-          toast.error(getUploadErrorMessage(err, 'Failed to send image'))
-        } finally {
-          onUploadStatusChange(false)
-        }
-      })()
+  const stageFiles = (files: File[]) => {
+    if (disabled || staged.busy) {
+      toast.error('Wait for the current send to finish before adding an attachment.')
+      return 0
     }
-  }
-
-  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (file) {
-      onUploadStatusChange(true)
-      ;(async () => {
-        try {
-          const url = await uploadChatFile(file)
-          const meta = JSON.stringify({ name: file.name, size: file.size, type: file.type })
-          const sent = await onSendMessage(meta, 'video', url, replyingTo?.id)
-          if (sent === null) {
-            toast.error('Failed to send video')
-            return
-          }
-          onCancelReply?.()
-        } catch (err) {
-          console.error(err)
-          toast.error(getUploadErrorMessage(err, 'Failed to send video'))
-        } finally {
-          onUploadStatusChange(false)
-        }
-      })()
-    }
+    const result = staged.addFiles(files)
+    result.errors.forEach(error => toast.error(error))
+    return result.accepted
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const files = Array.from(e.target.files ?? [])
     e.target.value = ''
-    if (file) {
-      onUploadStatusChange(true)
-      ;(async () => {
-        try {
-          const messageType: ChatMessageType = file.type.startsWith('image/')
-            ? 'image'
-            : file.type.startsWith('video/')
-              ? 'video'
-              : 'file'
-          const meta = JSON.stringify({ name: file.name, size: file.size, type: file.type })
-          const asset = messageType === 'image'
-            ? await uploadChatImageAsset(file, 'chat')
-            : null
-          const url = asset?.publicUrl || await uploadChatFile(file)
-          const sent = await onSendMessage(
-            messageType === 'image' ? '' : meta,
-            messageType,
-            url,
-            replyingTo?.id,
-            asset?.thumbnailUrl
-          )
-          if (sent === null) {
-            toast.error('Failed to send attachment')
-            return
-          }
-          onCancelReply?.()
-        } catch (err) {
-          console.error(err)
-          toast.error(getUploadErrorMessage(err, 'Failed to send attachment'))
-        } finally {
-          onUploadStatusChange(false)
-        }
-      })()
-    }
+    if (files.length > 0) stageFiles(files)
+  }
+
+  const insertPastedText = (value: string) => {
+    const textarea = textareaRef.current
+    if (!textarea || !value) return
+    const start = textarea.selectionStart
+    const end = textarea.selectionEnd
+    const next = messageRef.current.slice(0, start) + value + messageRef.current.slice(end)
+    setComposerMessage(next)
+    requestAnimationFrame(() => textarea.setSelectionRange(start + value.length, start + value.length))
+  }
+
+  const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = extractClipboardFiles(event.clipboardData)
+    if (files.length === 0) return
+    const accepted = stageFiles(files)
+    if (accepted === 0) return
+    const text = event.clipboardData.getData('text/plain')
+    event.preventDefault()
+    insertPastedText(text)
+  }
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault()
+  }
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    const files = extractDroppedFiles(event.dataTransfer)
+    if (files.length === 0) return
+    event.preventDefault()
+    stageFiles(files)
   }
 
   const clearRecordingLimitTimeout = useCallback(() => {
@@ -660,6 +729,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   return (
     <div
       data-message-composer-surface="true"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       className={`theme-composer-surface relative border-t border-[var(--border-panel)] px-3 py-2.5 md:p-3 ${className}`}
     >
       {replyingTo && (
@@ -778,10 +849,27 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       )}
 
       {showGifPicker && enableGifPicker && (
-        <GifPicker
-          onSelect={gif => void handleGifSelect(gif)}
-          onClose={() => setShowGifPicker(false)}
-        />
+        <Suspense fallback={<div role="status" aria-label="Loading GIF picker" className="mb-2 text-sm text-[var(--text-muted)]">Loading GIF picker…</div>}>
+          <GifPicker
+            onSelect={gif => void handleGifSelect(gif)}
+            onClose={() => setShowGifPicker(false)}
+          />
+        </Suspense>
+      )}
+
+      <StagedAttachmentList
+        items={staged.items}
+        onRemove={staged.remove}
+        onCancel={staged.cancel}
+        onRetry={id => { void sendStagedAttachments(id) }}
+      />
+      {staged.items.length > 0 && (
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-xs text-[var(--text-muted)]">Your message text stays in the composer.</span>
+          <Button type="button" size="sm" disabled={disabled || staged.busy} onClick={() => { void sendStagedAttachments() }}>
+            Send {staged.items.length} attachment{staged.items.length === 1 ? '' : 's'}
+          </Button>
+        </div>
       )}
 
       {/* Input Form */}
@@ -793,6 +881,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             variant="ghost"
             size="sm"
             onClick={() => setShowAttachmentMenu(prev => !prev)}
+            disabled={disabled || staged.busy}
             className="h-12 w-12 rounded-xl p-0"
             aria-label="Add attachment"
           >
@@ -857,7 +946,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             type="file"
             accept="image/*"
             ref={imageInputRef}
-            onChange={handleImageChange}
+            onChange={handleFileChange}
+            multiple
             data-upload-kind="image"
             className="hidden"
           />
@@ -865,7 +955,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             type="file"
             accept="video/*"
             ref={videoInputRef}
-            onChange={handleVideoChange}
+            onChange={handleFileChange}
+            multiple
             data-upload-kind="video"
             className="hidden"
           />
@@ -873,6 +964,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
+            multiple
             data-upload-kind="file"
             className="hidden"
           />
@@ -884,6 +976,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             value={message}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={placeholder}
             disabled={disabled}
             autoComplete="off"
@@ -900,6 +993,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleRecordClick}
+          disabled={disabled || staged.busy}
           className="hidden h-12 w-12 rounded-xl p-0 md:inline-flex"
           aria-label="Record audio"
         >

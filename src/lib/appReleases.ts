@@ -27,6 +27,11 @@ export const APP_RELEASE_CHECKS_ENABLED =
   CURRENT_APP_DEPLOY_CONTEXT === 'production' &&
   CURRENT_APP_BUILD_ID.length > 0
 
+export const shouldDeferAppReleaseRefresh = (
+  visibilityState: DocumentVisibilityState,
+  immediate: boolean
+) => visibilityState === 'hidden' && !immediate
+
 export type AppReleasePresentation = {
   shouldShow: boolean
   isCurrentBuild: boolean

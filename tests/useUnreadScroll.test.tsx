@@ -547,7 +547,8 @@ describe('useUnreadScroll', () => {
     )
 
     expect(result.current.firstUnreadMessageId).toBe('m3')
-    expect(firstUnreadEl.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' })
+    expect(firstUnreadEl.scrollIntoView).not.toHaveBeenCalled()
+    expect(result.current.feedState).toBe('layoutSettling')
     document.body.removeChild(container)
   })
 
@@ -629,7 +630,8 @@ describe('useUnreadScroll', () => {
       expect(result.current.firstUnreadMessageId).toBe('m22')
     })
     expect(onBeforeInitialJump).toHaveBeenCalledWith(makeMessage('m22', 22))
-    expect(firstUnreadEl.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' })
+    expect(firstUnreadEl.scrollIntoView).not.toHaveBeenCalled()
+    expect(result.current.feedState).toBe('layoutSettling')
 
     document.body.removeChild(container)
   })
@@ -698,7 +700,7 @@ describe('useUnreadScroll', () => {
       retryAttempts.forEach(callback => callback(16))
     })
 
-    expect(firstUnreadEl.scrollIntoView).toHaveBeenCalledWith({ block: 'start', behavior: 'auto' })
+    expect(firstUnreadEl.scrollIntoView).not.toHaveBeenCalled()
 
     document.body.removeChild(container)
   })
@@ -749,6 +751,43 @@ describe('useUnreadScroll', () => {
     expect(getElementId).not.toHaveBeenCalled()
 
     document.body.removeChild(container)
+  })
+
+  it('does not read rows partly or fully hidden by the owning mobile composer', async () => {
+    const surface = document.createElement('div')
+    const container = document.createElement('div')
+    const footer = document.createElement('div')
+    footer.dataset.mobileChatFooter = 'true'
+    surface.append(container, footer)
+    document.body.append(surface)
+    setScrollMetrics(container, 900)
+    setRect(container, 0, 400)
+    setRect(footer, 200, 400)
+    const messages = [makeMessage('readable', 1), makeMessage('partial', 2), makeMessage('covered', 3)]
+    const bounds = [[120, 180], [180, 280], [220, 320]]
+    messages.forEach((message, index) => {
+      const row = document.createElement('div')
+      row.id = `message-${message.id}`
+      row.dataset.messageId = message.id
+      setRect(row, bounds[index][0], bounds[index][1])
+      container.append(row)
+    })
+    const onMarkReadToLatest = jest.fn()
+    const { result } = renderHook(() => useUnreadScroll<TestMessage>({
+      containerRef: { current: container }, messages, cursor: null, surfaceKey: 'composer-occlusion',
+      getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at,
+      getElementId: id => `message-${id}`, onMarkReadToLatest,
+    }))
+
+    await act(async () => { await result.current.markLatestRead(true) })
+    expect(onMarkReadToLatest).toHaveBeenCalledWith(messages[0])
+    expect(result.current.lastObservedMessageId).toBe('readable')
+
+    setRect(footer, 100, 400)
+    await act(async () => { await result.current.markLatestRead(true) })
+    expect(onMarkReadToLatest).toHaveBeenCalledTimes(1)
+    expect(result.current.lastObservedMessageId).toBeNull()
+    surface.remove()
   })
 
   it('does not flush visible rows while the initial unread cursor is still loading', async () => {
@@ -894,4 +933,132 @@ describe('useUnreadScroll', () => {
       value: originalVisibilityState,
     })
   })
+  it('regression: does not flush visible rows before an exact target and cursor resolve', async () => {
+    useFakeTimersWithImmediateRaf()
+    const originalVisibilityState = document.visibilityState
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    })
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1400)
+    setRect(container, 0, 400)
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      value: 1000,
+      writable: true,
+    })
+
+    const messages = [
+      makeMessage('m1', 1),
+      makeMessage('m2', 2),
+      makeMessage('m3', 3),
+    ]
+
+    messages.forEach((message, index) => {
+      const row = document.createElement('div')
+      row.id = `message-${message.id}`
+      setRect(row, index === 2 ? 120 : 520, index === 2 ? 220 : 620)
+      container.appendChild(row)
+    })
+
+    const onMarkReadToLatest = jest.fn()
+
+    const { result } = renderHook(() =>
+      useUnreadScroll<TestMessage>({
+        containerRef: { current: container },
+        messages,
+        loading: false,
+        cursor: null,
+        cursorLoading: true,
+        enabled: true,
+        initialMessageId: 'm1',
+        surfaceKey: 'general_chat:main',
+        getMessageId: message => message.id,
+        getMessageCreatedAt: message => message.created_at,
+        getElementId: id => `message-${id}`,
+        onMarkReadToLatest,
+      })
+    )
+
+    act(() => {
+      result.current.handleUnreadScroll()
+    })
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    })
+
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      jest.runOnlyPendingTimers()
+      await Promise.resolve()
+    })
+
+    expect(onMarkReadToLatest).not.toHaveBeenCalled()
+
+    document.body.removeChild(container)
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: originalVisibilityState,
+    })
+  })
+  it('resets on an account change and ignores the previous account read completion', async () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.append(container)
+    setScrollMetrics(container, 1000, 200)
+    setRect(container, 0, 200)
+    const items = Array.from({ length: 6 }, (_, index) => makeMessage(`account-m${index}`, index))
+    items.forEach((message, index) => {
+      const row = document.createElement('div')
+      row.id = `message-${message.id}`
+      row.dataset.messageId = message.id
+      row.getBoundingClientRect = () => ({ top: index * 100 - container.scrollTop, bottom: index * 100 + 100 - container.scrollTop, height: 100 }) as DOMRect
+      container.append(row)
+    })
+    let resolveRead!: () => void
+    const onRead = jest.fn(() => new Promise<void>(resolve => { resolveRead = resolve }))
+    const { result, rerender } = renderHook(({ reader }) => useUnreadScroll<TestMessage>({
+      containerRef: { current: container }, messages: items, cursor: makeCursor(reader === 'a' ? 'account-m0' : 'account-m3', reader === 'a' ? 0 : 3), readerId: reader,
+      surfaceKey: 'account-reset', getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at, getElementId: id => `message-${id}`, onMarkReadToLatest: onRead,
+    }), { initialProps: { reader: 'a' } })
+    act(() => jest.advanceTimersByTime(180))
+    let reading!: Promise<void>
+    act(() => { reading = result.current.markLatestRead(true) })
+    expect(onRead).toHaveBeenCalledTimes(1)
+    rerender({ reader: 'b' })
+    act(() => jest.advanceTimersByTime(180))
+    expect(result.current.firstUnreadMessageId).toBe('account-m4')
+    await act(async () => { resolveRead(); await reading })
+    expect(result.current.lastFlushedMessageId).toBeNull()
+    expect(result.current.firstUnreadMessageId).toBe('account-m4')
+    container.remove()
+  })
+
+  it('retries the same visible candidate after a failed cursor write', async () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.append(container)
+    setScrollMetrics(container, 1000, 200)
+    setRect(container, 0, 200)
+    const message = makeMessage('retry-visible', 2)
+    const row = document.createElement('div')
+    row.id = 'message-retry-visible'
+    row.dataset.messageId = message.id
+    setRect(row, 0, 100)
+    container.append(row)
+    const onRead = jest.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(undefined)
+    const { result } = renderHook(() => useUnreadScroll<TestMessage>({ containerRef: { current: container }, messages: [message], cursor: makeCursor('previous', 1), surfaceKey: 'retry-write', getMessageId: item => item.id, getMessageCreatedAt: item => item.created_at, getElementId: id => `message-${id}`, onMarkReadToLatest: onRead }))
+    act(() => jest.advanceTimersByTime(180))
+    await act(async () => { await expect(result.current.markLatestRead(true)).rejects.toThrow('offline') })
+    await act(async () => { await result.current.markLatestRead(true) })
+    expect(onRead).toHaveBeenCalledTimes(2)
+    expect(result.current.lastFlushedMessageId).toBe(message.id)
+    container.remove()
+  })
+
 })

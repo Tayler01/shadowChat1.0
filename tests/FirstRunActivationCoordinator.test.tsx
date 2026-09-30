@@ -303,6 +303,70 @@ test('keeps a minimized journey compact and refreshes canonical completion on fo
   expect(await screen.findByText("You're in.")).toBeInTheDocument()
 })
 
+test('refreshes first-action progress from lifecycle events with a slower visible fallback', async () => {
+  jest.useFakeTimers()
+  const originalVisibilityDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState')
+  let visibilityState: DocumentVisibilityState = 'visible'
+  Object.defineProperty(document, 'visibilityState', {
+    configurable: true,
+    get: () => visibilityState,
+  })
+
+  try {
+    const firstActionJourney = journey({
+      currentStep: 'first_action',
+      identityCompletedAt: '2026-07-13T00:01:00Z',
+      preferencesCompletedAt: '2026-07-13T00:02:00Z',
+      notificationChoice: 'notifications_later',
+      selectedFirstActionKind: 'group_message',
+    })
+    mockGetJourney.mockResolvedValue(firstActionJourney)
+    render(<FirstRunActivationCoordinator currentView="chat" onNavigate={jest.fn()} />)
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(mockGetJourney).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      jest.advanceTimersByTime(59_999)
+      await Promise.resolve()
+    })
+    expect(mockGetJourney).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      jest.advanceTimersByTime(1)
+      await Promise.resolve()
+    })
+    expect(mockGetJourney).toHaveBeenCalledTimes(2)
+
+    fireEvent.focus(window)
+    await act(async () => { await Promise.resolve() })
+    expect(mockGetJourney).toHaveBeenCalledTimes(3)
+
+    visibilityState = 'hidden'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await act(async () => {
+      jest.advanceTimersByTime(60_000)
+      await Promise.resolve()
+    })
+    expect(mockGetJourney).toHaveBeenCalledTimes(3)
+
+    visibilityState = 'visible'
+    act(() => { document.dispatchEvent(new Event('visibilitychange')) })
+    await act(async () => { await Promise.resolve() })
+    expect(mockGetJourney).toHaveBeenCalledTimes(4)
+  } finally {
+    if (originalVisibilityDescriptor) {
+      Object.defineProperty(document, 'visibilityState', originalVisibilityDescriptor)
+    } else {
+      Reflect.deleteProperty(document, 'visibilityState')
+    }
+    jest.useRealTimers()
+  }
+})
+
 test('refreshes a stale journey after push succeeds but its preference receipt conflicts', async () => {
   mockPushSupported = true
   mockGetJourney.mockResolvedValue(journey({

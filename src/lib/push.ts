@@ -441,6 +441,8 @@ export const fetchNotificationPreferences = async (userId: string) => {
   return upsertNotificationPreferences(userId, {})
 }
 
+export const NOTIFICATION_PREFERENCES_CHANGED_EVENT = 'shadowchat:notification-preferences-changed'
+
 export const upsertNotificationPreferences = async (
   userId: string,
   updates: Partial<Omit<NotificationPreferences, 'user_id'>>
@@ -461,6 +463,9 @@ export const upsertNotificationPreferences = async (
     throw error
   }
 
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(NOTIFICATION_PREFERENCES_CHANGED_EVENT, { detail: { userId } }))
+  }
   return data as NotificationPreferences
 }
 
@@ -556,7 +561,7 @@ export const syncPushSubscription = async (
     throw new Error('Push subscription keys are missing.')
   }
 
-  const installation = await registerWebNotificationInstallation().catch(() => null)
+  const installation = await registerWebNotificationInstallation(userId).catch(() => null)
 
   const { error } = await workingClient
     .from('push_subscriptions')
@@ -578,6 +583,23 @@ export const syncPushSubscription = async (
   if (error) {
     throw error
   }
+}
+
+const DEVICE_PUSH_DISABLED_PREFIX = 'shadowchat:push-device-disabled:'
+const disabledPushUsers = new Set<string>()
+
+export const isPushDisabledForCurrentDevice = (userId: string) => {
+  if (disabledPushUsers.has(userId)) return true
+  try { return localStorage.getItem(`${DEVICE_PUSH_DISABLED_PREFIX}${userId}`) === 'true' } catch { return false }
+}
+
+const setDevicePushDisabled = (userId: string, disabled: boolean) => {
+  if (disabled) disabledPushUsers.add(userId)
+  else disabledPushUsers.delete(userId)
+  try {
+    if (disabled) localStorage.setItem(`${DEVICE_PUSH_DISABLED_PREFIX}${userId}`, 'true')
+    else localStorage.removeItem(`${DEVICE_PUSH_DISABLED_PREFIX}${userId}`)
+  } catch { /* In-memory intent remains authoritative for this session. */ }
 }
 
 export const enablePushForCurrentDevice = async (userId: string) => {
@@ -602,11 +624,13 @@ export const enablePushForCurrentDevice = async (userId: string) => {
 
   const subscription = await getFreshPushSubscription(registration)
   await syncPushSubscription(userId, subscription, true)
+  setDevicePushDisabled(userId, false)
 
   return subscription
 }
 
 export const disablePushForCurrentDevice = async (userId: string) => {
+  setDevicePushDisabled(userId, true)
   const workingClient = await getWorkingClient()
   const subscription = await getCurrentPushSubscription()
 
@@ -626,6 +650,7 @@ export const disablePushForCurrentDevice = async (userId: string) => {
 }
 
 export const syncCurrentDeviceSubscription = async (userId: string) => {
+  if (isPushDisabledForCurrentDevice(userId)) return false
   const support = getPushSupportStatus()
   if (!support.supported || getNotificationPermission() !== 'granted' || !VITE_WEB_PUSH_PUBLIC_KEY) {
     return false
@@ -641,7 +666,15 @@ export const syncCurrentDeviceSubscription = async (userId: string) => {
     return false
   }
 
+  if (isPushDisabledForCurrentDevice(userId)) {
+    await subscription.unsubscribe().catch(() => false)
+    return false
+  }
   await syncPushSubscription(userId, subscription, true)
+  if (isPushDisabledForCurrentDevice(userId)) {
+    await disablePushForCurrentDevice(userId)
+    return false
+  }
   return true
 }
 

@@ -93,11 +93,13 @@ describe('presence notification and unified badge database contract', () => {
 
   test('records the reviewed definer and active-table surfaces', () => {
     const authenticated = contract.domains.flatMap(domain => domain.signatures)
-    expect(contract.expected_total_security_definers).toBe(154)
+    expect(contract.expected_total_security_definers).toBe(156)
     expect(contract.private_security_definers).toContain('private.record_presence_heartbeat(boolean)')
     expect(contract.internal_signatures).toEqual(expect.arrayContaining([
       'claim_presence_activation_recipients(uuid,uuid)',
       'finish_presence_activation_dispatch(uuid,uuid)',
+      'claim_notification_delivery_targets(uuid,uuid[],uuid)',
+      'complete_notification_delivery_targets(uuid,uuid,jsonb)',
     ]))
     expect(authenticated).toEqual(expect.arrayContaining([
       'get_app_badge_state(uuid)',

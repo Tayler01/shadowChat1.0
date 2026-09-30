@@ -299,6 +299,16 @@ Coordinator validation during the original June audit:
 
 ## P0 - General Chat Read Position And Loading Stability
 
+September 30 follow-up: the new audit reproduced cursor-generation, premature
+target readiness, snapshot/realtime and delayed-DM-send races. The implementation
+now shares account-scoped read/scroll ownership across General, DMs, reply threads
+and Pins, including first-presentation gating, stable ID/offset anchors, bounded
+history and actionable missing-target recovery. See the current
+[implementation and validation record](features/chat-smoothness-implementation-2026-09-30.md)
+and [cross-surface contract](CHAT_SCROLL_AND_READ_POSITION_CONTRACT_2026-09-30.md).
+The June deployment evidence below remains historical; it does not certify this
+candidate or physical installed-phone behavior.
+
 Primary files:
 
 - [src/hooks/useMessages.tsx](C:/repos/chat2.0/src/hooks/useMessages.tsx:294)

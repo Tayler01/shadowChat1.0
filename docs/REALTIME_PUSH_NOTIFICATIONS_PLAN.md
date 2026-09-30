@@ -1,16 +1,30 @@
 # Realtime Push Notifications Plan
 
-## Documentation Status - August 5, 2026
+## Documentation Status - September 30, 2026
 
 The August 4 containment remains the permanent boundary for the old database
 workers. The v2 response collector had continued scanning `pg_net` responses
-every minute while delivery was disabled and accumulated enough database work
-to starve app boot, auth profile checks, Realtime, and message inserts.
-Migration `20260805112141_harden_web_notification_recovery.sql` restores only
-the production Web Push fallback through a once-per-minute Netlify scheduler,
-a dedicated shared secret, a singleton lease, batch size five, three-attempt
-ceiling, bounded concurrency, and eight-second provider timeouts. The old
-`pg_cron`/`pg_net` recovery and all native/TestFlight delivery remain paused.
+while delivery was disabled and accumulated work that starved app boot, auth,
+Realtime, and message inserts. Those collectors and all native/TestFlight
+workers remain paused.
+
+The active Web Push fallback is the bounded database `pg_cron`/`pg_net` path,
+restored by `20260805135200_enable_bounded_web_push_recovery_cron.sql` and
+verified read-only on September 30. It runs once per minute with a shared-secret
+Edge guard, a singleton lease, batch size five, three-attempt ceiling, bounded
+concurrency, and eight-second provider timeouts. The older Netlify scheduler
+is disabled. Cron success measures HTTP enqueue, not device receipt.
+
+The September 30 implementation adds a per-device delivery ledger, current
+conversation-mute checks on recovery, privacy/media policy before encryption,
+and an idle queue gate before Vault/HTTP work. Client changes preserve explicit
+device disable intent, fence async work by account/settings generation, coalesce
+preference/installation/badge requests, retain known badge counts on failures,
+and recover canonical events when foreground service-worker suppression occurs.
+See [implementation and validation evidence](features/notification-reliability-2026-09-30.md).
+At implementation time these changes are locally validated; release evidence
+must establish production rollout and physical-device receipt separately.
+
 Recipient-owned events, foreground alerts, unread/read state, exact counts,
 launcher badges, routes, and immediate Web Push remain independent and active.
 

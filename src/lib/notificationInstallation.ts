@@ -7,6 +7,18 @@ import {
 
 const INSTALLATION_KEY_STORAGE = 'shadowchat:notification-installation-v2'
 let installationKeyMemory: string | null = null
+let activeInstallationUserId: string | null = null
+let installationGeneration = 0
+let installationRegistration: { userId: string; loadedAt: number; result: { id: string | null; key: string } } | null = null
+let registrationRequest: { userId: string; promise: Promise<{ id: string | null; key: string } | null> } | null = null
+
+export const resetWebNotificationInstallationForUser = (userId: string | null) => {
+  if (activeInstallationUserId === userId) return
+  installationGeneration += 1
+  activeInstallationUserId = userId
+  installationRegistration = null
+  registrationRequest = null
+}
 
 const createInstallationKey = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -50,8 +62,10 @@ const isMissingV2Rpc = (error: { code?: string; message?: string } | null) => (
   Boolean(error?.message?.includes('notification_installation'))
 )
 
-export const registerWebNotificationInstallation = async () => {
+const registerInstallation = async () => {
+  const generation = installationGeneration
   const client = await getWorkingClient()
+  if (generation !== installationGeneration) return null
   const installationKey = getNotificationInstallationKey()
   const { data, error } = await client.rpc(
     'register_my_notification_installation_v2',
@@ -71,6 +85,7 @@ export const registerWebNotificationInstallation = async () => {
     },
   )
 
+  if (generation !== installationGeneration) return null
   if (error) {
     if (isMissingV2Rpc(error)) return null
     throw error
@@ -81,10 +96,30 @@ export const registerWebNotificationInstallation = async () => {
   }
 }
 
+export const registerWebNotificationInstallation = async (userId = activeInstallationUserId) => {
+  if (!userId) return registerInstallation()
+  if (installationRegistration?.userId === userId && Date.now() - installationRegistration.loadedAt < 5 * 60_000) {
+    return installationRegistration.result
+  }
+  if (registrationRequest?.userId === userId) return registrationRequest.promise
+  const request = registerInstallation().then(result => {
+    if (result && activeInstallationUserId === userId) {
+      installationRegistration = { userId, loadedAt: Date.now(), result }
+    }
+    return result
+  }).finally(() => {
+    if (registrationRequest?.promise === request) registrationRequest = null
+  })
+  registrationRequest = { userId, promise: request }
+  return request
+}
+
 export const updateWebNotificationInstallationForeground = async (
   foreground: boolean,
 ) => {
+  const generation = installationGeneration
   const client = await getWorkingClient()
+  if (generation !== installationGeneration) return false
   const installationKey = getNotificationInstallationKey()
   const { data, error } = await client.rpc(
     'set_my_notification_installation_foreground_v2',
@@ -96,6 +131,7 @@ export const updateWebNotificationInstallationForeground = async (
     },
   )
 
+  if (generation !== installationGeneration) return false
   if (error) {
     if (isMissingV2Rpc(error)) return false
     throw error
@@ -104,9 +140,11 @@ export const updateWebNotificationInstallationForeground = async (
 }
 
 export const claimWebNotificationPresentation = async (eventId: string) => {
+  const generation = installationGeneration
   const client = await getWorkingClient()
+  if (generation !== installationGeneration) return null
   const registration = await registerWebNotificationInstallation()
-  if (!registration) return null
+  if (generation !== installationGeneration || !registration) return null
 
   const { data, error } = await client.rpc(
     'claim_my_notification_presentation_v2',
@@ -116,6 +154,7 @@ export const claimWebNotificationPresentation = async (eventId: string) => {
       target_presentation_family: 'foreground',
     },
   )
+  if (generation !== installationGeneration) return null
   if (error) {
     if (isMissingV2Rpc(error)) return null
     throw error

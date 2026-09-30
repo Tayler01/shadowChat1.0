@@ -14,6 +14,7 @@ import {
   type DMConversationPreferenceChanges,
 } from '../components/dms/dmConversationHubModel'
 import { DRAFT_UPDATE_EVENT, readDraft, type DraftUpdateEventDetail } from './useDraft'
+import { getAccountDMDraftPrefix } from '../lib/draftStorage'
 
 export const useDMConversationHub = ({
   conversations,
@@ -26,7 +27,8 @@ export const useDMConversationHub = ({
   const [query, setQuery] = useState('')
   const [preferences, setPreferences] = useState<DMConversationHubPreference[]>([])
   const [mutedConversationIds, setMutedConversationIds] = useState<Set<string>>(new Set())
-  const [draftsByConversationId, setDraftsByConversationId] = useState<Record<string, string>>({})
+  const [draftState, setDraftState] = useState<{ ownerId: string | null | undefined; drafts: Record<string, string> }>({ ownerId: userId, drafts: {} })
+  const draftsByConversationId = useMemo(() => draftState.ownerId === userId ? draftState.drafts : {}, [draftState, userId])
   const [loading, setLoading] = useState(true)
   const preferencesRef = useRef<DMConversationHubPreference[]>([])
   const committedPreferencesRef = useRef<Map<string, DMConversationHubPreference>>(new Map())
@@ -77,36 +79,39 @@ export const useDMConversationHub = ({
 
   useEffect(() => {
     const nextDrafts: Record<string, string> = {}
-    conversationIds.forEach(conversationId => {
-      const draft = readDraft(getDMConversationDraftStorageKey(conversationId))
+    if (userId) conversationIds.forEach(conversationId => {
+      const draft = readDraft(getDMConversationDraftStorageKey(conversationId, userId))
       if (draft) nextDrafts[conversationId] = draft
     })
-    setDraftsByConversationId(nextDrafts)
+    setDraftState({ ownerId: userId, drafts: nextDrafts })
     // conversationIdsKey deliberately tracks the stable ID set, not array identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationIdsKey])
+  }, [conversationIdsKey, userId])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined' || !userId) return
+    const prefix = getAccountDMDraftPrefix(userId)
 
     const onDraftUpdate = (event: Event) => {
       const detail = (event as CustomEvent<DraftUpdateEventDetail>).detail
-      if (!detail?.storageKey.startsWith('draft-dm-')) return
-      const conversationId = detail.storageKey.slice('draft-dm-'.length)
-      setDraftsByConversationId(previous => {
-        const next = { ...previous }
+      if (!detail?.storageKey.startsWith(prefix)) return
+      const conversationId = detail.storageKey.slice(prefix.length)
+      setDraftState(previous => {
+        const next = { ...(previous.ownerId === userId ? previous.drafts : {}) }
         if (detail.draft.trim()) next[conversationId] = detail.draft
         else delete next[conversationId]
-        return next
+        return { ownerId: userId, drafts: next }
       })
     }
     const onStorage = (event: StorageEvent) => {
-      if (!event.key?.startsWith('draft-dm-')) return
-      const conversationId = event.key.slice('draft-dm-'.length)
-      setDraftsByConversationId(previous => ({
-        ...previous,
-        [conversationId]: event.newValue ?? '',
-      }))
+      if (!event.key?.startsWith(prefix)) return
+      const conversationId = event.key.slice(prefix.length)
+      setDraftState(previous => {
+        const next = { ...(previous.ownerId === userId ? previous.drafts : {}) }
+        if (event.newValue?.trim()) next[conversationId] = event.newValue
+        else delete next[conversationId]
+        return { ownerId: userId, drafts: next }
+      })
     }
 
     window.addEventListener(DRAFT_UPDATE_EVENT, onDraftUpdate)
@@ -115,7 +120,7 @@ export const useDMConversationHub = ({
       window.removeEventListener(DRAFT_UPDATE_EVENT, onDraftUpdate)
       window.removeEventListener('storage', onStorage)
     }
-  }, [])
+  }, [userId])
 
   useEffect(() => {
     if (!userId) return

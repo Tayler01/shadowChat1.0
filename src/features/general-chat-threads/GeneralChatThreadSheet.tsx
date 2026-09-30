@@ -11,6 +11,7 @@ import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ArrowDown, ArrowLeft, MessageCircle, RefreshCw } from 'lucide-react'
 import { MessageInput } from '../../components/chat/MessageInput'
+import { UnreadDivider } from '../../components/chat/UnreadDivider'
 import { MessageItem } from '../../components/chat/MessageItem'
 import { messageToReplyTarget, type ReplyTarget } from '../../components/chat/messageDisplay'
 import { MobileChatFooter } from '../../components/layout/MobileChatFooter'
@@ -20,6 +21,9 @@ import { useDialogAccessibility } from '../../hooks/useDialogAccessibility'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useOptionalMessages, type MessagesContextValue } from '../../hooks/MessagesContext'
 import { useReadCursor } from '../../hooks/useReadCursor'
+import { useUnreadScroll } from '../../hooks/useUnreadScroll'
+import { useAuth } from '../../hooks/useAuth'
+import { getSavedMessageScrollAnchor, scrollMessageWithinContainer } from '../../lib/messageScrollAnchor'
 import { clearGroupNotifications, requestAppBadgeRefresh } from '../../lib/appBadge'
 import { markGeneralNotificationEventsReadThrough, type ChatMessageType, type Message } from '../../lib/supabase'
 import { cn, shouldGroupMessage } from '../../lib/utils'
@@ -37,10 +41,6 @@ export type GeneralChatThreadSheetProps = {
   messagesApi?: MessagesContextValue
 }
 
-const isNearBottom = (element: HTMLElement) => (
-  element.scrollHeight - element.scrollTop - element.clientHeight < 88
-)
-
 export function GeneralChatThreadSheet({
   open,
   threadId,
@@ -56,12 +56,16 @@ export function GeneralChatThreadSheet({
   if (!messagesApi) throw new Error('GeneralChatThreadSheet requires a messages API or MessagesProvider')
 
   const titleId = useId()
+  const { user } = useAuth()
+  const surfaceKey = `general_chat_thread:${threadId ?? 'none'}:${open ? 'open' : 'closed'}`
+  const savedAnchor = useMemo(() => getSavedMessageScrollAnchor(user?.id, surfaceKey), [surfaceKey, user?.id])
+  const positioningMessageId = initialMessageId ?? savedAnchor?.id
   const closeRef = useRef<HTMLButtonElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const activeThreadRef = useRef(threadId)
+  activeThreadRef.current = threadId
   const targetScrolledRef = useRef<string | null>(null)
-  const readInFlightRef = useRef(false)
-  const wasNearBottomRef = useRef(true)
-  const previousReplyCountRef = useRef(0)
+  const [positionPresented, setPositionPresented] = useState(false)
   const [replyingTo, setReplyingTo] = useState<ReplyTarget | undefined>()
   const { isReducedMotion } = useComfortPreferences()
   const isDesktop = useIsDesktop()
@@ -69,40 +73,26 @@ export function GeneralChatThreadSheet({
     threadId,
     open,
     initialRootMessage,
-    targetMessageId: initialMessageId,
+    targetMessageId: positioningMessageId,
   })
-  const { markRead } = useReadCursor('general_chat_thread', threadId, open && Boolean(threadId))
+  const { cursor, loading: cursorLoading, error: cursorError, markRead } = useReadCursor('general_chat_thread', threadId, open && Boolean(threadId))
 
-  const markLatestVisibleRead = useCallback(async () => {
-    if (!threadId || readInFlightRef.current) return
-    const scroll = scrollRef.current
-    if (scroll && !isNearBottom(scroll)) return
-    const latest = thread.replies[thread.replies.length - 1] ?? thread.rootMessage
-    if (!latest) return
-
-    readInFlightRef.current = true
-    try {
-      await markRead(latest.id, latest.created_at)
-      await markGeneralNotificationEventsReadThrough(latest.id, threadId)
-      await clearGroupNotifications(undefined, undefined, threadId)
+  const markLatestVisibleRead = useCallback(async (message: Message) => {
+    if (!threadId || cursorLoading || thread.loading || message.optimistic || message.delivery_status === 'failed') return
+    await markGeneralNotificationEventsReadThrough(message.id, threadId)
+    await markRead(message.id, message.created_at)
+      await clearGroupNotifications(message.id, undefined, threadId)
       requestAppBadgeRefresh()
       await messagesApi.refreshThreadSummaries?.([threadId])
-    } catch {
-      // A later scroll/realtime refresh can retry the cursor without blocking the thread.
-    } finally {
-      readInFlightRef.current = false
-    }
-  }, [markRead, messagesApi, thread.replies, thread.rootMessage, threadId])
+  }, [cursorLoading, markRead, messagesApi, thread.loading, threadId])
 
   const requestClose = useCallback(() => {
-    if (wasNearBottomRef.current) {
-      void markLatestVisibleRead()
-    } else if (threadId) {
+    if (threadId) {
       const summaryRefresh = messagesApi.refreshThreadSummaries?.([threadId])
       if (summaryRefresh) void summaryRefresh.catch(() => undefined)
     }
     onClose()
-  }, [markLatestVisibleRead, messagesApi, onClose, threadId])
+  }, [messagesApi, onClose, threadId])
 
   const dialogRef = useDialogAccessibility<HTMLDivElement>({
     open,
@@ -121,95 +111,121 @@ export function GeneralChatThreadSheet({
     if (!open) setReplyingTo(undefined)
   }, [open])
 
-  useEffect(() => {
-    if (!open || !initialMessageId || targetScrolledRef.current === initialMessageId) return
-    const frame = window.requestAnimationFrame(() => {
-      const target = scrollRef.current?.querySelector<HTMLElement>(`[data-thread-message-id="${CSS.escape(initialMessageId)}"]`)
-      if (!target) return
-      target.scrollIntoView({ block: 'center', behavior: isReducedMotion ? 'auto' : 'smooth' })
-      target.focus({ preventScroll: true })
-      targetScrolledRef.current = initialMessageId
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [initialMessageId, isReducedMotion, open, thread.replies])
+  const scrollMessages = useMemo(() => [
+    ...(thread.rootMessage ? [thread.rootMessage] : []), ...thread.replies.filter(message => !message.optimistic && message.delivery_status !== 'failed'),
+  ], [thread.replies, thread.rootMessage])
+  const getMessageId = useCallback((message: Message) => message.id, [])
+  const getCreatedAt = useCallback((message: Message) => message.created_at, [])
+  const getElementId = useCallback((id: string) => `thread-message-${id}`, [])
+  const getUnreadMessages = useCallback((items: Message[]) => {
+    const first = thread.firstUnreadMessageId
+    const index = first ? items.findIndex(message => message.id === first) : -1
+    return index >= 0 ? items.slice(index).filter(message => message.user_id !== user?.id) : []
+  }, [thread.firstUnreadMessageId, user?.id])
+  const {
+    autoScroll, feedState, initialPositionReady, firstUnreadMessageId, handleUnreadScroll,
+    scrollToBottom, setAutoScroll, captureScrollAnchor, restoreScrollAnchor,
+  } = useUnreadScroll<Message>({
+    containerRef: scrollRef, messages: scrollMessages, cursor, cursorLoading,
+    enabled: open && Boolean(threadId), readerId: user?.id, surfaceKey,
+    loading: thread.loading || thread.loadedThreadId !== threadId,
+    restorationReady: !thread.error && !cursorError,
+    initialMessageId,
+    getMessageId, getMessageCreatedAt: getCreatedAt, getElementId, getUnreadMessages,
+    markVisibleOnScroll: true, onMarkReadToLatest: markLatestVisibleRead,
+  })
 
+  const followingIntentRef = useRef(autoScroll)
+  followingIntentRef.current = autoScroll
+  useEffect(() => { setPositionPresented(false) }, [threadId, user?.id, initialMessageId])
+  useEffect(() => { if (initialPositionReady) setPositionPresented(true) }, [initialPositionReady])
+  const { setFollowingLatest } = thread
+  useEffect(() => { setFollowingLatest(autoScroll && feedState === 'bottomPinned') }, [autoScroll, feedState, setFollowingLatest])
+  useEffect(() => { targetScrolledRef.current = null }, [open, threadId, positioningMessageId])
   useEffect(() => {
-    if (!open || thread.loading) return
-    const previousCount = previousReplyCountRef.current
-    previousReplyCountRef.current = thread.replies.length
-    const frame = window.requestAnimationFrame(() => {
-      const scroll = scrollRef.current
-      if (!scroll) return
-      if (thread.replies.length > previousCount && wasNearBottomRef.current) {
-        scroll.scrollTop = scroll.scrollHeight
-      }
-      if (isNearBottom(scroll)) void markLatestVisibleRead()
-    })
-    return () => window.cancelAnimationFrame(frame)
-  }, [markLatestVisibleRead, open, thread.loading, thread.replies.length])
+    if (!open || !positioningMessageId || feedState !== 'anchoredCatchup' || targetScrolledRef.current === positioningMessageId) return
+    const target = scrollRef.current?.querySelector<HTMLElement>(`[data-thread-message-id="${CSS.escape(positioningMessageId)}"]`)
+    if (!target) return
+    target.focus({ preventScroll: true })
+    targetScrolledRef.current = positioningMessageId
+  }, [feedState, open, positioningMessageId])
 
-  const scrollToLatest = useCallback(() => {
-    const scroll = scrollRef.current
-    if (!scroll) return
-    scroll.scrollTo({ top: scroll.scrollHeight, behavior: isReducedMotion ? 'auto' : 'smooth' })
-    wasNearBottomRef.current = true
+  const scrollToLatest = useCallback(async () => {
     thread.setFollowingLatest(true)
-    void markLatestVisibleRead()
-  }, [isReducedMotion, markLatestVisibleRead, thread])
+    const activeThread = threadId
+    await thread.refresh()
+    if (activeThreadRef.current !== activeThread) return
+    window.requestAnimationFrame(() => { if (activeThreadRef.current === activeThread) scrollToBottom(isReducedMotion ? 'auto' : 'smooth') })
+  }, [isReducedMotion, scrollToBottom, thread, threadId])
 
-  const handleScroll = useCallback((event: UIEvent<HTMLDivElement>) => {
-    const followingLatest = isNearBottom(event.currentTarget)
-    wasNearBottomRef.current = followingLatest
-    thread.setFollowingLatest(followingLatest)
-    if (followingLatest) void markLatestVisibleRead()
-  }, [markLatestVisibleRead, thread])
+  const handleScroll = useCallback((_event: UIEvent<HTMLDivElement>) => {
+    handleUnreadScroll()
+    const scroll = scrollRef.current
+    if (thread.hasNewer && !thread.loadingOlder && scroll && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 160 && feedState !== 'targetingDeepLink' && feedState !== 'targetingFirstUnread' && feedState !== 'resolvingInitial') {
+      captureScrollAnchor()
+      setAutoScroll(false)
+      void thread.loadNewer()
+    }
+  }, [captureScrollAnchor, feedState, handleUnreadScroll, setAutoScroll, thread])
 
   const loadOlder = useCallback(async () => {
-    const scroll = scrollRef.current
-    const previousHeight = scroll?.scrollHeight ?? 0
+    captureScrollAnchor()
+    setAutoScroll(false)
     await thread.loadOlder()
-    window.requestAnimationFrame(() => {
-      if (!scroll) return
-      scroll.scrollTop += scroll.scrollHeight - previousHeight
-    })
-  }, [thread])
+    window.requestAnimationFrame(restoreScrollAnchor)
+  }, [captureScrollAnchor, restoreScrollAnchor, setAutoScroll, thread])
 
   const handleSendMessage = useCallback(async (
     content: string,
     type?: ChatMessageType,
     fileUrl?: string,
     replyTo?: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
+    clientMessageId?: string,
+    onQueued?: () => void
   ) => {
     if (!threadId) return null
-    const sent = await messagesApi.sendMessage(content, type, fileUrl, replyTo ?? threadId, thumbnailUrl)
-    if (sent) {
-      setReplyingTo(undefined)
-      await thread.refresh()
-      window.requestAnimationFrame(scrollToLatest)
+    let queued = false
+    const acknowledgeQueue = () => {
+      queued = true
+      if (activeThreadRef.current === threadId) setReplyingTo(current => current?.id === replyTo ? undefined : current)
+      if (activeThreadRef.current === threadId) {
+        thread.setFollowingLatest(true)
+        scrollToBottom('auto')
+      }
+      onQueued?.()
+    }
+    const sent = await messagesApi.sendMessage(content, type, fileUrl, replyTo ?? threadId, thumbnailUrl, { clientMessageId, onQueued: acknowledgeQueue })
+    if (sent && activeThreadRef.current === threadId) {
+      if (!queued) setReplyingTo(current => current?.id === replyTo ? undefined : current)
+      if (followingIntentRef.current) await scrollToLatest()
     }
     return sent
-  }, [messagesApi, scrollToLatest, thread, threadId])
+  }, [messagesApi, scrollToBottom, scrollToLatest, thread, threadId])
+
+  const rowApiRef = useRef({ messagesApi, refresh: thread.refresh })
+  rowApiRef.current = { messagesApi, refresh: thread.refresh }
+  const handleReply = useCallback((message: Message) => setReplyingTo(messageToReplyTarget(message)), [])
 
   const handleEdit = useCallback(async (messageId: string, content: string) => {
-    await messagesApi.editMessage(messageId, content)
-    await thread.refresh()
-  }, [messagesApi, thread])
+    await rowApiRef.current.messagesApi.editMessage(messageId, content)
+    await rowApiRef.current.refresh()
+  }, [])
 
   const handleDelete = useCallback(async (messageId: string) => {
-    await messagesApi.deleteMessage(messageId)
+    await rowApiRef.current.messagesApi.deleteMessage(messageId)
     if (messageId === threadId) {
       requestClose()
       return
     }
-    await thread.refresh()
-  }, [messagesApi, requestClose, thread, threadId])
+    await rowApiRef.current.refresh()
+  }, [requestClose, threadId])
 
   const jumpToMessage = useCallback((messageId: string) => {
     const target = scrollRef.current?.querySelector<HTMLElement>(`[data-thread-message-id="${CSS.escape(messageId)}"]`)
-    target?.scrollIntoView({ block: 'center', behavior: isReducedMotion ? 'auto' : 'smooth' })
+    if (target && scrollRef.current) scrollMessageWithinContainer(scrollRef.current, target, 'center')
     target?.focus({ preventScroll: true })
-  }, [isReducedMotion])
+  }, [])
 
   if (!open || !threadId) return null
 
@@ -265,6 +281,10 @@ export function GeneralChatThreadSheet({
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-3 [overflow-anchor:auto] md:px-4 md:pb-3"
             data-testid="general-chat-thread-scroll"
           >
+            {thread.targetUnavailable && <div role="status" className="glass-panel p-4 text-center">
+              <p>That reply is no longer available.</p>
+              <button type="button" className="min-h-11 px-4" onClick={() => void scrollToLatest()}>Jump to latest</button>
+            </div>}
             {thread.loading && !thread.rootMessage ? (
               <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-[var(--text-muted)]">
                 <LoadingSpinner size="sm" /> Loading thread…
@@ -279,7 +299,7 @@ export function GeneralChatThreadSheet({
                 </button>
               </div>
             ) : (
-              <>
+              <div style={{ visibility: positionPresented ? 'visible' : 'hidden' }}>
                 {thread.rootMessage ? (
                   <div
                     data-thread-message-id={thread.rootMessage.id}
@@ -343,15 +363,17 @@ export function GeneralChatThreadSheet({
                         <div
                           key={message.id}
                           data-thread-message-id={message.id}
+                          data-message-id={message.id}
                           data-message-grouped={shouldGroupMessage(message, previousMessage) ? 'true' : 'false'}
                           tabIndex={-1}
                           className={cn('comfort-message-row rounded-[var(--radius-md)] py-0.5 outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]')}
                         >
+                          {firstUnreadMessageId === message.id && <UnreadDivider />}
                           <MessageItem
                             message={message}
                             previousMessage={previousMessage}
                             parentMessage={messageMap.get(message.reply_to ?? '')}
-                            onReply={reply => setReplyingTo(messageToReplyTarget(reply))}
+                            onReply={handleReply}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             onTogglePin={messagesApi.togglePin}
@@ -370,22 +392,23 @@ export function GeneralChatThreadSheet({
                     })}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
 
           {isDesktop && <div className="relative shrink-0 border-t border-[var(--border-panel)] bg-[var(--bg-panel-strong)] px-2 pb-[calc(env(safe-area-inset-bottom)_+_0.4rem)] pt-2 md:px-3 md:pb-3">
-            {thread.pendingReplyCount > 0 && (
+            {(thread.pendingReplyCount > 0 || (!autoScroll && thread.hasNewer)) && (
               <button
                 type="button"
                 onClick={scrollToLatest}
                 className="absolute bottom-full left-1/2 mb-2 inline-flex min-h-10 -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--border-glow)] bg-[var(--bg-panel-strong)] px-4 text-sm font-medium text-[var(--theme-accent-readable)] shadow-[var(--shadow-panel)]"
               >
                 <ArrowDown className="h-4 w-4" />
-                {thread.pendingReplyCount} new {thread.pendingReplyCount === 1 ? 'reply' : 'replies'}
+                {thread.pendingReplyCount > 0 ? `${thread.pendingReplyCount} new ${thread.pendingReplyCount === 1 ? 'reply' : 'replies'}` : 'Jump to latest'}
               </button>
             )}
             <MessageInput
+              identityKey={user?.id ?? null}
               onSendMessage={handleSendMessage}
               messages={thread.replies}
               replyingTo={replyingTo}
@@ -408,17 +431,18 @@ export function GeneralChatThreadSheet({
               avoidAndroidKeyboardLift
             >
               <div className="relative bg-[var(--bg-panel-strong)] px-2 pt-2">
-                {thread.pendingReplyCount > 0 && (
+                {(thread.pendingReplyCount > 0 || (!autoScroll && thread.hasNewer)) && (
                   <button
                     type="button"
                     onClick={scrollToLatest}
                     className="absolute bottom-full left-1/2 mb-2 inline-flex min-h-10 -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--border-glow)] bg-[var(--bg-panel-strong)] px-4 text-sm font-medium text-[var(--theme-accent-readable)] shadow-[var(--shadow-panel)]"
                   >
                     <ArrowDown className="h-4 w-4" />
-                    {thread.pendingReplyCount} new {thread.pendingReplyCount === 1 ? 'reply' : 'replies'}
+                    {thread.pendingReplyCount > 0 ? `${thread.pendingReplyCount} new ${thread.pendingReplyCount === 1 ? 'reply' : 'replies'}` : 'Jump to latest'}
                   </button>
                 )}
                 <MessageInput
+              identityKey={user?.id ?? null}
                   onSendMessage={handleSendMessage}
                   messages={thread.replies}
                   replyingTo={replyingTo}

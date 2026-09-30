@@ -1,3 +1,12 @@
+## September 30 chat smoothness candidate
+
+- The shared read/scroll controller waits for committed target rows, restores stable row/offset anchors, respects user movement and excludes rows covered by the fixed mobile composer. DM targets also clear the floating controls. General, DMs, reply threads and Pins retain bounded history.
+- Pins discussion checks passed Android Chromium, iPhone WebKit and desktop: initial unread, visible-only cursor, history prepend, realtime while reading, send/edit, private file upload, exact target and header counts. Temporary comments/files were removed and absence verified.
+- Shared-composer paste/stage/remove and mixed-text caret checks passed Chromium and WebKit. Final local image send appeared live for a second account; its exact message and Storage object were removed. These tests use an isolated local Supabase project with synthetic accounts, not real OS clipboard or installed-PWA proof.
+- Source gates passed: 268 Jest suites / 1,591 tests (16 existing TODOs), 63 Node contracts, lint, TypeScript and unchanged build budgets. Full migration replay, six transactional SQL suites and exact security contracts also passed.
+- Final build 5 integrated checks passed 20/20 Chromium and 20/20 WebKit, including the first displayed unread frame, fixed-control bounds, capped history, realtime/reconnect, two-account sends, missing-target recovery and delayed send after switching conversations. Exact temporary rows/user/conversation cleanup passed. Chromium had no page errors; WebKit emitted two ResizeObserver loop warnings despite passing all assertions. They remain a diagnostic follow-up, not physical-device proof.
+- [Implementation and release evidence](../features/chat-smoothness-implementation-2026-09-30.md) records the final cross-browser and hosted results. Physical-device acceptance remains RD-037 through RD-039 in [real-device validation](real-device-mobile-validation.md).
+
 ## September 29 Shadow Checkers hosted move and camera QA
 
 - Published build `fef865dee100b6c6ef92926c62faaab0a2ea1f04`, Netlify deploy `6abc7522c70385a4236e9f57`, passed hosted two-player Android/Chromium browser emulation. Legal-move animation began 12 ms after input before held RPC completion; the server persisted it without acknowledgement replay. Own-side orientation, opponent realtime turn/reply from the flipped seat, camera controls and exact test-created data cleanup passed. Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790735775133/summary.json`.

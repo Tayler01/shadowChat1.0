@@ -80,6 +80,15 @@ export function PinnedMessagesButton({
               message={message}
               onUnpin={onUnpin}
               onToggleReaction={onToggleReaction}
+              onViewInChat={messageId => {
+                setOpen(false)
+                const url = new URL('/', window.location.origin)
+                url.searchParams.set('view', 'chat')
+                url.searchParams.set('message', messageId)
+                const state = { ...(window.history.state ?? {}), shadowchatLayer: 'chat-pinned-result' }
+                window.history.pushState(state, '', url)
+                window.dispatchEvent(new PopStateEvent('popstate', { state }))
+              }}
             />
           ))}
         </div>

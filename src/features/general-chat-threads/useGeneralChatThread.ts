@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getWorkingClient, type Message } from '../../lib/supabase'
 import { loadLocalOutboxEntries, type LocalMessageOutboxEntry } from '../../lib/localMessageOutbox'
+import { embedPublicProfile } from '../../../supabase/functions/_shared/public-profile'
+import { useRealtimeRecovery } from '../../hooks/useRealtimeRecovery'
 import { useAuth } from '../../hooks/useAuth'
 import {
   fetchGeneralChatThread,
@@ -62,11 +64,23 @@ export function useGeneralChatThread({
   const [hasOlder, setHasOlder] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [pendingReplyCount, setPendingReplyCount] = useState(0)
+  const [hasNewer, setHasNewer] = useState(false)
+  const [loadedThreadId, setLoadedThreadId] = useState<string | null>(null)
+  const [targetUnavailable, setTargetUnavailable] = useState(false)
+  const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null)
+  const scopeKey = `${user?.id ?? ''}:${open}:${threadId}`
+  const scopeEpochRef = useRef({ key: scopeKey, version: 0 })
+  if (scopeEpochRef.current.key !== scopeKey) scopeEpochRef.current = { key: scopeKey, version: scopeEpochRef.current.version + 1 }
+  const scopeRef = useRef(threadId)
+  scopeRef.current = threadId
   const followingLatestRef = useRef(true)
   const repliesRef = useRef<Message[]>([])
   const hasLoadedRef = useRef(false)
   const initialRootMessageRef = useRef(initialRootMessage)
   const requestVersionRef = useRef(0)
+  const revisionRef = useRef(0)
+  const changedIdsRef = useRef(new Map<string, number>())
+  const noteChange = useCallback((id: string) => { changedIdsRef.current.set(id, ++revisionRef.current) }, [])
   const refreshTimerRef = useRef<number | null>(null)
 
   initialRootMessageRef.current = initialRootMessage
@@ -74,30 +88,68 @@ export function useGeneralChatThread({
   const refresh = useCallback(async () => {
     if (!threadId || !open) return
     const requestVersion = ++requestVersionRef.current
+    const scopeEpoch = scopeEpochRef.current.version
+    const snapshotRevision = revisionRef.current
+    if (hasLoadedRef.current && !followingLatestRef.current) {
+      const ids = repliesRef.current.filter(message => !message.optimistic && message.delivery_status !== 'failed').map(message => message.id)
+      try {
+        const client = await getWorkingClient()
+        const { data, error: queryError } = await client.from('messages').select(`*, ${embedPublicProfile('user', 'users!user_id')}`).in('id', [threadId, ...ids])
+        if (queryError) throw queryError
+        if (scopeEpoch !== scopeEpochRef.current.version || requestVersion !== requestVersionRef.current) return
+        const rows = (data ?? []) as unknown as Message[]
+        setRootMessage(rows.find(message => message.id === threadId) ?? null)
+        setReplies(current => mergeThreadMessages(
+          rows.filter(message => ids.includes(message.id) && (changedIdsRef.current.get(message.id) ?? 0) <= snapshotRevision),
+          current.filter(message => !ids.includes(message.id) || (changedIdsRef.current.get(message.id) ?? 0) > snapshotRevision)
+        ))
+        setError(null)
+      } catch (caught) {
+        if (scopeEpoch === scopeEpochRef.current.version) setError(caught instanceof Error ? caught : new Error('Unable to refresh this thread.'))
+      }
+      return
+    }
     if (!hasLoadedRef.current) setLoading(true)
     try {
       const window = await fetchGeneralChatThread({
         threadId,
         targetMessageId: hasLoadedRef.current ? null : targetMessageId,
+        readAnchor: targetMessageId && !hasLoadedRef.current ? undefined : !hasLoadedRef.current,
         limit: GENERAL_CHAT_THREAD_PAGE_SIZE,
       })
-      if (requestVersion !== requestVersionRef.current) return
+      if (requestVersion !== requestVersionRef.current || scopeEpoch !== scopeEpochRef.current.version) return
       setRootMessage(window.rootMessage)
+      if (!hasLoadedRef.current) setTargetUnavailable(Boolean(targetMessageId && !window.targetFound))
       const knownParentIds = new Set([threadId, ...window.replies.map(reply => reply.id)])
       const failedReplies = loadLocalOutboxEntries('general')
         .filter(entry => entry.senderId === user?.id && Boolean(entry.replyTo && knownParentIds.has(entry.replyTo)))
         .map(entry => outboxEntryToThreadMessage(entry, (profile ?? user) as Message['user']))
-      setReplies(current => mergeThreadMessages(current, [...window.replies, ...failedReplies]))
+      setReplies(current => {
+        const retained = hasLoadedRef.current && followingLatestRef.current
+          ? current.filter(message => message.optimistic || message.delivery_status === 'failed')
+          : current
+        const unchangedSnapshot = window.replies.filter(message => (changedIdsRef.current.get(message.id) ?? 0) <= snapshotRevision)
+        const changedCurrent = current.filter(message => (changedIdsRef.current.get(message.id) ?? 0) > snapshotRevision)
+        const merged = mergeThreadMessages(retained, [...unchangedSnapshot, ...failedReplies, ...changedCurrent])
+        const local = merged.filter(message => message.optimistic || message.delivery_status === 'failed')
+        const server = merged.filter(message => !message.optimistic && message.delivery_status !== 'failed')
+        return mergeThreadMessages(server.slice(-200), local)
+      })
       setHasOlder(window.hasOlder)
-      setError(null)
+      setHasNewer(window.hasNewer)
+      setLoadedThreadId(threadId)
+      setFirstUnreadMessageId(window.firstUnreadMessageId)
+      setError(window.rootMessage ? null : new Error('This thread is no longer available.'))
       hasLoadedRef.current = true
     } catch (caught) {
-      if (requestVersion !== requestVersionRef.current) return
+      if (requestVersion !== requestVersionRef.current || scopeEpoch !== scopeEpochRef.current.version) return
       setError(caught instanceof Error ? caught : new Error('Unable to load this thread.'))
     } finally {
-      if (requestVersion === requestVersionRef.current) setLoading(false)
+      if (requestVersion === requestVersionRef.current && scopeEpoch === scopeEpochRef.current.version) setLoading(false)
     }
   }, [open, profile, targetMessageId, threadId, user])
+
+  useRealtimeRecovery(() => { if (open && threadId) void refresh() })
 
   const scheduleRefresh = useCallback((isNewReply: boolean) => {
     if (isNewReply && !followingLatestRef.current) {
@@ -115,14 +167,19 @@ export function useGeneralChatThread({
     setRootMessage(initialRootMessageRef.current)
     setReplies([])
     setHasOlder(false)
+    setHasNewer(false)
+    setLoadedThreadId(null)
+    setFirstUnreadMessageId(null)
+    setTargetUnavailable(false)
     setPendingReplyCount(0)
     setError(null)
     hasLoadedRef.current = false
     followingLatestRef.current = true
+    changedIdsRef.current.clear()
     if (open && threadId) void refresh()
   // refresh intentionally omitted so a reply merge does not reset the thread.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, targetMessageId, threadId])
+  }, [open, targetMessageId, threadId, user?.id])
 
   useEffect(() => {
     repliesRef.current = replies
@@ -138,10 +195,24 @@ export function useGeneralChatThread({
         candidate.client_message_id === message.reply_to
       ))
     )
+    const acceptMessage = (message: Message) => {
+      noteChange(message.id)
+      if (!message.optimistic && message.delivery_status !== 'failed' && !followingLatestRef.current && !repliesRef.current.some(item => item.id === message.id || item.client_message_id && item.client_message_id === message.client_message_id)) {
+        setHasNewer(true)
+        setPendingReplyCount(count => count + 1)
+        return
+      }
+      setReplies(current => {
+        const merged = mergeThreadMessages(current, [message])
+        const local = merged.filter(item => item.optimistic || item.delivery_status === 'failed')
+        const server = merged.filter(item => !item.optimistic && item.delivery_status !== 'failed')
+        return mergeThreadMessages(followingLatestRef.current ? server.slice(-200) : server.slice(0, 200), local)
+      })
+    }
     const handleServerMessage = (event: Event) => {
       const message = (event as CustomEvent<Message>).detail
       if (!message || !belongsToThread(message)) return
-      setReplies(current => mergeThreadMessages(current, [message]))
+      acceptMessage(message)
     }
     const handleLocalMessage = (event: Event) => {
       const detail = (event as CustomEvent<{
@@ -155,8 +226,8 @@ export function useGeneralChatThread({
         )))
         return
       }
-      if (detail?.action === 'upsert' && detail.message && belongsToThread(detail.message)) {
-        setReplies(current => mergeThreadMessages(current, [detail.message!]))
+      if (detail?.action === 'upsert' && detail.message && detail.message.user_id === user?.id && belongsToThread(detail.message)) {
+        acceptMessage(detail.message)
       }
     }
 
@@ -166,7 +237,7 @@ export function useGeneralChatThread({
       window.removeEventListener('shadowchat:general-thread-message', handleServerMessage)
       window.removeEventListener('shadowchat:general-thread-local', handleLocalMessage)
     }
-  }, [open, threadId])
+  }, [noteChange, open, threadId, user?.id])
 
   useEffect(() => {
     if (!open || !threadId) return
@@ -188,7 +259,9 @@ export function useGeneralChatThread({
           filter: `thread_id=eq.${threadId}`,
         }, (payload: ThreadRealtimePayload) => {
           const changedMessageId = String(payload.new.message_id ?? payload.old.message_id ?? '')
+          if (disposed) return
           if (payload.eventType === 'DELETE' && changedMessageId) {
+            noteChange(changedMessageId)
             setReplies(current => current.filter(message => message.id !== changedMessageId))
           }
           scheduleRefresh(payload.eventType === 'INSERT')
@@ -202,7 +275,9 @@ export function useGeneralChatThread({
           schema: 'public',
           table: 'messages',
         }, (payload: ThreadRealtimePayload) => {
+          if (disposed) return
           const changedId = String((payload.new as { id?: unknown })?.id ?? (payload.old as { id?: unknown })?.id ?? '')
+          if (payload.eventType === 'DELETE' && changedId) noteChange(changedId)
           if (changedId === threadId && payload.eventType === 'DELETE') {
             setRootMessage(null)
           } else if (payload.eventType === 'DELETE' && changedId) {
@@ -219,32 +294,66 @@ export function useGeneralChatThread({
       if (mappingChannel && realtimeClient) void realtimeClient.removeChannel(mappingChannel)
       if (messageChannel && realtimeClient) void realtimeClient.removeChannel(messageChannel)
     }
-  }, [open, scheduleRefresh, threadId])
+  }, [noteChange, open, scheduleRefresh, threadId])
 
   const loadOlder = useCallback(async () => {
     const oldest = replies[0]
     if (!threadId || !oldest || !hasOlder || loadingOlder) return
     setLoadingOlder(true)
+    const requestVersion = requestVersionRef.current
     try {
       const window = await fetchGeneralChatThread({
         threadId,
         before: { created_at: oldest.created_at, id: oldest.id },
         limit: GENERAL_CHAT_THREAD_PAGE_SIZE,
       })
+      if (scopeRef.current !== threadId || requestVersionRef.current !== requestVersion) return
       setRootMessage(current => current ?? window.rootMessage)
-      setReplies(current => mergeThreadMessages(window.replies, current))
+      setReplies(current => {
+        const merged = mergeThreadMessages(window.replies, current)
+        const local = merged.filter(message => message.optimistic || message.delivery_status === 'failed')
+        const server = merged.filter(message => !message.optimistic && message.delivery_status !== 'failed')
+        if (server.length > 200) setHasNewer(true)
+        return mergeThreadMessages(server.slice(0, 200), local)
+      })
       setHasOlder(window.hasOlder)
       setError(null)
     } catch (caught) {
       setError(caught instanceof Error ? caught : new Error('Unable to load older replies.'))
     } finally {
-      setLoadingOlder(false)
+      if (scopeRef.current === threadId) setLoadingOlder(false)
     }
   }, [hasOlder, loadingOlder, replies, threadId])
 
+  const loadNewer = useCallback(async () => {
+    const newest = replies.filter(message => !message.optimistic).slice(-1)[0]
+    if (!threadId || !newest || !hasNewer || loadingOlder) return
+    const requestVersion = requestVersionRef.current
+    setLoadingOlder(true)
+    try {
+      const window = await fetchGeneralChatThread({ threadId, after: { created_at: newest.created_at, id: newest.id }, readAnchor: false })
+      if (scopeRef.current !== threadId || requestVersion !== requestVersionRef.current) return
+      setReplies(current => {
+        const merged = mergeThreadMessages(current, window.replies)
+        const local = merged.filter(message => message.optimistic || message.delivery_status === 'failed')
+        const server = merged.filter(message => !message.optimistic && message.delivery_status !== 'failed')
+        if (server.length > 200) setHasOlder(true)
+        return mergeThreadMessages(server.slice(-200), local)
+      })
+      setHasNewer(window.hasNewer)
+    } catch (caught) {
+      if (scopeRef.current === threadId) setError(caught instanceof Error ? caught : new Error('Unable to load newer replies.'))
+    } finally {
+      if (scopeRef.current === threadId) setLoadingOlder(false)
+    }
+  }, [hasNewer, loadingOlder, replies, threadId])
+
   const setFollowingLatest = useCallback((following: boolean) => {
     followingLatestRef.current = following
-    if (following) setPendingReplyCount(0)
+    if (following) {
+      setPendingReplyCount(0)
+      setTargetUnavailable(false)
+    }
   }, [])
 
   return {
@@ -255,8 +364,13 @@ export function useGeneralChatThread({
     hasOlder,
     error,
     pendingReplyCount,
+    hasNewer,
+    loadedThreadId,
+    firstUnreadMessageId,
+    targetUnavailable,
     refresh,
     loadOlder,
+    loadNewer,
     setFollowingLatest,
   }
 }

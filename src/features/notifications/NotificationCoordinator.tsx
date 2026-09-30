@@ -15,12 +15,16 @@ import { useAuth } from '../../hooks/useAuth'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { useSoundEffects } from '../../hooks/useSoundEffects'
 import { getUserProfile } from '../../lib/auth'
+import { beginChatTiming } from '../../lib/chatPerformance'
 import { updateWebNotificationInstallationForeground } from '../../lib/notificationInstallation'
 import {
   APP_BADGE_REFRESH_EVENT,
   refreshAppBadgeState,
+  resetAppBadgeStateForUser,
   requestAppBadgeRefresh,
 } from '../../lib/appBadge'
+import { NOTIFICATION_PREFERENCES_CHANGED_EVENT } from '../../lib/push'
+import { resetWebNotificationInstallationForUser } from '../../lib/notificationInstallation'
 import { createRealtimeChannelName } from '../../lib/realtimeChannelName'
 import {
   getRealtimeClient,
@@ -110,6 +114,7 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
   const [selectedProfile, setSelectedProfile] = useState<User | null>(null)
   const preferencesRef = useRef<NotificationCoordinatorPreferences | null>(null)
   const preferencesLoadedAtRef = useRef(0)
+  const preferencesVersionRef = useRef(0)
   const preferencesRequestRef = useRef<Promise<NotificationCoordinatorPreferences> | null>(null)
   const visibleSinceRef = useRef<number | null>(
     typeof document !== 'undefined' && document.visibilityState === 'visible'
@@ -117,6 +122,10 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
       : null,
   )
   const handledEventIdsRef = useRef(new Set<string>())
+  const sessionGenerationRef = useRef(0)
+  const activeUserIdRef = useRef<string | null>(user?.id ?? null)
+  activeUserIdRef.current = user?.id ?? null
+  const recoveryRequestRef = useRef<Promise<void> | null>(null)
 
   const dismissAll = useCallback(() => setQueue([]), [])
 
@@ -142,16 +151,22 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
     }
     if (preferencesRequestRef.current) return preferencesRequestRef.current
 
-    preferencesRequestRef.current = fetchNotificationCoordinatorPreferences(user.id)
+    const generation = sessionGenerationRef.current
+    const preferencesVersion = preferencesVersionRef.current
+    const userId = user.id
+    const request = fetchNotificationCoordinatorPreferences(userId)
       .then(preferences => {
-        preferencesRef.current = preferences
-        preferencesLoadedAtRef.current = Date.now()
+        if (generation === sessionGenerationRef.current && activeUserIdRef.current === userId && preferencesVersion === preferencesVersionRef.current) {
+          preferencesRef.current = preferences
+          preferencesLoadedAtRef.current = Date.now()
+        }
         return preferences
       })
       .finally(() => {
-        preferencesRequestRef.current = null
+        if (preferencesRequestRef.current === request) preferencesRequestRef.current = null
       })
-    return preferencesRequestRef.current
+    preferencesRequestRef.current = request
+    return request
   }, [user?.id])
 
   const enqueuePresentation = useCallback((item: QueuedNotificationPresentation) => {
@@ -232,12 +247,35 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
       return
     }
 
+    const generation = sessionGenerationRef.current
+    const isCurrentSession = () => generation === sessionGenerationRef.current && activeUserIdRef.current === event.user_id
     handledEventIdsRef.current.add(event.id)
+    // Server receipts remain authoritative after older local dedupe entries age out.
+    if (handledEventIdsRef.current.size > 500) {
+      const oldest = handledEventIdsRef.current.values().next().value
+      if (oldest) handledEventIdsRef.current.delete(oldest)
+    }
+    const finishPresentationTiming = beginChatTiming('present', 'notifications')
     try {
-      const preferences = await refreshPreferences(true)
+      let preferencesVersion = preferencesVersionRef.current
+      let preferences = await refreshPreferences()
+      if (!isCurrentSession()) return
+      while (preferencesVersion !== preferencesVersionRef.current) {
+        preferencesVersion = preferencesVersionRef.current
+        preferences = await refreshPreferences()
+        if (!isCurrentSession()) return
+      }
       if (!isNotificationTypeEnabled(event, preferences)) return
       const claimed = await claimNotificationEvent(event.id)
-      if (!claimed || document.visibilityState !== 'visible') return
+      if (!isCurrentSession() || !claimed || document.visibilityState !== 'visible') return
+      if (!isNotificationPresentationCandidate(event, visibleSince)) return
+      // A settings save can race the server claim; present only the latest policy.
+      while (preferencesVersion !== preferencesVersionRef.current) {
+        preferencesVersion = preferencesVersionRef.current
+        preferences = await refreshPreferences()
+        if (!isCurrentSession()) return
+      }
+      if (!isNotificationTypeEnabled(event, preferences) || document.visibilityState !== 'visible') return
 
       const presentation = buildNotificationPresentation(event)
       if (isNotificationSourceActive(presentation.route, window.location.href)) return
@@ -250,27 +288,40 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
         ],
       })
       enqueuePresentation({ presentation, envelope })
+      finishPresentationTiming()
       if (preferences.notification_foreground_sounds_enabled !== false) {
         playNotificationCue(envelope.soundId)
       }
       if (presentation.autoRead) {
         await markNotificationEventRead(event.id)
-        requestAppBadgeRefresh()
+        if (isCurrentSession()) requestAppBadgeRefresh()
       }
     } catch {
-      handledEventIdsRef.current.delete(event.id)
+      if (isCurrentSession()) handledEventIdsRef.current.delete(event.id)
     }
   }, [enqueuePresentation, playNotificationCue, refreshPreferences, user?.id])
 
   const recoverVisibleEvents = useCallback(async () => {
     const visibleSince = visibleSinceRef.current
     if (!user?.id || visibleSince === null || document.visibilityState !== 'visible') return
-    try {
-      const events = await fetchForegroundNotificationEvents(user.id, visibleSince)
-      for (const event of events) await handleEvent(event)
-    } catch {
-      // The live subscription or next visibility recovery retries safely.
-    }
+    if (recoveryRequestRef.current) return recoveryRequestRef.current
+    const generation = sessionGenerationRef.current
+    const userId = user.id
+    const request = (async () => {
+      try {
+        const events = await fetchForegroundNotificationEvents(userId, visibleSince)
+        for (const event of events) {
+          if (generation !== sessionGenerationRef.current || activeUserIdRef.current !== userId) return
+          await handleEvent(event)
+        }
+      } catch {
+        // The live subscription or next recovery wake-up retries safely.
+      }
+    })().finally(() => {
+      if (recoveryRequestRef.current === request) recoveryRequestRef.current = null
+    })
+    recoveryRequestRef.current = request
+    return request
   }, [handleEvent, user?.id])
 
   const openPresentation = useCallback((envelope: NotificationEnvelopeV2) => {
@@ -295,20 +346,28 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
   }, [dismissEvent, queue])
 
   const openProfile = useCallback(async (profileId: string) => {
+    const generation = sessionGenerationRef.current
+    const userId = activeUserIdRef.current
     try {
       const profile = await getUserProfile(profileId)
-      if (profile) setSelectedProfile(profile)
+      if (profile && generation === sessionGenerationRef.current && activeUserIdRef.current === userId) setSelectedProfile(profile)
     } catch {
       // The notification remains usable even if the current profile is unavailable.
     }
   }, [])
 
   useEffect(() => {
+    sessionGenerationRef.current += 1
+    preferencesVersionRef.current += 1
+    recoveryRequestRef.current = null
+    resetAppBadgeStateForUser(user?.id ?? null)
+    resetWebNotificationInstallationForUser(user?.id ?? null)
     preferencesRef.current = null
     preferencesLoadedAtRef.current = 0
     preferencesRequestRef.current = null
     handledEventIdsRef.current.clear()
     setQueue([])
+    setSelectedProfile(null)
     visibleSinceRef.current = document.visibilityState === 'visible' ? Date.now() : null
     if (!user?.id) return
     void refreshPreferences(true).catch(() => undefined)
@@ -336,6 +395,7 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
         const prior = channel
         channel = null
         if (prior) await client.removeChannel(prior).catch(() => undefined)
+        if (disposed) return
 
         const next = client
           .channel(createRealtimeChannelName(`notification_coordinator:${user.id}`))
@@ -416,6 +476,28 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
       if (document.visibilityState === 'visible') void refreshBadgeState()
     }
 
+    let recoveryTimer: number | null = null
+    const scheduleRecovery = () => {
+      if (!user?.id || document.visibilityState !== 'visible' || recoveryTimer !== null) return
+      recoveryTimer = window.setTimeout(() => {
+        recoveryTimer = null
+        void recoverVisibleEvents()
+      }, 150)
+    }
+    const handleSuppressedPush = (event: MessageEvent) => {
+      if (event.data?.type === 'SHADOWCHAT_FOREGROUND_PUSH_SUPPRESSED') scheduleRecovery()
+    }
+    const handlePreferencesChanged = (event: Event) => {
+      if ((event as CustomEvent<{ userId?: string }>).detail?.userId !== activeUserIdRef.current) return
+      preferencesVersionRef.current += 1
+      preferencesRequestRef.current = null
+      preferencesLoadedAtRef.current = 0
+      preferencesRef.current = null
+      void refreshPreferences(true).catch(() => undefined)
+    }
+    navigator.serviceWorker?.addEventListener?.('message', handleSuppressedPush)
+    window.addEventListener(NOTIFICATION_PREFERENCES_CHANGED_EVENT, handlePreferencesChanged)
+    window.addEventListener('online', scheduleRecovery)
     window.addEventListener('focus', beginVisibleSession)
     window.addEventListener('pageshow', handlePageShow)
     window.addEventListener(APP_BADGE_REFRESH_EVENT, handleBadgeRequest)
@@ -428,6 +510,10 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
     }, 30_000)
     return () => {
       window.clearInterval(intervalId)
+      if (recoveryTimer !== null) window.clearTimeout(recoveryTimer)
+      navigator.serviceWorker?.removeEventListener?.('message', handleSuppressedPush)
+      window.removeEventListener(NOTIFICATION_PREFERENCES_CHANGED_EVENT, handlePreferencesChanged)
+      window.removeEventListener('online', scheduleRecovery)
       window.removeEventListener('focus', beginVisibleSession)
       window.removeEventListener('pageshow', handlePageShow)
       window.removeEventListener(APP_BADGE_REFRESH_EVENT, handleBadgeRequest)
@@ -438,6 +524,7 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
     recoverVisibleEvents,
     refreshBadgeState,
     refreshPreferences,
+    user?.id,
   ])
 
   const contextValue: NotificationCoordinatorContextValue = {

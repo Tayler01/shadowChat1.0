@@ -14,6 +14,9 @@ export type GeneralChatThreadWindow = {
   rootMessage: Message | null
   replies: Message[]
   hasOlder: boolean
+  hasNewer: boolean
+  firstUnreadMessageId: string | null
+  anchorStatus: string
   targetMessageId: string | null
   targetFound: boolean
 }
@@ -33,6 +36,8 @@ export type FetchGeneralChatThreadRequest = {
   threadId: string
   targetMessageId?: string | null
   before?: GeneralChatThreadCursor | null
+  after?: GeneralChatThreadCursor | null
+  readAnchor?: boolean
   limit?: number
 }
 
@@ -79,7 +84,11 @@ const readNumber = (record: UnknownRecord, ...keys: string[]) => {
 }
 
 export const compareThreadMessages = (left: Message, right: Message) => {
-  const createdAtComparison = left.created_at.localeCompare(right.created_at)
+  const leftTime = Date.parse(left.created_at)
+  const rightTime = Date.parse(right.created_at)
+  const createdAtComparison = Number.isFinite(leftTime) && Number.isFinite(rightTime)
+    ? leftTime - rightTime
+    : left.created_at.localeCompare(right.created_at)
   return createdAtComparison || left.id.localeCompare(right.id)
 }
 
@@ -116,6 +125,9 @@ export const normalizeGeneralChatThreadWindow = (
     rootMessage,
     replies,
     hasOlder: Boolean(row.has_older ?? row.hasOlder),
+    hasNewer: Boolean(row.has_newer ?? row.hasNewer),
+    firstUnreadMessageId: readString(row, 'first_unread_message_id', 'firstUnreadMessageId'),
+    anchorStatus: readString(row, 'anchor_status', 'anchorStatus') ?? 'latest',
     targetMessageId,
     targetFound: !targetMessageId || targetStatus === 'found' || targetStatus === 'resolved' || replies.some(message => message.id === targetMessageId),
   }
@@ -130,13 +142,23 @@ const isMissingRpc = (error: unknown) => {
 export const fetchGeneralChatThread = async (
   request: FetchGeneralChatThreadRequest
 ): Promise<GeneralChatThreadWindow> => {
+  if (request.before && request.after) throw new Error('Use only one thread pagination cursor')
   const client = await getWorkingClient()
-  const { data, error } = await client.rpc('get_general_chat_thread', {
+  const limit = request.limit !== undefined && Number.isFinite(request.limit)
+    ? Math.max(1, Math.min(Math.trunc(request.limit), 80))
+    : GENERAL_CHAT_THREAD_PAGE_SIZE
+  const useReadWindow = request.readAnchor !== undefined || Boolean(request.after)
+  const { data, error } = await client.rpc(useReadWindow ? 'get_general_chat_thread_read_window' : 'get_general_chat_thread', {
     target_thread_id: request.threadId,
     target_message_id: request.targetMessageId ?? null,
     target_before_created_at: request.before?.created_at ?? null,
     target_before_id: request.before?.id ?? null,
-    target_limit: Math.max(1, Math.min(request.limit ?? GENERAL_CHAT_THREAD_PAGE_SIZE, 80)),
+    ...(useReadWindow ? {
+      target_after_created_at: request.after?.created_at ?? null,
+      target_after_id: request.after?.id ?? null,
+      target_read_anchor: request.readAnchor ?? false,
+    } : {}),
+    target_limit: limit,
   })
 
   if (error) throw error

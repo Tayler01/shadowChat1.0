@@ -46,3 +46,14 @@ it('icon buttons have aria-labels', () => {
   expect(screen.getByRole('button', { name: /add reaction/i })).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /unpin message/i })).toBeInTheDocument()
 })
+
+it('provides explicit canonical context navigation without changing reactions or unpinning', () => {
+  const onViewInChat = jest.fn()
+  const onUnpin = jest.fn()
+  const onToggleReaction = jest.fn()
+  render(<PinnedMessageItem message={message} onViewInChat={onViewInChat} onUnpin={onUnpin} onToggleReaction={onToggleReaction} />)
+  screen.getByRole('button', { name: 'View in chat' }).click()
+  expect(onViewInChat).toHaveBeenCalledWith('m1')
+  expect(onUnpin).not.toHaveBeenCalled()
+  expect(onToggleReaction).not.toHaveBeenCalled()
+})

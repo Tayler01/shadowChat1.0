@@ -129,6 +129,7 @@ describe('DM Conversation Hub model', () => {
     expect(photoPreview).toEqual({ kind: 'image', direction: 'outgoing', text: 'Photo · from the trail' })
     expect(audioPreview).toEqual({ kind: 'audio', direction: 'incoming', text: 'Voice message' })
     expect(getDMConversationDraftStorageKey('conversation-1')).toBe('draft-dm-conversation-1')
+    expect(getDMConversationDraftStorageKey('conversation-1', 'account-a')).toBe('draft-account:account-a:dm-conversation-1')
   })
 
   test('gives blocked state precedence over stored previews and local drafts', () => {

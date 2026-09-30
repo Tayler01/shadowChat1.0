@@ -102,6 +102,14 @@ export interface ShadowPinImage {
   viewer_has_hearted?: boolean
 }
 
+export interface ShadowPinCommentAttachment {
+  path: string
+  name: string
+  contentType: string
+  size: number
+  kind: 'image' | 'video' | 'file'
+}
+
 export interface ShadowPinComment {
   id: string
   image_id: string
@@ -112,6 +120,8 @@ export interface ShadowPinComment {
   updated_at: string
   author?: User | null
   reactions?: ShadowPinCommentReactionSummary
+  attachment?: ShadowPinCommentAttachment | null
+  attachmentUrl?: string | null
 }
 
 export type ShadowPinCommentReactionSummary = Record<string, {

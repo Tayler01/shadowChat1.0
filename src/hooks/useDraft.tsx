@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { getDraftStorageKey } from '../lib/draftStorage'
 
 type DraftUpdate = string | ((previous: string) => string)
 export type DraftUpdateEventDetail = {
@@ -15,8 +16,8 @@ const normalizeDraft = (value: string | null | undefined) => {
   return value
 }
 
-export const readDraft = (storageKey: string) => {
-  if (typeof localStorage === 'undefined') return ''
+export const readDraft = (storageKey: string | null) => {
+  if (!storageKey || typeof localStorage === 'undefined') return ''
   try {
     const rawDraft = localStorage.getItem(storageKey)
     const draft = normalizeDraft(rawDraft)
@@ -29,8 +30,8 @@ export const readDraft = (storageKey: string) => {
   }
 }
 
-const emitDraftUpdate = (storageKey: string, draft: string) => {
-  if (typeof window === 'undefined') return
+const emitDraftUpdate = (storageKey: string | null, draft: string) => {
+  if (!storageKey || typeof window === 'undefined') return
 
   window.setTimeout(() => {
     window.dispatchEvent(new CustomEvent<DraftUpdateEventDetail>(DRAFT_UPDATE_EVENT, {
@@ -39,13 +40,14 @@ const emitDraftUpdate = (storageKey: string, draft: string) => {
   }, 0)
 }
 
-export function useDraft(key: string) {
-  const storageKey = `draft-${key}`
-  const [draft, setDraftState] = useState(() => readDraft(storageKey))
+export function useDraft(key: string, identityKey?: string | null) {
+  const storageKey = getDraftStorageKey(key, identityKey)
+  const [state, setDraftState] = useState(() => ({ storageKey, draft: readDraft(storageKey) }))
+  const draft = state.storageKey === storageKey ? state.draft : readDraft(storageKey)
 
   // Load new draft when the key changes
   useEffect(() => {
-    setDraftState(readDraft(storageKey))
+    setDraftState({ storageKey, draft: readDraft(storageKey) })
   }, [storageKey])
 
   useEffect(() => {
@@ -53,11 +55,11 @@ export function useDraft(key: string) {
 
     const handleDraftUpdate = (event: Event) => {
       const detail = (event as CustomEvent<DraftUpdateEventDetail>).detail
-      if (!detail || detail.storageKey !== storageKey) {
+      if (!storageKey || !detail || detail.storageKey !== storageKey) {
         return
       }
 
-      setDraftState(normalizeDraft(detail.draft))
+      setDraftState({ storageKey, draft: normalizeDraft(detail.draft) })
     }
 
     window.addEventListener(DRAFT_UPDATE_EVENT, handleDraftUpdate)
@@ -66,32 +68,31 @@ export function useDraft(key: string) {
 
   const setDraft = useCallback((nextDraft: DraftUpdate) => {
     setDraftState(previous => {
-      const value = typeof nextDraft === 'function' ? nextDraft(previous) : nextDraft
+      const current = previous.storageKey === storageKey ? previous.draft : readDraft(storageKey)
+      const value = typeof nextDraft === 'function' ? nextDraft(current) : nextDraft
       const normalized = normalizeDraft(value)
+      if (storageKey) {
+        try {
+          if (normalized) localStorage.setItem(storageKey, normalized)
+          else localStorage.removeItem(storageKey)
+        } catch {
+          // Drafts remain editable if browser storage is unavailable.
+        }
+      }
       emitDraftUpdate(storageKey, normalized)
-      return normalized
+      return { storageKey, draft: normalized }
     })
   }, [storageKey])
 
-  useEffect(() => {
-    try {
-      if (draft.trim()) {
-        localStorage.setItem(storageKey, draft)
-      } else {
-        localStorage.removeItem(storageKey)
-      }
-    } catch {
-      // ignore
-    }
-  }, [draft, storageKey])
-
   const clear = useCallback(() => {
-    setDraftState('')
+    setDraftState({ storageKey, draft: '' })
     emitDraftUpdate(storageKey, '')
-    try {
-      localStorage.removeItem(storageKey)
-    } catch {
-      // ignore
+    if (storageKey) {
+      try {
+        localStorage.removeItem(storageKey)
+      } catch {
+        // ignore
+      }
     }
   }, [storageKey])
 

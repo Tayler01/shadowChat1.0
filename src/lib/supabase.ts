@@ -6,9 +6,11 @@ import {
 } from './env'
 import { optimizeImageFile } from './imageOptimization'
 import { createStoredImageAsset, type MediaThumbnailProfile } from './mediaAssets'
+import { getResumableStorageEndpoint } from './resumableStorageEndpoint'
 import {
   CHAT_FILE_UPLOAD_RULE,
   CHAT_IMAGE_UPLOAD_RULE,
+  resolveUploadMimeType,
   sanitizeUploadFileName,
   validateUpload,
   VOICE_UPLOAD_RULE,
@@ -636,12 +638,9 @@ export const SHADO_TV_BUCKET = 'shado-tv'
 const RESUMABLE_UPLOAD_THRESHOLD_BYTES = 6 * 1024 * 1024
 const RESUMABLE_UPLOAD_CHUNK_BYTES = 6 * 1024 * 1024
 
-const getResumableStorageEndpoint = () => {
-  const url = new URL(SUPABASE_URL)
-  const hostname = url.hostname.endsWith('.supabase.co')
-    ? url.hostname.replace(/\.supabase\.co$/, '.storage.supabase.co')
-    : url.hostname
-  return `${url.protocol}//${hostname}/storage/v1/upload/resumable`
+export type ChatUploadProgressOptions = {
+  signal?: AbortSignal
+  onProgress?: (percent: number) => void
 }
 
 const uploadResumableStorageObject = async (
@@ -649,7 +648,8 @@ const uploadResumableStorageObject = async (
   bucketName: string,
   objectName: string,
   file: File,
-  contentType: string
+  contentType: string,
+  options: ChatUploadProgressOptions = {}
 ) => {
   let { data: { session }, error } = await workingClient.auth.getSession()
   if (error || !session?.access_token) {
@@ -661,9 +661,11 @@ const uploadResumableStorageObject = async (
   if (error || !session?.access_token) throw error || new Error('Not authenticated')
 
   const { Upload } = await import('tus-js-client')
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
   await new Promise<void>((resolve, reject) => {
+    let settled = false
     const upload = new Upload(file, {
-      endpoint: getResumableStorageEndpoint(),
+      endpoint: getResumableStorageEndpoint(SUPABASE_URL),
       retryDelays: [0, 3000, 5000, 10000, 20000],
       headers: {
         authorization: `Bearer ${session.access_token}`,
@@ -678,15 +680,36 @@ const uploadResumableStorageObject = async (
         cacheControl: '31536000',
       },
       chunkSize: RESUMABLE_UPLOAD_CHUNK_BYTES,
-      onError: reject,
-      onSuccess: () => resolve(),
+      onProgress: (uploadedBytes, totalBytes) => options.onProgress?.(totalBytes > 0 ? (uploadedBytes / totalBytes) * 100 : 0),
+      onError: error => {
+        if (settled) return
+        settled = true
+        options.signal?.removeEventListener('abort', onAbort)
+        reject(error)
+      },
+      onSuccess: () => {
+        if (settled) return
+        settled = true
+        options.signal?.removeEventListener('abort', onAbort)
+        options.onProgress?.(100)
+        resolve()
+      },
     })
+
+    const onAbort = () => {
+      if (settled) return
+      settled = true
+      void upload.abort(true).catch(() => undefined)
+      reject(new DOMException('Upload canceled', 'AbortError'))
+    }
+    options.signal?.addEventListener('abort', onAbort, { once: true })
 
     // The object path is deliberately unique. A tus fingerprint is based on
     // the local file and can point at an older object path, so cross-session
     // fingerprint recovery would make the newly returned public URL invalid.
     // Retries within this Upload instance remain resumable and reliable.
-    upload.start()
+    if (options.signal?.aborted) onAbort()
+    else upload.start()
   })
 }
 
@@ -729,30 +752,34 @@ export const uploadVoiceMessage = async (blob: Blob, mimeType = 'audio/webm') =>
   return data.publicUrl
 }
 
-export const uploadChatFile = async (file: File) => {
+export const uploadChatFileAsset = async (file: File, options: ChatUploadProgressOptions = {}) => {
   validateUpload(file, CHAT_FILE_UPLOAD_RULE)
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
 
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
   if (!user) throw new Error('Not authenticated')
-  const uploadFile = file.type.startsWith('image/')
+  const uploadFile = resolveUploadMimeType(file).startsWith('image/')
     ? await optimizeImageFile(file, {
       maxWidth: 1600,
       maxHeight: 1600,
       quality: 0.82,
       fileNamePrefix: 'chat-image',
+      maxInputPixels: 32_000_000,
     })
     : file
   const contentType = validateUpload(uploadFile, CHAT_FILE_UPLOAD_RULE)
   const safeName = sanitizeUploadFileName(uploadFile.name)
-  const filePath = `${user.id}/${Date.now()}_${safeName}`
-  if (uploadFile.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES) {
+  const filePath = `${user.id}/${Date.now()}_${crypto.randomUUID()}_${safeName}`
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
+  if (options.onProgress || options.signal || uploadFile.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES) {
     await uploadResumableStorageObject(
       workingClient,
       UPLOADS_BUCKET,
       filePath,
       uploadFile,
-      contentType
+      contentType,
+      options
     )
   } else {
     const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
@@ -762,14 +789,18 @@ export const uploadChatFile = async (file: File) => {
     if (error) throw error
   }
   const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
-  return data.publicUrl
+  return { path: filePath, publicUrl: data.publicUrl }
 }
+
+export const uploadChatFile = async (file: File) => (await uploadChatFileAsset(file)).publicUrl
 
 export const uploadChatImageAsset = async (
   file: File,
-  thumbnailProfile: MediaThumbnailProfile = 'chat'
+  thumbnailProfile: MediaThumbnailProfile = 'chat',
+  options: ChatUploadProgressOptions = {}
 ) => {
   validateUpload(file, CHAT_IMAGE_UPLOAD_RULE)
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
 
   const workingClient = await getWorkingClient()
   const { data: { user } } = await workingClient.auth.getUser()
@@ -779,17 +810,31 @@ export const uploadChatImageAsset = async (
     maxHeight: 1600,
     quality: 0.82,
     fileNamePrefix: thumbnailProfile === 'weather' ? 'weather-share' : 'chat-image',
+    maxInputPixels: 32_000_000,
   })
   const contentType = validateUpload(uploadFile, CHAT_IMAGE_UPLOAD_RULE)
   const safeName = sanitizeUploadFileName(uploadFile.name, 'chat-image')
-  const filePath = `${user.id}/${Date.now()}_${safeName}`
-  const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
-    contentType,
-    cacheControl: '31536000',
-  })
-  if (error) throw error
+  const filePath = `${user.id}/${Date.now()}_${crypto.randomUUID()}_${safeName}`
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
+  if (options.onProgress || options.signal || uploadFile.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES) {
+    await uploadResumableStorageObject(workingClient, UPLOADS_BUCKET, filePath, uploadFile, contentType, options)
+  } else {
+    const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
+      contentType,
+      cacheControl: '31536000',
+    })
+    if (error) throw error
+  }
   const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
   return createStoredImageAsset(filePath, data.publicUrl, thumbnailProfile)
+}
+
+export const removeUnusedChatUploadAsset = async (path: string) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user || !path.startsWith(`${user.id}/`)) throw new Error('Cannot remove this upload')
+  const { error } = await workingClient.storage.from(UPLOADS_BUCKET).remove([path])
+  if (error) throw error
 }
 
 export const uploadArtBoardImage = async (file: File) => {
@@ -2005,13 +2050,26 @@ export const markDMMessagesReadThrough = async (
   conversationId: string,
   throughMessageId: string
 ) => {
+  const persistedIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!persistedIdPattern.test(conversationId) || !persistedIdPattern.test(throughMessageId)) {
+    console.warn('DM read-through skipped', { operation: 'mark_dm_messages_read_through', code: 'INVALID_ANCHOR' })
+    throw Object.assign(new Error('Read receipts require a persisted message'), { code: 'INVALID_ANCHOR' })
+  }
   const workingClient = await getWorkingClient()
   const { data, error } = await workingClient.rpc('mark_dm_messages_read_through', {
     conversation_id: conversationId,
     through_message_id: throughMessageId,
   })
 
-  if (error) throw error
+  if (error) {
+    // Do not log the RPC arguments or raw message/details: these can include
+    // conversation/message IDs. Preserve the original error for caller retry.
+    const code = typeof error.code === 'string' && /^[A-Z0-9]{5,12}$/.test(error.code)
+      ? error.code
+      : 'UNKNOWN'
+    console.warn('DM read-through failed', { operation: 'mark_dm_messages_read_through', code })
+    throw error
+  }
   return Math.max(0, Number(data) || 0)
 }
 

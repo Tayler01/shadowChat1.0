@@ -41,6 +41,7 @@ import { useIsDesktop } from '../../hooks/useIsDesktop'
 import { LoadingSpinner } from '../ui/LoadingSpinner'
 import { useTyping } from '../../hooks/useTyping'
 import { useReadCursor } from '../../hooks/useReadCursor'
+import { getSavedMessageScrollAnchor, scrollMessageWithinContainer } from '../../lib/messageScrollAnchor'
 import { useUnreadScroll } from '../../hooks/useUnreadScroll'
 import { useAllUsers } from '../../hooks/useAllUsers'
 import toast from 'react-hot-toast'
@@ -807,6 +808,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     hasNewer,
     loadLatestMessages,
     loadMessageWindow,
+    loadReadWindow,
+    loadNewerMessages,
+    setFollowingLatest,
     loading: conversationsLoading,
   } = useDirectMessages()
   const [showNewConversation, setShowNewConversation] = useState(false)
@@ -834,6 +838,17 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const inboxSearchInputRef = useRef<HTMLInputElement>(null)
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
+  const activeConversationRef = useRef(currentConversation)
+  activeConversationRef.current = currentConversation
+  const loadedMessagesRef = useRef(messages)
+  loadedMessagesRef.current = messages
+  const [restoredReadScope, setRestoredReadScope] = useState<string | null>(null)
+  const [readRestoreError, setReadRestoreError] = useState(false)
+  const [positionPresented, setPositionPresented] = useState(false)
+  const [targetUnavailable, setTargetUnavailable] = useState(false)
+  const [ignoreInitialTarget, setIgnoreInitialTarget] = useState(false)
+  const savedDMAnchor = useMemo(() => getSavedMessageScrollAnchor(profile?.id, `dm:${currentConversation || 'none'}`), [currentConversation, profile?.id])
+  const readRestoreScopeRef = useRef<string | null>(null)
   const prevHeightRef = useRef(0)
   const prevScrollTopRef = useRef(0)
   const olderLoadInFlightRef = useRef(false)
@@ -843,6 +858,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const initialConversationAppliedRef = useRef<string | null>(null)
   const initialTargetJumpDoneRef = useRef<string | null>(null)
   const initialTargetLoadAttemptRef = useRef<string | null>(null)
+  const targetRequestScopeKey = `${profile?.id ?? ''}:${currentConversation ?? ''}:${initialMessageId ?? ''}`
+  const targetRequestScopeRef = useRef({ key: targetRequestScopeKey, generation: 0 })
+  if (targetRequestScopeRef.current.key !== targetRequestScopeKey) {
+    targetRequestScopeRef.current = { key: targetRequestScopeKey, generation: targetRequestScopeRef.current.generation + 1 }
+  }
   const threadBackButtonRef = useRef<HTMLButtonElement>(null)
   const [uploading, setUploading] = useState(false)
   const [replyTo, setReplyTo] = useState<ReplyTarget | null>(null)
@@ -852,15 +872,33 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const {
     cursor,
     loading: cursorLoading,
+    error: cursorError,
     markRead,
   } = useReadCursor('dm', currentConversation, Boolean(profile?.id && currentConversation))
 
   useEffect(() => {
-    if (!initialMessageId) {
-      initialTargetLoadAttemptRef.current = null
-      initialTargetJumpDoneRef.current = null
-    }
-  }, [initialMessageId])
+    if (!currentConversation || !selectedThreadLoaded || messagesLoading || cursorLoading || initialMessageId) return
+    if (readRestoreScopeRef.current === currentConversation) return
+    readRestoreScopeRef.current = currentConversation
+    let disposed = false
+    setReadRestoreError(false)
+    const restore = savedDMAnchor && loadMessageWindow
+      ? loadMessageWindow(savedDMAnchor.id).then(resolved => resolved || (loadReadWindow ? loadReadWindow() : true))
+      : loadReadWindow ? loadReadWindow() : Promise.resolve(true)
+    void restore.then(resolved => {
+      if (!disposed && resolved) setRestoredReadScope(currentConversation)
+      else if (!disposed) setReadRestoreError(true)
+    }).catch(() => { if (!disposed) setReadRestoreError(true) })
+    return () => { disposed = true }
+  }, [currentConversation, cursorLoading, initialMessageId, loadReadWindow, messagesLoading, selectedThreadLoaded, savedDMAnchor, loadMessageWindow])
+
+  useEffect(() => {
+    initialTargetLoadAttemptRef.current = null
+    initialTargetJumpDoneRef.current = null
+    setTargetUnavailable(false)
+    setIgnoreInitialTarget(false)
+    setTargetAnnouncement('')
+  }, [targetRequestScopeKey])
 
   const focusThreadAfterTargetFailure = useCallback((announcement: string) => {
     setTargetAnnouncement(announcement)
@@ -1051,12 +1089,20 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     type?: ChatMessageType,
     fileUrl?: string,
     replyToId?: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
+    clientMessageId?: string,
+    onQueued?: () => void
   ) => {
     try {
-      const sent = await sendMessage(content, type, fileUrl, replyToId, thumbnailUrl)
-      if (sent) {
-        setReplyTo(null)
+      let queued = false
+      const acknowledgeQueue = () => {
+        queued = true
+        if (activeConversationRef.current === currentConversation) setReplyTo(current => current?.id === replyToId ? null : current)
+        onQueued?.()
+      }
+      const sent = await sendMessage(content, type, fileUrl, replyToId, thumbnailUrl, { clientMessageId, onQueued: acknowledgeQueue })
+      if (sent && !queued && activeConversationRef.current === currentConversation) {
+        setReplyTo(current => current?.id === replyToId ? null : current)
       }
       return sent
     } catch (error) {
@@ -1064,7 +1110,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       toast.error('Failed to send message')
       return null
     }
-  }, [sendMessage])
+  }, [currentConversation, sendMessage])
 
   const handleReply = useCallback((message: DMMessage) => {
     setReplyTo(messageToReplyTarget(message))
@@ -1075,6 +1121,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       if (!profile?.id) return []
       return items.filter(
         message =>
+          !message.optimistic && message.delivery_status !== 'failed' &&
           message.sender_id !== profile.id &&
           !(message.read_by ?? []).includes(profile.id)
       )
@@ -1085,10 +1132,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const markDMReadToLatest = useCallback(
     async (message: DMMessage) => {
       if (!currentConversation) return
-      await Promise.all([
-        markRead(message.id, message.created_at),
-        markAsRead(currentConversation, message.id),
-      ])
+      if (message.optimistic || message.delivery_status === 'failed') return
+      await markAsRead(currentConversation, message.id)
+      await markRead(message.id, message.created_at)
     },
     [currentConversation, markAsRead, markRead]
   )
@@ -1100,19 +1146,25 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     autoScroll,
     firstUnreadMessageId: firstUnreadDMMessageId,
     setAutoScroll,
-    setFirstUnreadMessageId,
     handleUnreadScroll,
     scrollToBottom,
-    markLatestRead,
+    feedState,
+    initialPositionReady,
+    captureScrollAnchor,
+    restoreScrollAnchor,
   } = useUnreadScroll<DMMessage>({
     containerRef: messagesRef,
-    messages,
+    messages: messages.filter(message => !message.optimistic && message.delivery_status !== 'failed'),
     loading: messagesLoading,
     cursor,
     cursorLoading,
+    restorationReady: !cursorError && !readRestoreError && Boolean(initialMessageId && !ignoreInitialTarget
+      ? messages.some(message => message.id === initialMessageId)
+      : restoredReadScope === currentConversation),
     enabled: Boolean(profile?.id && currentConversation),
     surfaceKey: `dm:${currentConversation || 'none'}`,
-    initialMessageId,
+    readerId: profile?.id,
+    initialMessageId: ignoreInitialTarget ? null : initialMessageId,
     getMessageId: getDMMessageId,
     getMessageCreatedAt: getDMMessageCreatedAt,
     getElementId: getDMMessageElementId,
@@ -1122,15 +1174,24 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     onMarkReadToLatest: markDMReadToLatest,
   })
 
+  useEffect(() => { setFollowingLatest?.(autoScroll && feedState === 'bottomPinned') }, [autoScroll, feedState, setFollowingLatest])
+  useEffect(() => { if (initialPositionReady) setPositionPresented(true) }, [initialPositionReady])
+
   const handleJumpToLatest = useCallback(async () => {
-    if (hasNewer) {
+    const generation = ++targetRequestScopeRef.current.generation
+    if (hasNewer || readRestoreError || targetUnavailable) {
       await loadLatestMessages()
     }
+    if (targetRequestScopeRef.current.generation !== generation) return
+    setIgnoreInitialTarget(true)
+    setTargetUnavailable(false)
+    setRestoredReadScope(currentConversation)
+    setReadRestoreError(false)
 
     requestAnimationFrame(() => {
-      scrollToBottom()
+      if (targetRequestScopeRef.current.generation === generation) scrollToBottom()
     })
-  }, [hasNewer, loadLatestMessages, scrollToBottom])
+  }, [currentConversation, hasNewer, loadLatestMessages, readRestoreError, targetUnavailable, scrollToBottom])
 
   const clearHistoryRetry = useCallback(() => {
     if (historyRetryTimerRef.current !== null) {
@@ -1164,12 +1225,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     lastHistoryRequestAtRef.current = now
     prevHeightRef.current = el.scrollHeight
     prevScrollTopRef.current = el.scrollTop
+    captureScrollAnchor()
     setAutoScroll(false)
     olderLoadInFlightRef.current = true
     void loadOlderMessages().finally(() => {
       olderLoadInFlightRef.current = false
     })
-  }, [clearHistoryRetry, hasMore, loadingMore, loadOlderMessages, setAutoScroll])
+  }, [captureScrollAnchor, clearHistoryRetry, hasMore, loadingMore, loadOlderMessages, setAutoScroll])
 
   const handleScroll = useCallback(() => {
     if (scrollFrameRef.current !== null) return
@@ -1183,27 +1245,34 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
       if (el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
         requestOlderMessages()
+      } else if (hasNewer && !loadingMore && el.scrollHeight - el.scrollTop - el.clientHeight <= HISTORY_LOAD_SCROLL_THRESHOLD) {
+        captureScrollAnchor()
+        setAutoScroll(false)
+        void loadNewerMessages?.().catch(() => undefined)
       }
     })
-  }, [handleUnreadScroll, requestOlderMessages])
+  }, [captureScrollAnchor, handleUnreadScroll, hasNewer, loadNewerMessages, loadingMore, requestOlderMessages, setAutoScroll])
 
   useEffect(() => {
     initialTargetJumpDoneRef.current = null
     setReplyTo(null)
-  }, [currentConversation])
+    setPositionPresented(false)
+    setTargetUnavailable(false)
+    setIgnoreInitialTarget(false)
+    readRestoreScopeRef.current = null
+    setRestoredReadScope(null)
+    setReadRestoreError(false)
+  }, [currentConversation, profile?.id])
 
   useEffect(() => {
     const el = messagesRef.current
     if (!el) return
     if (!loadingMore && prevHeightRef.current) {
-      const diff = el.scrollHeight - prevHeightRef.current
-      el.scrollTop = prevScrollTopRef.current <= 0
-        ? diff
-        : prevScrollTopRef.current + diff
+      restoreScrollAnchor()
       prevHeightRef.current = 0
       prevScrollTopRef.current = 0
     }
-  }, [loadingMore, messages.length])
+  }, [loadingMore, messages.length, restoreScrollAnchor])
 
   useEffect(() => {
     return () => {
@@ -1221,65 +1290,8 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   }, [autoScroll, scrollToBottom, typingUsers.length])
 
   useEffect(() => {
-    if (isDesktop || !currentConversation) return
-
-    let frameId: number | null = null
-    let settleFrameId: number | null = null
-    let settleTimerId: number | null = null
-
-    const keepLatestVisible = () => {
-      if (!autoScroll) return
-
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
-      if (settleFrameId !== null) {
-        cancelAnimationFrame(settleFrameId)
-      }
-      if (settleTimerId !== null) {
-        window.clearTimeout(settleTimerId)
-      }
-
-      frameId = requestAnimationFrame(() => {
-        frameId = null
-        scrollToBottom('auto')
-        settleFrameId = requestAnimationFrame(() => {
-          settleFrameId = null
-          scrollToBottom('auto')
-        })
-        settleTimerId = window.setTimeout(() => {
-          settleTimerId = null
-          scrollToBottom('auto')
-        }, 140)
-      })
-    }
-
-    keepLatestVisible()
-    window.visualViewport?.addEventListener('resize', keepLatestVisible)
-    window.visualViewport?.addEventListener('scroll', keepLatestVisible)
-    window.addEventListener('resize', keepLatestVisible)
-    window.addEventListener('focusin', keepLatestVisible)
-
-    return () => {
-      window.visualViewport?.removeEventListener('resize', keepLatestVisible)
-      window.visualViewport?.removeEventListener('scroll', keepLatestVisible)
-      window.removeEventListener('resize', keepLatestVisible)
-      window.removeEventListener('focusin', keepLatestVisible)
-      if (frameId !== null) {
-        cancelAnimationFrame(frameId)
-      }
-      if (settleFrameId !== null) {
-        cancelAnimationFrame(settleFrameId)
-      }
-      if (settleTimerId !== null) {
-        window.clearTimeout(settleTimerId)
-      }
-    }
-  }, [autoScroll, currentConversation, isDesktop, messages.length, scrollToBottom])
-
-  useEffect(() => {
     if (
-      !initialMessageId ||
+      !initialMessageId || ignoreInitialTarget || targetUnavailable ||
       !currentConversation ||
       !selectedThreadLoaded ||
       currentConv?.is_blocked ||
@@ -1291,55 +1303,31 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     const targetKey = `${currentConversation}:${initialMessageId}`
     if (initialTargetLoadAttemptRef.current === targetKey) return
     initialTargetLoadAttemptRef.current = targetKey
+    const generation = targetRequestScopeRef.current.generation
     void loadMessageWindow(initialMessageId).then(resolved => {
+      if (targetRequestScopeRef.current.generation !== generation) return
       if (!resolved) {
-        initialTargetLoadAttemptRef.current = null
+        setTargetUnavailable(true)
         toast.error('That message is no longer available')
         focusThreadAfterTargetFailure('That message is no longer available. You are back in the conversation.')
       }
     }).catch(error => {
-      initialTargetLoadAttemptRef.current = null
+      if (targetRequestScopeRef.current.generation !== generation) return
       console.error(error)
+      setTargetUnavailable(true)
       toast.error('Could not load that message')
       focusThreadAfterTargetFailure('Could not load that message. You are back in the conversation.')
     })
-  }, [currentConv?.is_blocked, currentConversation, focusThreadAfterTargetFailure, initialMessageId, loadMessageWindow, messages, selectedThreadLoaded])
+  }, [currentConv?.is_blocked, currentConversation, focusThreadAfterTargetFailure, initialMessageId, loadMessageWindow, messages, selectedThreadLoaded, ignoreInitialTarget, targetUnavailable])
 
   useEffect(() => {
-    if (
-      !initialMessageId ||
-      initialTargetJumpDoneRef.current === initialMessageId ||
-      messages.length === 0
-    ) {
-      return
-    }
-
-    const target = messages.find(message => message.id === initialMessageId)
-    if (!target) {
-      return
-    }
-
+    if (!initialMessageId || feedState !== 'anchoredCatchup' || initialTargetJumpDoneRef.current === initialMessageId) return
+    const el = document.getElementById(`dm-message-${initialMessageId}`)
+    if (!el) return
     initialTargetJumpDoneRef.current = initialMessageId
-    setFirstUnreadMessageId(null)
-    setAutoScroll(false)
-
-    requestAnimationFrame(() => {
-      const el = document.getElementById(`dm-message-${initialMessageId}`)
-      if (!el) return
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.focus({ preventScroll: true })
-      el.style.outline = '2px solid var(--theme-focus-ring)'
-      el.style.outlineOffset = '4px'
-      const announcement = `Opened message from ${target.sender?.display_name || (target.sender_id === profile?.id ? 'you' : 'this member')} at ${formatTime(target.created_at)}`
-      setTargetAnnouncement(announcement)
-      void markLatestRead(false)
-      window.setTimeout(() => {
-        el.style.removeProperty('outline')
-        el.style.removeProperty('outline-offset')
-        setTargetAnnouncement(current => current === announcement ? '' : current)
-      }, 2200)
-    })
-  }, [initialMessageId, markLatestRead, messages, profile?.id, setAutoScroll, setFirstUnreadMessageId])
+    el.focus({ preventScroll: true })
+    setTargetAnnouncement('Opened the selected message')
+  }, [feedState, initialMessageId])
 
   const dmMessageMap = useMemo(() => {
     const map = new Map<string, DMMessage>()
@@ -1352,11 +1340,11 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       const el = document.getElementById(`dm-message-${id}`)
       if (!el) return
 
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      if (messagesRef.current) scrollMessageWithinContainer(messagesRef.current, el, 'center')
       el.focus({ preventScroll: true })
       el.style.outline = '2px solid var(--theme-focus-ring)'
       el.style.outlineOffset = '4px'
-      const target = messages.find(message => message.id === id)
+      const target = loadedMessagesRef.current.find(message => message.id === id)
       let announcement = ''
       if (target) {
         announcement = `Opened message from ${target.sender?.display_name || (target.sender_id === profile?.id ? 'you' : 'this member')} at ${formatTime(target.created_at)}`
@@ -1370,7 +1358,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
         }
       }, 2000)
     })
-  }, [messages, profile?.id])
+  }, [profile?.id])
 
   const eagerDMAvatarMessageIds = useMemo(() => (
     new Set(messages.slice(-12).map(message => message.id))
@@ -1586,7 +1574,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               data-loaded-count={messages.length}
               data-rendered-count={messages.length}
               data-has-newer={String(hasNewer)}
-              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)+4rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)] md:pt-4"
+              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)+4rem)] scroll-pt-[calc(env(safe-area-inset-top)_+_4rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)] md:pt-4 md:scroll-pt-4"
             >
               <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
                 {targetAnnouncement || (uploading
@@ -1597,7 +1585,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                       ? `${typingUsers.map(typingUser => typingUser.display_name).join(', ')} ${typingUsers.length === 1 ? 'is' : 'are'} typing`
                       : '')}
               </div>
-              <div data-testid="dm-message-stack" className="comfort-message-stack mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-3">
+              {Boolean(readRestoreError || cursorError || targetUnavailable) && <div role="status" className="glass-panel p-4 text-center">
+                <p>{targetUnavailable ? 'That message is no longer available.' : 'Could not restore your reading position.'}</p>
+                <button type="button" className="min-h-11 px-4" onClick={() => { readRestoreScopeRef.current = null; void loadReadWindow?.().then(ok => { if (ok) { setRestoredReadScope(currentConversation); setReadRestoreError(false) } }) }}>Retry</button>
+                <button type="button" className="min-h-11 px-4" onClick={() => void handleJumpToLatest()}>Jump to latest</button>
+              </div>}
+              <div data-testid="dm-message-stack" style={{ visibility: positionPresented ? 'visible' : 'hidden' }} className="comfort-message-stack mx-auto flex min-h-full w-full max-w-4xl flex-col justify-end space-y-3">
               {loadingMore && (
                 <div className="flex justify-center py-2 text-sm text-[var(--text-muted)]">
                   <LoadingSpinner size="sm" /> Loading more...
@@ -1706,9 +1699,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <BlockedConversationNotice blockedByMe={currentConv.blocked_by_me} />
                 ) : (
                   <MessageInput
+              identityKey={profile?.id ?? null}
                     onSendMessage={handleSendMessage}
                     placeholder="Message..."
-                    disabled={sending || uploading}
+                    disabled={uploading}
                     cacheKey={`dm-${currentConversation}`}
                     onUploadStatusChange={setUploading}
                     messages={messages}
@@ -1729,6 +1723,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 <BlockedConversationNotice blockedByMe={currentConv.blocked_by_me} />
               ) : (
                 <MessageInput
+              identityKey={profile?.id ?? null}
                   onSendMessage={handleSendMessage}
                   placeholder="Message..."
                   disabled={uploading}

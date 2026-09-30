@@ -3,6 +3,7 @@ import {
   chooseVisibleAppRelease,
   getAppReleasePresentation,
   isIsolatedTrialAppHost,
+  shouldDeferAppReleaseRefresh,
 } from '../src/lib/appReleases'
 import {
   normalizeAppReleaseSections,
@@ -32,6 +33,12 @@ const release = (overrides: Partial<VisibleAppRelease> = {}): VisibleAppRelease 
 describe('app release presentation', () => {
   beforeEach(() => {
     sessionStorage.clear()
+  })
+
+  it('defers scheduled refreshes while hidden but preserves explicit event refreshes', () => {
+    expect(shouldDeferAppReleaseRefresh('hidden', false)).toBe(true)
+    expect(shouldDeferAppReleaseRefresh('visible', false)).toBe(false)
+    expect(shouldDeferAppReleaseRefresh('hidden', true)).toBe(false)
   })
 
   it('shows current-build notes with a restart prompt until acknowledged', () => {

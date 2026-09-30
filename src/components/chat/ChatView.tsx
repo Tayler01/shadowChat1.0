@@ -1,4 +1,5 @@
-import React, { lazy, Suspense, useEffect, useRef, useState, useCallback } from 'react'
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
+import { useAuth } from '../../hooks/useAuth'
 import { useMessages } from '../../hooks/useMessages'
 import { MessageList } from './MessageList'
 import { MessageInput } from './MessageInput'
@@ -11,6 +12,7 @@ import type { AppView } from '../../types/navigation'
 import type { Message } from '../../lib/supabase'
 import { useIsDesktop } from '../../hooks/useIsDesktop'
 import type { ChatThreadRouteAction } from '../../lib/appRouting'
+import { captureMessageScrollAnchor, restoreMessageScrollAnchor, type MessageScrollAnchor } from '../../lib/messageScrollAnchor'
 
 const LazyGeneralChatRoomTools = lazy(() => import('./GeneralChatRoomTools').then(module => ({
   default: module.GeneralChatRoomTools,
@@ -36,6 +38,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onThreadRoute,
 }) => {
   const isDesktop = useIsDesktop()
+  const { profile } = useAuth()
   const {
     messages,
     sendMessage,
@@ -48,35 +51,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [uploading, setUploading] = useState(false)
   const [localThreadId, setLocalThreadId] = useState<string | null>(initialThreadId ?? null)
   const activeThreadId = initialThreadId ?? localThreadId
-  const loungeScrollTopRef = useRef<number | null>(null)
+  const loungeScrollTopRef = useRef<MessageScrollAnchor | null>(null)
 
   const captureLoungeScroll = useCallback(() => {
     const scroll = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
-    if (scroll) loungeScrollTopRef.current = scroll.scrollTop
+    if (scroll) loungeScrollTopRef.current = captureMessageScrollAnchor(scroll)
   }, [])
 
   const restoreLoungeScroll = useCallback(() => {
-    const savedTop = loungeScrollTopRef.current
-    if (savedTop === null) return
-    const restore = () => {
-      const scroll = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
-      if (scroll) scroll.scrollTop = savedTop
-    }
-    restore()
-    window.requestAnimationFrame(() => {
-      restore()
-      window.requestAnimationFrame(restore)
-    })
-    window.setTimeout(restore, 120)
+    const savedAnchor = loungeScrollTopRef.current
+    const scroll = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
+    if (savedAnchor && scroll) restoreMessageScrollAnchor(scroll, savedAnchor)
   }, [])
 
   useEffect(() => {
     setLocalThreadId(initialThreadId ?? null)
   }, [initialThreadId])
 
-  useEffect(() => {
-    if (activeThreadId) restoreLoungeScroll()
-    else if (loungeScrollTopRef.current !== null) {
+  useLayoutEffect(() => {
+    if (!activeThreadId && loungeScrollTopRef.current !== null) {
       restoreLoungeScroll()
       loungeScrollTopRef.current = null
     }
@@ -117,10 +110,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
     type?: ChatMessageType,
     fileUrl?: string,
     replyToId?: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
+    clientMessageId?: string,
+    onQueued?: () => void
   ) => {
     try {
-      const msg = await sendMessage(content, type, fileUrl, replyToId, thumbnailUrl)
+      const msg = await sendMessage(content, type, fileUrl, replyToId, thumbnailUrl, { clientMessageId, onQueued })
       return msg
     } catch (error) {
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to send message')
@@ -148,6 +143,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
       {/* Messages */}
       <MessageList
+        active={!activeThreadId}
         onReply={handleReply}
         onOpenThread={openThread}
         onRetryFailed={retryFailedMessage}
@@ -164,9 +160,10 @@ export const ChatView: React.FC<ChatViewProps> = ({
       >
         <div className="mx-auto w-full max-w-6xl">
           <MessageInput
+              identityKey={profile?.id ?? null}
             onSendMessage={handleSendMessage}
             placeholder='Try "@ai" to ask AI anything'
-            disabled={sending || uploading}
+            disabled={uploading}
             cacheKey="general"
             onUploadStatusChange={setUploading}
             messages={messages}
@@ -182,6 +179,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
           onViewChange={onViewChange}
         >
           <MessageInput
+              identityKey={profile?.id ?? null}
             onSendMessage={handleSendMessage}
             placeholder='Try "@ai" to ask AI anything'
             disabled={uploading}
@@ -200,7 +198,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             open
             threadId={activeThreadId}
             initialRootMessage={messages.find(message => message.id === activeThreadId) ?? null}
-            initialMessageId={initialMessageId ?? activeThreadId}
+            initialMessageId={initialMessageId}
             currentView={currentView}
             onViewChange={onViewChange}
             onClose={closeThread}

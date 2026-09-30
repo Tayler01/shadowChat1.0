@@ -1,3 +1,4 @@
+import { beginChatTiming } from '../lib/chatPerformance';
 /* eslint-disable react-refresh/only-export-components */
 import React, {
   useEffect,
@@ -164,10 +165,12 @@ const withSentDeliveryState = (message: Message) => ({
 const trimMessageWindow = (items: Message[]) => {
   const deduped = dedupeMessagesById(items).filter(message => !message.reply_to)
   const pinned = deduped.filter(message => message.pinned)
-  const regular = deduped.filter(message => !message.pinned)
+  const local = deduped.filter(isLocalPendingMessage)
+  const regular = deduped.filter(message => !message.pinned && !isLocalPendingMessage(message))
 
   return sortMessagesByStableKey([
     ...pinned,
+    ...local.filter(message => !message.pinned),
     ...sortMessagesByStableKey(regular).slice(-MESSAGE_FETCH_LIMIT),
   ])
 }
@@ -487,7 +490,9 @@ const mergeMessageWindowIntoState = (
     baseMessages
   )
 
-  return sortMessagesByStableKey(mergedMessages)
+  const pinnedAndLocal = mergedMessages.filter(message => message.pinned || isLocalPendingMessage(message))
+  const regular = sortMessagesByStableKey(mergedMessages.filter(isServerWindowMessage))
+  return sortMessagesByStableKey([...pinnedAndLocal, ...(window.windowMode === 'newer' ? regular.slice(-300) : regular.slice(0, 300))])
 }
 
 // --- Helper functions extracted from sendMessage workflow ---
@@ -662,7 +667,7 @@ export const refreshSessionAndRetry = async (messageData: {
 };
 
 function useProvideMessages(): MessagesContextValue {
-  const initialMessages = (() => {
+  const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof localStorage !== 'undefined') {
       try {
         const stored = localStorage.getItem('chatHistory');
@@ -674,9 +679,7 @@ function useProvideMessages(): MessagesContextValue {
       }
     }
     return [] as Message[];
-  })();
-
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  });
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -696,8 +699,13 @@ function useProvideMessages(): MessagesContextValue {
   const resetInFlightRef = useRef<Promise<void> | null>(null);
   const fetchRequestIdRef = useRef(0);
   const loadedOlderRef = useRef(false);
-  const sendingRef = useRef(false);
-  const latestMessagesRef = useRef<Message[]>(initialMessages);
+  const pendingIntentsRef = useRef(new Set<string>());
+  const activeUserIdRef = useRef(user?.id);
+  activeUserIdRef.current = user?.id;
+  const latestMessagesRef = useRef<Message[]>(messages);
+  const messageRevisionRef = useRef(0);
+  const messageChangesRef = useRef(new Map<string, { revision: number; deleted: boolean }>());
+  const summaryVersionsRef = useRef(new Map<string, number>());
   const hydrationFetchesRef = useRef<Map<string, Promise<Message | null>>>(new Map());
   const windowModeRef = useRef<GeneralChatMessageWindowMode>('latest');
   const hasNewerRef = useRef(false);
@@ -798,6 +806,7 @@ function useProvideMessages(): MessagesContextValue {
         if (user && normalizedMessage.user_id !== user.id) playMessage()
         return
       }
+      messageChangesRef.current.set(normalizedMessage.id, { revision: ++messageRevisionRef.current, deleted: false });
       const currentMessages = latestMessagesRef.current;
       const existsInCurrentWindow = findMatchingMessageIndex(currentMessages, normalizedMessage) >= 0;
       const newestWindowMessage = getNewestServerWindowMessage(currentMessages);
@@ -833,19 +842,24 @@ function useProvideMessages(): MessagesContextValue {
   );
 
   const refreshThreadSummaries = useCallback(async (rootMessageIds?: string[]) => {
-    const ids = rootMessageIds?.length
+    const ids = [...new Set(rootMessageIds?.length
       ? rootMessageIds
-      : latestMessagesRef.current.filter(message => !message.reply_to).map(message => message.id)
+      : latestMessagesRef.current.filter(message => !message.reply_to).map(message => message.id))]
     if (ids.length === 0) return
-
-    const summaries = await fetchGeneralChatThreadSummaries(ids)
-    const loungeScroll = typeof document !== 'undefined'
-      ? document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
-      : null
-    const preserveScrollTop = loungeScroll?.scrollTop ?? null
+    const versions = new Map(ids.map(id => {
+      const version = (summaryVersionsRef.current.get(id) ?? 0) + 1
+      summaryVersionsRef.current.set(id, version)
+      return [id, version] as const
+    }))
+    const summaries = new Map<string, Message['thread_summary']>()
+    for (let start = 0; start < ids.length; start += 50) {
+      const batch = await fetchGeneralChatThreadSummaries(ids.slice(start, start + 50))
+      batch.forEach((summary, id) => summaries.set(id, summary))
+    }
     setMessages(prev => {
       let changed = false
       const next = prev.map(message => {
+        if (!versions.has(message.id) || summaryVersionsRef.current.get(message.id) !== versions.get(message.id)) return message
         const summary = summaries.get(message.id) ?? null
         const before = JSON.stringify(message.thread_summary ?? null)
         const after = JSON.stringify(summary)
@@ -855,18 +869,10 @@ function useProvideMessages(): MessagesContextValue {
       })
       return changed ? next : prev
     })
-    if (loungeScroll && preserveScrollTop !== null) {
-      const restore = () => { loungeScroll.scrollTop = preserveScrollTop }
-      restore()
-      window.requestAnimationFrame(() => {
-        restore()
-        window.requestAnimationFrame(restore)
-      })
-      window.setTimeout(restore, 120)
-    }
   }, [])
 
   const loadLatestMessages = useCallback(async () => {
+    const snapshotRevision = messageRevisionRef.current;
     const requestId = fetchRequestIdRef.current + 1;
     fetchRequestIdRef.current = requestId;
 
@@ -889,11 +895,19 @@ function useProvideMessages(): MessagesContextValue {
 
       if (combineWindowMessages(window).length > 0) {
         setMessages(prev => {
-          const nextMessages = mergeMessageWindowIntoState(prev, window, {
+          let nextMessages = mergeMessageWindowIntoState(prev, window, {
             replaceWindow: true,
             trimToLatest: true,
           });
-          cacheMessages(nextMessages);
+          for (const [id, change] of messageChangesRef.current) {
+            if (change.revision <= snapshotRevision) continue;
+            if (change.deleted) nextMessages = nextMessages.filter(message => message.id !== id);
+            else {
+              const current = prev.find(message => message.id === id);
+              if (current) nextMessages = upsertMessageIntoState(nextMessages, current);
+            }
+          }
+          nextMessages = trimMessageWindow(nextMessages);
           return nextMessages;
         });
       } else {
@@ -959,16 +973,11 @@ function useProvideMessages(): MessagesContextValue {
         limit: MESSAGE_FETCH_LIMIT,
       });
 
-      React.startTransition(() => {
-        setMessages(prev => mergeMessageWindowIntoState(prev, window, {
-          replaceWindow: false,
-        }));
-        applyWindowMetadata({
-          ...window,
-          windowMode: 'older',
-          hasNewer: hasNewerRef.current || window.hasNewer,
-          targetStatus: 'not_requested',
-        });
+      setMessages(prev => mergeMessageWindowIntoState(prev, window, { replaceWindow: false }));
+      applyWindowMetadata({
+        ...window, windowMode: 'older',
+        hasNewer: hasNewerRef.current || window.hasNewer || latestMessagesRef.current.length + combineWindowMessages(window).length > 300,
+        targetStatus: 'not_requested',
       });
     } finally {
       setLoadingMore(false);
@@ -993,16 +1002,11 @@ function useProvideMessages(): MessagesContextValue {
         limit: MESSAGE_FETCH_LIMIT,
       });
 
-      React.startTransition(() => {
-        setMessages(prev => mergeMessageWindowIntoState(prev, window, {
-          replaceWindow: false,
-        }));
-        applyWindowMetadata({
-          ...window,
-          windowMode: 'newer',
-          hasOlder: hasOlder || window.hasOlder,
-          targetStatus: 'not_requested',
-        });
+      setMessages(prev => mergeMessageWindowIntoState(prev, window, { replaceWindow: false }));
+      applyWindowMetadata({
+        ...window, windowMode: 'newer',
+        hasOlder: hasOlder || window.hasOlder || latestMessagesRef.current.length + combineWindowMessages(window).length > 300,
+        targetStatus: 'not_requested',
       });
     } finally {
       setLoadingMore(false);
@@ -1012,6 +1016,7 @@ function useProvideMessages(): MessagesContextValue {
   const ensureMessageWindow = useCallback(async (
     targetMessageId: string | null,
     options: {
+      force?: boolean
       anchor?: GeneralChatMessageKey | null
       targetLastReadMessageId?: string | null
       targetLastReadAt?: string | null
@@ -1027,7 +1032,7 @@ function useProvideMessages(): MessagesContextValue {
         message.id === targetMessageId || message.client_message_id === targetMessageId
       ) ?? null
       : null;
-    if (existing) {
+    if (existing && !options.force) {
       setTargetStatus('found');
       setAnchorStatus(options.anchor ? 'found' : 'not_requested');
       return existing;
@@ -1073,7 +1078,7 @@ function useProvideMessages(): MessagesContextValue {
       applyWindowMetadata({
         ...window,
         windowMode: 'target',
-        targetStatus: targetMessage ? 'found' : window.targetStatus,
+        targetStatus: targetMessage ? 'found' : targetMessageId ? 'missing' : window.targetStatus,
         anchorStatus: window.anchorStatus,
       });
 
@@ -1081,12 +1086,13 @@ function useProvideMessages(): MessagesContextValue {
         return null;
       }
 
-      React.startTransition(() => {
-        setMessages(prev => mergeMessageWindowIntoState(prev, window, {
-          replaceWindow: true,
-          trimToLatest: false,
-        }));
-      });
+      // The authoritative target/read window must commit at the same priority as
+      // its readiness flags. A deferred snapshot could otherwise expose the old
+      // latest page as ready and permanently settle the wrong unread target.
+      setMessages(prev => mergeMessageWindowIntoState(prev, window, {
+        replaceWindow: true,
+        trimToLatest: false,
+      }));
       return targetMessage;
     } finally {
       if (requestId === fetchRequestIdRef.current) {
@@ -1112,10 +1118,28 @@ function useProvideMessages(): MessagesContextValue {
       if (nextMessages === prev || nextMessages.length === prev.length) {
         return prev;
       }
-      cacheMessages(nextMessages);
       return nextMessages;
     });
   }, [loadLatestMessages, setHasNewerValue, setWindowModeValue]);
+
+  const refreshVisibleMessages = useCallback(async () => {
+    const container = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
+    const browsing = hasNewerRef.current || loadedOlderRef.current || Boolean(container && container.scrollHeight - container.scrollTop - container.clientHeight > 80)
+    if (!browsing) { await fetchMessages(); return }
+    const finishReconnectTiming = beginChatTiming('reconnect', 'general')
+    const snapshotRevision = messageRevisionRef.current
+    const ids = latestMessagesRef.current.filter(message => !isLocalPendingMessage(message)).map(message => message.id)
+    if (ids.length === 0) return
+    const client = await getWorkingClient()
+    const { data, error } = await client.from('messages').select(MESSAGE_WITH_USER_SELECT).in('id', ids)
+    if (error) throw error
+    const rows = (data ?? []) as unknown as Message[]
+    setMessages(current => sortMessagesByStableKey([
+      ...rows.filter(message => (messageChangesRef.current.get(message.id)?.revision ?? 0) <= snapshotRevision),
+      ...current.filter(message => !ids.includes(message.id) || (messageChangesRef.current.get(message.id)?.revision ?? 0) > snapshotRevision),
+    ]))
+    finishReconnectTiming()
+  }, [fetchMessages]);
 
   // Reset function to reinitialize everything with fresh client
   const resetWithFreshClient = useCallback(async () => {
@@ -1125,51 +1149,52 @@ function useProvideMessages(): MessagesContextValue {
 
     resetInFlightRef.current = (async () => {
       try {
-        await fetchMessages().catch(() => undefined);
+        await refreshVisibleMessages().catch(() => undefined);
         const newChannel = await subscriptionRef.current?.resubscribe().catch(() => null);
         channelRef.current = newChannel ?? null;
       } catch {
-        await fetchMessages().catch(() => undefined);
+        await refreshVisibleMessages().catch(() => undefined);
       } finally {
         resetInFlightRef.current = null;
       }
     })();
 
     return resetInFlightRef.current;
-  }, [fetchMessages]);
+  }, [refreshVisibleMessages]);
 
   const handleVisible = useCallback(() => {
     const channel = channelRef.current;
     if (channel && channel.state === 'joined') {
-      void fetchMessages().catch(() => undefined);
+      void refreshVisibleMessages().catch(() => undefined);
       return;
     }
 
     if (clientResetRef.current) {
       void clientResetRef.current().catch(() => {
-        void fetchMessages().catch(() => undefined);
+        void refreshVisibleMessages().catch(() => undefined);
       });
     } else {
-      void fetchMessages().catch(() => undefined);
+      void refreshVisibleMessages().catch(() => undefined);
     }
-  }, [fetchMessages]);
+  }, [refreshVisibleMessages]);
 
   useRealtimeRecovery(handleVisible);
 
   // Fetch initial messages
   useEffect(() => {
     void fetchMessages().catch(() => undefined);
-    
+
     // Store the reset function for visibility refresh
     clientResetRef.current = resetWithFreshClient;
-    
+
   }, [fetchMessages, resetWithFreshClient]);
 
   // Persist messages to localStorage whenever they change
   useEffect(() => {
     latestMessagesRef.current = messages;
     if (!hasNewer) {
-      cacheMessages(messages);
+      const timer = window.setTimeout(() => cacheMessages(messages), 250);
+      return () => window.clearTimeout(timer);
     }
   }, [hasNewer, messages]);
 
@@ -1234,11 +1259,11 @@ function useProvideMessages(): MessagesContextValue {
     const subscribeToChannel = async () => {
       let currentClient = await getWorkingClient().catch(() => getRealtimeClient());
       currentClient = currentClient || getRealtimeClient();
-      
+
       if (!currentClient?.channel || typeof currentClient.channel !== 'function') {
         throw new Error('Realtime client unavailable');
       }
-      
+
       // Supabase reuses channels by topic, so each resubscribe gets a fresh topic.
       const newChannel = currentClient.channel(createRealtimeChannelName(`public:messages:${user.id}`), {
           config: {
@@ -1290,6 +1315,7 @@ function useProvideMessages(): MessagesContextValue {
           (payload: any) => {
             const incoming = payload.new as Partial<Message>
             if (!incoming?.id || disposed) return
+            messageChangesRef.current.set(incoming.id, { revision: ++messageRevisionRef.current, deleted: false });
 
             setMessages(prev => {
               const index = prev.findIndex(msg => msg.id === incoming.id)
@@ -1330,6 +1356,7 @@ function useProvideMessages(): MessagesContextValue {
             table: 'messages'
           },
           (payload: any) => {
+            messageChangesRef.current.set(payload.old.id, { revision: ++messageRevisionRef.current, deleted: true });
             setMessages(prev =>
               prev.filter(msg => msg.id !== payload.old.id)
             );
@@ -1370,7 +1397,7 @@ function useProvideMessages(): MessagesContextValue {
             if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
               try {
                 await runRealtimeRecovery('channel-error');
-                
+
                 // Use the comprehensive reset function
                 if (clientResetRef.current) {
                   await clientResetRef.current();
@@ -1390,7 +1417,7 @@ function useProvideMessages(): MessagesContextValue {
           if (isRecoverableRealtimeStatus(status)) {
             try {
               await runRealtimeRecovery('channel-error');
-              
+
               // Use the comprehensive reset function
               if (clientResetRef.current) {
                 await clientResetRef.current();
@@ -1446,14 +1473,11 @@ function useProvideMessages(): MessagesContextValue {
       return null;
     }
 
-    if (sendingRef.current) {
-      return null;
-    }
-
-    sendingRef.current = true;
-    setSending(true);
-    let inserted: Message | null = null;
+    const finishSendTiming = beginChatTiming('send-ack', 'general');
+    const finishOptimisticTiming = beginChatTiming('optimistic-insert', 'general');
     const clientMessageId = options.clientMessageId || createClientMessageId();
+    const intentKey = `${user.id}:${clientMessageId}`;
+    if (pendingIntentsRef.current.has(intentKey)) return null;
     const createdAt = options.createdAt || new Date().toISOString();
     const optimisticPayload = prepareMessageData(
       user.id,
@@ -1478,6 +1502,16 @@ function useProvideMessages(): MessagesContextValue {
       delivery_status: 'sending',
     } as Message;
 
+    upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
+      id: clientMessageId, clientMessageId, senderId: user.id,
+      content: content.trim(), messageType, fileUrl, thumbnailUrl, replyTo,
+      createdAt, failedAt: createdAt,
+    }, { requirePersistence: true });
+    pendingIntentsRef.current.add(intentKey);
+    setSending(true);
+    let inserted: Message | null = null;
+
+
     if (!replyTo) {
       setMessages(prev => {
         const nextMessages = upsertMessageIntoState(prev, optimisticMessage);
@@ -1489,6 +1523,8 @@ function useProvideMessages(): MessagesContextValue {
       }))
     }
 
+    finishOptimisticTiming();
+    options.onQueued?.();
     const executeSend = async () => {
       // Ensure we have a valid session before attempting database operations
       const sessionValid = await ensureSession();
@@ -1527,7 +1563,7 @@ function useProvideMessages(): MessagesContextValue {
             delivery_status: 'sent',
           };
 
-          addNewMessage(inserted);
+          if (activeUserIdRef.current === user.id) addNewMessage(inserted);
 
           if (data.id) {
             triggerGroupPushNotification(data.id).catch(() => {
@@ -1564,8 +1600,8 @@ function useProvideMessages(): MessagesContextValue {
         failedAt: new Date().toISOString(),
       });
       if (!replyTo) {
-        setMessages(prev => markMessageSendFailed(prev, clientMessageId));
-      } else if (typeof window !== 'undefined') {
+        if (activeUserIdRef.current === user.id) setMessages(prev => markMessageSendFailed(prev, clientMessageId));
+      } else if (activeUserIdRef.current === user.id && typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('shadowchat:general-thread-local', {
           detail: {
             action: 'upsert',
@@ -1586,9 +1622,10 @@ function useProvideMessages(): MessagesContextValue {
       wrappedError.optimisticMessageId = clientMessageId;
       throw wrappedError;
     } finally {
-      sendingRef.current = false;
-      setSending(false);
+      pendingIntentsRef.current.delete(intentKey);
+      setSending([...pendingIntentsRef.current].some(key => key.startsWith(`${activeUserIdRef.current}:`)));
     }
+    if (inserted) finishSendTiming();
     return inserted;
   }, [addNewMessage, profile, user]);
 
@@ -1642,7 +1679,7 @@ function useProvideMessages(): MessagesContextValue {
 
     try {
       const workingClient = await getWorkingClient();
-      
+
       const { error } = await workingClient
         .from('messages')
         .update({
@@ -1673,7 +1710,7 @@ function useProvideMessages(): MessagesContextValue {
 
     try {
       const workingClient = await getWorkingClient();
-      
+
       const { data, error } = await workingClient
         .from('messages')
         .delete()
@@ -1717,7 +1754,7 @@ function useProvideMessages(): MessagesContextValue {
 
     try {
       const workingClient = await getWorkingClient();
-      
+
       const { error } = await workingClient.rpc('toggle_message_reaction', {
         message_id: messageId,
         emoji: emoji,
@@ -1733,7 +1770,7 @@ function useProvideMessages(): MessagesContextValue {
           // The reaction is authoritative even when optional push delivery fails.
         });
       }
-      
+
     } catch (error) {
       // Restore the exact pre-optimistic membership. This is idempotent even if
       // realtime has already delivered an authoritative reaction update.
@@ -1753,7 +1790,7 @@ function useProvideMessages(): MessagesContextValue {
 
     try {
       const workingClient = await getWorkingClient();
-      
+
       const { error } = await workingClient.rpc('toggle_message_pin', {
         message_id: messageId,
       });
@@ -1780,7 +1817,7 @@ function useProvideMessages(): MessagesContextValue {
             : m;
         });
       });
-      
+
     } catch (error) {
       // Re-sync with database to revert optimistic updates
       fetchMessages();
@@ -1841,6 +1878,7 @@ const localOutboxEntryToMessage = (
 
 type SendMessageOptions = {
   clientMessageId?: string
+  onQueued?: () => void
   createdAt?: string
 }
 

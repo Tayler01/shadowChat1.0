@@ -59,19 +59,32 @@ export const fetchForegroundNotificationEvents = async (
   visibleSinceMs: number,
 ): Promise<NotificationEventRecord[]> => {
   const client = await getWorkingClient()
-  const { data, error } = await client
-    .from('notification_events')
-    .select(EVENT_SELECT)
-    .eq('user_id', userId)
-    .is('read_at', null)
-    .is('resolved_at', null)
-    .gte('created_at', new Date(visibleSinceMs).toISOString())
-    .gt('presentation_expires_at', new Date().toISOString())
-    .order('created_at', { ascending: true })
-    .limit(20)
-
-  if (error) throw error
-  return (data ?? []) as unknown as NotificationEventRecord[]
+  // Five pages bound recovery work while a cursor prevents a claimed first page
+  // from hiding newer events. Recover the newest presentation window first.
+  const events: NotificationEventRecord[] = []
+  let cursor: NotificationEventRecord | undefined
+  for (let page = 0; page < 5; page += 1) {
+    let query = client.from('notification_events')
+      .select(EVENT_SELECT)
+      .eq('user_id', userId)
+      .is('read_at', null)
+      .is('resolved_at', null)
+      .gte('created_at', new Date(visibleSinceMs).toISOString())
+      .gt('presentation_expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(20)
+    if (cursor) {
+      query = query.or(`created_at.lt.${cursor.created_at},and(created_at.eq.${cursor.created_at},id.lt.${cursor.id})`)
+    }
+    const { data, error } = await query
+    if (error) throw error
+    const batch = (data ?? []) as unknown as NotificationEventRecord[]
+    events.push(...batch)
+    if (batch.length < 20) break
+    cursor = batch[batch.length - 1]
+  }
+  return events.reverse()
 }
 
 export const claimNotificationEvent = async (eventId: string) => {

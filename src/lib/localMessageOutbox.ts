@@ -43,26 +43,29 @@ export const loadLocalOutboxEntries = (scope: string) => {
 }
 
 const saveLocalOutboxEntries = (scope: string, entries: LocalMessageOutboxEntry[]) => {
-  if (typeof localStorage === 'undefined') return
+  if (typeof localStorage === 'undefined') return false
 
   try {
     const normalized = entries.map(normalizeEntry)
     if (normalized.length === 0) {
       localStorage.removeItem(getLocalOutboxStorageKey(scope))
-      return
+      return true
     }
     localStorage.setItem(getLocalOutboxStorageKey(scope), JSON.stringify(normalized))
+    return true
   } catch {
-    // Storage pressure should not block visible send failure handling.
+    // Existing failed sends remain visible even if storage is under pressure.
+    return false
   }
 }
 
-export const upsertLocalOutboxEntry = (scope: string, entry: LocalMessageOutboxEntry) => {
+export const upsertLocalOutboxEntry = (scope: string, entry: LocalMessageOutboxEntry, options: { requirePersistence?: boolean } = {}) => {
   const normalized = normalizeEntry(entry)
   const entries = loadLocalOutboxEntries(scope)
   const nextEntries = entries.filter(item => item.clientMessageId !== normalized.clientMessageId)
   nextEntries.push(normalized)
-  saveLocalOutboxEntries(scope, nextEntries)
+  const persisted = saveLocalOutboxEntries(scope, nextEntries)
+  if (options.requirePersistence && !persisted) throw new Error('Your device could not save this pending message. Free some storage and try again.')
   return normalized
 }
 

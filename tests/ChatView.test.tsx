@@ -26,6 +26,8 @@ const createMessagesState = () => ({
 
 let mockMessagesState = createMessagesState()
 
+jest.mock('../src/hooks/useAuth', () => ({ useAuth: () => ({ profile: { id: 'u1' } }) }))
+
 jest.mock('../src/hooks/useMessages', () => ({
   useMessages: () => mockMessagesState,
 }))
@@ -175,7 +177,7 @@ test('keeps the mobile composer enabled while a send is pending so iOS preserves
     composer.getAttribute('data-class-name')?.includes('border-t')
   )
 
-  expect(desktopComposer).toHaveAttribute('data-disabled', 'true')
+  expect(desktopComposer).toHaveAttribute('data-disabled', 'false')
   expect(mobileComposer).toHaveAttribute('data-disabled', 'false')
 })
 

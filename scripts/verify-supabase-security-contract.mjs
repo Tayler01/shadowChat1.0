@@ -9,11 +9,16 @@ const contract = JSON.parse(readFileSync(
 ))
 
 const scope = process.argv.includes('--linked') ? '--linked' : '--local'
+const localWorkdirIndex = process.argv.indexOf('--local-workdir')
+const localWorkdir = localWorkdirIndex >= 0 ? process.argv[localWorkdirIndex + 1] : null
+if (localWorkdirIndex >= 0 && (!localWorkdir || localWorkdir.startsWith('--') || scope === '--linked')) {
+  throw new Error('--local-workdir requires a directory and cannot be combined with --linked')
+}
 
 function query(sql) {
   const raw = execFileSync(
     'supabase',
-    ['db', 'query', scope, '--output-format', 'json', sql],
+    ['db', 'query', scope, ...(localWorkdir ? ['--workdir', localWorkdir] : []), '--output-format', 'json', sql],
     { cwd: new URL('..', import.meta.url), encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] },
   )
   return parseSupabaseQueryRows(raw)

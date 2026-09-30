@@ -41,6 +41,6 @@ test('summary slash command calls API and sends result', async () => {
 
   expect(summarizeConversation).toHaveBeenCalled()
   await waitFor(() =>
-    expect(onSend).toHaveBeenCalledWith('summary text', 'text', undefined, undefined)
+    expect(onSend).toHaveBeenCalledWith('summary text', 'text', undefined, undefined, undefined, undefined, expect.any(Function))
   )
 })

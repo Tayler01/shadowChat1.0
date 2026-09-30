@@ -3255,7 +3255,6 @@ function ShadowPinHome({
   tracker,
   unreadDestinations,
   onPostViewed,
-  onDiscussionViewed,
 }: Required<Pick<ShadowPinProps, 'currentView' | 'onViewChange'>> & {
   onOpenCategory: (category: ShadowPinCategory) => void
   onOpenPin: (image: ShadowPinImage) => void
@@ -3276,7 +3275,6 @@ function ShadowPinHome({
   tracker: ShadowPinActivityTracker
   unreadDestinations: ShadowPinBadgeDestination[]
   onPostViewed: (imageId: string) => void
-  onDiscussionViewed: (imageId: string) => void
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
@@ -4403,7 +4401,7 @@ function ShadowPinHome({
           image={commentsImage}
           initialCommentId={initialCommentId}
           open
-          onLoaded={() => onDiscussionViewed(commentsImage.id)}
+
           onClose={() => {
             setCommentsImage(null)
             onPinRoute('close-comments', connectionsViewerImage?.id || commentsImage.id)
@@ -4439,7 +4437,6 @@ function ShadowPinCategoryScreen({
   onViewerImageResolved,
   unreadDestinations,
   onPostViewed,
-  onDiscussionViewed,
 }: {
   currentView: AppView
   onViewChange: (view: AppView) => void
@@ -4456,7 +4453,6 @@ function ShadowPinCategoryScreen({
   onViewerImageResolved?: (image: ShadowPinImage) => void
   unreadDestinations: ShadowPinBadgeDestination[]
   onPostViewed: (imageId: string) => void
-  onDiscussionViewed: (imageId: string) => void
 }) {
   const { user } = useAuth()
   const { role: adminRole } = useAdminAccess({ includeUsers: false })
@@ -4798,7 +4794,7 @@ function ShadowPinCategoryScreen({
           image={commentsImage}
           initialCommentId={initialCommentId}
           open
-          onLoaded={() => onDiscussionViewed(commentsImage.id)}
+
           onClose={() => {
             setCommentsImage(null)
             onPinRoute('close-comments', viewerImage?.id || commentsImage.id)
@@ -4871,13 +4867,6 @@ export function ShadowPin({
     const destination = badgeState.shadowPinDestinations.find(candidate => candidate.imageId === imageId)
     if (destination?.postEventIds.length) {
       markDestinationEventsRead(imageId, destination.postEventIds, 'post')
-    }
-  }, [badgeState.shadowPinDestinations, markDestinationEventsRead])
-
-  const markDiscussionViewed = useCallback((imageId: string) => {
-    const destination = badgeState.shadowPinDestinations.find(candidate => candidate.imageId === imageId)
-    if (destination?.discussionEventIds.length) {
-      markDestinationEventsRead(imageId, destination.discussionEventIds, 'discussion')
     }
   }, [badgeState.shadowPinDestinations, markDestinationEventsRead])
 
@@ -5048,7 +5037,7 @@ export function ShadowPin({
         } : undefined}
         unreadDestinations={badgeState.shadowPinDestinations}
         onPostViewed={markPostViewed}
-        onDiscussionViewed={markDiscussionViewed}
+
       />
     )
   }
@@ -5097,7 +5086,7 @@ export function ShadowPin({
       tracker={tracker}
       unreadDestinations={badgeState.shadowPinDestinations}
       onPostViewed={markPostViewed}
-      onDiscussionViewed={markDiscussionViewed}
+
     />
   )
 }

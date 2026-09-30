@@ -1,19 +1,40 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { StrictMode } from 'react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { ShadowPinCommentsDialog } from '../src/features/shadow-pin/components/ShadowPinCommentsDialog'
 import {
+  createShadowPinComment,
+  fetchShadowPinDiscussionWindow,
+  fetchShadowPinNewerComments,
+  fetchShadowPinCommentById,
+  markShadowPinCommentsRead,
   deleteShadowPinComment,
   fetchShadowPinComments,
   toggleShadowPinCommentReaction,
 } from '../src/features/shadow-pin/api/shadowPinApi'
 import { useAdminAccess } from '../src/hooks/useAdminAccess'
 import { useAuth } from '../src/hooks/useAuth'
+import { getWorkingClient } from '../src/lib/supabase'
+import { createRealtimeSubscriptionManager } from '../src/lib/realtimeSubscription'
+
+jest.mock('../src/lib/supabase', () => ({ ...jest.requireActual('../src/lib/supabase'), getWorkingClient: jest.fn() }))
 
 jest.mock('../src/features/shadow-pin/api/shadowPinApi', () => ({
   createShadowPinComment: jest.fn(),
+  fetchShadowPinDiscussionWindow: jest.fn(),
+  fetchShadowPinNewerComments: jest.fn(),
+  fetchShadowPinCommentById: jest.fn(),
+  markShadowPinCommentsRead: jest.fn(),
+  uploadShadowPinCommentAttachment: jest.fn(),
+  cleanupShadowPinCommentAttachment: jest.fn(),
+  cleanupPersistedShadowPinCommentAttachment: jest.fn(async () => {}),
+  resolveShadowPinCommentAttachments: jest.fn(async rows => rows),
   deleteShadowPinComment: jest.fn(),
   fetchShadowPinComments: jest.fn(),
   toggleShadowPinCommentReaction: jest.fn(),
   updateShadowPinComment: jest.fn(),
+}))
+jest.mock('../src/lib/realtimeSubscription', () => ({
+  createRealtimeSubscriptionManager: jest.fn(() => ({ setSubscribe: jest.fn(), start: jest.fn(async () => {}), stop: jest.fn(async () => {}) })),
 }))
 jest.mock('../src/hooks/useAdminAccess', () => ({
   useAdminAccess: jest.fn(),
@@ -56,6 +77,10 @@ beforeEach(() => {
     hasMore: false,
     nextCursor: null,
   })
+  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockImplementation(async (imageId, _userId, targetId) => ({
+    ...(await fetchShadowPinComments(imageId, null, targetId)), hasNewer: false, cursor: null, firstUnreadId: null, targetUnavailable: false,
+  }))
+  ;(markShadowPinCommentsRead as jest.Mock).mockResolvedValue(null)
   ;(deleteShadowPinComment as jest.Mock).mockResolvedValue(undefined)
   ;(toggleShadowPinCommentReaction as jest.Mock).mockResolvedValue({})
 })
@@ -244,4 +269,205 @@ test('keeps the comments sheet inside the moving visual viewport while the keybo
       value: originalVisualViewport,
     })
   }
+})
+
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(done => { resolve = done })
+  return { promise, resolve }
+}
+const windowPage = (rows: any[]) => ({ comments: rows, hasMore: false, nextCursor: null, hasNewer: false, cursor: null, firstUnreadId: null, targetUnavailable: false })
+
+test('StrictMode effect replay still loads and accepts the live discussion result', async () => {
+  render(<StrictMode><ShadowPinCommentsDialog image={image} open onClose={() => undefined} /></StrictMode>)
+  expect(await screen.findByText('Root comment')).toBeInTheDocument()
+})
+
+test('A -> B -> A ignores both prior fetch generations and reveals only the final A', async () => {
+  const oldA = deferred<any>(), oldB = deferred<any>(), newA = deferred<any>()
+  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockReset()
+    .mockReturnValueOnce(oldA.promise).mockReturnValueOnce(oldB.promise).mockReturnValueOnce(newA.promise)
+  const view = render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  view.rerender(<ShadowPinCommentsDialog image={{ ...image, id: 'pin-2' }} open onClose={() => undefined} />)
+  view.rerender(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  await act(async () => { newA.resolve(windowPage([{ ...rootComment, body: 'Current A' }])) })
+  expect(await screen.findByText('Current A')).toBeInTheDocument()
+  await act(async () => { oldB.resolve(windowPage([{ ...rootComment, image_id: 'pin-2', body: 'Stale B' }])); oldA.resolve(windowPage([{ ...rootComment, body: 'Stale A' }])) })
+  expect(screen.queryByText('Stale B')).not.toBeInTheDocument()
+  expect(screen.queryByText('Stale A')).not.toBeInTheDocument()
+  expect(screen.getByText('Current A')).toBeInTheDocument()
+})
+
+test('a failed cursor/window load stays retryable without acknowledging comments', async () => {
+  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockRejectedValueOnce(new Error('Cursor unavailable'))
+  render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('Cursor unavailable')
+  expect(markShadowPinCommentsRead).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+  expect(await screen.findByText('Root comment')).toBeInTheDocument()
+  // JSDOM has no readable pixels. Loading rows is not read evidence.
+  expect(markShadowPinCommentsRead).not.toHaveBeenCalled()
+})
+
+test('a late own send cannot insert an A comment into B or clear B draft', async () => {
+  const send = deferred<any>()
+  ;(createShadowPinComment as jest.Mock).mockReturnValueOnce(send.promise)
+  const view = render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  await screen.findByText('Root comment')
+  fireEvent.change(screen.getByLabelText('Add a ShadowPin comment'), { target: { value: 'Sent to A' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Post comment' }))
+  view.rerender(<ShadowPinCommentsDialog image={{ ...image, id: 'pin-2' }} open onClose={() => undefined} />)
+  await screen.findByText('Root comment')
+  fireEvent.change(screen.getByLabelText('Add a ShadowPin comment'), { target: { value: 'B draft' } })
+  await act(async () => { send.resolve({ ...rootComment, id: 'sent-a', body: 'Sent to A' }) })
+  expect(screen.queryByText('Sent to A')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Add a ShadowPin comment')).toHaveValue('B draft')
+})
+
+test('pasted binary is staged with a removable preview and does not post immediately', async () => {
+  render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  await screen.findByText('Root comment')
+  const file = new File(['abc'], 'notes.txt', { type: 'text/plain' })
+  fireEvent.paste(screen.getByLabelText('Add a ShadowPin comment'), { clipboardData: { files: [file], items: [] } })
+  expect(await screen.findByText('notes.txt')).toBeInTheDocument()
+  expect(createShadowPinComment).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Remove notes.txt' }))
+  expect(screen.queryByText('notes.txt')).not.toBeInTheDocument()
+})
+
+test('unavailable exact targets report the state without clearing any unread event', async () => {
+  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockResolvedValueOnce({ ...windowPage([]), targetUnavailable: true })
+  render(<ShadowPinCommentsDialog image={image} initialCommentId="removed" open onClose={() => undefined} />)
+  expect(await screen.findByText(/This comment is no longer available/)).toBeInTheDocument()
+  expect(markShadowPinCommentsRead).not.toHaveBeenCalled()
+})
+
+const installCommentGeometry = () => {
+  jest.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.dataset.testid === 'shadow-pin-comment-scroll' ? 160 : 80
+  })
+  jest.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLElement) {
+    return this.dataset.testid === 'shadow-pin-comment-scroll' ? this.querySelectorAll('article').length * 80 : 80
+  })
+  jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    if (this.dataset.testid === 'shadow-pin-comment-scroll') return { top: 0, bottom: 160, height: 160, left: 0, right: 320, width: 320, x: 0, y: 0, toJSON() {} }
+    const container = this.closest<HTMLElement>('[data-testid="shadow-pin-comment-scroll"]')
+    const index = container ? Array.from(container.querySelectorAll('article')).indexOf(this) : -1
+    const top = index >= 0 ? index * 80 - container!.scrollTop : 0
+    return { top, bottom: top + 80, height: 80, left: 0, right: 320, width: 320, x: 0, y: top, toJSON() {} }
+  })
+}
+
+test('settled first-unread positioning acknowledges only readable rows, never the offscreen tail', async () => {
+  installCommentGeometry()
+  const rows = Array.from({ length: 40 }, (_, i) => ({ ...rootComment, id: `read-${String(i).padStart(3,'0')}`, body: `Read row ${i}` }))
+  const readCursor = { user_id: 'viewer-1', surface: 'shadow_pin_comments', scope_id: image.id, last_read_at: rootComment.created_at, last_read_message_id: 'read-009', updated_at: rootComment.created_at }
+  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockResolvedValueOnce({ ...windowPage(rows), cursor: readCursor, firstUnreadId: 'read-010', hasNewer: true })
+  ;(markShadowPinCommentsRead as jest.Mock).mockResolvedValue({ ...readCursor, last_read_message_id: 'read-011' })
+  render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  await screen.findByText('Read row 10')
+  await waitFor(() => expect(markShadowPinCommentsRead).toHaveBeenCalled(), { timeout: 1800 })
+  const calls = (markShadowPinCommentsRead as jest.Mock).mock.calls
+  expect(calls[0][0]).toBe(image.id)
+  expect(calls[0][1]).toEqual(['read-010', 'read-011'])
+  expect(calls.flatMap(call => call[1])).not.toContain('read-039')
+  expect(screen.getByTestId('shadow-pin-comment-scroll').scrollTop).toBe(800)
+  expect(screen.getByRole('separator')).toHaveTextContent('Unread comments')
+})
+
+test('newer window eviction records an older boundary so capped history remains reachable', async () => {
+  const rows = Array.from({ length: 200 }, (_, i) => ({ ...rootComment, id: `cap-${String(i).padStart(3,'0')}`, body: `Cap row ${i}` }))
+  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockResolvedValueOnce({ ...windowPage(rows), hasNewer: true })
+  ;(fetchShadowPinNewerComments as jest.Mock).mockResolvedValueOnce({ comments: [{ ...rootComment, id: 'cap-200', body: 'Cap newest' }], hasNewer: false })
+  render(<ShadowPinCommentsDialog image={{ ...image, id: 'cap-pin' }} open onClose={() => undefined} />)
+  fireEvent.click(await screen.findByRole('button', { name: 'Load newer comments' }))
+  expect(await screen.findByText('Cap newest')).toBeInTheDocument()
+  expect(screen.queryByText('Cap row 0')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Load earlier comments' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Load earlier comments' }))
+  await waitFor(() => expect(fetchShadowPinComments).toHaveBeenLastCalledWith('cap-pin', { createdAt: rootComment.created_at, id: 'cap-001' }))
+})
+
+const historySavedScope = 'pin:saved-return-pin'
+test('live count deduplicates another insert, own send echoes and own delete echoes', async () => {
+  let listener: (event: unknown) => Promise<void> = async () => {}
+  const channel: { on: jest.Mock; subscribe: jest.Mock } = { on: jest.fn((_type, _filter, callback) => { listener = callback; return channel }), subscribe: jest.fn(() => channel) }
+  ;(getWorkingClient as jest.Mock).mockResolvedValue({ channel: () => channel })
+  ;(createRealtimeSubscriptionManager as jest.Mock).mockImplementationOnce(() => {
+    let subscribe: () => Promise<unknown> = async () => null
+    return { setSubscribe: (callback: typeof subscribe) => { subscribe = callback }, start: () => subscribe(), stop: async () => {} }
+  })
+  const own = { ...rootComment, id: 'count-own', author_id: 'viewer-1', body: 'Own counted' }
+  const other = { ...rootComment, id: 'count-other', body: 'Other counted' }
+  ;(fetchShadowPinCommentById as jest.Mock).mockImplementation(async (_image, id) => id === own.id ? own : other)
+  const send = deferred<typeof own>()
+  ;(createShadowPinComment as jest.Mock).mockReturnValueOnce(send.promise)
+  const onCountChange = jest.fn()
+  render(<ShadowPinCommentsDialog image={{ ...image, id: 'count-pin' }} open onClose={() => undefined} onCountChange={onCountChange} />)
+  await screen.findByText('Root comment')
+  await act(async () => { await listener({ eventType: 'INSERT', new: { id: other.id }, old: {} }) })
+  expect(screen.getByText(/8 comments/)).toBeInTheDocument()
+  fireEvent.change(screen.getByLabelText('Add a ShadowPin comment'), { target: { value: own.body } })
+  fireEvent.click(screen.getByRole('button', { name: 'Post comment' }))
+  await act(async () => { await listener({ eventType: 'INSERT', new: { id: own.id }, old: {} }) })
+  await act(async () => { send.resolve(own) })
+  await act(async () => { await listener({ eventType: 'INSERT', new: { id: own.id }, old: {} }) })
+  expect(screen.getByText(/9 comments/)).toBeInTheDocument()
+  const deletion = deferred<void>()
+  ;(deleteShadowPinComment as jest.Mock).mockReturnValueOnce(deletion.promise)
+  jest.spyOn(window, 'confirm').mockReturnValue(true)
+  const ownRow = screen.getByTestId(`shadow-pin-comment-bubble-${own.id}`).closest('article')!
+  fireEvent.click(within(ownRow).getByRole('button', { name: /Actions for comment/ }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /Delete/ }))
+  await act(async () => { await listener({ eventType: 'DELETE', new: {}, old: { id: own.id } }); deletion.resolve() })
+  await act(async () => { await listener({ eventType: 'DELETE', new: {}, old: { id: 'another-image-comment' } }) })
+  expect(screen.getByText(/8 comments/)).toBeInTheDocument()
+  expect(onCountChange.mock.calls.map(call => call[0])).toEqual([8, 9, 8])
+})
+
+test('reopening a history session requests its saved visible id before restoring offset', async () => {
+  const { saveMessageScrollAnchor } = await import('../src/lib/messageScrollAnchor')
+  saveMessageScrollAnchor('viewer-1', historySavedScope, { id: 'saved-history', offset: -15 })
+  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockResolvedValueOnce(windowPage([{ ...rootComment, id: 'saved-history', body: 'Saved history' }]))
+  render(<ShadowPinCommentsDialog image={{ ...image, id: 'saved-return-pin' }} open onClose={() => undefined} />)
+  expect(await screen.findByText('Saved history')).toBeInTheDocument()
+  expect(fetchShadowPinDiscussionWindow).toHaveBeenCalledWith('saved-return-pin', 'viewer-1', 'saved-history')
+  saveMessageScrollAnchor('viewer-1', historySavedScope, null)
+})
+
+test('an explicit target overrides a saved history anchor', async () => {
+  const { saveMessageScrollAnchor } = await import('../src/lib/messageScrollAnchor')
+  saveMessageScrollAnchor('viewer-1', 'pin:target-precedence-pin', { id: 'saved-history', offset: -15 })
+  render(<ShadowPinCommentsDialog image={{ ...image, id: 'target-precedence-pin' }} initialCommentId="explicit-target" open onClose={() => undefined} />)
+  await screen.findByText('Root comment')
+  expect(fetchShadowPinDiscussionWindow).toHaveBeenCalledWith('target-precedence-pin', 'viewer-1', 'explicit-target')
+  saveMessageScrollAnchor('viewer-1', 'pin:target-precedence-pin', null)
+})
+
+it('keeps mixed clipboard text with its staged file and reports invalid files', async () => {
+  render(<ShadowPinCommentsDialog image={{ ...image, id: 'mixed-paste-pin' }} open onClose={() => undefined} />)
+  await screen.findByText('Root comment')
+  const input = screen.getByLabelText('Add a ShadowPin comment') as HTMLTextAreaElement
+  fireEvent.change(input, { target: { value: 'Before after' } })
+  input.setSelectionRange(7, 7)
+  fireEvent.paste(input, { clipboardData: { files: [new File(['ok'], 'notes.txt', { type: 'text/plain' })], items: [], getData: () => 'caption ' } })
+  expect(input).toHaveValue('Before caption after')
+  expect(screen.getByText('notes.txt')).toBeInTheDocument()
+  fireEvent.paste(input, { clipboardData: { files: [new File([], 'empty.txt', { type: 'text/plain' })], items: [], getData: () => '' } })
+  expect(screen.getByRole('alert')).toHaveTextContent('Choose a file between 1 byte and 50 MB.')
+})
+
+it('removes a successfully deleted comment while preserving a file-cleanup retry', async () => {
+  ;(useAuth as jest.Mock).mockReturnValue({ user: { id: rootComment.author_id } })
+  const attachment = { path: '93000000-0000-4000-8000-000000000001/93000000-0000-4000-8000-000000000011/93000000-0000-4000-8000-000000000202', name: 'pending.txt', size: 2, contentType: 'text/plain', kind: 'file' }
+  ;(deleteShadowPinComment as jest.Mock).mockResolvedValueOnce({ pendingCleanup: attachment })
+  jest.spyOn(window, 'confirm').mockReturnValue(true)
+  render(<ShadowPinCommentsDialog image={{ ...image, id: 'cleanup-pin' }} open onClose={() => undefined} />)
+  await screen.findByText('Root comment')
+  fireEvent.click(screen.getByRole('button', { name: /actions for comment by author/i }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /delete/i }))
+  await waitFor(() => expect(screen.queryByText('Root comment')).not.toBeInTheDocument())
+  expect(screen.getByRole('button', { name: 'Retry file cleanup: pending.txt' })).toBeInTheDocument()
+  expect(localStorage.getItem(`shadowchat:pin-comment-cleanup:${rootComment.author_id}`)).toContain('pending.txt')
+  localStorage.removeItem(`shadowchat:pin-comment-cleanup:${rootComment.author_id}`)
 })

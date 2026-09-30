@@ -26,6 +26,8 @@ const mockReplyMessage = {
   user: { id: 'user-2', display_name: 'Reply author' },
 }
 
+jest.mock('../src/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'reader-1' } }) }))
+
 jest.mock('../src/hooks/useIsDesktop', () => ({
   useIsDesktop: () => mockDesktop,
 }))
@@ -51,6 +53,10 @@ jest.mock('../src/features/general-chat-threads/useGeneralChatThread', () => ({
     rootMessage: mockRootMessage,
     replies: [mockReplyMessage],
     loading: false,
+    loadedThreadId: 'root-1',
+    firstUnreadMessageId: 'reply-1',
+    hasNewer: false,
+    loadNewer: jest.fn(),
     error: null,
     hasOlder: false,
     loadingOlder: false,

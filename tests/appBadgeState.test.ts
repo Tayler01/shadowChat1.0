@@ -1,5 +1,5 @@
 import { getWorkingClient } from '../src/lib/supabase'
-import { fetchAppBadgeState } from '../src/lib/appBadge'
+import { fetchAppBadgeState, refreshAppBadgeState, resetAppBadgeStateForUser, getCachedAppBadgeState } from '../src/lib/appBadge'
 
 jest.mock('../src/lib/supabase', () => ({
   getWorkingClient: jest.fn(),
@@ -77,4 +77,30 @@ test('loads the complete v2 badge breakdown and normalizes category counts', asy
   expect(rpc).toHaveBeenCalledWith('get_app_badge_state_v2', {
     target_user_id: 'user-1',
   })
+})
+
+
+test('a transient aggregate failure retains the last successful state of the same account', async () => {
+  resetAppBadgeStateForUser('badge-user')
+  const rpc = jest.fn().mockResolvedValueOnce({ data: { total: 7, dm: 7 }, error: null })
+    .mockResolvedValueOnce({ data: null, error: new Error('offline') })
+  workingClient.mockResolvedValue({ auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'badge-user' } }, error: null }) }, rpc } as never)
+  expect((await refreshAppBadgeState()).total).toBe(7)
+  expect((await refreshAppBadgeState()).total).toBe(7)
+  resetAppBadgeStateForUser(null)
+  expect(getCachedAppBadgeState().total).toBe(0)
+})
+
+test('an old account aggregate cannot publish after account switching', async () => {
+  resetAppBadgeStateForUser('account-a')
+  let resolveRpc!: (value: unknown) => void
+  const rpc = jest.fn(() => new Promise(resolve => { resolveRpc = resolve }))
+  workingClient.mockResolvedValue({ auth: { getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'account-a' } }, error: null }) }, rpc } as never)
+  const pending = refreshAppBadgeState()
+  while (!resolveRpc) await Promise.resolve()
+  resetAppBadgeStateForUser('account-b')
+  resolveRpc({ data: { total: 91, dm: 91 }, error: null })
+  await pending
+  expect(getCachedAppBadgeState().total).toBe(0)
+  resetAppBadgeStateForUser(null)
 })

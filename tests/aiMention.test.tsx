@@ -35,6 +35,6 @@ test('ai mention sends query and lets backend post Shado response', async () => 
   })
 
   await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1))
-  expect(onSend).toHaveBeenCalledWith('@ai what is up?', 'text', undefined, undefined)
+  expect(onSend).toHaveBeenCalledWith('@ai what is up?', 'text', undefined, undefined, undefined, undefined, expect.any(Function))
   expect(askQuestion).toHaveBeenCalledWith('what is up?', { postToChat: true })
 })

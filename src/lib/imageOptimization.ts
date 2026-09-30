@@ -1,3 +1,5 @@
+import { resolveUploadMimeType } from './uploadLimits'
+
 export type ImageOptimizeOptions = {
   maxWidth: number
   maxHeight: number
@@ -5,6 +7,7 @@ export type ImageOptimizeOptions = {
   minBytes?: number
   outputType?: 'image/webp' | 'image/jpeg'
   fileNamePrefix?: string
+  maxInputPixels?: number
 }
 
 const DEFAULT_MIN_BYTES = 220 * 1024
@@ -54,12 +57,13 @@ export const optimizeImageFile = async (
   file: File,
   options: ImageOptimizeOptions
 ): Promise<File> => {
-  if (!file.type.startsWith('image/') || SKIPPED_IMAGE_TYPES.has(file.type)) {
+  const mimeType = resolveUploadMimeType(file)
+  if (!mimeType.startsWith('image/') || SKIPPED_IMAGE_TYPES.has(mimeType)) {
     return file
   }
 
   const minBytes = options.minBytes ?? DEFAULT_MIN_BYTES
-  if (file.size > 0 && file.size < minBytes) {
+  if (file.size > 0 && file.size < minBytes && !options.maxInputPixels) {
     return file
   }
 
@@ -67,16 +71,25 @@ export const optimizeImageFile = async (
   if (!image?.naturalWidth || !image.naturalHeight) {
     return file
   }
+  if (options.maxInputPixels && image.naturalWidth * image.naturalHeight > options.maxInputPixels) {
+    throw new Error('Image dimensions are too large to process safely. Choose a smaller image.')
+  }
+  if (file.size > 0 && file.size < minBytes) {
+    return file
+  }
 
   const scale = Math.min(1, options.maxWidth / image.naturalWidth, options.maxHeight / image.naturalHeight)
   const targetWidth = Math.max(1, Math.round(image.naturalWidth * scale))
   const targetHeight = Math.max(1, Math.round(image.naturalHeight * scale))
   const shouldResize = targetWidth !== image.naturalWidth || targetHeight !== image.naturalHeight
-  const shouldTranscode = file.type !== (options.outputType || 'image/webp')
+  const shouldTranscode = mimeType !== (options.outputType || 'image/webp')
 
   if (!shouldResize && !shouldTranscode && file.size < minBytes * 2) {
     return file
   }
+
+  // Let the composer paint its processing state before a potentially expensive canvas draw.
+  await new Promise<void>(resolve => setTimeout(resolve, 0))
 
   const canvas = document.createElement('canvas')
   canvas.width = targetWidth

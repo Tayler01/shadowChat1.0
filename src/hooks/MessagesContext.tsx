@@ -11,6 +11,7 @@ export type MessageWindowMode = GeneralChatMessageWindowMode
 export type MessageWindowStatus = GeneralChatMessageWindowStatus
 
 export interface EnsureMessageWindowOptions {
+  force?: boolean
   anchor?: GeneralChatMessageKey | null
   targetLastReadMessageId?: string | null
   targetLastReadAt?: string | null
@@ -32,7 +33,8 @@ export interface MessagesContextValue {
     type?: ChatMessageType,
     fileUrl?: string,
     replyTo?: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
+    options?: { clientMessageId?: string; onQueued?: () => void }
   ) => Promise<Message | null>
   editMessage: (id: string, content: string) => Promise<void>
   deleteMessage: (id: string) => Promise<void>

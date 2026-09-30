@@ -484,6 +484,92 @@ describe('message fetching windows', () => {
     expect(result.current.messages.map(message => message.id)).toEqual([root.id])
   })
 
+  it('regression: retains unrelated thread summaries after a scoped realtime refresh', async () => {
+    let messageInsertHandler: ((payload: any) => void) | undefined
+    workingClient.channel.mockImplementation(() => {
+      const channel: any = {
+        on: jest.fn((event: string, filter: any, handler: any) => {
+          if (
+            event === 'postgres_changes' &&
+            filter?.event === 'INSERT' &&
+            filter?.table === 'messages'
+          ) {
+            messageInsertHandler = handler
+          }
+          return channel
+        }),
+        subscribe: jest.fn(() => channel),
+        send: jest.fn(),
+        state: 'joined',
+      }
+      return channel
+    })
+
+    const root = makeDbMessage('root', '2026-05-03T12:00:00.000Z')
+    const otherRoot = makeDbMessage('other-root', '2026-05-03T11:00:00.000Z')
+    const otherSummary = { reply_count: 5, unread_count: 2, latest_reply_id: 'other-reply' }
+    ;(fetchGeneralChatThreadSummaries as jest.Mock).mockResolvedValueOnce(new Map([[otherRoot.id, otherSummary]]))
+    const { result } = await renderWithLatestWindow([otherRoot, root])
+    expect(result.current.messages.find(message => message.id === otherRoot.id)?.thread_summary).toEqual(otherSummary)
+    await waitFor(() => expect(messageInsertHandler).toBeDefined())
+
+    const reply = {
+      ...makeDbMessage('reply', '2026-05-03T12:01:00.000Z'),
+      user_id: 'other-user',
+      reply_to: root.id,
+    } as Message
+    const summary = {
+      reply_count: 1,
+      unread_count: 1,
+      latest_reply_id: reply.id,
+    }
+    workingClient.from.mockReturnValue(createQuery({
+      maybeSingle: jest.fn().mockResolvedValue({ data: reply, error: null }),
+    }) as any)
+    ;(resolveGeneralChatThreadId as jest.Mock).mockResolvedValue(root.id)
+    ;(fetchGeneralChatThreadSummaries as jest.Mock).mockResolvedValue(new Map([[root.id, summary]]))
+
+    act(() => {
+      messageInsertHandler?.({ new: { id: reply.id } })
+    })
+
+    await waitFor(() => expect(resolveGeneralChatThreadId).toHaveBeenCalledWith(reply.id))
+    await waitFor(() => expect(fetchGeneralChatThreadSummaries).toHaveBeenCalledWith([root.id]))
+    await waitFor(() => expect(result.current.messages.find(message => message.id === root.id)?.thread_summary).toEqual(summary))
+    expect(result.current.messages.find(message => message.id === otherRoot.id)?.thread_summary).toEqual(otherSummary)
+  })
+
+  it('regression: keeps a realtime root that arrives while the latest snapshot is in flight', async () => {
+    let broadcastHandler: ((payload: any) => void) | undefined;
+    workingClient.channel.mockImplementation(() => {
+      const channel: any = {
+        on: jest.fn((event: string, filter: any, handler: any) => {
+          if (event === 'broadcast' && filter?.event === 'new_message') broadcastHandler = handler;
+          return channel;
+        }), subscribe: jest.fn(() => channel), send: jest.fn(), state: 'joined',
+      };
+      return channel;
+    });
+    const root = makeDbMessage('root', '2026-05-03T12:00:00.000Z');
+    const { result } = await renderWithLatestWindow([root]);
+    await waitFor(() => expect(broadcastHandler).toBeDefined());
+    let resolveSnapshot!: (value: any) => void;
+    const snapshotPromise = new Promise(resolve => { resolveSnapshot = resolve; });
+    workingClient.from
+      .mockReturnValueOnce(createThenableQuery({ data: [], error: null }) as any)
+      .mockReturnValueOnce(createQuery({ then: (fulfilled: any, rejected: any) => snapshotPromise.then(fulfilled, rejected) }) as any);
+    let refreshPromise!: Promise<void>;
+    act(() => { refreshPromise = result.current.loadLatestMessages(); });
+    await waitFor(() => expect(workingClient.from).toHaveBeenCalledTimes(4));
+    const arriving = makeDbMessage('arriving', '2026-05-03T12:01:00.000Z');
+    act(() => { broadcastHandler?.({ payload: arriving }); });
+    await waitFor(() => expect(result.current.messages.some(m => m.id === arriving.id)).toBe(true));
+    await act(async () => {
+      resolveSnapshot({ data: [root], error: null });
+      await refreshPromise;
+    });
+    expect(result.current.messages.some(m => m.id === arriving.id)).toBe(true);
+  });
   it('loads older history with a created_at and id keyset when timestamps collide', async () => {
     const { result, latestWindow } = await renderWithLatestWindow();
     const anchor = latestWindow[0];
@@ -742,6 +828,34 @@ describe('message actions', () => {
     (ensureSession as jest.Mock).mockResolvedValue(true);
   });
 
+
+  it('accepts distinct durable intents while acknowledgements are pending and deduplicates the same intent', async () => {
+    ;(triggerGroupPushNotification as jest.Mock).mockResolvedValue(undefined)
+    const pending = new Map<string, (value: unknown) => void>()
+    const insertSpy = jest.spyOn(messagesModule, 'insertMessage').mockImplementation(payload => new Promise(resolve => {
+      pending.set(payload.client_message_id!, resolve as (value: unknown) => void)
+    }))
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const queued = jest.fn()
+    let first!: Promise<Message | null>, second!: Promise<Message | null>
+    act(() => {
+      first = result.current.sendMessage('first', 'text', undefined, undefined, undefined, { clientMessageId: 'rapid-one', onQueued: queued })
+      second = result.current.sendMessage('second', 'text', undefined, undefined, undefined, { clientMessageId: 'rapid-two', onQueued: queued })
+    })
+    expect(queued).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(localStorage.getItem('shadowchat:outbox:general')!)).toHaveLength(2)
+    await waitFor(() => expect(insertSpy).toHaveBeenCalledTimes(2))
+    let duplicate: Message | null = null
+    await act(async () => { duplicate = await result.current.sendMessage('first', 'text', undefined, undefined, undefined, { clientMessageId: 'rapid-one', onQueued: queued }) })
+    expect(duplicate).toBeNull()
+    expect(queued).toHaveBeenCalledTimes(2)
+    await act(async () => { pending.get('rapid-one')!({ data: { ...makeDbMessage('server-one', '2026-09-30T12:00:00Z'), client_message_id: 'rapid-one' }, error: null }); await first })
+    expect(result.current.sending).toBe(true)
+    await act(async () => { pending.get('rapid-two')!({ data: { ...makeDbMessage('server-two', '2026-09-30T12:00:01Z'), client_message_id: 'rapid-two' }, error: null }); await second })
+    expect(result.current.sending).toBe(false)
+    insertSpy.mockRestore()
+  })
   it('edits message', async () => {
     const query = createQuery();
     const updateFn = jest.fn(() => query);
@@ -902,4 +1016,5 @@ describe('message actions', () => {
 
     expect(rpcFn).toHaveBeenCalledWith('toggle_message_pin', { message_id: 'm1' });
   });
+
 });

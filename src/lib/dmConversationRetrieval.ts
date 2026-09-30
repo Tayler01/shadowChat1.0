@@ -55,6 +55,11 @@ export interface DMMessageWindowResult {
   targetStatus: 'resolved' | 'missing'
 }
 
+export interface DMReadWindowResult extends DMMessageWindowResult {
+  anchorStatus: 'unread' | 'latest' | 'older' | 'newer'
+  firstUnreadMessageId: string | null
+}
+
 type RetrievalOptions = {
   limit?: number
   cursor?: Partial<DMRetrievalCursor> | null
@@ -302,5 +307,48 @@ export const getDMMessageWindow = async (
     hasOlder: row.has_older === true,
     hasNewer: row.has_newer === true,
     targetStatus: 'resolved',
+  }
+}
+
+// Cursor/receipt resolution is server-owned: the oldest unread row can lie
+// outside the latest page, and caller-visible rows can change after a block.
+export const getDMReadWindow = async (
+  conversationId: string,
+  options: {
+    limit?: number
+    before?: Partial<DMRetrievalCursor> | null
+    after?: Partial<DMRetrievalCursor> | null
+    readAnchor?: boolean
+  } = {}
+): Promise<DMReadWindowResult> => {
+  const targetConversationId = requireUuid(conversationId, 'Conversation id')
+  const before = normalizeCursor(options.before)
+  const after = normalizeCursor(options.after)
+  if (before && after) throw new Error('Use only one DM pagination cursor')
+  const client = await getWorkingClient()
+  const { data, error } = await client.rpc('get_dm_read_window', {
+    target_conversation_id: targetConversationId,
+    target_message_id: null,
+    target_before_created_at: before?.createdAt ?? null,
+    target_before_id: before?.id ?? null,
+    target_after_created_at: after?.createdAt ?? null,
+    target_after_id: after?.id ?? null,
+    target_read_anchor: options.readAnchor ?? (!before && !after),
+    target_limit: normalizeLimit(options.limit, 50, 100),
+  })
+  if (error) throw error
+  const row = rowsFromData(data)[0]
+  if (!row) throw new Error('Invalid DM read window response: row is missing')
+  const anchorStatus = row.anchor_status
+  if (anchorStatus !== 'unread' && anchorStatus !== 'latest' && anchorStatus !== 'older' && anchorStatus !== 'newer') {
+    throw new Error('Invalid DM read window response: anchor_status is invalid')
+  }
+  return {
+    messages: parseWindowMessages(row.messages),
+    hasOlder: row.has_older === true,
+    hasNewer: row.has_newer === true,
+    targetStatus: 'resolved',
+    anchorStatus,
+    firstUnreadMessageId: optionalString(row.first_unread_message_id),
   }
 }

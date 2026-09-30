@@ -1,5 +1,16 @@
 # Mobile Viewport Audit
 
+## September 30 chat smoothness checkpoint
+
+Initial message positioning now uses the actual readable area: DM targets clear
+the floating controls, and mobile composer overlap is excluded from read-cursor
+sampling. First presentation waits for the restored row instead of briefly
+showing a latest-page or thread-root frame. Saved message offsets remain stable.
+Pins discussion viewport/read-position checks passed Android Chromium, iPhone
+WebKit and desktop. See the [implementation record](../features/chat-smoothness-implementation-2026-09-30.md)
+for final General/DM/thread results and release identity. Physical keyboard,
+installed-PWA and OS notification checks remain with Tayler (RD-037–RD-039).
+
 ## Documentation Status - July 10, 2026
 
 This audit separates previously verified mobile artifacts from the deployed

@@ -25,6 +25,42 @@ test('updates draft when key changes', () => {
   })
   rerender({ key: 'other' })
   expect(result.current.draft).toBe('world')
+  expect(localStorage.getItem('draft-general')).toBe('hello')
+  expect(localStorage.getItem('draft-other')).toBe('world')
+})
+
+test('switching draft keys never writes the previous conversation into the new key', () => {
+  localStorage.setItem('draft-dm-a', 'hello from A')
+  localStorage.setItem('draft-dm-b', 'hello from B')
+  const { result, rerender } = renderHook((props: { key: string }) => useDraft(props.key), {
+    initialProps: { key: 'dm-a' },
+  })
+  expect(result.current.draft).toBe('hello from A')
+  rerender({ key: 'dm-b' })
+  expect(result.current.draft).toBe('hello from B')
+  expect(localStorage.getItem('draft-dm-a')).toBe('hello from A')
+  expect(localStorage.getItem('draft-dm-b')).toBe('hello from B')
+  rerender({ key: 'dm-a' })
+  expect(result.current.draft).toBe('hello from A')
+})
+
+test('account-scoped drafts retain each account text without exposing unowned legacy data', () => {
+  localStorage.setItem('draft-general', 'legacy with unknown owner')
+  const { result, rerender } = renderHook((props: { owner: string | null }) => useDraft('general', props.owner), {
+    initialProps: { owner: 'account-a' } as { owner: string | null },
+  })
+  expect(result.current.draft).toBe('')
+  act(() => result.current.setDraft('Account A text'))
+  expect(localStorage.getItem('draft-account:account-a:general')).toBe('Account A text')
+  rerender({ owner: 'account-b' })
+  expect(result.current.draft).toBe('')
+  act(() => result.current.setDraft('Account B text'))
+  rerender({ owner: 'account-a' })
+  expect(result.current.draft).toBe('Account A text')
+  rerender({ owner: null })
+  expect(result.current.draft).toBe('')
+  expect(localStorage.getItem('draft-general')).toBe('legacy with unknown owner')
+  expect(localStorage.getItem('draft-account:account-b:general')).toBe('Account B text')
 })
 
 test('treats whitespace-only stored draft as empty', () => {

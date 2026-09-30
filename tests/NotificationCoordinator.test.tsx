@@ -26,6 +26,7 @@ jest.mock('../src/hooks/useComfortPreferences', () => ({
   }),
 }))
 jest.mock('../src/lib/notificationInstallation', () => ({
+  resetWebNotificationInstallationForUser: jest.fn(),
   updateWebNotificationInstallationForeground: jest.fn().mockResolvedValue(true),
 }))
 jest.mock('../src/lib/supabase', () => ({
@@ -34,6 +35,7 @@ jest.mock('../src/lib/supabase', () => ({
 }))
 jest.mock('../src/lib/appBadge', () => ({
   APP_BADGE_REFRESH_EVENT: 'shadowchat:app-badge-refresh',
+  resetAppBadgeStateForUser: jest.fn(),
   refreshAppBadgeState: jest.fn().mockResolvedValue({
     total: 0,
     dm: 0,
@@ -308,4 +310,64 @@ describe('NotificationCoordinatorProvider', () => {
     expect(screen.queryByTestId('notification-banner-v2')).not.toBeInTheDocument()
     jest.useRealTimers()
   })
+  const freshEvent = (id: string, body = 'Recovered foreground text') => ({
+    id, user_id: 'user-1', type: 'dm_message', category: 'dm', entity_id: 'm',
+    conversation_id: 'c', dm_message_id: 'm', message_id: null, actor_id: null,
+    route: '/?view=dms&conversation=c', payload: { title: 'JJ', body },
+    sent_at: null, read_at: null, presented_at: null, resolved_at: null,
+    created_at: new Date(Date.now() + 100).toISOString(),
+    presentation_expires_at: new Date(Date.now() + 90_000).toISOString(),
+  })
+
+  it('rejects an old account claim result after identity changes', async () => {
+    let resolveClaim!: (value: boolean) => void
+    ;(claimNotificationEvent as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { resolveClaim = resolve }))
+    const view = render(<NotificationCoordinatorProvider><main>App</main></NotificationCoordinatorProvider>)
+    await waitFor(() => expect(insertHandler).toBeDefined())
+    act(() => insertHandler?.({ new: freshEvent('old-account', 'A private preview') }))
+    await waitFor(() => expect(resolveClaim).toBeDefined())
+    ;(useAuth as jest.Mock).mockReturnValue({ user: { id: 'user-2' } })
+    view.rerender(<NotificationCoordinatorProvider><main>App</main></NotificationCoordinatorProvider>)
+    await act(async () => resolveClaim(true))
+    expect(screen.queryByText('A private preview')).not.toBeInTheDocument()
+  })
+
+  it('applies a privacy settings save that races a delayed claim', async () => {
+    let resolveClaim!: (value: boolean) => void
+    ;(fetchNotificationCoordinatorPreferences as jest.Mock).mockResolvedValue({ notifications_enabled: true, dm_enabled: true, notification_preview_mode: 'full' })
+    ;(claimNotificationEvent as jest.Mock).mockImplementationOnce(() => new Promise(resolve => { resolveClaim = resolve }))
+    render(<NotificationCoordinatorProvider><main>App</main></NotificationCoordinatorProvider>)
+    await waitFor(() => expect(insertHandler).toBeDefined())
+    act(() => insertHandler?.({ new: freshEvent('settings-race', 'Secret message preview') }))
+    await waitFor(() => expect(resolveClaim).toBeDefined())
+    ;(fetchNotificationCoordinatorPreferences as jest.Mock).mockResolvedValue({ notifications_enabled: true, dm_enabled: true, notification_preview_mode: 'private', notification_foreground_sounds_enabled: false })
+    act(() => window.dispatchEvent(new CustomEvent('shadowchat:notification-preferences-changed', { detail: { userId: 'user-1' } })))
+    await act(async () => resolveClaim(true))
+    await waitFor(() => expect(screen.getByTestId('notification-banner-v2')).toBeInTheDocument())
+    expect(screen.queryByText('Secret message preview')).not.toBeInTheDocument()
+    expect(screen.queryByText('JJ')).not.toBeInTheDocument()
+  })
+
+  it('uses fresh cached preferences across a burst and invalidates after a settings save', async () => {
+    render(<NotificationCoordinatorProvider><main>App</main></NotificationCoordinatorProvider>)
+    await waitFor(() => expect(insertHandler).toBeDefined())
+    await waitFor(() => expect(fetchNotificationCoordinatorPreferences).toHaveBeenCalled())
+    ;(fetchNotificationCoordinatorPreferences as jest.Mock).mockClear()
+    await act(async () => { insertHandler?.({ new: freshEvent('burst-1') }); await Promise.resolve() })
+    await act(async () => { insertHandler?.({ new: freshEvent('burst-2') }); await Promise.resolve() })
+    expect(fetchNotificationCoordinatorPreferences).not.toHaveBeenCalled()
+    act(() => window.dispatchEvent(new CustomEvent('shadowchat:notification-preferences-changed', { detail: { userId: 'user-1' } })))
+    await waitFor(() => expect(fetchNotificationCoordinatorPreferences).toHaveBeenCalledTimes(1))
+  })
+
+  it('recovers canonical events after the worker suppresses push with realtime unavailable', async () => {
+    const serviceWorker = new EventTarget()
+    Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: serviceWorker })
+    render(<NotificationCoordinatorProvider><main>App</main></NotificationCoordinatorProvider>)
+    await waitFor(() => expect(insertHandler).toBeDefined())
+    ;(fetchForegroundNotificationEvents as jest.Mock).mockResolvedValueOnce([freshEvent('suppressed')])
+    act(() => serviceWorker.dispatchEvent(new MessageEvent('message', { data: { type: 'SHADOWCHAT_FOREGROUND_PUSH_SUPPRESSED' } })))
+    expect(await screen.findByText('Recovered foreground text')).toBeInTheDocument()
+  })
+
 })

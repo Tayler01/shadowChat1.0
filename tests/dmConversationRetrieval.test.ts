@@ -1,6 +1,7 @@
 import { getWorkingClient } from '../src/lib/supabase'
 import {
   getDMMessageWindow,
+  getDMReadWindow,
   listDMSharedContent,
   searchDMConversationMessages,
 } from '../src/lib/dmConversationRetrieval'
@@ -214,5 +215,38 @@ describe('DM conversation retrieval wrappers', () => {
     const error = { code: '42501', message: 'Conversation is unavailable' }
     mockRpc({ data: null, error })
     await expect(searchDMConversationMessages(CONVERSATION_ID, 'signal')).rejects.toBe(error)
+  })
+
+  test('resolves the server unread window without treating the latest page as authoritative', async () => {
+    const rpc = mockRpc({ data: [{
+      messages: [makeRow()], has_older: true, has_newer: true,
+      anchor_status: 'unread', first_unread_message_id: MESSAGE_ID,
+    }], error: null })
+    await expect(getDMReadWindow(CONVERSATION_ID, { limit: 400 })).resolves.toMatchObject({
+      anchorStatus: 'unread', firstUnreadMessageId: MESSAGE_ID, hasOlder: true, hasNewer: true,
+    })
+    expect(rpc).toHaveBeenCalledWith('get_dm_read_window', {
+      target_conversation_id: CONVERSATION_ID, target_message_id: null,
+      target_before_created_at: null, target_before_id: null,
+      target_after_created_at: null, target_after_id: null,
+      target_read_anchor: true, target_limit: 100,
+    })
+  })
+
+  test('forward pages preserve both ordering cursor fields and disable unread re-anchoring', async () => {
+    const rpc = mockRpc({ data: [{ messages: [makeRow()], anchor_status: 'newer' }], error: null })
+    await getDMReadWindow(CONVERSATION_ID, { after: { createdAt: '2026-07-11T12:00:00Z', id: OLDER_MESSAGE_ID } })
+    expect(rpc).toHaveBeenCalledWith('get_dm_read_window', expect.objectContaining({
+      target_after_created_at: '2026-07-11T12:00:00.000Z', target_after_id: OLDER_MESSAGE_ID,
+      target_read_anchor: false,
+    }))
+    const cursor = { createdAt: '2026-07-11T12:00:00Z', id: MESSAGE_ID }
+    await expect(getDMReadWindow(CONVERSATION_ID, { before: cursor, after: cursor })).rejects.toThrow('only one')
+  })
+
+  test('read-window failures remain errors rather than a latest-page fallback', async () => {
+    const error = { code: '42501', message: 'Conversation is unavailable' }
+    mockRpc({ data: null, error })
+    await expect(getDMReadWindow(CONVERSATION_ID)).rejects.toBe(error)
   })
 })

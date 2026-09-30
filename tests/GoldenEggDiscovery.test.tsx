@@ -109,7 +109,7 @@ describe('GoldenEggDiscoveryLogo', () => {
       expect(mockRefreshProfile).toHaveBeenCalledTimes(1)
     })
 
-    expect(screen.getByTestId('gold-egg-discovery-overlay')).toBeInTheDocument()
+    expect(await screen.findByTestId('gold-egg-discovery-overlay')).toBeInTheDocument()
     expect(screen.getByText('Golden Egg Found')).toBeInTheDocument()
     expect(screen.getByText('Alice')).toBeInTheDocument()
     expect(screen.getByLabelText('Golden egg found')).toBeInTheDocument()

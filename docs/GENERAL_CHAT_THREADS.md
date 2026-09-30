@@ -71,6 +71,10 @@ mapping through the message foreign key.
 - `get_general_chat_thread(...)` returns the visible root or its unavailable
   placeholder plus a bounded chronological reply page. It accepts an exact
   target and `(created_at, id)` keyset cursor for older replies.
+- `get_general_chat_thread_read_window(...)` adds a server-owned first-unread
+  anchor from the caller's thread cursor, bounded context, complete before/after
+  tuple pagination, `has_newer`, and the first unread reply ID. Initial loads use
+  read anchoring; explicit latest and forward pages disable re-anchoring.
 - `get_general_chat_thread_summaries(uuid[])` accepts at most 50 roots and
   returns visible reply count, unread count, latest reply metadata, and at most
   five recent participants.
@@ -104,6 +108,18 @@ Thread read state reuses owner-private `user_read_cursors` with:
 The client marks the latest visible reply read only while following the bottom
 of the thread. Realtime replies received above the bottom increase the local
 pending count instead of forcing scroll position.
+
+The cursor table validates known General, General-thread and DM anchors against
+caller-visible canonical messages, derives their timestamps on the server, and
+prevents tuple regressions through both RPC and direct owner writes. Missing,
+blocked or wrong-thread anchors leave the cursor unchanged. DM read-through
+similarly treats a missing or inaccessible persisted anchor as a no-op and
+returns authoritative remaining unread; it never substitutes a mark-all action.
+
+The root window allows ordered-index paging before enrichment and batches
+summaries in groups of at most 50 roots. Pinned results retain their existing
+complete-return contract and their summaries use the same batching. The legacy
+flat reader and server-owned reply projection remain compatible.
 
 ## Security And Privacy
 
@@ -140,6 +156,11 @@ message rather than showing that reply as a root in the room.
 ## Required Verification
 
 ### Database
+
+`scripts/verify-chat-read-windows-local.sql` exercises first unread outside the
+latest page, tied timestamps, forward pages, direct cursor writes, canonical
+timestamps, deleted/blocked targets, service reply validation, and read-through
+no-op races in a rollback transaction. Use a disposable local database.
 
 - Clean local migration replay and zero database lint/security-advisor
   findings.

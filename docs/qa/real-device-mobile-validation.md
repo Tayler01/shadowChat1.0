@@ -128,6 +128,17 @@ These checks target the deployed closeout update. Browser checks do not fill in 
 | RD-035 | Two controlled accounts on phones | Invite while foreground/background; join/decline/expire; take turns, tap push, read current turn | Correct private recipient/match; no duplicate game or stale alerts; foreground prompt and supported background push; exact turn/badge clearing. | not run |
 | RD-036 | iPhone and Android installed PWA | Master/music/piece toggles, lock/return, sustained full match, opening tour and fireplace camera movement | Preferences preserved; natural quiet soundtrack/effects; no objectionable blocky patches; responsive play without crash/heat regression; user accepts final visuals/audio. | not run |
 
+## September 30 chat smoothness acceptance
+
+Tayler will perform these after the authorized manual release. Local WebKit and
+Chromium evidence is tracked in the [implementation record](../features/chat-smoothness-implementation-2026-09-30.md).
+
+| ID | Device | Flow | Expected result | Result |
+| --- | --- | --- | --- | --- |
+| RD-037 | iPhone and Android installed PWA | Open General, DM, reply thread and Pins with unread history; page older, receive a message, jump latest, close/reopen and reconnect | Correct first unread or saved row; no loading jump or pull away from history; reads advance only for visible content | Pending Tayler's physical-device test |
+| RD-038 | iPhone and Android installed PWA, desktop clipboard | Paste text/image/file, review/remove attachments, send twice rapidly, switch conversation before acknowledgement, open/close keyboard | Staged media, preserved new draft/reply, correct recipient, stable viewport and usable caret | Pending Tayler's physical-device test |
+| RD-039 | Two physical devices/accounts | Disable notifications on one device, mute a conversation, hide previews, foreground/background/lock, reconnect | Device choice persists; privacy and mute choices honored; no duplicate recovery; accurate supported OS badges | Pending Tayler's physical-device test |
+
 ## Known Emulator Gaps
 
 - iOS Home Screen status-bar and browser-chrome behavior.

@@ -45,7 +45,8 @@ const keepLatestCursor = (
   currentCursor: UserReadCursor | null,
   nextCursor: UserReadCursor | null
 ) => {
-  if (!currentCursor || !nextCursor) return nextCursor
+  if (!nextCursor) return currentCursor
+  if (!currentCursor) return nextCursor
 
   return isMessageKeyAtOrBefore(cursorToMessageKey(nextCursor), currentCursor)
     ? currentCursor
@@ -70,6 +71,17 @@ export function useReadCursor(
   const channelRef = useRef<RealtimeChannel | null>(null)
   const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
   const hasLoadedRef = useRef(cachedCursor !== undefined)
+  const scopeEpochRef = useRef(0)
+  const activeKeyRef = useRef(cacheKey)
+  const requestVersionRef = useRef(0)
+  const [publishedKey, setPublishedKey] = useState(cacheKey)
+  if (activeKeyRef.current !== cacheKey) {
+    activeKeyRef.current = cacheKey
+    scopeEpochRef.current += 1
+    requestVersionRef.current += 1
+    cursorRef.current = cachedCursor ?? null
+    hasLoadedRef.current = cachedCursor !== undefined
+  }
 
   const setCursorState = useCallback((nextCursor: UserReadCursor | null) => {
     cursorRef.current = nextCursor
@@ -77,6 +89,7 @@ export function useReadCursor(
   }, [])
 
   const refresh = useCallback(async (options: RefreshOptions = {}) => {
+    const requestVersion = ++requestVersionRef.current
     if (!enabled || !user || !cacheKey) {
       setCursorState(null)
       setError(null)
@@ -92,20 +105,28 @@ export function useReadCursor(
 
     try {
       const nextCursor = await fetchUserReadCursor(surface, normalizedScopeId)
-      readCursorCache.set(cacheKey, nextCursor)
-      setCursorState(nextCursor)
+      if (activeKeyRef.current !== cacheKey || requestVersion !== requestVersionRef.current) return nextCursor
+      const resolvedCursor = keepLatestCursor(cursorRef.current, nextCursor)
+      readCursorCache.set(cacheKey, resolvedCursor)
+      setCursorState(resolvedCursor)
+      setPublishedKey(cacheKey)
       setError(null)
-      return nextCursor
+      return resolvedCursor
     } catch (readCursorError) {
+      if (activeKeyRef.current !== cacheKey || requestVersion !== requestVersionRef.current) return null
       setError(readCursorError)
       return cursorRef.current
     } finally {
-      hasLoadedRef.current = true
-      setLoading(false)
+      if (activeKeyRef.current === cacheKey && requestVersion === requestVersionRef.current) {
+        hasLoadedRef.current = true
+        setPublishedKey(cacheKey)
+        setLoading(false)
+      }
     }
   }, [cacheKey, enabled, normalizedScopeId, setCursorState, surface, user])
 
   useEffect(() => {
+    setPublishedKey(cacheKey)
     if (!cacheKey) {
       setCursorState(null)
       setError(null)
@@ -134,7 +155,11 @@ export function useReadCursor(
   }, [refresh])
 
   const resetCursorChannel = useCallback(async () => {
+    const recoveryKey = cacheKey
+    const recoveryVersion = requestVersionRef.current
+    const recoveryEpoch = scopeEpochRef.current
     await refresh({ silent: true })
+    if (scopeEpochRef.current !== recoveryEpoch || activeKeyRef.current !== recoveryKey || requestVersionRef.current > recoveryVersion + 1) return
 
     const activeChannel = channelRef.current
     const realtimeClient = getRealtimeClient()
@@ -148,9 +173,10 @@ export function useReadCursor(
 
     channelRef.current = null
     if (subscribeRef.current) {
-      channelRef.current = await subscribeRef.current().catch(() => null)
+      const recoveredChannel = await subscribeRef.current().catch(() => null)
+      if (scopeEpochRef.current === recoveryEpoch && activeKeyRef.current === recoveryKey) channelRef.current = recoveredChannel
     }
-  }, [refresh])
+  }, [cacheKey, refresh])
 
   useRealtimeRecovery(() => {
     void resetCursorChannel()
@@ -161,10 +187,12 @@ export function useReadCursor(
 
     let channel: RealtimeChannel | null = null
     let currentClient: any = null
+    let disposed = false
 
     const subscribe = async (): Promise<RealtimeChannel | null> => {
       currentClient = await getWorkingClient().catch(() => getRealtimeClient())
       currentClient = currentClient || getRealtimeClient()
+      if (disposed || activeKeyRef.current !== cacheKey) return null
       if (!currentClient?.channel) return null
 
       channel = currentClient
@@ -178,6 +206,7 @@ export function useReadCursor(
             filter: `user_id=eq.${user.id}`,
           },
           (payload: any) => {
+            if (disposed || activeKeyRef.current !== cacheKey) return
             const row = (payload.new || payload.old) as UserReadCursor | undefined
             if (!row || row.surface !== surface || row.scope_id !== normalizedScopeId) {
               return
@@ -206,6 +235,7 @@ export function useReadCursor(
     void subscribe()
 
     return () => {
+      disposed = true
       subscribeRef.current = null
       if (channel && currentClient?.removeChannel) {
         currentClient.removeChannel(channel)
@@ -227,28 +257,34 @@ export function useReadCursor(
     }
 
     try {
-      const nextCursor = await setUserReadCursor(
+      const markVersion = scopeEpochRef.current
+    const nextCursor = await setUserReadCursor(
         surface,
         normalizedScopeId,
         messageId,
         messageCreatedAt
       )
+      if (activeKeyRef.current !== cacheKey || scopeEpochRef.current !== markVersion) return nextCursor
       const resolvedCursor = keepLatestCursor(cursorRef.current, nextCursor)
       readCursorCache.set(cacheKey, resolvedCursor)
       setCursorState(resolvedCursor)
       setError(null)
       return resolvedCursor
     } catch (readCursorError) {
+      if (activeKeyRef.current !== cacheKey) throw readCursorError
       setError(readCursorError)
       throw readCursorError
     }
   }, [cacheKey, enabled, normalizedScopeId, setCursorState, surface, user])
 
   const hasCachedCursorValue = cacheKey ? readCursorCache.has(cacheKey) : false
-  const loadingOrUnknown = loading || Boolean(cacheKey && error && cursor === null && !hasCachedCursorValue)
+  const scopeChanged = publishedKey !== cacheKey
+  const loadingOrUnknown = scopeChanged
+    ? Boolean(cacheKey && !hasCachedCursorValue)
+    : loading || Boolean(cacheKey && error && cursor === null && !hasCachedCursorValue)
 
   return {
-    cursor,
+    cursor: scopeChanged ? cachedCursor ?? null : cursor,
     loading: loadingOrUnknown,
     error,
     refresh,

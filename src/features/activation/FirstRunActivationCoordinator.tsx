@@ -38,6 +38,7 @@ type FirstRunActivationCoordinatorProps = {
 }
 
 const ACTIVATION_LOOKUP_RETRY_MS = [750, 2_000, 5_000, 15_000, 30_000]
+const FIRST_ACTION_REFRESH_FALLBACK_MS = 60_000
 
 const ACTION_DESTINATIONS: Record<ActivationJourneyFirstAction, Extract<AppView, 'chat' | 'dms' | 'pins'>> = {
   group_message: 'chat',
@@ -178,7 +179,7 @@ export function FirstRunActivationCoordinator({
       if (document.visibilityState === 'hidden') return
       void refresh()
     }
-    const interval = window.setInterval(refreshWhenVisible, 3500)
+    const interval = window.setInterval(refreshWhenVisible, FIRST_ACTION_REFRESH_FALLBACK_MS)
     window.addEventListener('focus', refreshWhenVisible)
     window.addEventListener('pageshow', refreshWhenVisible)
     document.addEventListener('visibilitychange', refreshWhenVisible)

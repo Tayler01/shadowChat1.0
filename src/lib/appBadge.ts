@@ -59,6 +59,18 @@ export const EMPTY_APP_BADGE_STATE: AppBadgeState = {
 
 let cachedBadgeState: AppBadgeState = EMPTY_APP_BADGE_STATE
 let badgeStateRequest: Promise<AppBadgeState> | null = null
+let badgeIdentity: string | null = null
+let badgeGeneration = 0
+let badgeRefreshTimer: ReturnType<typeof setTimeout> | null = null
+
+export const resetAppBadgeStateForUser = (userId: string | null) => {
+  if (badgeIdentity === userId) return
+  badgeIdentity = userId
+  badgeGeneration += 1
+  badgeStateRequest = null
+  publishBadgeState(EMPTY_APP_BADGE_STATE)
+  void updateAppBadge(0)
+}
 
 const asRecord = (value: unknown): Record<string, unknown> | null => (
   value && typeof value === 'object' && !Array.isArray(value)
@@ -138,6 +150,7 @@ const publishBadgeState = (state: AppBadgeState) => {
 export const getCachedAppBadgeState = () => ({ ...cachedBadgeState })
 
 const postMessageToServiceWorker = async (message: Record<string, unknown>) => {
+  const generation = badgeGeneration
   if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
     return
   }
@@ -146,7 +159,7 @@ const postMessageToServiceWorker = async (message: Record<string, unknown>) => {
 
   try {
     const registration = await navigator.serviceWorker.getRegistration?.()
-    registration?.active?.postMessage(message)
+    if (generation === badgeGeneration) registration?.active?.postMessage(message)
   } catch {
     // Service worker messaging is best-effort and should never block chat.
   }
@@ -172,6 +185,7 @@ const postServiceWorkerMessage = async (message: Record<string, unknown>) => {
 }
 
 export const updateAppBadge = async (count: number) => {
+  const generation = badgeGeneration
   const normalizedCount = normalizeBadgeCount(count)
 
   if (typeof navigator === 'undefined') {
@@ -190,7 +204,7 @@ export const updateAppBadge = async (count: number) => {
     // Some platforms expose the API but still reject depending on install or OS settings.
   }
 
-  await postBadgeCountToServiceWorker(normalizedCount)
+  if (generation === badgeGeneration) await postBadgeCountToServiceWorker(normalizedCount)
 }
 
 export const clearDMNotifications = async (
@@ -224,16 +238,19 @@ export const clearGroupNotifications = async (
 export const fetchAppBadgeState = async () => {
   if (badgeStateRequest) return badgeStateRequest
 
-  badgeStateRequest = (async () => {
+  const generation = badgeGeneration
+  const request = (async () => {
     const workingClient = await getWorkingClient()
+    if (generation !== badgeGeneration) return EMPTY_APP_BADGE_STATE
     const {
       data: { user },
       error: userError,
     } = await workingClient.auth.getUser()
 
-    if (userError || !user) {
-      return EMPTY_APP_BADGE_STATE
-    }
+    if (generation !== badgeGeneration) return EMPTY_APP_BADGE_STATE
+    if (userError) throw userError
+    if (!user) return EMPTY_APP_BADGE_STATE
+    if (badgeIdentity !== null && user.id !== badgeIdentity) throw new Error('Badge identity changed')
 
     const { data, error } = await workingClient.rpc('get_app_badge_state_v2', {
       target_user_id: user.id,
@@ -243,12 +260,14 @@ export const fetchAppBadgeState = async () => {
       throw error
     }
 
+    if (generation !== badgeGeneration) return EMPTY_APP_BADGE_STATE
     return normalizeBadgeState(data)
   })().finally(() => {
-    badgeStateRequest = null
+    if (generation === badgeGeneration && badgeStateRequest === request) badgeStateRequest = null
   })
+  badgeStateRequest = request
 
-  return badgeStateRequest
+  return request
 }
 
 export const fetchUnreadAppBadgeCount = async () => {
@@ -257,8 +276,9 @@ export const fetchUnreadAppBadgeCount = async () => {
 }
 
 export const refreshAppBadgeState = async (
-  fallbackState: AppBadgeState = EMPTY_APP_BADGE_STATE
+  fallbackState: AppBadgeState = cachedBadgeState
 ) => {
+  const generation = badgeGeneration
   let state: AppBadgeState
   try {
     state = await fetchAppBadgeState()
@@ -266,6 +286,7 @@ export const refreshAppBadgeState = async (
     state = normalizeBadgeState(fallbackState)
   }
 
+  if (generation !== badgeGeneration) return getCachedAppBadgeState()
   publishBadgeState(state)
   await updateAppBadge(state.total)
   return state
@@ -282,5 +303,9 @@ export const refreshAppBadge = async (fallbackCount = 0) => {
 
 export const requestAppBadgeRefresh = () => {
   if (typeof window === 'undefined') return
-  window.dispatchEvent(new Event(APP_BADGE_REFRESH_EVENT))
+  if (badgeRefreshTimer !== null) return
+  badgeRefreshTimer = setTimeout(() => {
+    badgeRefreshTimer = null
+    window.dispatchEvent(new Event(APP_BADGE_REFRESH_EVENT))
+  }, 100)
 }

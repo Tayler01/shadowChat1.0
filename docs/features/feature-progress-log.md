@@ -1,3 +1,8 @@
+## September 30 chat smoothness implementation started
+
+- Tayler authorized the full performance/read-position/notifications/attachments audit fixes, goal execution, main push and manual Netlify deployment. [Implementation checkpoints](chat-smoothness-implementation-2026-09-30.md) track the shared General/DM/thread/Pins contract and backend-first release.
+- Work is isolated from existing Unity and agent-guide changes. Six agents own distinct implementation areas; integrated validation and release remain pending. Physical installed-PWA testing is reserved for Tayler after the release, with practical mobile browser checks required before it.
+
 ## September 29 Shadow Checkers move sync and camera published
 
 - Published commit/build `fef865dee100b6c6ef92926c62faaab0a2ea1f04` to `https://shadochat.online` via Netlify deploy `6abc7522c70385a4236e9f57`. Public health checked app 200, media endpoint 405 and 11 game assets; production health checked app 200 with News paused. Required restart release `fef865de` was published and broadcast.

@@ -1,3 +1,4 @@
+import { beginChatTiming } from '../lib/chatPerformance';
 /* eslint-disable react-refresh/only-export-components */
 import React, {
   useEffect,
@@ -45,7 +46,7 @@ import {
   isRecoverableRealtimeStatus,
 } from '../lib/realtimeSubscription';
 import { embedPublicProfile } from '../../supabase/functions/_shared/public-profile';
-import { getDMMessageWindow } from '../lib/dmConversationRetrieval';
+import { getDMMessageWindow, getDMReadWindow, type DMRetrievedMessage } from '../lib/dmConversationRetrieval';
 
 const DM_MESSAGE_WITH_SENDER_SELECT = `
   *,
@@ -76,7 +77,8 @@ interface DirectMessagesContextValue {
     messageType?: ChatMessageType,
     fileUrl?: string,
     replyTo?: string,
-    thumbnailUrl?: string | null
+    thumbnailUrl?: string | null,
+    options?: { clientMessageId?: string; onQueued?: () => void }
   ) => Promise<DMMessage | null>;
   retryFailedMessage: (messageId: string) => Promise<DMMessage | null>;
   discardFailedMessage: (messageId: string) => void;
@@ -87,6 +89,9 @@ interface DirectMessagesContextValue {
   loadOlderMessages: () => Promise<void>;
   loadLatestMessages: () => Promise<void>;
   loadMessageWindow: (messageId: string) => Promise<boolean>;
+  loadReadWindow: () => Promise<boolean>;
+  loadNewerMessages: () => Promise<void>;
+  setFollowingLatest: (following: boolean) => void;
 }
 
 const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
@@ -162,12 +167,27 @@ const localOutboxEntryToDMMessage = (
 
 type SendDMMessageOptions = {
   clientMessageId?: string;
+  onQueued?: () => void;
   createdAt?: string;
 }
 
 type FetchConversationMessagesOptions = {
   silent?: boolean;
 }
+
+const retrievedDMToMessage = (message: DMRetrievedMessage): DMMessage => ({
+  id: message.id, client_message_id: message.clientMessageId,
+  conversation_id: message.conversationId, sender_id: message.senderId,
+  content: message.content, message_type: message.messageType,
+  file_url: message.fileUrl ?? undefined, thumbnail_url: message.thumbnailUrl,
+  thumbnail_path: message.thumbnailPath, audio_url: message.audioUrl ?? undefined,
+  audio_duration: message.audioDuration ?? undefined, reply_to: message.replyTo,
+  read_at: message.readAt ?? undefined, read_by: message.readBy,
+  reactions: message.reactions, edited_at: message.editedAt ?? undefined,
+  created_at: message.createdAt, updated_at: message.updatedAt,
+  media_width: message.mediaWidth, media_height: message.mediaHeight,
+  media_processed_at: message.mediaProcessedAt, sender: message.sender,
+} as DMMessage);
 
 function useProvideDirectMessages(): DirectMessagesContextValue {
   const [conversations, setConversations] = useState<DMConversation[]>([]);
@@ -204,11 +224,16 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     loadOlderMessages,
     loadLatestMessages,
     loadMessageWindow,
+    loadReadWindow,
+    loadNewerMessages,
+    setFollowingLatest,
     handleRealtimeInsert,
     handleRealtimeUpdate,
     handleRealtimeDelete,
     refreshVisibleMessages,
   } = useConversationMessages(currentConversation);
+  const selectedConversationRef = useRef(currentConversation);
+  selectedConversationRef.current = currentConversation;
 
   activeMessageHandlersRef.current = {
     insert: handleRealtimeInsert,
@@ -449,18 +474,19 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
       messageType?: ChatMessageType,
       fileUrl?: string,
       replyTo?: string,
-      thumbnailUrl?: string | null
+      thumbnailUrl?: string | null,
+      options: { clientMessageId?: string; onQueued?: () => void } = {}
     ) => {
-      const message = await sendConversationMessage(content, messageType, fileUrl, replyTo, thumbnailUrl);
+      const message = await sendConversationMessage(content, messageType, fileUrl, replyTo, thumbnailUrl, options);
       if (message) {
-        if (hasNewer) {
+        if (hasNewer && selectedConversationRef.current === currentConversation) {
           await loadLatestMessages();
         }
         refreshConversationsDebounced();
       }
       return message;
     },
-    [hasNewer, loadLatestMessages, refreshConversationsDebounced, sendConversationMessage]
+    [currentConversation, hasNewer, loadLatestMessages, refreshConversationsDebounced, sendConversationMessage]
   );
 
   const retryFailedMessage = useCallback(async (messageId: string) => {
@@ -559,6 +585,9 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
     loadOlderMessages,
     loadLatestMessages,
     loadMessageWindow,
+    loadReadWindow,
+    loadNewerMessages,
+    setFollowingLatest,
   };
 }
 
@@ -573,11 +602,20 @@ export function useConversationMessages(conversationId: string | null) {
   const { user, profile } = useAuth();
   const clientResetRef = useRef<() => Promise<void>>();
   const activeConversationIdRef = useRef<string | null>(conversationId);
+  activeConversationIdRef.current = conversationId;
   const hasNewerRef = useRef(false);
   const fetchRequestIdRef = useRef(0);
-  const sendingRef = useRef(false);
+  const pendingIntentsRef = useRef(new Map<string, string>());
+  const activeUserIdRef = useRef(user?.id);
+  activeUserIdRef.current = user?.id;
+  const sendScopeKey = `${user?.id}:${conversationId}`;
+  const sendScopeEpochRef = useRef({ key: sendScopeKey, version: 0 });
+  if (sendScopeEpochRef.current.key !== sendScopeKey) sendScopeEpochRef.current = { key: sendScopeKey, version: sendScopeEpochRef.current.version + 1 };
+  const messageRevisionRef = useRef(0);
+  const messageChangesRef = useRef(new Map<string, { revision: number; deleted: boolean }>());
   const latestMessagesRef = useRef<DMMessage[]>([]);
   const hydrationFetchesRef = useRef<Map<string, Promise<DMMessage | null>>>(new Map());
+  const followingLatestRef = useRef(true);
 
   const updateHasNewer = useCallback((value: boolean) => {
     hasNewerRef.current = value;
@@ -587,7 +625,9 @@ export function useConversationMessages(conversationId: string | null) {
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
     hydrationFetchesRef.current.clear();
-  }, [conversationId]);
+    messageChangesRef.current.clear();
+    setSending([...pendingIntentsRef.current.values()].includes(`${user?.id}:${conversationId}`));
+  }, [conversationId, user?.id]);
 
   useEffect(() => {
     latestMessagesRef.current = messages;
@@ -774,9 +814,27 @@ export function useConversationMessages(conversationId: string | null) {
   }, []);
 
   const refreshVisibleMessages = useCallback(async () => {
-    if (hasNewerRef.current) return;
+    if (hasNewerRef.current || !followingLatestRef.current) {
+      const scope = activeConversationIdRef.current;
+      const ids = latestMessagesRef.current.filter(isServerDMCursorMessage).map(message => message.id);
+      if (!scope || ids.length === 0) return;
+      const finishReconnectTiming = beginChatTiming('reconnect', 'dm');
+      const snapshotRevision = messageRevisionRef.current;
+      const client = await getWorkingClient();
+      const { data, error } = await client.from('dm_messages').select(DM_MESSAGE_WITH_SENDER_SELECT)
+        .eq('conversation_id', scope).in('id', ids).order('created_at', { ascending: true }).order('id', { ascending: true });
+      if (error || activeConversationIdRef.current !== scope) return;
+      setMessages(previous => mergeDMMessagesByStableKey([
+        ...((data ?? []) as unknown as DMMessage[]).filter(message => (messageChangesRef.current.get(message.id)?.revision ?? 0) <= snapshotRevision),
+        ...previous.filter(message => !ids.includes(message.id) || (messageChangesRef.current.get(message.id)?.revision ?? 0) > snapshotRevision),
+      ]));
+      finishReconnectTiming();
+      return;
+    }
     await clientResetRef.current?.();
   }, []);
+
+  const setFollowingLatest = useCallback((following: boolean) => { followingLatestRef.current = following; }, []);
 
   // Fetch messages for conversation
   useEffect(() => {
@@ -794,6 +852,7 @@ export function useConversationMessages(conversationId: string | null) {
     let disposed = false;
 
     const fetchMessages = async (options: FetchConversationMessagesOptions = {}) => {
+      const snapshotRevision = messageRevisionRef.current;
       const requestId = fetchRequestIdRef.current + 1;
       fetchRequestIdRef.current = requestId;
       if (!options.silent) {
@@ -830,10 +889,18 @@ export function useConversationMessages(conversationId: string | null) {
             const pendingLocalMessages = prev.filter(
               message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
             );
-            const mergedMessages = fetchedMessages.reduce<DMMessage[]>(
+            let mergedMessages = fetchedMessages.reduce<DMMessage[]>(
               (acc, message) => upsertMessageIntoState(acc, { ...message, optimistic: false, delivery_status: 'sent' }),
               pendingLocalMessages
             );
+            for (const [id, change] of messageChangesRef.current) {
+              if (change.revision <= snapshotRevision) continue;
+              if (change.deleted) mergedMessages = mergedMessages.filter(message => message.id !== id);
+              else {
+                const current = prev.find(message => message.id === id);
+                if (current) mergedMessages = upsertMessageIntoState(mergedMessages, current);
+              }
+            }
             return boundDMMessagesForWindow(mergedMessages, 'latest').messages;
           });
         }
@@ -884,6 +951,7 @@ export function useConversationMessages(conversationId: string | null) {
     if (loadingMore || !hasMore || !conversationId) return;
     const oldest = getOldestServerDMCursor(messages);
     if (!oldest) return;
+    const requestId = fetchRequestIdRef.current;
     setLoadingMore(true);
     try {
       const workingClient = await getWorkingClient();
@@ -898,7 +966,7 @@ export function useConversationMessages(conversationId: string | null) {
 
       if (error) throw error;
 
-      if (activeConversationIdRef.current !== conversationId) {
+      if (activeConversationIdRef.current !== conversationId || requestId !== fetchRequestIdRef.current) {
         return;
       }
 
@@ -917,7 +985,7 @@ export function useConversationMessages(conversationId: string | null) {
         setHasMore(false);
       }
     } finally {
-      setLoadingMore(false);
+      if (activeConversationIdRef.current === conversationId && requestId === fetchRequestIdRef.current) setLoadingMore(false);
     }
   }, [loadingMore, hasMore, conversationId, messages, updateHasNewer]);
 
@@ -933,6 +1001,8 @@ export function useConversationMessages(conversationId: string | null) {
     const message = await hydrateConversationMessage(incoming.id);
     if (!message || activeConversationIdRef.current !== incoming.conversation_id) return;
     if (hasNewerRef.current) return;
+
+    messageChangesRef.current.set(message.id, { revision: ++messageRevisionRef.current, deleted: false });
 
     setMessages(prev => boundDMMessagesForWindow([
       ...prev,
@@ -950,6 +1020,7 @@ export function useConversationMessages(conversationId: string | null) {
       !incoming.conversation_id ||
       activeConversationIdRef.current !== incoming.conversation_id
     ) return;
+    messageChangesRef.current.set(incoming.id, { revision: ++messageRevisionRef.current, deleted: false });
 
     setMessages(prev => {
       const existing = prev.find(message => message.id === incoming.id);
@@ -962,6 +1033,7 @@ export function useConversationMessages(conversationId: string | null) {
 
   const handleRealtimeDelete = useCallback((removed: Partial<DMMessage>) => {
     if (!removed.id) return;
+    messageChangesRef.current.set(removed.id, { revision: ++messageRevisionRef.current, deleted: true });
 
     setMessages(prev => prev.filter(message => message.id !== removed.id));
   }, []);
@@ -969,10 +1041,12 @@ export function useConversationMessages(conversationId: string | null) {
   const loadMessageWindow = useCallback(async (messageId: string) => {
     if (!conversationId) return false;
     const requestedConversationId = conversationId;
+    const requestId = ++fetchRequestIdRef.current;
     setLoadingMore(true);
     try {
       const result = await getDMMessageWindow(requestedConversationId, messageId, { limit: 60 });
       if (
+        requestId !== fetchRequestIdRef.current ||
         result.targetStatus !== 'resolved' ||
         activeConversationIdRef.current !== requestedConversationId
       ) {
@@ -1013,9 +1087,46 @@ export function useConversationMessages(conversationId: string | null) {
       updateHasNewer(result.hasNewer);
       return true;
     } finally {
-      setLoadingMore(false);
+      if (activeConversationIdRef.current === conversationId && requestId === fetchRequestIdRef.current) setLoadingMore(false);
     }
   }, [conversationId, updateHasNewer]);
+
+  const loadReadWindow = useCallback(async () => {
+    if (!conversationId) return false;
+    const scope = conversationId;
+    const requestId = ++fetchRequestIdRef.current;
+    setLoadingMore(true);
+    try {
+      const result = await getDMReadWindow(scope, { readAnchor: true, limit: 60 });
+      if (activeConversationIdRef.current !== scope || fetchRequestIdRef.current !== requestId) return false;
+      setMessages(previous => boundDMMessagesForWindow([
+        ...result.messages.map(retrievedDMToMessage), ...previous.filter(message => !isServerDMCursorMessage(message)),
+      ], 'latest').messages);
+      setHasMore(result.hasOlder);
+      updateHasNewer(result.hasNewer);
+      setLoadedConversationId(scope);
+      return true;
+    } finally {
+      if (activeConversationIdRef.current === scope && fetchRequestIdRef.current === requestId) setLoadingMore(false);
+    }
+  }, [conversationId, updateHasNewer]);
+
+  const loadNewerMessages = useCallback(async () => {
+    if (!conversationId || loadingMore || !hasNewerRef.current) return;
+    const scope = conversationId;
+    const newest = latestMessagesRef.current.filter(isServerDMCursorMessage).slice(-1)[0];
+    if (!newest) return;
+    setLoadingMore(true);
+    try {
+      const result = await getDMReadWindow(scope, { after: { createdAt: newest.created_at, id: newest.id }, readAnchor: false, limit: 60 });
+      if (activeConversationIdRef.current !== scope) return;
+      setMessages(previous => boundDMMessagesForWindow([...previous, ...result.messages.map(retrievedDMToMessage)], 'latest').messages);
+      updateHasNewer(result.hasNewer);
+      setHasMore(previous => previous || result.hasOlder);
+    } finally {
+      if (activeConversationIdRef.current === scope) setLoadingMore(false);
+    }
+  }, [conversationId, loadingMore, updateHasNewer]);
 
   const sendMessage = useCallback(
     async (
@@ -1026,18 +1137,18 @@ export function useConversationMessages(conversationId: string | null) {
       thumbnailUrl?: string | null,
       options: SendDMMessageOptions = {}
     ): Promise<DMMessage | null> => {
-    
+
       const trimmedContent = content.trim();
       const requiresContent = messageType !== 'audio' && messageType !== 'image' && messageType !== 'video' && messageType !== 'file';
       if (!user || !conversationId || (requiresContent && !trimmedContent)) return null;
 
-      if (sendingRef.current) {
-        return null;
-      }
-
-      sendingRef.current = true;
-      setSending(true);
-      const clientMessageId = options.clientMessageId || createClientMessageId();
+      const finishSendTiming = beginChatTiming('send-ack', 'dm');
+    const finishOptimisticTiming = beginChatTiming('optimistic-insert', 'dm');
+    const clientMessageId = options.clientMessageId || createClientMessageId();
+      const intentKey = `${user.id}:${clientMessageId}`;
+      const intentScope = `${user.id}:${conversationId}`;
+      const sendScopeEpoch = sendScopeEpochRef.current.version;
+      if (pendingIntentsRef.current.has(intentKey)) return null;
       const createdAt = options.createdAt || new Date().toISOString();
       const optimisticMessage = {
         id: clientMessageId,
@@ -1059,7 +1170,16 @@ export function useConversationMessages(conversationId: string | null) {
         optimistic: true,
         delivery_status: 'sending',
       } as DMMessage;
+      upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
+        id: clientMessageId, clientMessageId, senderId: user.id, content: trimmedContent,
+        messageType, fileUrl, thumbnailUrl, replyTo, createdAt, failedAt: createdAt,
+      }, { requirePersistence: true });
+      pendingIntentsRef.current.set(intentKey, intentScope);
+      setSending(true);
+
       setMessages(prev => upsertMessageIntoState(prev, optimisticMessage));
+      finishOptimisticTiming();
+      options.onQueued?.();
 
       try {
         return await withTimeout(
@@ -1106,12 +1226,16 @@ export function useConversationMessages(conversationId: string | null) {
 
             if (finalData) {
               removeLocalOutboxEntry(getDMOutboxScope(conversationId), clientMessageId);
+              finishSendTiming();
               const message = {
                 ...(finalData as DMMessage),
                 optimistic: false,
                 delivery_status: 'sent',
               } as DMMessage;
-              setMessages(prev => upsertMessageIntoState(prev, message));
+              if (activeConversationIdRef.current === conversationId && sendScopeEpochRef.current.version === sendScopeEpoch) {
+                messageChangesRef.current.set(message.id, { revision: ++messageRevisionRef.current, deleted: false });
+                setMessages(prev => upsertMessageIntoState(prev, message));
+              }
               if (message.id) {
                 triggerDMPushNotification(message.id).catch(() => {
                   // Push delivery should not block the DM send path.
@@ -1137,7 +1261,7 @@ export function useConversationMessages(conversationId: string | null) {
           createdAt,
           failedAt: new Date().toISOString(),
         });
-        setMessages(prev => markMessageSendFailed(prev, clientMessageId));
+        if (activeConversationIdRef.current === conversationId && sendScopeEpochRef.current.version === sendScopeEpoch) setMessages(prev => markMessageSendFailed(prev, clientMessageId));
         await runRealtimeRecovery('send-error').catch(() => undefined);
         if (error instanceof Error) {
           (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
@@ -1147,8 +1271,8 @@ export function useConversationMessages(conversationId: string | null) {
         wrappedError.optimisticMessageId = clientMessageId;
         throw wrappedError;
       } finally {
-        sendingRef.current = false;
-        setSending(false);
+        pendingIntentsRef.current.delete(intentKey);
+        setSending([...pendingIntentsRef.current.values()].includes(`${activeUserIdRef.current}:${activeConversationIdRef.current}`));
       }
     }, [user, conversationId, insertConversationMessage, profile]);
 
@@ -1272,6 +1396,9 @@ export function useConversationMessages(conversationId: string | null) {
     loadOlderMessages,
     loadLatestMessages,
     loadMessageWindow,
+    loadReadWindow,
+    loadNewerMessages,
+    setFollowingLatest,
     handleRealtimeInsert,
     handleRealtimeUpdate,
     handleRealtimeDelete,

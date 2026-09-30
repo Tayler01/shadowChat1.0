@@ -1,9 +1,12 @@
 import {
+  fetchGeneralChatThread,
   mergeThreadMessages,
   normalizeGeneralChatThreadSummaries,
   normalizeGeneralChatThreadWindow,
 } from '../src/features/general-chat-threads/generalChatThreadsApi'
-import type { Message } from '../src/lib/supabase'
+import { getWorkingClient, type Message } from '../src/lib/supabase'
+
+jest.mock('../src/lib/supabase', () => ({ getWorkingClient: jest.fn() }))
 
 const makeMessage = (id: string, createdAt: string, content = id): Message => ({
   id,
@@ -35,6 +38,9 @@ test('normalizes a thread window and keeps replies chronological', () => {
     rootMessage: root,
     replies: [older, newer],
     hasOlder: true,
+    hasNewer: false,
+    firstUnreadMessageId: null,
+    anchorStatus: 'latest',
     targetMessageId: older.id,
     targetFound: true,
   })
@@ -59,6 +65,12 @@ test('merges realtime refreshes without duplicates and replaces stale rows', () 
   const second = makeMessage('reply-2', '2026-07-12T12:03:00.000Z')
 
   expect(mergeThreadMessages([first], [second, changed])).toEqual([changed, second])
+})
+
+test('orders equivalent timestamp encodings by ID before reconciling optimistic rows', () => {
+  const newerId = makeMessage('reply-2', '2026-07-12T12:02:00.000Z')
+  const olderId = makeMessage('reply-1', '2026-07-12T08:02:00-04:00')
+  expect(mergeThreadMessages([], [newerId, olderId])).toEqual([olderId, newerId])
 })
 
 test('reconciles a local reply with its server row by client message id', () => {
@@ -102,4 +114,23 @@ test('accepts summary field variants and drops malformed rows', () => {
     lastReplyAuthor: { id: 'user-2', display_name: 'Shado' },
     participants: [{ id: 'user-2', display_name: 'Shado' }],
   }])
+})
+
+test('read-aware thread request uses server cursor resolution and authoritative forward bounds', async () => {
+  const rpc = jest.fn().mockResolvedValue({ data: [{
+    thread_id: 'root-1', replies: [makeMessage('reply-1', '2026-09-30T12:00:00Z')],
+    anchor_status: 'unread', first_unread_message_id: 'reply-1', has_newer: true,
+  }], error: null })
+  ;(getWorkingClient as jest.Mock).mockResolvedValue({ rpc })
+  const result = await fetchGeneralChatThread({ threadId: 'root-1', readAnchor: true })
+  expect(rpc).toHaveBeenCalledWith('get_general_chat_thread_read_window', expect.objectContaining({
+    target_read_anchor: true, target_after_id: null, target_before_id: null,
+  }))
+  expect(result).toMatchObject({ hasNewer: true, firstUnreadMessageId: 'reply-1', anchorStatus: 'unread' })
+  const after = { created_at: '2026-09-30T12:00:00Z', id: 'reply-1' }
+  await fetchGeneralChatThread({ threadId: 'root-1', after, readAnchor: false })
+  expect(rpc).toHaveBeenLastCalledWith('get_general_chat_thread_read_window', expect.objectContaining({
+    target_after_created_at: after.created_at, target_after_id: after.id, target_read_anchor: false,
+  }))
+  await expect(fetchGeneralChatThread({ threadId: 'root-1', before: after, after })).rejects.toThrow('only one')
 })

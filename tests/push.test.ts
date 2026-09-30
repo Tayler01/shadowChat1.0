@@ -1,4 +1,4 @@
-import { enablePushForCurrentDevice, syncCurrentDeviceSubscription } from '../src/lib/push'
+import { disablePushForCurrentDevice, enablePushForCurrentDevice, syncCurrentDeviceSubscription } from '../src/lib/push'
 
 const currentVapidKey = new Uint8Array([1, 2, 3, 4]).buffer
 const staleVapidKey = new Uint8Array([9, 9, 9, 9]).buffer
@@ -98,4 +98,14 @@ describe('push subscription renewal', () => {
     expect(existing.unsubscribe).toHaveBeenCalled()
     expect(subscribe).toHaveBeenCalled()
   })
+  it('preserves deliberate device disable through automatic repair, then accepts explicit enable', async () => {
+    getSubscription.mockResolvedValue(createSubscription(currentVapidKey))
+    await disablePushForCurrentDevice('device-optout-user')
+    subscribe.mockClear()
+    await expect(syncCurrentDeviceSubscription('device-optout-user')).resolves.toBe(false)
+    expect(subscribe).not.toHaveBeenCalled()
+    await enablePushForCurrentDevice('device-optout-user')
+    await expect(syncCurrentDeviceSubscription('device-optout-user')).resolves.toBe(true)
+  })
+
 })

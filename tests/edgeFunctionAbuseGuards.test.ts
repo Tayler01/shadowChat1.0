@@ -127,7 +127,12 @@ describe('Edge Function abuse and idempotency boundaries', () => {
     )
 
     expect(delivery).not.toContain('endpoint: subscriptionrow.endpoint, status: response.status')
-    expect(delivery).toContain('retryablefailures: results.filter')
+    expect(delivery).toContain("supabase.rpc('claim_notification_delivery_targets'")
+    expect(delivery).toContain("supabase.rpc('complete_notification_delivery_targets'")
+    expect(delivery).toContain("pendingtargetcount = (targets ?? []).filter(target => target.status === 'pending').length")
+    expect(delivery).toContain('const terminal = pendingtargetcount === 0')
+    expect(delivery).toContain('retryablefailures: pendingtargetcount')
+    expect(delivery).toContain('getretryablefailurecount(delivery) > 0 ? 503 : 200')
     expect(delivery).not.toContain('results, }')
     expect(source).not.toContain('results: perrecipientresults')
     expect(source).toContain("errormessage: 'push provider delivery can be retried'")

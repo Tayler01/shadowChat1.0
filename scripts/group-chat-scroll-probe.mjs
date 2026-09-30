@@ -13,6 +13,8 @@ const DEFAULT_SCENARIO = 'metrics'
 const DEFAULT_CYCLES = 10
 const DEFAULT_SEED_COUNT = 72
 const DEFAULT_TIMEOUT_MS = 20_000
+// Keep the existing 50 ms jank threshold, but report it as a threshold, not a 60 FPS budget.
+const DEFAULT_SLOW_FRAME_THRESHOLD_MS = 50
 const READ_CURSOR_SURFACE = 'general_chat'
 const READ_CURSOR_SCOPE = 'main'
 const KNOWN_PRODUCTION_SUPABASE_PROJECT = 'shsqqouecvdoifzufkqm'
@@ -41,6 +43,7 @@ const logsDir = path.join(artifactDir, 'logs')
 const resultPath = path.join(artifactDir, 'summary.json')
 const baseUrl = args.baseUrl || envValues.PLAYWRIGHT_BASE_URL || DEFAULT_BASE_URL
 const cycles = Number(args.cycles || DEFAULT_CYCLES)
+const frameThresholdMs = Number(args.frameThresholdMs)
 const seedCount = Math.max(56, Number(args.seedCount || DEFAULT_SEED_COUNT))
 const scenarios = resolveScenarios(args.scenario)
 const browserType = args.browserName === 'webkit' ? webkit : chromium
@@ -50,6 +53,10 @@ const summary = {
   browserName: args.browserName,
   viewport: args.desktop ? 'desktop' : 'iPhone 13',
   scenarios: [],
+}
+
+if (!Number.isFinite(frameThresholdMs) || frameThresholdMs <= 0) {
+  throw new Error('--frame-threshold-ms must be a finite number greater than zero')
 }
 
 await mkdir(logsDir, { recursive: true })
@@ -136,6 +143,7 @@ function parseArgs(argv) {
     skipBuild: false,
     reuseServer: true,
     cycles: DEFAULT_CYCLES,
+    frameThresholdMs: DEFAULT_SLOW_FRAME_THRESHOLD_MS,
     seedCount: DEFAULT_SEED_COUNT,
     cleanArtifacts: false,
     allowProductionSeed: false,
@@ -160,6 +168,8 @@ function parseArgs(argv) {
     else if (current === '--run-name' && argv[index + 1]) parsed.runName = argv[++index]
     else if (current.startsWith('--cycles=')) parsed.cycles = Number(current.slice('--cycles='.length)) || DEFAULT_CYCLES
     else if (current === '--cycles' && argv[index + 1]) parsed.cycles = Number(argv[++index]) || DEFAULT_CYCLES
+    else if (current.startsWith('--frame-threshold-ms=')) parsed.frameThresholdMs = Number(current.slice('--frame-threshold-ms='.length))
+    else if (current === '--frame-threshold-ms' && argv[index + 1]) parsed.frameThresholdMs = Number(argv[++index])
     else if (current.startsWith('--seed-count=')) parsed.seedCount = Number(current.slice('--seed-count='.length)) || DEFAULT_SEED_COUNT
     else if (current === '--seed-count' && argv[index + 1]) parsed.seedCount = Number(argv[++index]) || DEFAULT_SEED_COUNT
     else if (current.startsWith('--slow-mo=')) parsed.slowMo = Number(current.slice('--slow-mo='.length)) || 0
@@ -226,11 +236,12 @@ async function scenarioMetrics(browserInstance) {
 
   try {
     const { page } = session
+    const readiness = await waitForChatView(page)
     await page.locator('[data-testid="message-scroll"]').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
     await page.screenshot({ path: path.join(artifactDir, 'metrics-ready.png'), fullPage: false })
     const beforeSnapshot = await readScrollSnapshot(page)
 
-    const metrics = await page.evaluate(async ({ cycles: scrollCycles }) => {
+    const metrics = await page.evaluate(async ({ cycles: scrollCycles, frameThresholdMs: slowFrameThresholdMs }) => {
       const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms))
       const scrollEl = document.querySelector('[data-testid="message-scroll"]')
       if (!scrollEl) {
@@ -239,17 +250,34 @@ async function scenarioMetrics(browserInstance) {
 
       const longTasks = []
       let observer = null
-      if ('PerformanceObserver' in window) {
+      const supportedEntryTypes = typeof PerformanceObserver === 'function'
+        ? PerformanceObserver.supportedEntryTypes
+        : undefined
+      const observerSupport = {
+        available: typeof PerformanceObserver === 'function',
+        longTaskEntryTypeSupported: Array.isArray(supportedEntryTypes)
+          ? supportedEntryTypes.includes('longtask')
+          : null,
+        observed: false,
+        unavailableReason: typeof PerformanceObserver !== 'function'
+          ? 'PerformanceObserver is unavailable'
+          : null,
+      }
+      if (observerSupport.available && observerSupport.longTaskEntryTypeSupported !== false) {
         try {
           observer = new PerformanceObserver(entries => {
             for (const entry of entries.getEntries()) {
               longTasks.push(Math.round(entry.duration))
             }
           })
-          observer.observe({ entryTypes: ['longtask'] })
-        } catch {
+          observer.observe({ type: 'longtask' })
+          observerSupport.observed = true
+        } catch (error) {
           observer = null
+          observerSupport.unavailableReason = error instanceof Error ? error.message : String(error)
         }
+      } else if (observerSupport.available) {
+        observerSupport.unavailableReason = 'longtask entries are not listed in supportedEntryTypes'
       }
 
       const frameDeltas = []
@@ -303,8 +331,8 @@ async function scenarioMetrics(browserInstance) {
       cancelAnimationFrame(rafId)
       observer?.disconnect?.()
 
-      const maxFrameDelta = frameDeltas.length ? Math.max(...frameDeltas) : 0
-      const overBudgetFrames = frameDeltas.filter(delta => delta > 50).length
+      const maxFrameIntervalMs = frameDeltas.length ? Math.max(...frameDeltas) : 0
+      const framesOverThreshold = frameDeltas.filter(delta => delta > slowFrameThresholdMs).length
       const maxLongTask = longTasks.length ? Math.max(...longTasks) : 0
 
       return {
@@ -317,21 +345,25 @@ async function scenarioMetrics(browserInstance) {
         samples,
         frameStats: {
           samples: frameDeltas.length,
-          maxFrameDelta: Math.round(maxFrameDelta),
-          overBudgetFrames,
+          slowFrameThresholdMs,
+          approximateFpsAtThreshold: Math.round(1000 / slowFrameThresholdMs),
+          maxFrameIntervalMs: Math.round(maxFrameIntervalMs),
+          framesOverThreshold,
         },
         longTaskStats: {
+          observerSupport,
           count: longTasks.length,
           maxDuration: maxLongTask,
         },
       }
-    }, { cycles })
+    }, { cycles, frameThresholdMs })
 
     await page.screenshot({ path: path.join(artifactDir, 'metrics-after-scroll.png'), fullPage: false })
     const afterSnapshot = await readScrollSnapshot(page)
 
     return {
       seeded: false,
+      readiness,
       beforeSnapshot,
       afterSnapshot,
       metrics,
@@ -940,6 +972,7 @@ async function authenticate(page, targetUrl, values, accountIndex) {
 
   if (await isChatVisible(page)) {
     await dismissAppReleaseDialog(page)
+    await waitForChatView(page)
     return
   }
 
@@ -955,8 +988,9 @@ async function authenticate(page, targetUrl, values, accountIndex) {
   await page.locator('input[name="email"]').fill(account.email)
   await page.locator('input[name="password"]').fill(account.password)
   await page.locator('form').getByRole('button', { name: /^Sign in$/i }).click()
-  await waitForChatView(page)
+  await waitForChatSurface(page)
   await dismissAppReleaseDialog(page)
+  await waitForChatView(page)
 }
 
 function getPlaywrightAccount(values, index) {
@@ -986,8 +1020,53 @@ async function waitForBootSurface(page) {
 }
 
 async function waitForChatView(page) {
-  await page.getByText(/Lounge/i).first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await page.locator('textarea:visible').first().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await waitForChatSurface(page)
+  const readiness = await page.evaluate(() => {
+    const scroll = document.querySelector('[data-testid="message-scroll"]')
+    const isVisible = element => {
+      if (!(element instanceof HTMLElement)) return false
+      const style = getComputedStyle(element)
+      const rect = element.getBoundingClientRect()
+      return style.display !== 'none' && style.visibility !== 'hidden'
+        && Number(style.opacity || 1) > 0 && rect.width > 0 && rect.height > 0
+    }
+    const overlaps = (left, right) => left.right > right.left && left.left < right.right
+      && left.bottom > right.top && left.top < right.bottom
+    const composer = Array.from(document.querySelectorAll('textarea')).find(isVisible)
+    const targets = [scroll, composer].filter(isVisible)
+    const visibleOverlays = Array.from(document.querySelectorAll(
+      'dialog[open], [role="dialog"], [aria-modal="true"], [data-overlay="true"]'
+    )).filter(isVisible).map(overlay => {
+      const rect = overlay.getBoundingClientRect()
+      const blocksChat = targets.some(target => overlaps(rect, target.getBoundingClientRect()))
+      const text = (overlay.textContent || '').replace(/\s+/gu, ' ').trim().slice(0, 100)
+      return {
+        role: overlay.getAttribute('role') || overlay.tagName.toLowerCase(),
+        label: overlay.getAttribute('aria-label') || overlay.getAttribute('aria-labelledby') || '',
+        text,
+        blocksChat,
+      }
+    })
+
+    return {
+      loungeVisible: Array.from(document.querySelectorAll('h1, p')).some(element => /^\s*Lounge\s*$/i.test(element.textContent || '') && isVisible(element)),
+      composerVisible: isVisible(composer),
+      messageScrollVisible: isVisible(scroll),
+      visibleOverlays,
+      blockingOverlays: visibleOverlays.filter(overlay => overlay.blocksChat),
+    }
+  })
+  if (readiness.blockingOverlays.length > 0) {
+    throw new Error(`Chat readiness is blocked by visible overlays: ${JSON.stringify(readiness.blockingOverlays)}`)
+  }
+  return readiness
+}
+
+async function waitForChatSurface(page) {
+  // The mobile title deliberately collapses with the keyboard. Real scroll and
+  // composer surfaces, plus the overlay check below, establish readiness.
+  await page.locator('textarea:visible').first().waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+  await page.locator('[data-testid="message-scroll"]').waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function waitForScrollReady(page) {
@@ -1041,7 +1120,7 @@ async function dismissAppReleaseDialog(page) {
 }
 
 async function isChatVisible(page) {
-  return page.getByText(/Lounge/i).first().isVisible().catch(() => false)
+  return page.getByText(/^\s*Lounge\s*$/i).first().isVisible().catch(() => false)
 }
 
 async function waitForVisibleMessage(page, messageId, label) {

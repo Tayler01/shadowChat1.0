@@ -1,6 +1,8 @@
+import { beginChatTiming, type ChatTimingSurface } from '../lib/chatPerformance'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { MOBILE_VIEWPORT_UPDATED_EVENT } from '../lib/mobileViewport'
 import { isMessageAfterCursor, type UserReadCursor } from '../lib/readCursors'
+import { captureMessageScrollAnchor, restoreMessageScrollAnchor, saveMessageScrollAnchor, getSavedMessageScrollAnchor, getMessageReadableViewport, scrollMessageWithinContainer, type MessageScrollAnchor } from '../lib/messageScrollAnchor'
 
 const READ_SETTLE_MS = 220
 const TARGET_SETTLE_MS = 180
@@ -27,8 +29,10 @@ interface UseUnreadScrollOptions<TMessage> {
   loading?: boolean
   cursor: UserReadCursor | null
   cursorLoading?: boolean
+  restorationReady?: boolean
   enabled?: boolean
   surfaceKey: string
+  readerId?: string | null
   initialMessageId?: string | null
   renderSignal?: unknown
   getMessageId: (message: TMessage) => string
@@ -48,9 +52,9 @@ type ObservedMessage<TMessage> = {
   message: TMessage
 }
 
-const getReadableVisiblePixels = (elementRect: DOMRect, containerRect: DOMRect) => {
-  const visibleTop = Math.max(elementRect.top, containerRect.top)
-  const visibleBottom = Math.min(elementRect.bottom, containerRect.bottom)
+const getReadableVisiblePixels = (elementRect: DOMRect, viewport: { top: number; bottom: number }) => {
+  const visibleTop = Math.max(elementRect.top, viewport.top)
+  const visibleBottom = Math.min(elementRect.bottom, viewport.bottom)
   return Math.max(0, visibleBottom - visibleTop)
 }
 
@@ -60,8 +64,10 @@ export function useUnreadScroll<TMessage>({
   loading = false,
   cursor,
   cursorLoading = false,
+  restorationReady = true,
   enabled = true,
   surfaceKey,
+  readerId,
   initialMessageId,
   renderSignal,
   getMessageId,
@@ -73,6 +79,12 @@ export function useUnreadScroll<TMessage>({
   markVisibleOnScroll = false,
   onMarkReadToLatest,
 }: UseUnreadScrollOptions<TMessage>) {
+  const savedAnchor = useMemo(() => getSavedMessageScrollAnchor(readerId, surfaceKey), [readerId, surfaceKey])
+  const positionTargetId = initialMessageId ?? (savedAnchor && messages.some(message => getMessageId(message) === savedAnchor.id) ? savedAnchor.id : null)
+  const scopeGenerationRef = useRef({ key: `${readerId ?? ''}:${surfaceKey}`, version: 0 })
+  const scopeKey = `${readerId ?? ''}:${surfaceKey}:${initialMessageId ?? ''}`
+  if (scopeGenerationRef.current.key !== scopeKey) scopeGenerationRef.current = { key: scopeKey, version: scopeGenerationRef.current.version + 1 }
+  const [readyScope, setReadyScope] = useState<string | null>(null)
   const [autoScroll, setAutoScrollState] = useState(true)
   const [firstUnreadMessageId, setFirstUnreadMessageId] = useState<string | null>(null)
   const [feedState, setFeedStateValue] = useState<UnreadScrollFeedState>('resolvingInitial')
@@ -97,11 +109,16 @@ export function useUnreadScroll<TMessage>({
   const messagesRef = useRef(messages)
   const loadingRef = useRef(loading)
   const cursorLoadingRef = useRef(cursorLoading)
+  const restorationReadyRef = useRef(restorationReady)
+  const anchoredPositionRef = useRef<MessageScrollAnchor | null>(null)
   messagesRef.current = messages
   cursorRef.current = cursor
   loadingRef.current = loading
   cursorLoadingRef.current = cursorLoading
+  restorationReadyRef.current = restorationReady
   onMarkReadRef.current = onMarkReadToLatest
+  const enabledRef = useRef(enabled)
+  enabledRef.current = enabled
   const messageCount = messages.length
   const latestMessage = messages[messageCount - 1]
   const latestMessageKey = latestMessage
@@ -114,6 +131,8 @@ export function useUnreadScroll<TMessage>({
     }
     return map
   }, [getMessageId, messages])
+  const messagesByIdRef = useRef(messagesById)
+  messagesByIdRef.current = messagesById
 
   const setFeedState = useCallback((value: UnreadScrollFeedState) => {
     if (feedStateRef.current === value) {
@@ -200,16 +219,16 @@ export function useUnreadScroll<TMessage>({
     return {
       id,
       createdAt,
-      key: `${surfaceKey}:${id}:${createdAt}`,
+      key: `${scopeKey}:${id}:${createdAt}`,
       message,
     }
-  }, [getMessageCreatedAt, getMessageId, surfaceKey])
+  }, [getMessageCreatedAt, getMessageId, scopeKey])
 
   const updateLastObservedMessage = useCallback(() => {
     const container = containerRef.current
     if (!enabled || !container) return lastObservedMessageRef.current
 
-    const containerRect = container.getBoundingClientRect()
+    const readableViewport = getMessageReadableViewport(container)
     let candidate: ObservedMessage<TMessage> | null = null
 
     const mountedRows = Array.from(
@@ -219,17 +238,17 @@ export function useUnreadScroll<TMessage>({
     if (mountedRows.length > 0) {
       for (const element of mountedRows) {
         const id = element.dataset.messageId
-        const message = id ? messagesById.get(id) : null
+        const message = id ? messagesByIdRef.current.get(id) : null
         if (!message || !container.contains(element)) {
           continue
         }
 
         const rect = element.getBoundingClientRect()
-        if (rect.height <= 0 || rect.bottom <= containerRect.top || rect.top >= containerRect.bottom) {
+        if (rect.height <= 0 || rect.bottom <= readableViewport.top || rect.top >= readableViewport.bottom) {
           continue
         }
 
-        const visiblePixels = getReadableVisiblePixels(rect, containerRect)
+        const visiblePixels = getReadableVisiblePixels(rect, readableViewport)
         const readableThreshold = Math.min(48, Math.max(12, rect.height * 0.45))
         if (visiblePixels >= readableThreshold) {
           candidate = getObservedMessage(message)
@@ -244,11 +263,11 @@ export function useUnreadScroll<TMessage>({
         }
 
         const rect = element.getBoundingClientRect()
-        if (rect.height <= 0 || rect.bottom <= containerRect.top || rect.top >= containerRect.bottom) {
+        if (rect.height <= 0 || rect.bottom <= readableViewport.top || rect.top >= readableViewport.bottom) {
           continue
         }
 
-        const visiblePixels = getReadableVisiblePixels(rect, containerRect)
+        const visiblePixels = getReadableVisiblePixels(rect, readableViewport)
         const readableThreshold = Math.min(48, Math.max(12, rect.height * 0.45))
         if (visiblePixels >= readableThreshold) {
           candidate = getObservedMessage(message)
@@ -259,10 +278,13 @@ export function useUnreadScroll<TMessage>({
     if (candidate && lastObservedMessageRef.current?.key !== candidate.key) {
       lastObservedMessageRef.current = candidate
       setLastObservedMessageId(candidate.id)
+    } else if (!candidate && lastObservedMessageRef.current) {
+      lastObservedMessageRef.current = null
+      setLastObservedMessageId(null)
     }
 
-    return candidate ?? lastObservedMessageRef.current
-  }, [containerRef, enabled, getElementId, getMessageId, getObservedMessage, messagesById])
+    return candidate
+  }, [containerRef, enabled, getElementId, getMessageId, getObservedMessage])
 
   const isCandidateBeyondCursor = useCallback((candidate: ObservedMessage<TMessage>) => {
     const currentCursor = cursorRef.current
@@ -301,11 +323,12 @@ export function useUnreadScroll<TMessage>({
     candidate: ObservedMessage<TMessage> | null,
     clearDivider = false
   ) => {
-    if (!enabled || !candidate || !isCandidateBeyondCursor(candidate)) return
-    if (!initialMessageId && !initialUnreadJumpDoneRef.current) return
+    if (!enabledRef.current || document.querySelector('[aria-modal="true"]') && !containerRef.current?.closest('[aria-modal="true"]') || !candidate || !isCandidateBeyondCursor(candidate)) return
+    if (loadingRef.current || cursorLoadingRef.current || !restorationReadyRef.current || !initialUnreadJumpDoneRef.current) return
     if (initialUnreadReadHoldRef.current && !clearDivider) return
 
     const markKey = candidate.key
+    const scopeGeneration = scopeGenerationRef.current.version
     if (lastMarkedKeyRef.current === markKey || readInFlightKeyRef.current === markKey) {
       return
     }
@@ -313,26 +336,27 @@ export function useUnreadScroll<TMessage>({
     readInFlightKeyRef.current = markKey
     try {
       await onMarkReadRef.current(candidate.message)
+      if (scopeGeneration !== scopeGenerationRef.current.version) return
       lastMarkedKeyRef.current = markKey
       setLastFlushedMessageId(candidate.id)
-      if (clearDivider) {
+      if (clearDivider && autoScrollRef.current) {
         setFirstUnreadMessageId(null)
       }
     } finally {
-      if (readInFlightKeyRef.current === markKey) {
+      if (scopeGeneration === scopeGenerationRef.current.version && readInFlightKeyRef.current === markKey) {
         readInFlightKeyRef.current = null
       }
-      if (autoScrollRef.current && feedStateRef.current !== 'targetingFirstUnread') {
+      if (scopeGeneration === scopeGenerationRef.current.version && autoScrollRef.current && feedStateRef.current !== 'targetingFirstUnread') {
         setFeedState('bottomPinned')
       }
     }
-  }, [enabled, initialMessageId, isCandidateBeyondCursor, setFeedState])
+  }, [containerRef, isCandidateBeyondCursor, setFeedState])
 
   const markObservedRead = useCallback(async (
     clearDivider = false,
     options: { refreshCandidate?: boolean } = {}
   ) => {
-    const candidate = options.refreshCandidate
+    const candidate = (options.refreshCandidate ?? true)
       ? updateLastObservedMessage()
       : lastObservedMessageRef.current
     await markReadToCandidate(candidate, clearDivider)
@@ -345,13 +369,13 @@ export function useUnreadScroll<TMessage>({
 
     markTimerRef.current = window.setTimeout(() => {
       markTimerRef.current = null
-      void markObservedRead(clearDivider, { refreshCandidate: true })
+      void markObservedRead(clearDivider, { refreshCandidate: true }).catch(() => undefined)
     }, READ_SETTLE_MS)
   }, [markObservedRead])
 
   const scrollContainerToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const container = containerRef.current
-    if (!container) return
+    if (!container || !enabledRef.current || document.querySelector('[aria-modal="true"]') && !container.closest('[aria-modal="true"]')) return
 
     const top = Math.max(container.scrollHeight - container.clientHeight, 0)
     if (Math.abs(container.scrollTop - top) > 1) {
@@ -364,6 +388,9 @@ export function useUnreadScroll<TMessage>({
   }, [containerRef])
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    clearTargetSettleTimer()
+    initialUnreadJumpDoneRef.current = true
+    setReadyScope(scopeKey)
     initialUnreadReadHoldRef.current = false
     scrollContainerToBottom(behavior)
     setAutoScroll(true)
@@ -371,7 +398,7 @@ export function useUnreadScroll<TMessage>({
     setTargetMessageId(null)
     setFeedState('layoutSettling')
     scheduleMarkObservedRead(true)
-  }, [scheduleMarkObservedRead, scrollContainerToBottom, setAutoScroll, setFeedState, setTargetMessageId])
+  }, [clearTargetSettleTimer, scopeKey, scheduleMarkObservedRead, scrollContainerToBottom, setAutoScroll, setFeedState, setTargetMessageId])
 
   const flushFollowLatest = useCallback(() => {
     cancelFollowLatest()
@@ -381,8 +408,8 @@ export function useUnreadScroll<TMessage>({
   }, [cancelFollowLatest, scrollToBottom])
 
   const followLatest = useCallback(() => {
-    if (!autoScrollRef.current) return
-    if (!initialMessageId && !initialUnreadJumpDoneRef.current) return
+    if (!enabledRef.current || document.querySelector('[aria-modal="true"]') && !containerRef.current?.closest('[aria-modal="true"]') || !autoScrollRef.current) return
+    if (!initialUnreadJumpDoneRef.current) return
     if (initialUnreadReadHoldRef.current) return
 
     setFeedState('layoutSettling')
@@ -397,19 +424,19 @@ export function useUnreadScroll<TMessage>({
     if (followMaxTimerRef.current === null) {
       followMaxTimerRef.current = window.setTimeout(flushFollowLatest, FOLLOW_LATEST_MAX_WAIT_MS)
     }
-  }, [flushFollowLatest, initialMessageId, scrollContainerToBottom, setFeedState])
+  }, [containerRef, flushFollowLatest, scrollContainerToBottom, setFeedState])
 
   const handleScroll = useCallback(() => {
     const container = containerRef.current
     if (!container) return false
 
     const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 28
+    anchoredPositionRef.current = captureMessageScrollAnchor(container)
+    if (initialUnreadJumpDoneRef.current) saveMessageScrollAnchor(readerId, surfaceKey, atBottom ? null : anchoredPositionRef.current)
     updateLastObservedMessage()
 
     if (
-      !initialMessageId &&
-      !initialUnreadJumpDoneRef.current &&
-      (loadingRef.current || cursorLoadingRef.current || targetSettleTimerRef.current !== null)
+      loadingRef.current || cursorLoadingRef.current || !restorationReadyRef.current || !initialUnreadJumpDoneRef.current
     ) {
       return atBottom
     }
@@ -437,13 +464,29 @@ export function useUnreadScroll<TMessage>({
     return atBottom
   }, [
     containerRef,
-    initialMessageId,
     scheduleMarkObservedRead,
     setAutoScroll,
     setFeedState,
     updateLastObservedMessage,
     markVisibleOnScroll,
+    readerId,
+    surfaceKey,
   ])
+
+  const captureScrollAnchor = useCallback(() => {
+    const container = containerRef.current
+    if (container) anchoredPositionRef.current = captureMessageScrollAnchor(container)
+    saveMessageScrollAnchor(readerId, surfaceKey, anchoredPositionRef.current)
+    return anchoredPositionRef.current
+  }, [containerRef, readerId, surfaceKey])
+  const restoreScrollAnchor = useCallback(() => {
+    const container = containerRef.current
+    if (container && !autoScrollRef.current && initialUnreadJumpDoneRef.current) {
+      restoreMessageScrollAnchor(container, anchoredPositionRef.current)
+    }
+  }, [containerRef])
+
+  useLayoutEffect(restoreScrollAnchor, [messages, renderSignal, restoreScrollAnchor])
 
   const completeTargetAfterSettle = useCallback((
     nextState: UnreadScrollFeedState,
@@ -451,17 +494,27 @@ export function useUnreadScroll<TMessage>({
   ) => {
     clearTargetSettleTimer()
     setFeedState('layoutSettling')
+    const timingSurface: ChatTimingSurface = surfaceKey.startsWith('dm:') ? 'dm' : surfaceKey.startsWith('general_chat_thread:') ? 'thread' : surfaceKey.includes('pin') ? 'pins' : 'general'
+    const finishRestoreTiming = beginChatTiming('restore', timingSurface)
 
+    const container = containerRef.current
+    const settledAnchor = container ? captureMessageScrollAnchor(container) : null
+    const settlingScope = scopeGenerationRef.current.version
     targetSettleTimerRef.current = window.setTimeout(() => {
       targetSettleTimerRef.current = null
+      if (settlingScope !== scopeGenerationRef.current.version || !enabledRef.current) return
+      if (container) restoreMessageScrollAnchor(container, settledAnchor)
       updateLastObservedMessage()
       initialUnreadJumpDoneRef.current = true
+      setReadyScope(scopeKey)
+      anchoredPositionRef.current = containerRef.current ? captureMessageScrollAnchor(containerRef.current) : null
       initialUnreadTargetIdRef.current = null
       initialUnreadReadHoldRef.current = !markAfterSettled
       setTargetMessageId(null)
       setFeedState(nextState)
+      finishRestoreTiming()
       if (markAfterSettled) {
-        void markObservedRead(true)
+        void markObservedRead(true).catch(() => undefined)
       }
     }, TARGET_SETTLE_MS)
   }, [
@@ -470,9 +523,13 @@ export function useUnreadScroll<TMessage>({
     setFeedState,
     setTargetMessageId,
     updateLastObservedMessage,
+    surfaceKey,
+    scopeKey,
+    containerRef,
   ])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    setReadyScope(null)
     initialUnreadJumpDoneRef.current = false
     initialUnreadTargetIdRef.current = null
     initialUnreadReadHoldRef.current = false
@@ -486,7 +543,8 @@ export function useUnreadScroll<TMessage>({
     setAutoScroll(true)
     setFeedState('resolvingInitial')
     clearTargetSettleTimer()
-  }, [clearTargetSettleTimer, setAutoScroll, setFeedState, setTargetMessageId, surfaceKey])
+    anchoredPositionRef.current = null
+  }, [clearTargetSettleTimer, setAutoScroll, setFeedState, setTargetMessageId, scopeKey, initialMessageId])
 
   useEffect(() => {
     return () => {
@@ -496,15 +554,40 @@ export function useUnreadScroll<TMessage>({
       }
       clearTargetSettleTimer()
       cancelFollowLatest()
-      void markObservedRead(false)
     }
-  }, [cancelFollowLatest, clearTargetSettleTimer, markObservedRead])
+  }, [cancelFollowLatest, clearTargetSettleTimer])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container || !enabled) return
+    const previousOverflowAnchor = container.style.overflowAnchor
+    container.style.overflowAnchor = 'none'
+    const takeScrollControl = () => {
+      clearTargetSettleTimer()
+      cancelFollowLatest()
+      initialUnreadJumpDoneRef.current = true
+      setReadyScope(scopeKey)
+      initialUnreadTargetIdRef.current = null
+      initialUnreadReadHoldRef.current = false
+      setTargetMessageId(null)
+      setAutoScroll(false)
+      setFeedState('userScrolledUp')
+      captureScrollAnchor()
+    }
+    container.addEventListener('wheel', takeScrollControl, { passive: true })
+    container.addEventListener('touchmove', takeScrollControl, { passive: true })
+    return () => {
+      container.style.overflowAnchor = previousOverflowAnchor
+      container.removeEventListener('wheel', takeScrollControl)
+      container.removeEventListener('touchmove', takeScrollControl)
+    }
+  }, [cancelFollowLatest, captureScrollAnchor, clearTargetSettleTimer, containerRef, enabled, scopeKey, setAutoScroll, setFeedState, setTargetMessageId])
 
   useEffect(() => {
     if (!enabled) return
 
     const flushReadCursor = () => {
-      void markObservedRead(false)
+      void markObservedRead(false).catch(() => undefined)
     }
 
     const handleVisibilityChange = () => {
@@ -533,11 +616,17 @@ export function useUnreadScroll<TMessage>({
       return
     }
 
-    const observer = new ResizeObserver(followLatest)
+    const handleLayout = () => {
+      if (!enabledRef.current || document.querySelector('[aria-modal="true"]') && !container.closest('[aria-modal="true"]')) return
+      if (autoScrollRef.current) followLatest()
+      else restoreScrollAnchor()
+    }
+    const observer = new ResizeObserver(handleLayout)
     observer.observe(container)
     if (container.firstElementChild instanceof Element) {
       observer.observe(container.firstElementChild)
     }
+    container.querySelectorAll('[data-message-id], [data-thread-message-id]').forEach(row => observer.observe(row))
 
     window.visualViewport?.addEventListener('resize', followLatest)
     window.visualViewport?.addEventListener('scroll', followLatest)
@@ -554,7 +643,7 @@ export function useUnreadScroll<TMessage>({
       window.removeEventListener(MOBILE_VIEWPORT_UPDATED_EVENT, followLatest)
       cancelFollowLatest()
     }
-  }, [cancelFollowLatest, containerRef, enabled, followLatest, latestMessageKey, loading])
+  }, [cancelFollowLatest, containerRef, enabled, followLatest, latestMessageKey, messageCount, renderSignal, loading, restoreScrollAnchor])
 
   useEffect(() => {
     const container = containerRef.current
@@ -610,11 +699,12 @@ export function useUnreadScroll<TMessage>({
       return
     }
 
-    if (loading || cursorLoading) {
+    if (loading || cursorLoading || !restorationReady) {
       setFeedState(messages.length > 0 ? 'reconnectReconciling' : 'resolvingInitial')
       if (
         loading &&
         !cursorLoading &&
+        restorationReady &&
         !initialMessageId &&
         messages.length > 0 &&
         !initialUnreadJumpDoneRef.current &&
@@ -627,9 +717,18 @@ export function useUnreadScroll<TMessage>({
       return
     }
 
-    if (initialMessageId) {
-      setTargetMessageId(initialMessageId)
+    if (positionTargetId) {
+      if (initialUnreadJumpDoneRef.current || targetSettleTimerRef.current !== null) return
+      setTargetMessageId(positionTargetId)
       setFeedState('targetingDeepLink')
+      const container = containerRef.current
+      const target = document.getElementById(getElementId(positionTargetId))
+      if (container && target instanceof HTMLElement && container.contains(target) && target.getBoundingClientRect().height > 0) {
+        if (savedAnchor && !initialMessageId) restoreMessageScrollAnchor(container, savedAnchor)
+        else scrollMessageWithinContainer(container, target, 'center')
+        setAutoScroll(false)
+        completeTargetAfterSettle('anchoredCatchup', false)
+      }
       return
     }
 
@@ -684,7 +783,7 @@ export function useUnreadScroll<TMessage>({
         return
       }
 
-      firstUnreadEl.scrollIntoView({ block: 'start', behavior: 'auto' })
+      scrollMessageWithinContainer(container, firstUnreadEl, 'start')
       setAutoScroll(false)
       completeTargetAfterSettle('anchoredCatchup', markInitialVisibleRead)
     }
@@ -705,7 +804,10 @@ export function useUnreadScroll<TMessage>({
     getElementId,
     getMessageId,
     initialMessageId,
+    positionTargetId,
+    savedAnchor,
     loading,
+    restorationReady,
     messages,
     markInitialVisibleRead,
     onBeforeInitialJump,
@@ -763,6 +865,7 @@ export function useUnreadScroll<TMessage>({
   ])
 
   return {
+    initialPositionReady: readyScope === scopeKey && restorationReady && !cursorLoading,
     autoScroll,
     firstUnreadMessageId,
     feedState,
@@ -774,5 +877,7 @@ export function useUnreadScroll<TMessage>({
     handleUnreadScroll: handleScroll,
     scrollToBottom,
     markLatestRead: markObservedRead,
+    captureScrollAnchor,
+    restoreScrollAnchor,
   }
 }

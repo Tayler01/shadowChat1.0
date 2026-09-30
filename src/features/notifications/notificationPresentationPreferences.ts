@@ -1,3 +1,4 @@
+import { NOTIFICATION_PREFERENCES_CHANGED_EVENT } from '../../lib/push'
 import { getWorkingClient } from '../../lib/supabase'
 import {
   getNotificationTypePolicyV2,
@@ -271,6 +272,7 @@ export const updateNotificationCategorySound = async (
     })
 
   if (error) throw error
+  window.dispatchEvent(new CustomEvent(NOTIFICATION_PREFERENCES_CHANGED_EVENT, { detail: { userId } }))
 }
 
 export const fetchNotificationEventPresentationPreferences = async (
@@ -323,6 +325,7 @@ export const updateNotificationEventSound = async (
     })
 
   if (error) throw error
+  window.dispatchEvent(new CustomEvent(NOTIFICATION_PREFERENCES_CHANGED_EVENT, { detail: { userId } }))
 }
 
 export const getNotificationSoundLabel = (soundId: NotificationSoundId) => (

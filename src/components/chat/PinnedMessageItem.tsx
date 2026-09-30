@@ -25,12 +25,14 @@ interface PinnedMessageItemProps {
   message: Message
   onUnpin: (messageId: string) => Promise<void>
   onToggleReaction: (messageId: string, emoji: string) => Promise<void>
+  onViewInChat?: (messageId: string) => void
 }
 
 export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
   message,
   onUnpin,
   onToggleReaction,
+  onViewInChat,
 }) => {
   const { profile, user } = useAuth()
   const [showPicker, setShowPicker] = useState(false)
@@ -97,6 +99,11 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
             <MessageRichText content={message.content} className="inline whitespace-pre-wrap" />
           )}
         </div>
+        {onViewInChat && (
+          <button type="button" onClick={() => onViewInChat(message.id)} className="min-h-11 text-sm font-semibold text-[var(--theme-accent-readable)]">
+            View in chat
+          </button>
+        )}
         <div className={cn('hidden group-hover:flex items-center space-x-2 mt-1', showPicker && 'flex')}>
           {QUICK_REACTIONS.map(e => (
             <button

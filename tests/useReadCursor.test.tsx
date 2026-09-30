@@ -161,4 +161,38 @@ describe('useReadCursor', () => {
     expect(result.current.cursor).toEqual(nextCursor)
     expect(result.current.error).toBeNull()
   })
+  it('regression: ignores a previous scope fetch after the next scope resolves', async () => {
+    let resolveA!: (value: any) => void;
+    const delayedA = new Promise(resolve => { resolveA = resolve; });
+    const cursorA = makeCursor('a', '2026-05-03T12:00:00.000Z', 'scope-a');
+    const cursorB = makeCursor('b', '2026-05-03T12:01:00.000Z', 'scope-b');
+    workingClient.rpc.mockImplementation((_name: string, args: any) => (
+      args.target_scope_id === 'scope-a' ? delayedA : Promise.resolve({ data: [cursorB], error: null })
+    ));
+    const { result, rerender } = renderHook(({ scope }) => useReadCursor('general_chat', scope, true), {
+      initialProps: { scope: 'scope-a' },
+    });
+    await waitFor(() => expect(workingClient.rpc).toHaveBeenCalledTimes(1));
+    rerender({ scope: 'scope-b' });
+    await waitFor(() => expect(result.current.cursor?.scope_id).toBe('scope-b'));
+    await act(async () => { resolveA({ data: [cursorA], error: null }); });
+    expect(result.current.cursor?.scope_id).toBe('scope-b');
+  });
+  it('regression: preserves a newer cursor when an older refresh snapshot finishes', async () => {
+    const oldCursor = makeCursor('old', '2026-05-03T12:00:00.000Z', 'refresh-order');
+    const newCursor = makeCursor('new', '2026-05-03T12:02:00.000Z', 'refresh-order');
+    workingClient.rpc.mockResolvedValueOnce({ data: [oldCursor], error: null });
+    const { result } = renderHook(() => useReadCursor('general_chat', 'refresh-order', true));
+    await waitFor(() => expect(result.current.cursor?.last_read_message_id).toBe('old'));
+    let resolveRefresh!: (value: any) => void;
+    workingClient.rpc.mockImplementationOnce(() => new Promise(resolve => { resolveRefresh = resolve; }));
+    let refreshing!: Promise<any>;
+    act(() => { refreshing = result.current.refresh({ silent: true }); });
+    await waitFor(() => expect(workingClient.rpc).toHaveBeenCalledTimes(2));
+    workingClient.rpc.mockResolvedValueOnce({ data: [newCursor], error: null });
+    await act(async () => { await result.current.markRead('new', newCursor.last_read_at); });
+    expect(result.current.cursor?.last_read_message_id).toBe('new');
+    await act(async () => { resolveRefresh({ data: [oldCursor], error: null }); await refreshing; });
+    expect(result.current.cursor?.last_read_message_id).toBe('new');
+  });
 })

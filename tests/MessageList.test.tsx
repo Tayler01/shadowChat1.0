@@ -48,6 +48,7 @@ jest.mock('../src/hooks/useUnreadScroll', () => ({
 
 mockUseUnreadScroll.mockImplementation(() => ({
   autoScroll: mockUnreadState.autoScroll,
+  initialPositionReady: !mockUseMessages()?.loading && mockUnreadState.feedState !== 'targetingFirstUnread' && mockUnreadState.feedState !== 'targetingDeepLink',
   firstUnreadMessageId: mockUnreadState.firstUnreadMessageId,
   feedState: mockUnreadState.feedState ?? (mockUnreadState.autoScroll ? 'bottomPinned' : 'userScrolledUp'),
   targetMessageId: mockUnreadState.firstUnreadMessageId,
@@ -197,7 +198,7 @@ describe('MessageList mobile keyboard layout', () => {
     expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
   })
 
-  it('keeps cached messages visible inside the scroll container while a refresh is loading', () => {
+  it('keeps cached rows mounted but hides their provisional position until restoration is ready', () => {
     mockUseMessages.mockReturnValue({
       messages: [message],
       loading: true,
@@ -213,8 +214,8 @@ describe('MessageList mobile keyboard layout', () => {
     renderMessageList()
 
     expect(screen.getByTestId('message-scroll')).toBeInTheDocument()
-    expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'false')
-    expect(screen.getByTestId('message-stack')).not.toHaveClass('invisible')
+    expect(screen.getByTestId('message-stack')).toHaveAttribute('data-initial-position-pending', 'true')
+    expect(screen.getByTestId('message-stack')).toHaveClass('invisible')
     expect(screen.getByText('A tiny group chat thread')).toBeInTheDocument()
     expect(screen.queryByText('Loading the conversation...')).not.toBeInTheDocument()
   })
@@ -466,7 +467,7 @@ describe('MessageList mobile keyboard layout', () => {
     expect(mockMarkLatestRead).not.toHaveBeenCalled()
   })
 
-  it('does not request a stale cursor-anchored window when the stored cursor predates the latest page', async () => {
+  it('requests the real cursor window when unread begins before the latest page', async () => {
     const ensureMessageWindow = jest.fn().mockResolvedValue(null)
     mockUseMessages.mockReturnValue({
       messages: [makeMessage(10), makeMessage(11)],
@@ -500,7 +501,7 @@ describe('MessageList mobile keyboard layout', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    expect(ensureMessageWindow).not.toHaveBeenCalled()
+    expect(ensureMessageWindow).toHaveBeenCalledWith(null, expect.objectContaining({ targetLastReadMessageId: 'm1' }))
     expect(mockUseUnreadScroll).toHaveBeenLastCalledWith(expect.objectContaining({
       loading: false,
       cursor: expect.objectContaining({
@@ -509,7 +510,7 @@ describe('MessageList mobile keyboard layout', () => {
     }))
   })
 
-  it('keeps unread targeting active instead of waiting on a stale cursor window', async () => {
+  it('gates initial positioning until the real unread window resolves', async () => {
     const ensureMessageWindow = jest.fn(() => new Promise(() => undefined))
     mockUseMessages.mockReturnValue({
       messages: [makeMessage(10), makeMessage(11)],
@@ -541,7 +542,7 @@ describe('MessageList mobile keyboard layout', () => {
     renderMessageList()
 
     expect(mockUseUnreadScroll).toHaveBeenLastCalledWith(expect.objectContaining({
-      loading: false,
+      loading: true,
       cursor: expect.objectContaining({
         last_read_message_id: 'm1',
       }),
@@ -550,7 +551,7 @@ describe('MessageList mobile keyboard layout', () => {
     await act(async () => {
       await Promise.resolve()
     })
-    expect(ensureMessageWindow).not.toHaveBeenCalled()
+    expect(ensureMessageWindow).toHaveBeenCalledWith(null, expect.objectContaining({ targetLastReadMessageId: 'm1' }))
   })
 
   it('orders same-timestamp messages by id before rendering and unread targeting', () => {

@@ -1011,7 +1011,8 @@ describe('DirectMessagesView user search', () => {
 
     await waitFor(() => expect(loadMessageWindow).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Back to direct messages' })).toHaveFocus());
-    expect(screen.getByRole('status')).toHaveTextContent(/message is no longer available/i);
+    expect(screen.getAllByRole('status').some(status => /message is no longer available/i.test(status.textContent ?? ''))).toBe(true);
+    expect(screen.getByRole('button', { name: 'Jump to latest' })).toBeEnabled();
 
     rerender(
       <DirectMessagesView
@@ -1032,6 +1033,22 @@ describe('DirectMessagesView user search', () => {
     );
 
     await waitFor(() => expect(loadMessageWindow).toHaveBeenCalledTimes(2));
+
+    let resolveStaleTarget!: (value: boolean) => void;
+    loadMessageWindow.mockImplementationOnce(() => new Promise<boolean>(resolve => { resolveStaleTarget = resolve; }));
+    loadMessageWindow.mockResolvedValueOnce(true);
+    rerender(
+      <DirectMessagesView onToggleSidebar={() => {}} currentView="dms" onViewChange={() => {}}
+        initialConversation="c1" initialMessageId="old-pending-target" />
+    );
+    await waitFor(() => expect(loadMessageWindow).toHaveBeenCalledTimes(3));
+    rerender(
+      <DirectMessagesView onToggleSidebar={() => {}} currentView="dms" onViewChange={() => {}}
+        initialConversation="c1" initialMessageId="new-target" />
+    );
+    await waitFor(() => expect(loadMessageWindow).toHaveBeenCalledTimes(4));
+    await act(async () => resolveStaleTarget(false));
+    expect(screen.queryAllByRole('status').some(status => /message is no longer available/i.test(status.textContent ?? ''))).toBe(false);
   });
 
   test('shows inbox loading state instead of empty state while conversations restore', () => {
@@ -1396,7 +1413,7 @@ describe('DirectMessagesView user search', () => {
     const composers = screen.getAllByPlaceholderText('Message...') as HTMLTextAreaElement[];
 
     expect(composers).toHaveLength(2);
-    expect(composers[0]).toBeDisabled();
+    expect(composers[0]).not.toBeDisabled();
     expect(composers[1]).not.toBeDisabled();
   });
 
@@ -1532,4 +1549,65 @@ test('hydrates failed DM sends from local storage and retries them with the same
     content: 'offline note',
   }));
   expect(window.localStorage.getItem('shadowchat:outbox:dm:conv1')).toBeNull();
+
 });
+
+test('regression: ignores send completion from the previous conversation', async () => {
+  const pendingInsert = createDeferred<{ data: any; error: null }>();
+  const makeMessage = (id: string, conversation_id: string, content: string) => ({
+    id, conversation_id, sender_id: 'u1', content, message_type: 'text', reactions: {},
+    created_at: '2026-04-21T12:00:00.000Z', updated_at: '2026-04-21T12:00:00.000Z',
+  });
+  const a = makeMessage('a', 'conv1', 'existing A');
+  const b = makeMessage('b', 'conv2', 'existing B');
+  workingClient.from.mockImplementationOnce(() => createQuery({
+    limit: jest.fn().mockResolvedValue({ data: [a], error: null }),
+  }) as any);
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  act(() => { result.current.setCurrentConversation('conv1'); });
+  await waitFor(() => expect(result.current.messages.map(m => m.id)).toEqual(['a']));
+  workingClient.from.mockImplementationOnce(() => createQuery({ single: jest.fn(() => pendingInsert.promise) }) as any);
+  let sendingPromise!: Promise<any>;
+  act(() => { sendingPromise = result.current.sendMessage('late A'); });
+  await waitFor(() => expect(result.current.sending).toBe(true));
+  await waitFor(() => expect(workingClient.from).toHaveBeenCalledTimes(2));
+  workingClient.from.mockImplementationOnce(() => createQuery({
+    limit: jest.fn().mockResolvedValue({ data: [b], error: null }),
+  }) as any);
+  act(() => { result.current.setCurrentConversation('conv2'); });
+  await waitFor(() => expect(result.current.messages.map(m => m.id)).toEqual(['b']));
+  await act(async () => {
+    pendingInsert.resolve({ data: makeMessage('late-a', 'conv1', 'late A'), error: null });
+    await sendingPromise;
+  });
+  expect(result.current.messagesConversationId).toBe('conv2');
+  expect(result.current.messages.map(m => m.id)).toEqual(['b']);
+});
+
+test('accepts two durable DM intents before the first ack and tracks the remaining send', async () => {
+  jest.requireMock('../src/lib/supabase').withTimeout.mockImplementation((promise: Promise<unknown>) => promise)
+  const first = createDeferred<{ data: unknown; error: null }>()
+  const second = createDeferred<{ data: unknown; error: null }>()
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider })
+  await waitFor(() => expect(result.current.loading).toBe(false))
+  act(() => result.current.setCurrentConversation('conv1'))
+  await waitFor(() => expect(result.current.messagesLoading).toBe(false))
+  workingClient.from.mockImplementationOnce(() => createQuery({ single: jest.fn(() => first.promise) }) as never)
+  workingClient.from.mockImplementationOnce(() => createQuery({ single: jest.fn(() => second.promise) }) as never)
+  const queued = jest.fn()
+  let sendingFirst!: Promise<unknown>, sendingSecond!: Promise<unknown>
+  act(() => {
+    sendingFirst = result.current.sendMessage('one', 'text', undefined, undefined, undefined, { clientMessageId: 'dm-rapid-one', onQueued: queued })
+    sendingSecond = result.current.sendMessage('two', 'text', undefined, undefined, undefined, { clientMessageId: 'dm-rapid-two', onQueued: queued })
+  })
+  expect(queued).toHaveBeenCalledTimes(2)
+  expect(JSON.parse(localStorage.getItem('shadowchat:outbox:dm:conv1')!)).toHaveLength(2)
+  await waitFor(() => expect(result.current.messages.filter(message => message.optimistic)).toHaveLength(2))
+  await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve() })
+  const makeSent = (id: string) => ({ id, client_message_id: id, sender_id: 'u1', conversation_id: 'conv1', content: id, message_type: 'text', reactions: {}, created_at: '2026-09-30T12:00:00Z', updated_at: '2026-09-30T12:00:00Z' })
+  await act(async () => { first.resolve({ data: makeSent('dm-rapid-one'), error: null }); await sendingFirst })
+  expect(result.current.sending).toBe(true)
+  await act(async () => { second.resolve({ data: makeSent('dm-rapid-two'), error: null }); await sendingSecond })
+  expect(result.current.sending).toBe(false)
+})

@@ -56,9 +56,25 @@ const deferred = <T,>() => {
 
 beforeEach(() => {
   jest.clearAllMocks()
+  localStorage.clear()
   channel.on.mockReturnValue(channel)
   subscribeMock.mockReturnValue(channel)
   fetchStateMock.mockResolvedValue({ preferences: [], mutedConversationIds: [] })
+})
+
+test('DM draft previews follow the authenticated account and ignore unowned legacy drafts', async () => {
+  localStorage.setItem('draft-dm-conversation-1', 'legacy unknown owner')
+  localStorage.setItem('draft-account:user-1:dm-conversation-1', 'A private draft')
+  localStorage.setItem('draft-account:user-2:dm-conversation-1', 'B private draft')
+  const { result, rerender } = renderHook(({ userId }: { userId: string }) => useDMConversationHub({ conversations: [conversation], userId }), {
+    initialProps: { userId: 'user-1' },
+  })
+  await waitFor(() => expect(result.current.allItems[0].localDraft).toBe('A private draft'))
+  rerender({ userId: 'user-2' })
+  expect(result.current.allItems[0].localDraft).toBe('B private draft')
+  rerender({ userId: 'user-1' })
+  expect(result.current.allItems[0].localDraft).toBe('A private draft')
+  expect(localStorage.getItem('draft-dm-conversation-1')).toBe('legacy unknown owner')
 })
 
 test('serializes preference writes and preserves the newest combined intent', async () => {

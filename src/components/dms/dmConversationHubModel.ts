@@ -1,4 +1,5 @@
 import type { DMConversation, DMMessage } from '../../lib/supabase'
+import { getDraftStorageKey } from '../../lib/draftStorage'
 
 export type DMConversationHubMode = 'inbox' | 'unread' | 'archived'
 
@@ -91,8 +92,8 @@ const withOptionalCaption = (label: string, message: DMMessage) => {
   return caption ? `${label} · ${caption}` : label
 }
 
-export const getDMConversationDraftStorageKey = (conversationId: string) => (
-  `draft-dm-${conversationId}`
+export const getDMConversationDraftStorageKey = (conversationId: string, identityKey?: string | null) => (
+  getDraftStorageKey(`dm-${conversationId}`, identityKey)
 )
 
 export const normalizeDMConversationDraft = (value: string | null | undefined) => (
@@ -271,4 +272,3 @@ export const rollbackOptimisticDMConversationPreference = (
   if (token.previous) next.push(token.previous)
   return { preferences: next, rolledBack: true }
 }
-

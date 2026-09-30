@@ -8,6 +8,7 @@ import type {
   ShadowPinCategory,
   ShadowPinCategoryFormValues,
   ShadowPinComment,
+  ShadowPinCommentAttachment,
   ShadowPinImage,
   ShadowPinImageFormValues,
   ShadowPinFeedCursor,
@@ -17,6 +18,8 @@ import type {
   ShadowPinCommentReactionSummary,
 } from '../types'
 import { embedPublicProfile } from '../../../../supabase/functions/_shared/public-profile'
+import type { UserReadCursor } from '../../../lib/readCursors'
+import { classifyComposerFile } from '../../../lib/composerAttachments'
 import {
   triggerShadowPinCommentPushNotification,
   triggerShadowPinPostPushNotification,
@@ -1221,6 +1224,7 @@ const SHADOW_PIN_COMMENT_SELECT = `
   author_id,
   parent_comment_id,
   body,
+  attachment,
   created_at,
   updated_at,
   ${embedPublicProfile('author', 'users!author_id')},
@@ -1347,9 +1351,10 @@ export async function fetchShadowPinComments(
 export async function createShadowPinComment(
   imageId: string,
   body: string,
-  parentCommentId?: string | null
+  parentCommentId?: string | null,
+  attachment?: ShadowPinCommentAttachment
 ) {
-  const normalizedBody = normalizeShadowPinText(body, 1000, 'Comment', true)
+  const normalizedBody = normalizeShadowPinText(body.trim() || attachment?.name || '', 1000, 'Comment', true)
   const client = await getWorkingClient()
   const { data: { user } } = await client.auth.getUser()
   if (!user) throw new Error('Sign in to comment.')
@@ -1361,13 +1366,19 @@ export async function createShadowPinComment(
       author_id: user.id,
       parent_comment_id: parentCommentId || null,
       body: normalizedBody,
+      ...(attachment ? { id: attachment.path.split('/').pop(), attachment } : {}),
     })
     .select(SHADOW_PIN_COMMENT_SELECT)
     .single()
+  if (error && attachment) {
+    const existing = await client.from('shadow_pin_comments').select(SHADOW_PIN_COMMENT_SELECT)
+      .eq('id', attachment.path.split('/').pop()!).eq('image_id', imageId).eq('author_id', user.id).maybeSingle()
+    if (existing.data) return (await resolveShadowPinCommentAttachments([normalizeShadowPinCommentRecord(existing.data as unknown as ShadowPinCommentRecord)]))[0]
+  }
   if (error) throw error
   const comment = normalizeShadowPinCommentRecord(data as unknown as ShadowPinCommentRecord)
   void triggerShadowPinCommentPushNotification(comment.id).catch(() => undefined)
-  return comment
+  return (await resolveShadowPinCommentAttachments([comment]))[0]
 }
 
 export async function updateShadowPinComment(commentId: string, body: string) {
@@ -1385,11 +1396,19 @@ export async function updateShadowPinComment(commentId: string, body: string) {
 
 export async function deleteShadowPinComment(commentId: string) {
   const client = await getWorkingClient()
+  const before = await client.from('shadow_pin_comments').select('attachment').eq('id', commentId).maybeSingle()
+  if (before.error) throw before.error
   const { error } = await client
     .from('shadow_pin_comments')
     .delete()
     .eq('id', commentId)
   if (error) throw error
+  const attachment = before.data?.attachment as ShadowPinCommentAttachment | undefined
+  if (attachment) {
+    try { await cleanupShadowPinCommentAttachment(attachment) }
+    catch { return { pendingCleanup: attachment } }
+  }
+  return { pendingCleanup: null }
 }
 
 export async function toggleShadowPinCommentReaction(
@@ -1420,4 +1439,159 @@ export async function toggleShadowPinCommentReaction(
     if (count > 0) summary[reactionEmoji] = { count, users }
     return summary
   }, {})
+}
+
+const COMMENT_ATTACHMENT_BUCKET = 'shadow-pin-comments'
+export type ShadowPinDiscussionWindow = ShadowPinCommentPage & {
+  hasNewer: boolean
+  cursor: UserReadCursor | null
+  firstUnreadId: string | null
+  targetUnavailable: boolean
+}
+
+type PinCursorRecord = {
+  user_id: string
+  image_id: string
+  last_read_comment_id: string
+  last_read_at: string
+  updated_at: string
+}
+const asDiscussionCursor = (row: PinCursorRecord | null): UserReadCursor | null => row ? ({
+  user_id: row.user_id, surface: 'shadow_pin_comments', scope_id: row.image_id,
+  last_read_message_id: row.last_read_comment_id, last_read_at: row.last_read_at, updated_at: row.updated_at,
+}) : null
+
+export async function resolveShadowPinCommentAttachments(comments: ShadowPinComment[]): Promise<ShadowPinComment[]> {
+  const paths = comments.flatMap(comment => comment.attachment?.path ? [comment.attachment.path] : [])
+  if (!paths.length) return comments
+  const client = await getWorkingClient()
+  const { data, error } = await client.storage.from(COMMENT_ATTACHMENT_BUCKET).createSignedUrls(paths, 600)
+  if (error) return comments.map(comment => ({ ...comment, attachmentUrl: null }))
+  const urls = new Map<string, string>((data ?? []).map((item: { path: string; signedUrl: string }) => [item.path, item.signedUrl]))
+  return comments.map(comment => ({ ...comment, attachmentUrl: urls.get(comment.attachment?.path ?? '') ?? null }))
+}
+
+/** Load a contiguous chronological window around the authoritative boundary.
+ * No cursor means latest (the documented first-visit default), not oldest.
+ * Cursor failures reject: callers must not convert failure into "all read".
+ */
+export async function fetchShadowPinDiscussionWindow(imageId: string, userId: string, targetCommentId?: string): Promise<ShadowPinDiscussionWindow> {
+  const client = await getWorkingClient()
+  const { data: cursorRow, error: cursorError } = await client.from('shadow_pin_comment_read_cursors')
+    .select('user_id,image_id,last_read_comment_id,last_read_at,updated_at')
+    .eq('user_id', userId).eq('image_id', imageId).maybeSingle()
+  if (cursorError) throw cursorError
+  const cursor = asDiscussionCursor(cursorRow as PinCursorRecord | null)
+  let boundary: ShadowPinComment | null = null
+  let firstUnreadId: string | null = null
+  if (targetCommentId) {
+    const { data, error } = await client.from('shadow_pin_comments').select(SHADOW_PIN_COMMENT_SELECT)
+      .eq('image_id', imageId).eq('id', targetCommentId).maybeSingle()
+    if (error) throw error
+    boundary = data ? normalizeShadowPinCommentRecord(data as unknown as ShadowPinCommentRecord) : null
+    if (!boundary) return { comments: [], hasMore: false, nextCursor: null, hasNewer: false, cursor, firstUnreadId: null, targetUnavailable: true }
+  } else if (cursor) {
+    const { data, error } = await client.from('shadow_pin_comments').select(SHADOW_PIN_COMMENT_SELECT)
+      .eq('image_id', imageId)
+      .or(`created_at.gt.${cursor.last_read_at},and(created_at.eq.${cursor.last_read_at},id.gt.${cursor.last_read_message_id})`)
+      .order('created_at', { ascending: true }).order('id', { ascending: true }).limit(1).maybeSingle()
+    if (error) throw error
+    boundary = data ? normalizeShadowPinCommentRecord(data as unknown as ShadowPinCommentRecord) : null
+    firstUnreadId = boundary?.id ?? null
+  }
+  if (!boundary) {
+    const page = await fetchShadowPinComments(imageId)
+    return { ...page, comments: await resolveShadowPinCommentAttachments(page.comments), hasNewer: false, cursor, firstUnreadId, targetUnavailable: false }
+  }
+  const key = { createdAt: boundary.created_at, id: boundary.id }
+  const [before, after] = await Promise.all([
+    client.from('shadow_pin_comments').select(SHADOW_PIN_COMMENT_SELECT).eq('image_id', imageId)
+      .or(`created_at.lt.${key.createdAt},and(created_at.eq.${key.createdAt},id.lt.${key.id})`)
+      .order('created_at', { ascending: false }).order('id', { ascending: false }).limit(11),
+    client.from('shadow_pin_comments').select(SHADOW_PIN_COMMENT_SELECT).eq('image_id', imageId)
+      .or(`created_at.gt.${key.createdAt},and(created_at.eq.${key.createdAt},id.gt.${key.id})`)
+      .order('created_at', { ascending: true }).order('id', { ascending: true }).limit(30),
+  ])
+  if (before.error) throw before.error
+  if (after.error) throw after.error
+  const older = normalizeShadowPinCommentRows(before.data).slice(0, 10)
+  const newer = normalizeShadowPinCommentRows(after.data).slice(0, 29)
+  const comments = [...older, boundary, ...newer].sort(compareShadowPinComments)
+  return {
+    comments: await resolveShadowPinCommentAttachments(comments),
+    hasMore: (before.data?.length ?? 0) > 10,
+    nextCursor: comments[0] ? { createdAt: comments[0].created_at, id: comments[0].id } : null,
+    hasNewer: (after.data?.length ?? 0) > 29, cursor, firstUnreadId, targetUnavailable: false,
+  }
+}
+
+export async function fetchShadowPinNewerComments(imageId: string, cursor: ShadowPinCommentCursor): Promise<{ comments: ShadowPinComment[]; hasNewer: boolean }> {
+  const client = await getWorkingClient()
+  const { data, error } = await client.from('shadow_pin_comments').select(SHADOW_PIN_COMMENT_SELECT).eq('image_id', imageId)
+    .or(`created_at.gt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.gt.${cursor.id})`)
+    .order('created_at', { ascending: true }).order('id', { ascending: true }).limit(SHADOW_PIN_COMMENT_PAGE_SIZE + 1)
+  if (error) throw error
+  return { comments: await resolveShadowPinCommentAttachments(normalizeShadowPinCommentRows(data).slice(0, SHADOW_PIN_COMMENT_PAGE_SIZE)), hasNewer: (data?.length ?? 0) > SHADOW_PIN_COMMENT_PAGE_SIZE }
+}
+
+export async function markShadowPinCommentsRead(imageId: string, observedIds: string[], expectedUserId?: string): Promise<UserReadCursor | null> {
+  const client = await getWorkingClient()
+  const { data: { session } } = await client.auth.getSession()
+  if (!expectedUserId || session?.user.id !== expectedUserId) throw new Error('Discussion account changed.')
+  const { data, error } = await client.rpc('mark_shadow_pin_comments_read', {
+    target_image_id: imageId, observed_comment_ids: observedIds.slice(-200),
+  })
+  if (error) throw error
+  return asDiscussionCursor(data as PinCursorRecord | null)
+}
+
+export async function uploadShadowPinCommentAttachment(imageId: string, file: File, options: { signal: AbortSignal; onProgress: (progress: number) => void }): Promise<ShadowPinCommentAttachment> {
+  if (file.size === 0 || file.size > 50 * 1024 * 1024) throw new Error('Choose a file between 1 byte and 50 MB.')
+  const client = await getWorkingClient()
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) throw new Error('Sign in to attach a file.')
+  options.signal.throwIfAborted()
+  const { kind, mimeType } = classifyComposerFile(file)
+  const path = `${user.id}/${imageId}/${crypto.randomUUID()}`
+  options.onProgress(0)
+  const { error } = await client.storage.from(COMMENT_ATTACHMENT_BUCKET).upload(path, file, { contentType: mimeType, upsert: false })
+  if (error) throw error
+  // Return completed metadata even after late cancellation: staged intake owns
+  // removal and persists a failed cleanup for the same account's next retry.
+  options.onProgress(100)
+  return { path, name: file.name.slice(0, 255), contentType: mimeType, size: file.size, kind }
+}
+
+export async function cleanupShadowPinCommentAttachment(attachment: Pick<ShadowPinCommentAttachment, 'path'>) {
+  const client = await getWorkingClient()
+  // A timeout may hide a successful insert. Never remove an attached file.
+  const { data, error: lookupError } = await client.from('shadow_pin_comments').select('id').eq('attachment->>path', attachment.path).limit(1)
+  if (lookupError) throw lookupError
+  if (data?.length) return
+  const { error } = await client.storage.from(COMMENT_ATTACHMENT_BUCKET).remove([attachment.path])
+  if (error) throw error
+}
+
+export async function cleanupPersistedShadowPinCommentAttachment(path: string) {
+  const client = await getWorkingClient()
+  const { data: { session } } = await client.auth.getSession()
+  if (!session?.user.id || path.split('/')[0] !== session.user.id) throw new Error('Attachment account changed.')
+  await cleanupShadowPinCommentAttachment({ path })
+}
+
+export async function fetchShadowPinCommentById(imageId: string, commentId: string) {
+  const client = await getWorkingClient()
+  const { data, error } = await client.from('shadow_pin_comments').select(SHADOW_PIN_COMMENT_SELECT)
+    .eq('image_id', imageId).eq('id', commentId).maybeSingle()
+  if (error) throw error
+  return data ? (await resolveShadowPinCommentAttachments([normalizeShadowPinCommentRecord(data as unknown as ShadowPinCommentRecord)]))[0] : null
+}
+
+export async function refreshShadowPinCommentRows(imageId: string, ids: string[]): Promise<ShadowPinComment[]> {
+  if (!ids.length) return []
+  const client = await getWorkingClient()
+  const { data, error } = await client.from('shadow_pin_comments').select(SHADOW_PIN_COMMENT_SELECT)
+    .eq('image_id', imageId).in('id', ids.slice(-200))
+  if (error) throw error
+  return resolveShadowPinCommentAttachments(normalizeShadowPinCommentRows(data))
 }
