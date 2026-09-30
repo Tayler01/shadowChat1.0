@@ -68,14 +68,14 @@ afterAll(() => {
   })
 })
 
-test('renders catch-up and low-tier live Hype as compact nonblocking notices', () => {
+test('renders catch-up and low-tier live Hype as compact nonblocking notices', async () => {
   mockedUseHype.mockReturnValue({
     activeCelebration: makeCelebration('catchup', 8, 4),
     dismissCelebration,
   })
 
   const { rerender } = render(<HypeCelebrationController />)
-  const catchup = screen.getByTestId('hype-celebration-overlay')
+  const catchup = await screen.findByTestId('hype-celebration-overlay')
   expect(catchup).toHaveAttribute('data-hype-presentation', 'compact')
   expect(catchup).toHaveClass('hype-celebration--compact')
   expect(catchup.querySelectorAll('.hype-celebration__particle')).toHaveLength(0)
@@ -92,7 +92,7 @@ test('renders catch-up and low-tier live Hype as compact nonblocking notices', (
   expect(dismissCelebration).toHaveBeenCalledTimes(1)
 })
 
-test('uses fullscreen effects only for live high-tier Hype', () => {
+test('uses fullscreen effects only for live high-tier Hype', async () => {
   mockedUseHype.mockReturnValue({
     activeCelebration: makeCelebration('live', 3),
     dismissCelebration,
@@ -100,14 +100,14 @@ test('uses fullscreen effects only for live high-tier Hype', () => {
 
   render(<HypeCelebrationController />)
 
-  const overlay = screen.getByTestId('hype-celebration-overlay')
+  const overlay = await screen.findByTestId('hype-celebration-overlay')
   expect(overlay).toHaveAttribute('data-hype-presentation', 'fullscreen')
   expect(overlay).toHaveClass('hype-celebration--fullscreen')
   expect(overlay.querySelector('.hype-celebration__wash')).toBeInTheDocument()
   expect(overlay.querySelectorAll('.hype-celebration__particle').length).toBeGreaterThan(0)
 })
 
-test('forces high-tier Hype onto the compact reduced-motion path', () => {
+test('forces high-tier Hype onto the compact reduced-motion path', async () => {
   mockMedia({ phone: true, reducedMotion: true })
   mockedUseHype.mockReturnValue({
     activeCelebration: makeCelebration('live', 8),
@@ -116,9 +116,17 @@ test('forces high-tier Hype onto the compact reduced-motion path', () => {
 
   render(<HypeCelebrationController />)
 
-  const overlay = screen.getByTestId('hype-celebration-overlay')
+  const overlay = await screen.findByTestId('hype-celebration-overlay')
   expect(overlay).toHaveAttribute('data-hype-presentation', 'compact')
   expect(overlay).toHaveAttribute('data-reduced-motion', 'true')
   expect(overlay).toHaveStyle({ '--hype-display-duration': '2000ms' })
   expect(overlay.querySelectorAll('.hype-celebration__particle')).toHaveLength(0)
+})
+
+test('does not mount celebration UI or phone media listeners while idle', () => {
+  mockedUseHype.mockReturnValue({ activeCelebration: null, dismissCelebration })
+  render(<HypeCelebrationController />)
+
+  expect(screen.queryByTestId('hype-celebration-overlay')).not.toBeInTheDocument()
+  expect(window.matchMedia).not.toHaveBeenCalled()
 })
