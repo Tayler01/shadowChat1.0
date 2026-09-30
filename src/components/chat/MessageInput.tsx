@@ -30,12 +30,12 @@ import {
 } from '../../lib/uploadLimits'
 import { buildAttachmentMessageContent, classifyComposerFile, extractClipboardFiles, extractDroppedFiles } from '../../lib/composerAttachments'
 import { useStagedAttachments, type AttachmentStageView } from '../../hooks/useStagedAttachments'
-import { StagedAttachmentList } from './StagedAttachmentList'
 import { measureChatInputFrame } from '../../lib/chatPerformance'
 import { useComposerKeyboardDismiss } from '../../hooks/useComposerKeyboardDismiss'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 const GifPicker = React.lazy(() => import('./GifPicker').then(module => ({ default: module.GifPicker })))
+const StagedAttachmentList = React.lazy(() => import('./StagedAttachmentList').then(module => ({ default: module.StagedAttachmentList })))
 const HYPE_SEND_LONG_PRESS_MS = 650
 
 const shouldCollapseReplyPreview = (content: string) =>
@@ -1103,12 +1103,16 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </div>
 
         <div className="obsidian-input min-w-0 flex-1 overflow-hidden rounded-[var(--radius-md)]" data-composer-entry="true">
-          <StagedAttachmentList
-            items={staged.items}
-            onRemove={staged.remove}
-            onCancel={staged.cancel}
-            onRetry={id => { void sendStagedAttachments(id) }}
-          />
+          {staged.items.length > 0 && (
+            <Suspense fallback={<div role="status" className="flex h-24 items-center px-3 text-sm text-[var(--text-muted)]">Loading attachment previews…</div>}>
+              <StagedAttachmentList
+                items={staged.items}
+                onRemove={staged.remove}
+                onCancel={staged.cancel}
+                onRetry={id => { void sendStagedAttachments(id) }}
+              />
+            </Suspense>
+          )}
           <textarea
             ref={textareaRef}
             value={message}

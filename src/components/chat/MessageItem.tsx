@@ -16,7 +16,6 @@ import {
   Flag,
 } from 'lucide-react'
 import { Avatar } from '../ui/Avatar'
-import { ImageModal } from '../ui/ImageModal'
 import { Button } from '../ui/Button'
 import { FileAttachment } from './FileAttachment'
 import { VideoAttachment } from './VideoAttachment'
@@ -78,6 +77,8 @@ interface MessageItemProps {
   moderationScope?: ChannelBanScope
   messageActionsPortalClassName?: string
 }
+
+const ImageModal = lazy(() => import('../ui/ImageModal').then(module => ({ default: module.ImageModal })))
 
 const PublicProfileDialog = lazy(() =>
   import('../profile/PublicProfileDialog').then(module => ({
@@ -805,12 +806,16 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
           )}
         </div>
         </div>
-        <ImageModal
-          open={showImageModal}
-          src={message.file_url || ''}
-          alt="uploaded image"
-          onClose={() => setShowImageModal(false)}
-        />
+        {showImageModal && (
+          <Suspense fallback={null}>
+            <ImageModal
+              open
+              src={message.file_url || ''}
+              alt="uploaded image"
+              onClose={() => setShowImageModal(false)}
+            />
+          </Suspense>
+        )}
         {showShadowPinShare && (
           <ShareImageToShadowPinModal
             open={showShadowPinShare}

@@ -1,8 +1,9 @@
-import React, { useState } from 'react'
+import React, { lazy, Suspense, useState } from 'react'
 import { FailedMessage } from '../../hooks/useFailedMessages'
 import { Button } from '../ui/Button'
-import { ImageModal } from '../ui/ImageModal'
 import { VideoAttachment } from './VideoAttachment'
+
+const ImageModal = lazy(() => import('../ui/ImageModal').then(module => ({ default: module.ImageModal })))
 
 interface Props {
   message: FailedMessage
@@ -46,12 +47,16 @@ export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
           Resend
         </Button>
       </div>
-      <ImageModal
-        open={showImageModal}
-        src={message.dataUrl || ''}
-        alt={message.fileName}
-        onClose={() => setShowImageModal(false)}
-      />
+      {showImageModal && (
+        <Suspense fallback={null}>
+          <ImageModal
+            open
+            src={message.dataUrl || ''}
+            alt={message.fileName}
+            onClose={() => setShowImageModal(false)}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }
