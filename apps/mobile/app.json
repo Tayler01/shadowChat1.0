@@ -17,6 +17,9 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "ShadoChat uses your camera when you choose to capture a photo or video for a message.",
+        "NSPhotoLibraryUsageDescription": "ShadoChat lets you choose photos and videos to attach to your messages.",
+        "NSMicrophoneUsageDescription": "ShadoChat uses your microphone when you choose to record a voice message or video.",
         "NSUserActivityTypes": [
           "$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route",
           "INSendMessageIntent"

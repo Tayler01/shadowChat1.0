@@ -525,6 +525,7 @@ export default function ShadowChatAppScreen() {
         bounces={false}
         cacheEnabled
         incognito={false}
+        hideKeyboardAccessoryView
         contentInsetAdjustmentBehavior="never"
         decelerationRate="normal"
         injectedJavaScriptBeforeContentLoaded={NATIVE_BOOTSTRAP_SCRIPT}

@@ -1,3 +1,8 @@
+## September 30 native Build 16 preparation
+
+- Current complete hosted UI is retained; the shared native WebView now requests accessory-toolbar suppression. Expo Doctor 20/20, mobile lint/types, fresh install, audit, compatibility tests and iOS export passed. Physical iPhone suppression, media permissions, account resume and notification acceptance remain pending TestFlight delivery.
+- PWA Photos video paste remains unresolved despite working image paste and video picker upload on Tayler's phone. Native toolbar configuration is not evidence of a clipboard fix. [Release evidence](../features/native-testflight-update-2026-09-30.md).
+
 ## September 30 large-video and empty-paste follow-up
 
 - Published merged build `fb1d0b58` / Netlify `6abd41540302b1466c64796c`; public identity/cache/media guards, migration dry-run and operations health passed, with required restart broadcast. The initial static-only deployment's missing Functions was corrected before release broadcast.

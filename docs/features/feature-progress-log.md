@@ -1,3 +1,8 @@
+## September 30 native TestFlight refresh
+
+- Tayler resumed native testing and authorized publishing a fresh signed iPhone build. Build 16 updates Expo/React Native patches, suppresses the WebView keyboard accessory bar and supplies media permission descriptions while retaining the current hosted interface.
+- Mobile audit is clean; fresh install, dependency compatibility tests, lint/types, Expo Doctor 20/20 and iOS export passed. Signed build/Apple processing and physical-device acceptance remain separate gates. Photos video paste remains unresolved. [Release evidence](native-testflight-update-2026-09-30.md).
+
 ## September 30 video-size and PWA paste follow-up published
 
 - Client build `fb1d0b58` merges current main and is live through corrected Netlify deploy `6abd41540302b1466c64796c`. Global Storage now matches chat's existing 64 MiB contract; all bucket constraints/visibility remain unchanged. Required restart is active and broadcast; live media guards and operations health passed.

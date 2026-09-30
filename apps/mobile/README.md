@@ -1,10 +1,10 @@
 # ShadowChat Mobile
 
-## Documentation Status - July 24, 2026
+## Documentation Status - September 30, 2026
 
 The native workspace is the signed iPhone/Android notification companion for
-the production ShadoChat web client. It is aligned to Expo `~57.0.4`, React
-Native `0.86.0`, React `19.2.3`, and TypeScript `~6.0.3`.
+the production ShadoChat web client. It is aligned to Expo `~57.0.26`, React
+Native `0.86.3`, React `19.2.3`, and TypeScript `~6.0.3`.
 
 Expo iOS-first native client for ShadoChat. The complete product UI continues
 to come from `https://shadochat.online` inside a strict same-origin WebView, so
@@ -77,6 +77,7 @@ production routing.
 ```powershell
 npm ci
 npm audit --audit-level=low
+npm run test:dependencies
 npm run lint
 npx tsc --noEmit
 npm run doctor
@@ -132,6 +133,18 @@ a fresh native request. A previous unresolved request must not trap the next
 attempt.
 
 ## EAS Build Hygiene
+
+Build `16` updates the native runtime, hides the iOS WebView keyboard accessory
+toolbar, and adds explicit camera, photo-library and microphone permission
+descriptions. The hosted inline composer remains unchanged. Physical iPhone
+toolbar removal, media capture and notification acceptance still need device
+verification. This build does not claim to fix Photos video clipboard delivery.
+
+Use Node `24.15.0`, including on EAS. Patched `decode-uri-component` and
+`image-size` versions remove dependency audit findings. `patch-package` applies
+the one-line CommonJS/default-export adaptation needed by `query-string` 7;
+installation fails if the patch cannot apply. Dependency contract tests and the
+iOS Metro/Hermes export verify the actual router and image-decoding paths.
 
 Run signed builds from the clean `main` checkout after confirming it matches
 `origin/main`. On Windows, starting EAS from a linked Git worktree can cause the
