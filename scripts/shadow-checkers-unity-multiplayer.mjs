@@ -26,7 +26,9 @@ const output = `output/playwright/shadow-checkers-unity/multiplayer-${Date.now()
 await mkdir(output, { recursive: true })
 let browser, created
 const pages = []
+let releaseFirstSubmit
 const screenshots = process.argv.includes('--screenshots')
+const skipChat = process.argv.includes('--skip-chat')
 const clients = []
 const assert = (value, message) => { if (!value) throw new Error(message) }
 const rpc = async (client, name, args) => { const r = await client.rpc(name, args); if (r.error) throw r.error; return r.data }
@@ -53,7 +55,10 @@ try {
   const iphone = process.argv.includes('--iphone')
   const android = process.argv.includes('--android')
   const mobile = iphone || android
-  browser = await (iphone ? webkit : chromium).launch({ headless: !process.argv.includes('--headed') })
+  browser = await (iphone ? webkit : chromium).launch({
+    headless: !process.argv.includes('--headed'),
+    args: iphone ? [] : ['--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding'],
+  })
   for (const account of clients) {
     const context = await browser.newContext({ ...(iphone ? devices['iPhone 13'] : android ? devices['Pixel 7'] : { viewport: { width: 1360, height: 1000 } }), serviceWorkers: 'block' })
     await context.addInitScript(({ key, session }) => { localStorage.setItem(key, JSON.stringify(session)) }, { key: `sb-${ref}-auth-token`, session: account.session })
@@ -67,12 +72,12 @@ try {
       window.addEventListener('message', event => {
         if (event.origin === location.origin && event.data?.version === 1 && event.data.type === 'projection') window.__checkersProjection = event.data
         if (event.origin === location.origin && event.data?.version === 1) {
-          window.__checkersEvents.push(event.data)
+          window.__checkersEvents.push({ ...event.data, qaAt: performance.now() })
           if(window.__checkersEvents.length > 50) window.__checkersEvents.shift()
         }
       })
     })
-    await page.goto(`${base}/?view=games&experience=shadow-checkers&item=${created.matchId}`)
+    await page.goto(`${base}/?view=games&experience=shadow-checkers&item=${created.matchId}`, { waitUntil: 'domcontentloaded', timeout: 60_000 })
     if(mobile) {
       await page.getByRole('dialog',{name:'Rotate phone to play'}).waitFor()
       if (screenshots) await page.screenshot({path:`${output}/rotate-${pages.length+1}.png`})
@@ -137,6 +142,11 @@ try {
     else await page.mouse.click(x,y)
   }
   const waitRevision = async (page, previous) => page.waitForFunction(previous => window.__checkersProjection?.revision !== previous, previous)
+  const fetchBoard = async () => {
+    const r = await admin.from('shadow_checkers_matches').select('board_state,move_count,current_turn_user_id').eq('id', created.matchId).single()
+    if (r.error) throw r.error
+    return r.data
+  }
   if (process.argv.includes('--notices')) {
     await clickSquare(pages[0], 7, 0)
     await pages[0].getByText('That piece has no legal moves', { exact: true }).waitFor()
@@ -146,23 +156,62 @@ try {
   const before = await pages[0].evaluate(() => window.__checkersProjection.revision)
   await clickSquare(pages[0], 5, 0)
   await waitRevision(pages[0], before)
+  let markFirstSubmit
+  const firstSubmitIntercepted = new Promise(resolve => { markFirstSubmit = resolve })
+  const firstSubmitGate = new Promise(resolve => { releaseFirstSubmit = resolve })
+  let holdFirstSubmit = true
+  await pages[0].route('**/rest/v1/rpc/submit_shadow_checkers_move', async route => {
+    if (holdFirstSubmit) {
+      holdFirstSubmit = false
+      markFirstSubmit()
+      await firstSubmitGate
+    }
+    await route.continue()
+  })
+  const optimisticStart = await pages[0].evaluate(() => {
+    return {
+      revision: window.__checkersProjection.revision,
+      moveCinematics: window.__checkersEvents.filter(event => event.type === 'cinematic' && event.stage === 'move' && event.busy).length,
+    }
+  })
   await clickSquare(pages[0], 4, 1)
+  await firstSubmitIntercepted
+  assert((await fetchBoard()).move_count === 0, 'Move reached the server before the latency gate was released')
+  await pages[0].waitForFunction(({ revision, moveCinematics }) => {
+    const newMoveStarted = window.__checkersEvents.filter(event => event.type === 'cinematic' && event.stage === 'move' && event.busy).length > moveCinematics
+    const presented = window.__checkersEvents.some(event => event.type === 'presented' && event.revision !== revision)
+    return newMoveStarted && presented
+  }, optimisticStart)
+  const optimisticMove = await pages[0].evaluate(({ moveCinematics }) => {
+    const events = window.__checkersEvents.filter(event => event.type === 'cinematic' && event.stage === 'move' && event.busy)
+    const started = events[moveCinematics]
+    const destinationTap = window.__checkersEvents.filter(event => event.type === 'square' && event.row === 4 && event.col === 1).at(-1)
+    return {
+      latencyMs: Math.round(started.qaAt - destinationTap.qaAt),
+      moveCinematics: events.length,
+      revision: window.__checkersProjection.revision,
+    }
+  }, optimisticStart)
+  assert(optimisticMove.latencyMs >= 0 && optimisticMove.latencyMs < 500, `Local move animation was not prompt after the Unity tap event: ${JSON.stringify(optimisticMove)}`)
+  assert((await fetchBoard()).move_count === 0, 'Optimistic animation waited for or bypassed the held server request')
+  releaseFirstSubmit()
+  releaseFirstSubmit = null
   if (process.argv.includes('--notices')) {
     await pages[0].getByText('Your move is played', { exact: true }).waitFor()
     if (screenshots) await pages[0].screenshot({path:`${output}/notice-move.png`})
     report.checks.push('Themed rule notice, manual dismissal and server-confirmed move notice')
   }
   await pages[1].waitForFunction(() => document.querySelector('iframe')?.dataset.ready === 'true')
-  const fetchBoard = async () => {
-    const r = await admin.from('shadow_checkers_matches').select('board_state,move_count,current_turn_user_id').eq('id', created.matchId).single()
-    if (r.error) throw r.error
-    return r.data
-  }
   for (let attempt = 0; attempt < 30; attempt++) { if ((await fetchBoard()).move_count === 1) break; await new Promise(resolve => setTimeout(resolve, 500)) }
   assert((await fetchBoard()).move_count === 1, 'Unity tap did not reach authoritative move RPC')
-  report.checks.push('Real Unity canvas tap submitted and server persisted move')
+  await pages[0].waitForTimeout(900)
+  const postAckMoveCinematics = await pages[0].evaluate(() => window.__checkersEvents.filter(event => event.type === 'cinematic' && event.stage === 'move' && event.busy).length)
+  assert(postAckMoveCinematics === optimisticMove.moveCinematics, 'Server acknowledgement replayed the local move animation')
+  report.optimisticMove = optimisticMove
+  report.checks.push('Local move animated before held RPC, server persisted it, and acknowledgement did not replay it')
   // Recipient must have the newly enabled move state, verified with actual input.
-  await pages[1].waitForTimeout(1200)
+  await foregroundPlayer(pages[1])
+  await pages[1].getByText('Your turn. Select a piece, then its destination. Use Accessible board for keyboard controls.', { exact: true }).waitFor()
   const secondBefore = await pages[1].evaluate(() => window.__checkersProjection.revision)
   await clickSquare(pages[1], 2, 1)
   await waitRevision(pages[1], secondBefore)
@@ -170,25 +219,30 @@ try {
   for (let attempt = 0; attempt < 30; attempt++) { if ((await fetchBoard()).move_count === 2) break; await new Promise(resolve => setTimeout(resolve, 500)) }
   assert((await fetchBoard()).move_count === 2, 'Recipient live update/input failed')
   report.checks.push('Recipient realtime turn update and reply move from the opposed seat')
-  const message = `Unity QA ${Date.now()}`
-  await pages[0].getByRole('button',{name:'Open match chat'}).click()
-  await pages[1].getByRole('button',{name:'Open match chat'}).click()
-  await pages[0].getByPlaceholder('Say something').fill(message)
-  await pages[0].getByPlaceholder('Say something').press('Enter')
-  await pages[1].getByText(message, { exact: false }).waitFor()
-  report.checks.push('Temporary match chat reached the other player')
+  if (!skipChat) {
+    const message = `Unity QA ${Date.now()}`
+    await pages[0].getByRole('button',{name:'Open match chat'}).click()
+    await pages[1].getByRole('button',{name:'Open match chat'}).click()
+    await pages[0].getByPlaceholder('Say something').fill(message)
+    await pages[0].getByPlaceholder('Say something').press('Enter')
+    await foregroundPlayer(pages[1])
+    await pages[1].getByText(message, { exact: false }).waitFor()
+    report.checks.push('Temporary match chat reached the other player')
+  }
   for(const page of pages) {
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Page overflows phone width')
     await foregroundPlayer(page)
-    await page.getByRole('button', {name:'Close match chat',exact:true}).click()
+    if (!skipChat) await page.getByRole('button', {name:'Close match chat',exact:true}).click()
+    await page.getByRole('button', { name: 'Open Shadow Checkers menu', exact: true }).click()
     await page.getByRole('button', { name: 'Camera help', exact: true }).click()
     await page.getByRole('button',{name:'Overhead',exact:true}).click()
+    await page.getByRole('button', { name: 'Open Shadow Checkers menu', exact: true }).click()
     await page.getByRole('button', { name: 'Camera help', exact: true }).click()
     await page.getByRole('button',{name:'Reset table camera',exact:true}).click()
     await page.waitForTimeout(800)
     if (screenshots) await page.screenshot({path:`${output}/study-${pages.indexOf(page)+1}.png`})
   }
-  report.checks.push('Portrait gate, landscape width, match chat panel and camera controls')
+  report.checks.push(`Portrait gate, landscape width${skipChat ? '' : ', match chat panel'} and camera controls`)
   if (screenshots) for (const [index, page] of pages.entries()) await page.screenshot({ path: `${output}/player-${index + 1}.png`, fullPage: true })
   report.status = 'passed'
 } catch (error) {
@@ -202,6 +256,7 @@ try {
   }
   throw error
 } finally {
+  releaseFirstSubmit?.()
   await browser?.close().catch(() => {})
   if (created?.sessionId) {
     const deletion = await admin.from('game_sessions').delete().eq('id', created.sessionId)

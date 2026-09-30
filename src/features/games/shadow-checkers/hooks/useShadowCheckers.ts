@@ -41,6 +41,23 @@ const emptySnapshot: ShadowCheckersSnapshot = {
   leaderboard: [],
 }
 
+function keepNewerMatch(previous: ShadowCheckersSnapshot, next: ShadowCheckersSnapshot): ShadowCheckersSnapshot {
+  const prior = previous.activeMatch
+  const incoming = next.activeMatch
+  if (!prior || !incoming || prior.id !== incoming.id) return next
+  const incomingIsOlder = prior.move_count > incoming.move_count
+    || (prior.move_count === incoming.move_count
+      && ['completed', 'cancelled'].includes(prior.status)
+      && incoming.status === 'active')
+  if (!incomingIsOlder) return next
+  return {
+    ...next,
+    activeMatch: prior,
+    matches: next.matches.map(match => match.id === prior.id ? prior : match),
+    moves: previous.moves,
+  }
+}
+
 function formatShadowCheckersHookError(label: string, error: unknown) {
   const message = error instanceof Error ? error.message : 'Game action failed'
   if (label === 'move' && /capture required|multi-jump|required jump|mandatory jump|move banned|not permitted|row-level security|violates row-level/i.test(message)) {
@@ -65,15 +82,23 @@ export function useShadowCheckers(
   const [pageVisible, setPageVisible] = useState(() => document.visibilityState === 'visible')
   const channelRef = useRef<RealtimeChannel | null>(null)
   const refreshTimerRef = useRef<number | null>(null)
+  const matchRefreshTimerRef = useRef<number | null>(null)
   const selectedMatchIdRef = useRef<string | null>(initialMatchId ?? null)
   const currentUserIdRef = useRef(user?.id ?? null)
+  const snapshotOwnerIdRef = useRef<string | null>(null)
+  const selectionGenerationRef = useRef(0)
   const refreshGenerationRef = useRef(0)
+  const busyOperationRef = useRef(0)
   currentUserIdRef.current = user?.id ?? null
 
   const refresh = useCallback(async (nextSelectedMatchId = selectedMatchId) => {
     const requestUserId = user?.id ?? null
     const generation = ++refreshGenerationRef.current
-    const isCurrent = () => generation === refreshGenerationRef.current && requestUserId === currentUserIdRef.current
+    const selectionGeneration = selectionGenerationRef.current
+    const isCurrent = () => generation === refreshGenerationRef.current
+      && requestUserId === currentUserIdRef.current
+      && selectionGeneration === selectionGenerationRef.current
+      && nextSelectedMatchId === selectedMatchIdRef.current
     try {
       const [sessions, matches, leaderboard] = await Promise.all([
         fetchShadowCheckersSessions(),
@@ -93,7 +118,11 @@ export function useShadowCheckers(
 
       const next = { sessions, matches, activeMatch, queue, myQueuedSessionIds, moves, chat, leaderboard }
       if (isCurrent()) {
-        setSnapshot(next)
+        const previousOwnerId = snapshotOwnerIdRef.current
+        setSnapshot(previous => isCurrent()
+          ? keepNewerMatch(previousOwnerId === requestUserId ? previous : emptySnapshot, next)
+          : previous)
+        snapshotOwnerIdRef.current = requestUserId
         setSnapshotOwnerId(requestUserId)
         setError(null)
       }
@@ -107,12 +136,51 @@ export function useShadowCheckers(
     }
   }, [selectedMatchId, user?.id])
 
+  const refreshCurrentMatch = useCallback(async (matchId: string) => {
+    const requestUserId = user?.id ?? null
+    const selectionGeneration = selectionGenerationRef.current
+    const isCurrent = () => requestUserId === currentUserIdRef.current
+      && selectionGeneration === selectionGenerationRef.current
+      && matchId === selectedMatchIdRef.current
+    void fetchShadowCheckersMoves(matchId).then(moves => {
+      if (!isCurrent()) return
+      setSnapshot(previous => {
+        if (!isCurrent() || snapshotOwnerIdRef.current !== requestUserId) return previous
+        const priorMove = previous.moves[previous.moves.length - 1]?.move_number ?? 0
+        const incomingMove = moves[moves.length - 1]?.move_number ?? 0
+        return incomingMove >= priorMove ? { ...previous, moves } : previous
+      })
+    }).catch(() => {})
+    const activeMatch = await fetchShadowCheckersMatch(matchId)
+    if (isCurrent()) {
+      const previousOwnerId = snapshotOwnerIdRef.current
+      setSnapshot(previous => {
+        if (!isCurrent()) return previous
+        const base = previousOwnerId === requestUserId ? previous : emptySnapshot
+        const next = {
+          ...base,
+          activeMatch,
+          matches: activeMatch
+            ? base.matches.map(match => match.id === matchId ? activeMatch : match)
+            : base.matches,
+        }
+        return keepNewerMatch(base, next)
+      })
+      snapshotOwnerIdRef.current = requestUserId
+      setSnapshotOwnerId(requestUserId)
+      setError(null)
+      setLoading(false)
+    }
+    return activeMatch
+  }, [user?.id])
+
   useEffect(() => {
     void refresh().catch(() => {})
   }, [refresh])
 
   useEffect(() => {
     const nextInitialMatchId = initialMatchId ?? null
+    if (selectedMatchIdRef.current !== nextInitialMatchId) selectionGenerationRef.current += 1
     selectedMatchIdRef.current = nextInitialMatchId
     setSelectedMatchId(nextInitialMatchId)
   }, [initialMatchId])
@@ -205,12 +273,29 @@ export function useShadowCheckers(
         }, 80)
       }
 
+      const refreshMatchSoon = () => {
+        if (matchRefreshTimerRef.current !== null) window.clearTimeout(matchRefreshTimerRef.current)
+        matchRefreshTimerRef.current = window.setTimeout(() => {
+          matchRefreshTimerRef.current = null
+          const matchId = selectedMatchIdRef.current
+          if (matchId) void refreshCurrentMatch(matchId).catch(() => {})
+        }, 40)
+      }
+
+      const changedId = (payload: { new?: Record<string, unknown>; old?: Record<string, unknown> }, key: string) =>
+        payload.new?.[key] ?? payload.old?.[key]
+
       channel = currentClient
         .channel('public:shadow-checkers')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'game_sessions' }, refreshSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'game_session_queue' }, refreshSoon)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_checkers_matches' }, refreshSoon)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_checkers_moves' }, refreshSoon)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_checkers_matches' }, (payload: any) => {
+          if (changedId(payload, 'id') === selectedMatchIdRef.current) refreshMatchSoon()
+          else if (!selectedMatchIdRef.current) refreshSoon()
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_checkers_moves' }, (payload: any) => {
+          if (changedId(payload, 'match_id') === selectedMatchIdRef.current) refreshMatchSoon()
+        })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_checkers_chat_messages' }, refreshSoon)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'shadow_checkers_stats' }, refreshSoon)
         .subscribe((status: string) => {
@@ -232,9 +317,13 @@ export function useShadowCheckers(
         window.clearTimeout(refreshTimerRef.current)
         refreshTimerRef.current = null
       }
+      if (matchRefreshTimerRef.current !== null) {
+        window.clearTimeout(matchRefreshTimerRef.current)
+        matchRefreshTimerRef.current = null
+      }
       channelRef.current = null
     }
-  }, [refresh, user])
+  }, [refresh, refreshCurrentMatch, user])
 
   const runAction = useCallback(async <T,>(
     label: string,
@@ -242,16 +331,23 @@ export function useShadowCheckers(
     getSelectedMatchId?: (result: T) => string | null | undefined,
     autoSelectRouteMode?: AutoSelectRouteMode,
   ) => {
+    const operation = ++busyOperationRef.current
+    const requestUserId = currentUserIdRef.current
+    const selectionGeneration = selectionGenerationRef.current
+    const isCurrent = () => requestUserId === currentUserIdRef.current
+      && selectionGeneration === selectionGenerationRef.current
     setBusy(label)
     setError(null)
     try {
       const result = await action()
+      if (!isCurrent()) throw new DOMException('Match selection changed', 'AbortError')
       const nextSelectedMatchId = getSelectedMatchId?.(result)
       const selectionChanged = Boolean(
         nextSelectedMatchId
         && nextSelectedMatchId !== selectedMatchIdRef.current
       )
       if (nextSelectedMatchId !== undefined) {
+        if (nextSelectedMatchId !== selectedMatchIdRef.current) selectionGenerationRef.current += 1
         selectedMatchIdRef.current = nextSelectedMatchId
         setSelectedMatchId(nextSelectedMatchId)
       }
@@ -261,13 +357,50 @@ export function useShadowCheckers(
       await refresh(nextSelectedMatchId).catch(() => emptySnapshot)
       return result
     } catch (err) {
-      const message = formatShadowCheckersHookError(label, err)
-      setError(message)
+      if (operation === busyOperationRef.current
+        && isCurrent()
+        && !(err instanceof DOMException && err.name === 'AbortError')) {
+        setError(formatShadowCheckersHookError(label, err))
+      }
       throw err
     } finally {
-      setBusy(null)
+      if (operation === busyOperationRef.current) setBusy(null)
     }
   }, [onAutoSelectMatch, refresh])
+
+  const submitMoveAction = useCallback(async (matchId: string, pieceId: string, path: CheckersPosition[]) => {
+    const operation = ++busyOperationRef.current
+    const requestUserId = currentUserIdRef.current
+    const selectionGeneration = selectionGenerationRef.current
+    const isCurrent = () => requestUserId === currentUserIdRef.current
+      && selectionGeneration === selectionGenerationRef.current
+      && matchId === selectedMatchIdRef.current
+    setBusy('move')
+    setError(null)
+    try {
+      const result = await submitShadowCheckersMove(matchId, pieceId, path)
+      if (!isCurrent()) throw new DOMException('Match selection changed', 'AbortError')
+      void triggerShadowCheckersTurnPushNotification(result.matchId).catch(() => undefined)
+      try {
+        await refreshCurrentMatch(matchId)
+      } catch {
+        // The RPC already committed. Keep that success result and let the broad
+        // refresh/realtime path retry the authoritative read without a false move error.
+      }
+      if (!isCurrent()) throw new DOMException('Match selection changed', 'AbortError')
+      void refresh(matchId).catch(() => {})
+      return result
+    } catch (err) {
+      if (operation === busyOperationRef.current
+        && isCurrent()
+        && !(err instanceof DOMException && err.name === 'AbortError')) {
+        setError(formatShadowCheckersHookError('move', err))
+      }
+      throw err
+    } finally {
+      if (operation === busyOperationRef.current) setBusy(null)
+    }
+  }, [refresh, refreshCurrentMatch])
 
   const actions = useMemo(() => ({
     create: (characterKey: string, boardSkin: 'classic' | 'cinematic' = 'classic') =>
@@ -278,12 +411,7 @@ export function useShadowCheckers(
         void triggerShadowCheckersTurnPushNotification(result.matchId).catch(() => undefined)
         return result
       }, result => result.matchId, 'push'),
-    submitMove: (matchId: string, pieceId: string, path: CheckersPosition[]) =>
-      runAction('move', async () => {
-        const result = await submitShadowCheckersMove(matchId, pieceId, path)
-        void triggerShadowCheckersTurnPushNotification(result.matchId).catch(() => undefined)
-        return result
-      }),
+    submitMove: submitMoveAction,
     resign: (matchId: string) =>
       runAction('resign', () => resignShadowCheckersMatch(matchId)),
     cancel: (matchId: string) =>
@@ -307,11 +435,12 @@ export function useShadowCheckers(
     postChat: (matchId: string, body: string) =>
       runAction('chat', () => postShadowCheckersChatMessage(matchId, body)),
     selectMatch: (matchId: string | null) => {
+      if (matchId !== selectedMatchIdRef.current) selectionGenerationRef.current += 1
       selectedMatchIdRef.current = matchId
       setSelectedMatchId(matchId)
       void refresh(matchId).catch(() => {})
     },
-  }), [refresh, runAction])
+  }), [refresh, runAction, submitMoveAction])
 
   return {
     ...visibleSnapshot,

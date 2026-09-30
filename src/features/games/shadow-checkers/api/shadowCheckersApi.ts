@@ -216,7 +216,9 @@ export async function joinShadowCheckersMatch(sessionId: string, characterKey: s
 }
 
 export async function submitShadowCheckersMove(matchId: string, pieceId: string, path: CheckersPosition[]) {
-  const { workingClient } = await ensureShadowCheckersSession()
+  // The RPC checks auth.uid(), the match participants, and the current turn.
+  // A second auth.getUser() network request only delays an already-authenticated move.
+  const workingClient = await client()
   const { data, error } = await workingClient.rpc('submit_shadow_checkers_move', {
     target_match_id: matchId,
     piece_id: pieceId,

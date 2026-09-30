@@ -119,7 +119,7 @@ export function Sidebar({
       <div className="flex h-20 items-center overflow-visible border-b border-[var(--border-panel)] px-5">
         <div className="flex w-full items-center gap-3">
           <img
-            src="/icons/header-logo-safe.png"
+            src="/icons/app-icon-512.png"
             alt="SHADO"
             className="h-12 w-12 shrink-0 rounded-[var(--radius-md)] object-contain shadow-[0_10px_24px_rgba(0,0,0,0.28)]"
           />

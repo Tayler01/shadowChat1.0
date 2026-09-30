@@ -1,3 +1,14 @@
+## September 29 Shadow Checkers move sync and camera candidate
+
+- Legal moves begin local animation before RPC completion and reconcile the server acknowledgement without replay. Two-player Android/Chromium and iPhone/WebKit browser-emulated runs passed at 10 ms and 146 ms local animation start respectively; both persisted the move, showed the opponent's realtime turn/reply from the correctly flipped seat, and passed camera controls.
+- Reports: `output/playwright/shadow-checkers-unity/multiplayer-1790734760532/summary.json` and `multiplayer-1790734821801/summary.json`. Both report exact test-created data cleanup. Physical iPhone/Android installed-PWA confirmation and production release verification are still pending; these runs are browser evidence only.
+
+## September 27 Shadow Checkers paused for the night
+
+- User paused the goal at 10:49 PM ET. Interrupted active implementation agents and saved the next requests in `SHADOW_CHECKERS_FINISH_CHECKLIST.md`: reduce move sync delay, animate validated local moves immediately with authoritative reconciliation, and smooth camera rotation. These three changes are not implemented or verified.
+- Opponent-seat fix is committed locally at `5366fb61` with rebuilt Unity assets, 1,200 native picking checks plus 14 seat/motion checks, 28 focused Jest tests, lint/types and Chromium/WebKit seat-switch proof. It has not been published. Live remains `47b0775` / Netlify `6ab9d01510b8d67a73d93cd6`.
+- Stopped obsolete packaging job; cleanup found no remaining matching packaging helpers. Resume needs fresh build/release verification and manual Netlify deploy. Preserve unrelated changes and inspect unreviewed Unity scene/project-settings diffs.
+
 ## September 27 Shadow Checkers continuation parity and production rules proof
 
 - Follow-up hosted invite-choice/Decline check passed on `47b0775` with no game created and exact cleanup counts zero (`output/playwright/shadow-checkers-choice-decline-1790562575111/summary.json`). Opponent-seat phone report is now being corrected: native reproduction confirms unchanged logical pieces retained their old transforms when the viewer role changed.

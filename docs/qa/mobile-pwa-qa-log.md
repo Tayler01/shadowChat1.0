@@ -1,3 +1,15 @@
+## September 29 Shadow Checkers optimistic move and camera browser QA
+
+- Two-player Android/Chromium browser emulation passed: a legal move began local animation 10 ms after input while its RPC was held, the server persisted it without animation replay on acknowledgement, and the opponent saw the realtime turn and replied from the correctly flipped seat. Portrait/landscape gate and camera controls passed. Exact test-created data cleanup passed. Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790734760532/summary.json`.
+- The corresponding iPhone/WebKit browser-emulated run passed the same move, realtime reply, seat and camera checks with 146 ms local animation start and exact cleanup. Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790734821801/summary.json`.
+- These are browser-emulated contexts. Physical iPhone and Android installed-PWA responsiveness, real touch gestures and sustained performance remain pending; this entry does not establish a production deployment.
+
+## September 27 Shadow Checkers opponent orientation follow-up
+
+- Reproduced and corrected stale native token transforms after viewer-seat changes; explicitly clear canceled movement bookkeeping to avoid busy-input lock. Native checks: 240 piece hits, 960 empty-square hits, 14 orientation/motion/reset/overhead checks.
+- Rebuilt WebGL source `5366fb618549f64b7f772f6863836a8c32d52f30` passes one-frame seat switching in Chromium/Pixel 7 and WebKit/iPhone 13 emulation. Both place own home rows nearest and return correct logical piece taps; zero page errors. Reviewed the opponent screenshot with dark pieces near and white far. `output/playwright/shadow-checkers-unity/seat-switch-report.json` records the rebuilt manifest.
+- Physical confirmation that the opponent sees their own pieces nearest remains open. The user's Send/zoom/plain-chat confirmation remains limited to those three prior fixes.
+
 ## September 27 Shadow Checkers continuation release — 10:26 PM ET
 
 - Published `47b07751782a13f8fa48460b8f0c7e980209a2b1`, Netlify `6ab9d01510b8d67a73d93cd6`: queue-leave/status, correct queued-loser waiting action, and explicit invite/queue appearance choices. Full lint/types/build/docs and 254 suites pass (1,471 tests, 16 existing TODOs); Chromium/WebKit layout coverage and one reviewed 667×320/130% invitation screen pass. Public health/11 assets and Linux function/production health verified, restart notice broadcast.

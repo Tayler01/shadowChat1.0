@@ -243,7 +243,8 @@ public partial class ShadowBoard : MonoBehaviour
         bool newRevision=current==null || current.revision!=next.revision;
         current=next;
         GetComponent<MedievalStudyEffects>()?.Configure(next.reducedMotion,presentationPaused);
-        if(flip) { cameraAngle=12; UpdateCamera(); }
+        if(flip) { StopCameraGestureMotion();cameraAngle=12; UpdateCamera(); }
+        else if(next.reducedMotion && cameraGestureMotion!=null) { StopCameraGestureMotion();UpdateCamera(); }
         foreach(var t in lightTiles) t.sharedMaterial=next.highContrast?contrastLight:next.boardSkin=="cinematic"?boardWhite:slateStone;
         foreach(var t in darkTiles) t.sharedMaterial=next.highContrast?contrastDark:next.boardSkin=="cinematic"?boardBlack:blackStone;
         var ids=new HashSet<string>();
@@ -396,11 +397,14 @@ public partial class ShadowBoard : MonoBehaviour
     public void SetCamera(string command)
     {
         if(cameraMotion!=null) {StopCoroutine(cameraMotion);cameraMotion=null;CinematicState(false,"ready");}
-        if(command=="left") cameraAngle-=25;
-        else if(command=="right") cameraAngle+=25;
-        else if(command=="tactical") tactical=!tactical;
-        else { cameraAngle=12; cameraPitch=27.144f;cameraZoom=1;tactical=false; }
-        UpdateCamera(); SendProjection();
+        if(command=="left") {cameraAngle-=25;BeginCameraGestureMotion();}
+        else if(command=="right") {cameraAngle+=25;BeginCameraGestureMotion();}
+        else {
+            StopCameraGestureMotion();
+            if(command=="tactical") tactical=!tactical;
+            else { cameraAngle=12; cameraPitch=27.144f;cameraZoom=1;tactical=false; }
+            UpdateCamera(); SendProjection();
+        }
     }
     [Serializable] class CameraGestureDelta { public float turn;public float tilt;public float zoomRatio=1; }
     public void MoveCamera(string json)
@@ -410,14 +414,12 @@ public partial class ShadowBoard : MonoBehaviour
         cameraAngle=Mathf.Repeat(cameraAngle+Mathf.Clamp(delta.turn,-.25f,.25f)*90,360);
         cameraPitch=Mathf.Clamp(cameraPitch+Mathf.Clamp(delta.tilt,-.3f,.3f)*Mathf.Rad2Deg,20,65);
         cameraZoom=Mathf.Clamp(cameraZoom*Mathf.Clamp(delta.zoomRatio,.75f,1.25f),.75f,1.18f);
-        tactical=false;UpdateCamera();SendProjection();
+        tactical=false;BeginCameraGestureMotion();
     }
     public void SetPaused(string value) { presentationPaused=value=="true";if(presentationPaused) pressed=false;Application.targetFrameRate=presentationPaused?5:30;GetComponent<MedievalStudyEffects>()?.Configure(current?.reducedMotion??false,presentationPaused); }
-    void UpdateCamera()
+    void CameraPose(out Vector3 position,out Quaternion rotation)
     {
-        if(view==null) return;
         float a=cameraAngle*Mathf.Deg2Rad;
-        view.orthographic=tactical;
         float distance=(view.aspect>1.3f?11.8f:13.8f)*Mathf.Max(1,1/Mathf.Max(.8f,view.aspect));
         // The room ceiling is at 12.2; keep the overhead lens inside the study.
         float pitch=cameraPitch*Mathf.Deg2Rad;
@@ -428,9 +430,16 @@ public partial class ShadowBoard : MonoBehaviour
         float radius=arm*Mathf.Cos(pitch),height=-.65f+arm*Mathf.Sin(pitch);
         // Optical zoom stays responsive even when the orbit meets the ceiling.
         // It also avoids pushing the lens through nearby room furnishings.
+        position=new Vector3(Mathf.Sin(a)*(tactical?.01f:radius),tactical?10:height,-Mathf.Cos(a)*(tactical?.01f:radius));
+        rotation=Quaternion.LookRotation(new Vector3(0,-.65f,0)-position);
+    }
+    void UpdateCamera()
+    {
+        if(view==null) return;
+        CameraPose(out var position,out var rotation);
+        view.orthographic=tactical;
         view.fieldOfView=43*cameraZoom;
-        view.transform.position=new Vector3(Mathf.Sin(a)*(tactical?.01f:radius),tactical?10:height,-Mathf.Cos(a)*(tactical?.01f:radius));
-        view.transform.LookAt(new Vector3(0,-.65f,0));
+        view.transform.SetPositionAndRotation(position,rotation);
         view.orthographicSize=Mathf.Max(5.35f,5.5f/Mathf.Max(.65f,view.aspect));
     }
     int previousWidth,previousHeight;
@@ -475,7 +484,7 @@ public partial class ShadowBoard : MonoBehaviour
             Emit(new BoardEvent {type="presented",revision=current.revision});
         }
         if(Screen.width!=previousWidth || Screen.height!=previousHeight)
-        { previousWidth=Screen.width; previousHeight=Screen.height;if(cameraMotion==null) UpdateCamera(); SendProjection(); }
+        { previousWidth=Screen.width; previousHeight=Screen.height;if(cameraMotion==null && cameraGestureMotion==null) UpdateCamera(); SendProjection(); }
         if(presentationPaused || current==null || current.disabled || cameraMotion!=null || movingCount>0) {pressed=false;return;}
 #if !UNITY_WEBGL || UNITY_EDITOR
         if(Input.GetMouseButtonDown(0)) { pressPoint=Input.mousePosition; pressed=true; }

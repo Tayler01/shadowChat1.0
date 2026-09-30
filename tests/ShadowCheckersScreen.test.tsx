@@ -2,7 +2,7 @@ import { act, fireEvent, render as renderBase, screen, waitFor, within } from '@
 import type { ReactElement } from 'react'
 import { ComfortProvider } from '../src/hooks/useComfortPreferences'
 import { ShadowCheckersScreen } from '../src/features/games/shadow-checkers/ShadowCheckersScreen'
-import { createInitialBoard, serializeBoard } from '../src/features/games/shadow-checkers/engine/checkers'
+import { applyMove, createInitialBoard, serializeBoard } from '../src/features/games/shadow-checkers/engine/checkers'
 import type { BasicUser, ShadowCheckersMatch } from '../src/lib/supabase'
 import { SHADOW_CHECKERS_CHARACTERS } from '../src/features/games/shadow-checkers/assets/manifest'
 
@@ -152,6 +152,182 @@ test('the host sends the opponent seat on entry and on same-board role changes',
   expect(second.revision).not.toBe(spectator.revision)
   expect(screen.getByTitle('Shadow Checkers 3D board')).toBe(iframe)
   post.mockRestore()
+})
+
+function openMoveFrame() {
+  const view = render(<ShadowCheckersScreen />)
+  const iframe = screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
+  const post = jest.spyOn(iframe.contentWindow!, 'postMessage')
+  const emit = (data: Record<string, unknown>) => act(() => window.dispatchEvent(new MessageEvent('message', {
+    origin: location.origin, source: iframe.contentWindow, data: { version: 1, ...data },
+  })))
+  emit({ type: 'ready' })
+  const snapshots = () => post.mock.calls.filter(call => call[0].type === 'snapshot').map(call => call[0].value)
+  const latest = () => { const sent = snapshots(); return sent[sent.length - 1] }
+  const move = (from: { row: number; col: number }, to: { row: number; col: number }) => {
+    emit({ type: 'square', revision: latest().revision, ...from })
+    emit({ type: 'square', revision: latest().revision, ...to })
+  }
+  return { view, iframe, post, emit, snapshots, latest, move }
+}
+
+test('shows a legal move while its RPC is pending, survives stale refresh, and reconciles without replay', async () => {
+  const fixture = mockUseShadowCheckers()
+  let resolveMove!: (value: unknown) => void
+  fixture.actions.submitMove.mockImplementation(() => new Promise(resolve => { resolveMove = resolve }))
+  const board = openMoveFrame()
+  const initial = board.latest()
+  board.move({ row: 5, col: 0 }, { row: 4, col: 1 })
+  expect(fixture.actions.submitMove).toHaveBeenCalledTimes(1)
+  expect(fixture.actions.submitMove).toHaveBeenCalledWith('match-1', 'p1-5-0', [{ row: 5, col: 0 }, { row: 4, col: 1 }])
+  expect(board.latest().pieces.find((piece: { id: string }) => piece.id === 'p1-5-0')).toMatchObject({ row: 4, col: 1 })
+  expect(board.latest().disabled).toBe(true)
+  board.emit({ type: 'square', revision: board.latest().revision, row: 4, col: 1 })
+  expect(fixture.actions.submitMove).toHaveBeenCalledTimes(1)
+
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: { ...activeMatch } })
+  board.view.rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  expect(board.latest().pieces.find((piece: { id: string }) => piece.id === 'p1-5-0')).toMatchObject({ row: 4, col: 1 })
+
+  const authoritative = applyMove(createInitialBoard(), 'player_one', 'p1-5-0', [{ row: 5, col: 0 }, { row: 4, col: 1 }]).state
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: { ...activeMatch, move_count: 1, current_turn_user_id: 'player-two', board_state: serializeBoard(authoritative) } })
+  board.view.rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  expect(board.latest().pieces).toEqual(authoritative.pieces)
+  expect(board.latest().pieces).not.toEqual(initial.pieces)
+  const acknowledgedSnapshots = board.snapshots().length
+  await act(async () => resolveMove({ matchId: 'match-1', completed: false }))
+  expect(board.snapshots()).toHaveLength(acknowledgedSnapshots)
+  expect(fixture.actions.submitMove).toHaveBeenCalledTimes(1)
+  board.post.mockRestore()
+})
+
+test('rejected move restores the authoritative pieces and reports the failure', async () => {
+  const fixture = mockUseShadowCheckers()
+  let rejectMove!: (error: Error) => void
+  fixture.actions.submitMove.mockImplementation(() => new Promise((_, reject) => { rejectMove = reject }))
+  const board = openMoveFrame()
+  const initialPieces = board.latest().pieces
+  board.move({ row: 5, col: 0 }, { row: 4, col: 1 })
+  expect(board.latest().pieces).not.toEqual(initialPieces)
+  await act(async () => rejectMove(new Error('Connection lost')))
+  expect(board.latest().pieces).toEqual(initialPieces)
+  expect(screen.getByText('Connection lost')).toBeInTheDocument()
+  board.post.mockRestore()
+})
+
+test('a confirmed RPC keeps the preview until the authoritative board revision arrives', async () => {
+  const fixture = mockUseShadowCheckers()
+  fixture.actions.submitMove.mockResolvedValue({ matchId: 'match-1', completed: false })
+  const board = openMoveFrame()
+  board.move({ row: 5, col: 0 }, { row: 4, col: 1 })
+  await waitFor(() => expect(screen.getByText('Your move is played')).toBeInTheDocument())
+  expect(board.latest().pieces.find((piece: { id: string }) => piece.id === 'p1-5-0')).toMatchObject({ row: 4, col: 1 })
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: { ...activeMatch } })
+  board.view.rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  expect(board.latest().pieces.find((piece: { id: string }) => piece.id === 'p1-5-0')).toMatchObject({ row: 4, col: 1 })
+  const accepted = applyMove(createInitialBoard(), 'player_one', 'p1-5-0', [{ row: 5, col: 0 }, { row: 4, col: 1 }]).state
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: { ...activeMatch, move_count: 1, current_turn_user_id: 'player-two', board_state: serializeBoard(accepted) } })
+  board.view.rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  expect(board.latest().pieces).toEqual(accepted.pieces)
+  board.post.mockRestore()
+})
+
+test('the opponent sees only server-published board positions', () => {
+  mockCurrentUserId = 'player-two'
+  const fixture = mockUseShadowCheckers()
+  const board = openMoveFrame()
+  const original = board.latest().pieces
+  board.emit({ type: 'square', revision: board.latest().revision, row: 2, col: 1 })
+  expect(fixture.actions.submitMove).not.toHaveBeenCalled()
+  expect(board.latest().pieces).toEqual(original)
+  const accepted = applyMove(createInitialBoard(), 'player_one', 'p1-5-0', [{ row: 5, col: 0 }, { row: 4, col: 1 }]).state
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: { ...activeMatch, move_count: 1, current_turn_user_id: 'player-two', board_state: serializeBoard(accepted) } })
+  board.view.rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  expect(board.latest().pieces).toEqual(accepted.pieces)
+  board.post.mockRestore()
+})
+
+test('a delayed move result cannot affect a newly opened match or account', async () => {
+  const fixture = mockUseShadowCheckers()
+  let rejectMove!: (error: Error) => void
+  fixture.actions.submitMove.mockImplementation(() => new Promise((_, reject) => { rejectMove = reject }))
+  const board = openMoveFrame()
+  board.move({ row: 5, col: 0 }, { row: 4, col: 1 })
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, selectedMatchId: 'match-2' })
+  board.view.rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  expect(board.latest().pieces).toEqual(createInitialBoard().pieces)
+  mockCurrentUserId = 'player-two'
+  const nextMatch = { ...activeMatch, id: 'match-2', current_turn_user_id: 'player-two' }
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: nextMatch, selectedMatchId: nextMatch.id })
+  board.view.rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+  expect(screen.getByTitle('Shadow Checkers 3D board')).not.toBe(board.iframe)
+  await act(async () => rejectMove(new Error('Old match failed')))
+  expect(screen.queryByText('Old match failed')).not.toBeInTheDocument()
+  const nextFrame = screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
+  const nextPost = jest.spyOn(nextFrame.contentWindow!, 'postMessage')
+  act(() => window.dispatchEvent(new MessageEvent('message', { origin: location.origin, source: nextFrame.contentWindow, data: { version: 1, type: 'ready' } })))
+  const latest = nextPost.mock.calls.filter(call => call[0].type === 'snapshot').map(call => call[0].value).pop()
+  expect(latest.viewerSlot).toBe('player_two')
+  expect(latest.pieces).toEqual(createInitialBoard().pieces)
+  nextPost.mockRestore()
+  board.post.mockRestore()
+})
+
+test.each([
+  ['multiple jumps', [{ id: 'silver', owner: 'player_one', row: 5, col: 0, king: false }, { id: 'black-1', owner: 'player_two', row: 4, col: 1, king: false }, { id: 'black-2', owner: 'player_two', row: 2, col: 3, king: false }, { id: 'black-3', owner: 'player_two', row: 0, col: 7, king: false }], { row: 5, col: 0 }, { row: 1, col: 4 }, false],
+  ['kinging finish', [{ id: 'silver', owner: 'player_one', row: 2, col: 1, king: false }, { id: 'black-1', owner: 'player_two', row: 1, col: 2, king: false }], { row: 2, col: 1 }, { row: 0, col: 3 }, true],
+] as const)('predicts %s locally without announcing an unconfirmed result', async (_name, pieces, from, to, terminal) => {
+  const fixture = mockUseShadowCheckers()
+  const state = createInitialBoard()
+  state.pieces = pieces.map(piece => ({ ...piece }))
+  let resolveMove!: (value: unknown) => void
+  fixture.actions.submitMove.mockImplementation(() => new Promise(resolve => { resolveMove = resolve }))
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: { ...activeMatch, board_state: serializeBoard(state) } })
+  const board = openMoveFrame()
+  board.move(from, to)
+  const snapshot = board.latest()
+  expect(snapshot.pieces.find((piece: { id: string }) => piece.id === 'silver')).toMatchObject({ row: to.row, col: to.col, king: terminal })
+  expect(snapshot.pieces.filter((piece: { owner: string }) => piece.owner === 'player_two')).toHaveLength(terminal ? 0 : 1)
+  expect(snapshot.winner).toBe(terminal ? 'player_one' : '')
+  expect(screen.queryByRole('heading', { name: 'Victory' })).not.toBeInTheDocument()
+  if (terminal) {
+    board.emit({ type: 'presented', revision: snapshot.revision })
+    expect(screen.queryByRole('heading', { name: 'Victory' })).not.toBeInTheDocument()
+    const accepted = applyMove(state, 'player_one', 'silver', [{ ...from }, { row: 0, col: 3 }]).state
+    mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: { ...activeMatch, status: 'completed', move_count: 1, board_state: serializeBoard(accepted) } })
+    board.view.rerender(<ComfortProvider><ShadowCheckersScreen /></ComfortProvider>)
+    expect(screen.queryByRole('heading', { name: 'Victory' })).not.toBeInTheDocument()
+    board.emit({ type: 'presented', revision: board.latest().revision })
+    expect(screen.getByRole('heading', { name: 'Victory' })).toBeInTheDocument()
+  }
+  expect(fixture.actions.submitMove).toHaveBeenCalledTimes(1)
+  // Settle the deferred RPC so this test does not leave an in-flight action.
+  await act(async () => resolveMove({ matchId: 'match-1', completed: terminal }))
+  board.view.unmount()
+  board.post.mockRestore()
+})
+
+test('a sync timeout rolls back the preview and keeps input locked while rechecking the table', async () => {
+  const fixture = mockUseShadowCheckers()
+  let rejectMove!: (error: Error) => void
+  fixture.actions.submitMove.mockImplementation(() => new Promise((_, reject) => { rejectMove = reject }))
+  const board = openMoveFrame()
+  const initialPieces = board.latest().pieces
+  jest.useFakeTimers()
+  try {
+    board.move({ row: 5, col: 0 }, { row: 4, col: 1 })
+    expect(board.latest().pieces).not.toEqual(initialPieces)
+    act(() => jest.advanceTimersByTime(15_000))
+    expect(board.latest().pieces).toEqual(initialPieces)
+    expect(board.latest().disabled).toBe(true)
+    expect(fixture.actions.selectMatch).toHaveBeenCalledWith('match-1')
+    expect(screen.getByText(/Move sync is taking longer/)).toBeInTheDocument()
+    await act(async () => rejectMove(new Error('Connection lost')))
+    expect(fixture.actions.submitMove).toHaveBeenCalledTimes(1)
+  } finally {
+    jest.useRealTimers()
+    board.post.mockRestore()
+  }
 })
 
 test('shows a compact feed and toggles the composer without a room header', () => {

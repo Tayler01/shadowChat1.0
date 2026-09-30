@@ -15,7 +15,7 @@ import { SHADOW_CHECKERS_ASSETS, SHADOW_CHECKERS_CHARACTERS, getShadowCheckersCh
 import { ShadowCheckersUnityBoard, type ShadowCheckersBoardControls } from './components/ShadowCheckersUnityBoard'
 import { CheckersCrownBadge } from './components/CheckersCrownBadge'
 import { ShadowCheckersInvitePicker } from './components/ShadowCheckersInvitations'
-import { deserializeBoard, getLegalMoves, hasMandatoryCapture } from './engine/checkers'
+import { applyMove, deserializeBoard, getLegalMoves, hasMandatoryCapture } from './engine/checkers'
 import type { CheckersBoardState, CheckersMove, CheckersPiece, CheckersPlayer } from './engine/types'
 import { useShadowCheckers } from './hooks/useShadowCheckers'
 
@@ -104,6 +104,25 @@ function formatCheckersActionError(error: unknown, fallback = 'Shadow Checkers a
 
 type ShadowCheckersBoardSkin = 'classic' | 'cinematic'
 
+interface PendingMovePreview {
+  id: number
+  matchId: string
+  userId: string
+  baseMoveCount: number
+  source: CheckersBoardState
+  predicted: CheckersBoardState
+  timedOut?: boolean
+}
+
+function sameBoardPosition(left: CheckersBoardState, right: CheckersBoardState) {
+  if (left.turn !== right.turn || left.moveNumber !== right.moveNumber || left.pieces.length !== right.pieces.length) return false
+  const pieces = new Map(left.pieces.map(piece => [piece.id, piece]))
+  return right.pieces.every(piece => {
+    const original = pieces.get(piece.id)
+    return original?.owner === piece.owner && original.row === piece.row && original.col === piece.col && original.king === piece.king
+  })
+}
+
 function normalizeBoardSkin(value?: string | null): ShadowCheckersBoardSkin {
   return value === 'cinematic' ? 'cinematic' : 'classic'
 }
@@ -173,6 +192,13 @@ export function ShadowCheckersScreen({
   const [chatDraft, setChatDraft] = React.useState('')
   const [dismissedResultMatchId, setDismissedResultMatchId] = React.useState<string | null>(null)
   const [presentedBoard, setPresentedBoard] = React.useState<CheckersBoardState | null>(null)
+  const [pendingMovePreview, setPendingMovePreview] = React.useState<PendingMovePreview | null>(null)
+  const [moveLocked, setMoveLocked] = React.useState(false)
+  const moveSequence = React.useRef(0)
+  const moveInFlight = React.useRef<{ id: number; matchId: string; userId: string } | null>(null)
+  const pendingMoveRef = React.useRef<PendingMovePreview | null>(null)
+  const moveTimeout = React.useRef<number | null>(null)
+  const currentIdentity = React.useRef<{ matchId: string | null; userId: string | null }>({ matchId: null, userId: null })
   const [showYourTurnBanner, setShowYourTurnBanner] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement | null>(null)
   const [confirmation, setConfirmation] = React.useState<null | { kind: 'resign' | 'cancel'; matchId: string; adminRemoval?: boolean }>(null)
@@ -208,9 +234,14 @@ export function ShadowCheckersScreen({
   const state = React.useMemo(() => (
     activeMatch ? deserializeBoard(activeMatch.board_state as any) : null
   ), [activeMatch])
+  currentIdentity.current = { matchId: selectedMatchId, userId: user?.id ?? null }
   const viewerSlot = playerSlot(activeMatch, user?.id)
   const activePlayer = viewerSlot !== 'spectator'
-  const myTurn = Boolean(activeMatch && state && activePlayer && activeMatch.current_turn_user_id === user?.id && activeMatch.status === 'active')
+  const pendingSourceCurrent = Boolean(pendingMovePreview && state && selectedMatchId === pendingMovePreview.matchId && activeMatch?.id === pendingMovePreview.matchId && user?.id === pendingMovePreview.userId
+    && activeMatch.status === 'active' && activeMatch.move_count === pendingMovePreview.baseMoveCount && sameBoardPosition(state, pendingMovePreview.source))
+  const previewCurrent = pendingSourceCurrent && !pendingMovePreview?.timedOut
+  const boardState = previewCurrent ? pendingMovePreview!.predicted : state
+  const myTurn = Boolean(activeMatch && state && activePlayer && !moveLocked && activeMatch.current_turn_user_id === user?.id && activeMatch.status === 'active')
   const currentTurnSlot: CheckersPlayer | null =
     activeMatch?.current_turn_user_id === activeMatch?.player_one_id
       ? 'player_one'
@@ -245,6 +276,31 @@ export function ShadowCheckersScreen({
   const visibleLeaders = leaderboard.slice(Math.min(famePage, famePageCount - 1), Math.min(famePage, famePageCount - 1) + 1)
   const myMatch = React.useMemo(() => matches.find(match => isPlayer(match, user?.id)) ?? null, [matches, user?.id])
   const activeBoardSkin = activeMatch ? normalizeBoardSkin(activeMatch.board_skin) : selectedBoardSkin
+
+  React.useEffect(() => {
+    if (!pendingMovePreview || pendingSourceCurrent) return
+    pendingMoveRef.current = null
+    setPendingMovePreview(null)
+    setMoveLocked(false)
+    if (moveTimeout.current !== null) window.clearTimeout(moveTimeout.current)
+    moveTimeout.current = null
+  }, [pendingMovePreview, pendingSourceCurrent])
+
+  React.useEffect(() => {
+    return () => {
+      if (moveTimeout.current !== null) window.clearTimeout(moveTimeout.current)
+      moveTimeout.current = null
+      pendingMoveRef.current = null
+      moveInFlight.current = null
+    }
+  }, [selectedMatchId, user?.id])
+
+  React.useEffect(() => {
+    if (pendingMovePreview && (pendingMovePreview.matchId !== selectedMatchId || pendingMovePreview.matchId !== activeMatch?.id || pendingMovePreview.userId !== user?.id)) {
+      setPendingMovePreview(null)
+      setMoveLocked(false)
+    }
+  }, [activeMatch?.id, pendingMovePreview, selectedMatchId, user?.id])
 
   React.useEffect(() => {
     setSelectedPieceId(null)
@@ -361,17 +417,49 @@ export function ShadowCheckersScreen({
   }
 
   const handleSelectMove = (move: CheckersMove) => {
-    if (!activeMatch || !myTurn) return
+    if (!activeMatch || selectedMatchId !== activeMatch.id || !state || !user?.id || !myTurn || viewerSlot === 'spectator' || moveInFlight.current) return
+    let predicted: CheckersBoardState
+    try {
+      predicted = applyMove(state, viewerSlot, move.pieceId, move.path).state
+    } catch (err) {
+      notify('error', formatCheckersActionError(err, 'That move is not legal.'))
+      return
+    }
+    const id = ++moveSequence.current
+    const matchId = activeMatch.id
+    const userId = user.id
+    const preview = { id, matchId, userId, baseMoveCount: activeMatch.move_count, source: state, predicted }
+    moveInFlight.current = { id, matchId, userId }
+    pendingMoveRef.current = preview
+    setPendingMovePreview(preview)
+    setMoveLocked(true)
+    setSelectedPieceId(null)
+    setHelperMoves([])
+    moveTimeout.current = window.setTimeout(() => {
+      if (pendingMoveRef.current?.id !== id || currentIdentity.current.matchId !== matchId || currentIdentity.current.userId !== userId) return
+      pendingMoveRef.current = null
+      setPendingMovePreview(current => current?.id === id ? { ...current, timedOut: true } : current)
+      notify('error', 'Move sync is taking longer than expected. Checking the table.')
+      actions.selectMatch(matchId)
+    }, 15_000)
     void (async () => {
       try {
-        await actions.submitMove(activeMatch.id, move.pieceId, move.path)
-        notify('success', 'Your move is played')
+        await actions.submitMove(matchId, move.pieceId, move.path)
+        if (moveInFlight.current?.id === id && currentIdentity.current.matchId === matchId && currentIdentity.current.userId === userId) notify('success', 'Your move is played')
       } catch (err) {
-        if (isMandatoryJumpError(err) && state && viewerSlot !== 'spectator') {
+        if (moveInFlight.current?.id !== id || currentIdentity.current.matchId !== matchId || currentIdentity.current.userId !== userId) return
+        if (pendingMoveRef.current?.id === id) pendingMoveRef.current = null
+        setPendingMovePreview(current => current?.id === id ? null : current)
+        setMoveLocked(false)
+        if (moveTimeout.current !== null) window.clearTimeout(moveTimeout.current)
+        moveTimeout.current = null
+        if (isMandatoryJumpError(err)) {
           const captureMoves = getLegalMoves(state, viewerSlot).filter(candidate => candidate.captures.length > 0)
           setHelperMoves(captureMoves)
         }
         notify('error', formatCheckersActionError(err, 'That move is not legal.'))
+      } finally {
+        if (moveInFlight.current?.id === id) moveInFlight.current = null
       }
     })()
   }
@@ -837,7 +925,7 @@ export function ShadowCheckersScreen({
                 masterSoundEnabled={masterSoundEnabled}
                 onPresentationComplete={setPresentedBoard}
                 paused={rotateGate}
-                state={state}
+                state={boardState ?? state}
                 viewerSlot={viewerSlot}
                 selectedPieceId={selectedPieceId}
                 legalMoves={legalMoves}
@@ -846,7 +934,7 @@ export function ShadowCheckersScreen({
                 onSelectPiece={handleSelectPiece}
                 onSelectMove={handleSelectMove}
                 onInvalidDestination={handleInvalidDestination}
-                disabled={rotateGate || Boolean(confirmation) || !myTurn || Boolean(state.winner) || busy === 'move'}
+                disabled={rotateGate || Boolean(confirmation) || !myTurn || Boolean(state.winner) || moveLocked || busy === 'move'}
                 showHints={showHints}
                 boardSkin={activeBoardSkin}
               />

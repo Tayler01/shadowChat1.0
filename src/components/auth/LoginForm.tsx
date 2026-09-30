@@ -348,7 +348,7 @@ export function LoginForm() {
           <div className="space-y-2 text-center sm:space-y-3">
             <div className="flex justify-center">
               <img
-                src="/icons/header-logo-safe.png"
+                src="/icons/app-icon-512.png"
                 alt="SHADO"
                 className="theme-logo h-20 w-20 rounded-[var(--radius-xl)] object-contain shadow-[0_14px_30px_rgba(0,0,0,0.3)] sm:h-24 sm:w-24"
               />
