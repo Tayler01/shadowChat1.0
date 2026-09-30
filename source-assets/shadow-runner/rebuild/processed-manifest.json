@@ -1,0 +1,626 @@
+[
+  {
+    "filename": "east-gate-moonrise-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 181554,
+    "sha256": "36b61fea28f4d6949a186534df1c3e35bab226519749fdcb4471fddca72a6536",
+    "source": "east-gate-moonrise-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "e9f3955f4e14884fb6fee444281700715c2ab2356dafd5b6ea84d112c538a976"
+  },
+  {
+    "filename": "east-gate-moonrise-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 11218,
+    "sha256": "d30b7303d9d2ad488403ad9bc5d26d4a0f3172eecc8c6c80dbd5d1eec63d02fd",
+    "source": "east-gate-moonrise-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "e9f3955f4e14884fb6fee444281700715c2ab2356dafd5b6ea84d112c538a976"
+  },
+  {
+    "filename": "moonlit-causeway-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 191864,
+    "sha256": "80ee8737edc8db749d237ba2060d1fdbb7ea52442276995e815db6c26f089ed9",
+    "source": "moonlit-causeway-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "ca5eb69c35c630c0c451735b75c3d0d3fb7dcb130b01b4b54b6e6c4afa751caf"
+  },
+  {
+    "filename": "moonlit-causeway-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 11738,
+    "sha256": "8ed8dc1e91461deffe36e53638663ce803aa314def99cc46d6600f28db18ec54",
+    "source": "moonlit-causeway-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "ca5eb69c35c630c0c451735b75c3d0d3fb7dcb130b01b4b54b6e6c4afa751caf"
+  },
+  {
+    "filename": "lantern-market-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 107330,
+    "sha256": "1afe8ee60226045d8143cf7f254974105f729df799be06c08dc86e0aa99b0bf5",
+    "source": "lantern-market-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "879e4a116cb11b2f7e3aa3b5985f0147869c21ecee4a4f1ea57ff239c592d048"
+  },
+  {
+    "filename": "lantern-market-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 6494,
+    "sha256": "210559749f8596084764722a3d2764a6ad05732af6f1f71b32dc1050283e312c",
+    "source": "lantern-market-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "879e4a116cb11b2f7e3aa3b5985f0147869c21ecee4a4f1ea57ff239c592d048"
+  },
+  {
+    "filename": "ivy-viaduct-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 196312,
+    "sha256": "2a7a08520c134bc310898f6c61a0be4889d17ffa06933cc24983abd26e8f90cc",
+    "source": "ivy-viaduct-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "c715b2be9e381784ea22d41a5d6279289b9c522f98c3ec0a4108c292cde84b76"
+  },
+  {
+    "filename": "ivy-viaduct-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 11024,
+    "sha256": "626f7a6dfd96d8f09d3f9a12a0a643410862df57c8f761155b7f0479d5cab493",
+    "source": "ivy-viaduct-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "c715b2be9e381784ea22d41a5d6279289b9c522f98c3ec0a4108c292cde84b76"
+  },
+  {
+    "filename": "bell-tower-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 180622,
+    "sha256": "533dda18827afb1f58f04e937b01487b99c7abe1ceee52238136584612c10751",
+    "source": "bell-tower-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 940,
+    "sourceSha256": "dc6c7c1df85288414291ca50386f5754ca5c722d86cf1f4a15794ae7f788a221"
+  },
+  {
+    "filename": "bell-tower-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 9184,
+    "sha256": "d4dbf6460e5b9edb61445b34e0ef47927c1842ef3915b8db1f0201fecd0e2ebb",
+    "source": "bell-tower-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 940,
+    "sourceSha256": "dc6c7c1df85288414291ca50386f5754ca5c722d86cf1f4a15794ae7f788a221"
+  },
+  {
+    "filename": "candle-fair-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 210268,
+    "sha256": "58bdabe7b530dfad44fd2de9398eff0f463d4d5e2b2dda8dee1da0beda63e71c",
+    "source": "candle-fair-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "b42f81e20280b3bc2dcb8bf828b0313545dd9c708dd6ca8d1e14e6d391633399"
+  },
+  {
+    "filename": "candle-fair-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 11478,
+    "sha256": "99aba12e6a0ecefb9f2c1c1125f84f6313b52ed23b7831312413f8e6d582f88b",
+    "source": "candle-fair-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "b42f81e20280b3bc2dcb8bf828b0313545dd9c708dd6ca8d1e14e6d391633399"
+  },
+  {
+    "filename": "clockmaker-yard-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 194418,
+    "sha256": "f09ba4ff5bf5508881e3dcd30f424c53eb323be6b6df8c353a6f1d8892fd09f9",
+    "source": "clockmaker-yard-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "a5b7cda45518f7133aa4d4239eb03c87da7a8d5c7bbc79526c65ac8c297ee01c"
+  },
+  {
+    "filename": "clockmaker-yard-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 8742,
+    "sha256": "ef8ed2c49e58d1f03f9e54f99c37500aa3f8eae4e3a855a91c8a78cb4211df8e",
+    "source": "clockmaker-yard-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "a5b7cda45518f7133aa4d4239eb03c87da7a8d5c7bbc79526c65ac8c297ee01c"
+  },
+  {
+    "filename": "courier-catacombs-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 202222,
+    "sha256": "c0f59792a5ba6e1c0c8c0a289d731d38b070613a18e22b20fe612414c26b9998",
+    "source": "courier-catacombs-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "e27b7d7923edeb447416e89c8281ef4f2c7967fd66a339c28670b208e343accf"
+  },
+  {
+    "filename": "courier-catacombs-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 9900,
+    "sha256": "9c466353ee09c7421e56be3140a3bd0846d4038f079fb6519a9494a9c2adc0f8",
+    "source": "courier-catacombs-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "e27b7d7923edeb447416e89c8281ef4f2c7967fd66a339c28670b208e343accf"
+  },
+  {
+    "filename": "broken-crown-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 251266,
+    "sha256": "697df473f75de4f06b6c23f485f8422c957dec656c4055522c27c93473d19ca1",
+    "source": "broken-crown-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "edcf5223a8dd9f3634105da374a9309c65b5e32ce782815bdae55c3d420e5501"
+  },
+  {
+    "filename": "relay-ignition-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 273392,
+    "sha256": "a5593a44ba645d2af280fd94730e6e051b50fa92baf04a36eef225403102c72b",
+    "source": "relay-ignition-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "5f1dcfab03de84a47d89aa657bae0206b64107e16cf32313b31a2ddd67752dd1"
+  },
+  {
+    "filename": "silver-courier-walkway.webp",
+    "width": 1024,
+    "height": 132,
+    "bytes": 145688,
+    "sha256": "9be29dcda90e401b597dc63fc5ba3e99c2215dd6d5ff42c9b07637c36ea39019",
+    "source": "silver-courier-walkway-master.png",
+    "sourceWidth": 2161,
+    "sourceHeight": 728,
+    "sourceSha256": "c8bef3e68ef35b7502d755c5a1d17b9d6ea20acc14f7e7e1595e0bc2a44757b3"
+  },
+  {
+    "filename": "courier-waypost.webp",
+    "width": 64,
+    "height": 176,
+    "bytes": 13304,
+    "sha256": "2ae02c2d327714bd33c35e2c029a635cc64fe958249ed31cab0befc4ce536249",
+    "source": "courier-waypost-master.png",
+    "sourceWidth": 1236,
+    "sourceHeight": 1272,
+    "sourceSha256": "fd20a6c3f7fee32cb2810c3fa19eee9d3abab49d149bcc5a10f581179141ea60"
+  },
+  {
+    "filename": "relay-masonry.webp",
+    "width": 1024,
+    "height": 272,
+    "bytes": 128498,
+    "sha256": "7921b02a663bc34c5176450b6354dc4311d9949b4d52b51c956b17309a7133a1",
+    "source": "relay-masonry-master.png",
+    "sourceWidth": 1536,
+    "sourceHeight": 1024,
+    "sourceSha256": "ca60d65c4227b4e3cd02b6989034ab9777b93dc3c96ac90cdb244e1e33867458"
+  },
+  {
+    "filename": "captain-masonry.webp",
+    "width": 1024,
+    "height": 224,
+    "bytes": 95862,
+    "sha256": "ff67b2be1e91e823b59d76a09a1c6dd6ef9d4929cd5e1e6c8644579ad3d940fa",
+    "source": "captain-masonry-master.png",
+    "sourceWidth": 1536,
+    "sourceHeight": 1024,
+    "sourceSha256": "34a484173ff779da6c21a1825b0e782ab5bbd3c281bde6962dcc148ad66d2313"
+  },
+  {
+    "filename": "catacomb-hanging-lantern.webp",
+    "width": 72,
+    "height": 404,
+    "bytes": 24878,
+    "sha256": "5b95e46add50e4384c4bf087e66720a1b3fb21ed2232a76ad7aec419f86a8b7f",
+    "source": "catacomb-hanging-lantern-master.png",
+    "sourceWidth": 724,
+    "sourceHeight": 2172,
+    "sourceSha256": "5ab5b486ae3239c6b2b00bdb3a5a39c5ca71b2bbe09ab76bad478aae56774358"
+  },
+  {
+    "filename": "captain-gate-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 177650,
+    "sha256": "5323aef38bb03ec08caf6864fb908953ed3a9a036facc5837ea2bb8cf370f490",
+    "source": "captain-gate-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "97a4cee85925ed4315f66b39b29e5a36f9a9e317c9d671593e35139064b23059"
+  },
+  {
+    "filename": "captain-gate-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 11760,
+    "sha256": "b83492f7973328ac3856e6f0009505cc619334a5235ef0fbed4f162d9a8d9c76",
+    "source": "captain-gate-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "97a4cee85925ed4315f66b39b29e5a36f9a9e317c9d671593e35139064b23059"
+  },
+  {
+    "filename": "dawn-relay-spire-background.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 192144,
+    "sha256": "b38c157fd6daf601ea642a1ac5f4c7a43cb459b0b2147efc5641433a272b6080",
+    "source": "dawn-relay-spire-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "54fb4a61fa058f49f41d93e415be4b381fff358f8c039088046794283f21aa3c"
+  },
+  {
+    "filename": "dawn-relay-spire-thumbnail.webp",
+    "width": 320,
+    "height": 180,
+    "bytes": 12018,
+    "sha256": "7d24b0a947c410dbd4c725664441d3c2f0e7567a9b9072c3b3907153cc9462f5",
+    "source": "dawn-relay-spire-master.png",
+    "sourceWidth": 1672,
+    "sourceHeight": 941,
+    "sourceSha256": "54fb4a61fa058f49f41d93e415be4b381fff358f8c039088046794283f21aa3c"
+  },
+  {
+    "filename": "watch-banner.webp",
+    "width": 128,
+    "height": 448,
+    "bytes": 40232,
+    "sha256": "57e54919134f1449bcb7a39649e0c6a4b7828d06bacda4fafdfc930130ebf26a",
+    "source": "watch-banner-master.png",
+    "sourceWidth": 735,
+    "sourceHeight": 2138,
+    "sourceSha256": "3eb21211a068b36e42c91a1ebb9b09a50b8e64a45c253fb408d7dab0b0ca61ad"
+  },
+  {
+    "filename": "relay-hanging-cage.webp",
+    "width": 80,
+    "height": 400,
+    "bytes": 38518,
+    "sha256": "e440a9ac618b858c561edc826a84737421fd0e3a2a6fb9bc03677a3947b7e05c",
+    "source": "relay-hanging-cage-master.png",
+    "sourceWidth": 1024,
+    "sourceHeight": 1536,
+    "sourceSha256": "c4d043a3a65b74b35bdebbcc2c13ec5ff19fc3764257196b6e5b809e18d18b53"
+  },
+  {
+    "filename": "story-oath.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 21544,
+    "sha256": "16d13bf5fcce91c9570b5ce91b3bbe35bc5fae64f6e3f66353fcbb25c16a1f01",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 0,
+      "top": 0,
+      "width": 417,
+      "height": 402
+    }
+  },
+  {
+    "filename": "story-dispatch.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 17304,
+    "sha256": "f05fe5ae007363ff6e7aacb534cd8e83e2f5809942039308506d0c458afa47c0",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 417,
+      "top": 0,
+      "width": 416,
+      "height": 402
+    }
+  },
+  {
+    "filename": "story-forgery.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 22384,
+    "sha256": "72c69efb5c248a8689d453dd50e6dda2a63fc116602a3b34f6bb060179d8cae2",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 833,
+      "top": 0,
+      "width": 421,
+      "height": 402
+    }
+  },
+  {
+    "filename": "story-beacon.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 21454,
+    "sha256": "a9972517b24f966bac3a1c6b7a2605ccaf0c44f18eb41a2ac8b98ce64c2fafb7",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 0,
+      "top": 402,
+      "width": 417,
+      "height": 385
+    }
+  },
+  {
+    "filename": "story-gear-lock.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 26812,
+    "sha256": "32b613c14ca9aba607ec98784d31019ffad0ac0c9fd53ac98d065846b905fc70",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 417,
+      "top": 402,
+      "width": 416,
+      "height": 385
+    }
+  },
+  {
+    "filename": "story-shard-receiver.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 19014,
+    "sha256": "7013f7be65bebb2a3382acd4a13bffd45853e3840267dd51c8e55586f35a218a",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 833,
+      "top": 402,
+      "width": 421,
+      "height": 385
+    }
+  },
+  {
+    "filename": "story-memorial.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 16970,
+    "sha256": "7f2d00fc5e5a86bb9abcc15f94e5f2e8ade2781b6005fd10aa8085f4643affaf",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 0,
+      "top": 787,
+      "width": 417,
+      "height": 467
+    }
+  },
+  {
+    "filename": "story-watchfire.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 20450,
+    "sha256": "7427b5757cabf802a8a10e82cb857979363fa8ee7fac747dfd9f5aaf970bdb12",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 417,
+      "top": 787,
+      "width": 416,
+      "height": 467
+    }
+  },
+  {
+    "filename": "story-relay.webp",
+    "width": 128,
+    "height": 128,
+    "bytes": 18314,
+    "sha256": "b028e72e817d7c4fa160ee0d88e7728de08a35c5c5c7c422381ab070ad340611",
+    "source": "story-landmarks-master.png",
+    "sourceSha256": "77994a32710e00603f882fdf79fa50618550f4e74c835d1019982a3ff618278f",
+    "sourceWidth": 1254,
+    "sourceHeight": 1254,
+    "crop": {
+      "left": 833,
+      "top": 787,
+      "width": 421,
+      "height": 467
+    }
+  },
+  {
+    "filename": "act-one.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 261692,
+    "sha256": "6691f1676bdb1b394cabd26e024fb46c09e06a09f685fbc569fac4532a0cd9e0",
+    "source": "act-one-master.png",
+    "sourceSha256": "c52abbcc6f004adb014380a9cc574a4461ec3bc2065efa95360c6526f539af25",
+    "sourceWidth": 1672,
+    "sourceHeight": 941
+  },
+  {
+    "filename": "act-two.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 257100,
+    "sha256": "72bce60c64111602b5b17a6801ea0005782084b97a0aa414619affabb6b22907",
+    "source": "act-two-master.png",
+    "sourceSha256": "06995e0eb2e9a9bdcac2c3d7aa323e8fa35f607a96b13410605e6a4158f9e183",
+    "sourceWidth": 1672,
+    "sourceHeight": 941
+  },
+  {
+    "filename": "act-three.webp",
+    "width": 1536,
+    "height": 864,
+    "bytes": 257834,
+    "sha256": "d520457061a34c86f800f4e0f9a822f35ef49c3352a0576f7eb58d617f0be8aa",
+    "source": "act-three-master.png",
+    "sourceSha256": "16a43034b12521c40aa809ac8e79dd94d06e0dbab2ae46acbe59006526d676e7",
+    "sourceWidth": 1672,
+    "sourceHeight": 941
+  },
+  {
+    "filename": "district-depth-1.webp",
+    "width": 192,
+    "height": 240,
+    "bytes": 40108,
+    "sha256": "9e55035fcf2b2d2828fe5472cfc8dbca93485a07416cd6529556a0d4cc7a134d",
+    "source": "district-depth-master.png",
+    "sourceSha256": "ff3c6d3e816fb92626b806916f1b8d301807cef8e4d3592f456249999f35f145",
+    "sourceWidth": 1774,
+    "sourceHeight": 887,
+    "crop": {
+      "left": 0,
+      "top": 0,
+      "width": 444,
+      "height": 444
+    }
+  },
+  {
+    "filename": "district-depth-2.webp",
+    "width": 192,
+    "height": 240,
+    "bytes": 38656,
+    "sha256": "80b2d5fbcae60d87f70864a01d42611b779f2e8ba96f74f667fd34cbc6223f8d",
+    "source": "district-depth-master.png",
+    "sourceSha256": "ff3c6d3e816fb92626b806916f1b8d301807cef8e4d3592f456249999f35f145",
+    "sourceWidth": 1774,
+    "sourceHeight": 887,
+    "crop": {
+      "left": 444,
+      "top": 0,
+      "width": 443,
+      "height": 444
+    }
+  },
+  {
+    "filename": "district-depth-3.webp",
+    "width": 192,
+    "height": 240,
+    "bytes": 47586,
+    "sha256": "d5c7a2b0004a2c4c551a0f850a94db0820c4133a47defac22740610d360ee1a2",
+    "source": "district-depth-master.png",
+    "sourceSha256": "ff3c6d3e816fb92626b806916f1b8d301807cef8e4d3592f456249999f35f145",
+    "sourceWidth": 1774,
+    "sourceHeight": 887,
+    "crop": {
+      "left": 887,
+      "top": 0,
+      "width": 444,
+      "height": 444
+    }
+  },
+  {
+    "filename": "district-depth-4.webp",
+    "width": 192,
+    "height": 240,
+    "bytes": 37204,
+    "sha256": "da3c6a07cf1a1e79aa986bb8c0330a0479342095b5c202aa1649712f08abca60",
+    "source": "district-depth-master.png",
+    "sourceSha256": "ff3c6d3e816fb92626b806916f1b8d301807cef8e4d3592f456249999f35f145",
+    "sourceWidth": 1774,
+    "sourceHeight": 887,
+    "crop": {
+      "left": 1331,
+      "top": 0,
+      "width": 443,
+      "height": 444
+    }
+  },
+  {
+    "filename": "district-depth-5.webp",
+    "width": 192,
+    "height": 240,
+    "bytes": 54552,
+    "sha256": "e25a0f104da003893849021c1822ee19ee56772d4198d0cbe3a24d51b74df63c",
+    "source": "district-depth-master.png",
+    "sourceSha256": "ff3c6d3e816fb92626b806916f1b8d301807cef8e4d3592f456249999f35f145",
+    "sourceWidth": 1774,
+    "sourceHeight": 887,
+    "crop": {
+      "left": 0,
+      "top": 444,
+      "width": 444,
+      "height": 443
+    }
+  },
+  {
+    "filename": "district-depth-6.webp",
+    "width": 192,
+    "height": 240,
+    "bytes": 50018,
+    "sha256": "8d22f64b5d4fa60ce5d3cc2a2b1a17a83a54aeaad9bd22b8e6d77dd3cf407188",
+    "source": "district-depth-master.png",
+    "sourceSha256": "ff3c6d3e816fb92626b806916f1b8d301807cef8e4d3592f456249999f35f145",
+    "sourceWidth": 1774,
+    "sourceHeight": 887,
+    "crop": {
+      "left": 444,
+      "top": 444,
+      "width": 443,
+      "height": 443
+    }
+  },
+  {
+    "filename": "district-depth-7.webp",
+    "width": 192,
+    "height": 240,
+    "bytes": 31876,
+    "sha256": "dfbded31bc996da09ab49ab828291e479fe5e79389199570b8b3cc147752b02d",
+    "source": "district-depth-master.png",
+    "sourceSha256": "ff3c6d3e816fb92626b806916f1b8d301807cef8e4d3592f456249999f35f145",
+    "sourceWidth": 1774,
+    "sourceHeight": 887,
+    "crop": {
+      "left": 887,
+      "top": 444,
+      "width": 444,
+      "height": 443
+    }
+  }
+]

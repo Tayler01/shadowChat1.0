@@ -17,105 +17,74 @@ const SHADOW_RUNNER_SFX_KEY = 'shadow-runner-sfx-enabled-v1'
 const LEVELS = {
   tutorial: {
     title: 'Tutorial Run',
+    delivery: 'Carry the first sealed message',
+    objective: 'Pass the training sentry and reach the east gate',
     completedLevels: [],
     titleButton: /Start Tutorial/i,
   },
   'level-1': {
     title: 'East Gate Run',
+    delivery: 'Reopen the east gate',
+    objective: 'Reach the east gate',
     completedLevels: ['tutorial'],
   },
   'level-2': {
     title: 'Lantern Market Roofs',
+    delivery: 'Cross the lantern market',
+    objective: 'Cross the market roofs',
     completedLevels: ['tutorial', 'level-1'],
   },
   'level-3': {
     title: 'Ivy Viaduct',
+    delivery: 'Restore the viaduct crossing',
+    objective: 'Cross the ivy viaduct',
     completedLevels: ['tutorial', 'level-1', 'level-2'],
   },
   'level-4': {
     title: 'Bell Tower Archives',
+    delivery: 'Find the forged order',
+    objective: 'Find the forged order',
     completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3'],
   },
   'level-5': {
     title: 'Candle Fair Ruins',
     completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4'],
-    detailChecks: [
-      /Level 5/i,
-      /Trick Hazards/i,
-      /Shielded archer volleys/i,
-      /Candle Jesters/i,
-    ],
-    gameplayChecks: [
-      /Shield up\. Stay low\. Pick coin risks\./i,
-    ],
+    delivery: 'Pass the false beacons',
+    objective: 'Slip through the fair',
   },
   'level-6': {
     title: 'Clockmaker Yard',
     completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5'],
-    detailChecks: [
-      /Level 6/i,
-      /Clockwork Pace/i,
-      /Chrono Lantern/i,
-      /Lantern Bandit Scouts/i,
-    ],
-    gameplayChecks: [
-      /Catch the clock\. Slow the yard\. Break the gear lock\./i,
-    ],
+    delivery: 'Break the gear lock',
+    objective: 'Break the gear lock',
   },
   'level-7': {
     title: 'Moonlit Causeway',
     completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6'],
-    detailChecks: [
-      /Level 7/i,
-      /Causeway Chase/i,
-      /Moon Shards/i,
-      /Shadow Surge/i,
-    ],
-    gameplayChecks: [
-      /Recover every shard\. Cross the moon road\. Do not trust the bridges\./i,
-    ],
+    delivery: 'Recover the authentic command',
+    objective: 'Recover the three Moon Shards',
+    objectiveHud: 'Moon Shards 0 of 3',
   },
   'level-8': {
     title: 'Courier Catacombs',
     completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7'],
-    detailChecks: [
-      /Level 8/i,
-      /Hidden Paths/i,
-      /Wraithlight/i,
-      /Mirror Ward/i,
-      /Relay Seals/i,
-    ],
-    gameplayChecks: [
-      /The courier dead kept the first road\. Recover their seals before the Rival does\./i,
-    ],
+    delivery: 'Open the courier relay door',
+    objective: 'Recover three Relay Seals and open the relay door',
+    objectiveHud: 'Relay Seals 0 of 3',
   },
   'level-9': {
     title: 'Captain Gate',
     completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7', 'level-8'],
-    detailChecks: [
-      /Level 9/i,
-      /Stormwatch Siege/i,
-      /Gale Mantle/i,
-      /Sunsteel Edge/i,
-      /Watchfire Crests/i,
-    ],
-    gameplayChecks: [
-      /The Captain sealed the road against the false command\. Break the watch before dawn\./i,
-    ],
+    delivery: 'Reach the Captain beyond the storm',
+    objective: 'Recover four Watchfire Crests and defeat the Moonlit Captain',
+    objectiveHud: 'Watchfire Crests 0 of 4',
   },
   'level-10': {
     title: 'Dawn Relay Spire',
     completedLevels: ['tutorial', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7', 'level-8', 'level-9'],
-    detailChecks: [
-      /Level 10/i,
-      /Sovereign Trial/i,
-      /Relay beams/i,
-      /Dawnfire Aegis/i,
-      /Aether Step/i,
-    ],
-    gameplayChecks: [
-      /The false command began here\. Carry the true order to the crown before dawn\./i,
-    ],
+    delivery: 'Carry the true order to the crown',
+    objective: 'Restore five Relay Flames and defeat the Sentry Sovereign',
+    objectiveHud: 'Relay Flames 0 of 5',
   },
 }
 
@@ -163,6 +132,10 @@ const summary = {
   baseUrl: config.baseUrl,
   level: config.levelId,
   profiles: config.profiles.map(profile => profile.label),
+  evidenceKind: 'QA-assisted diagnostics, not an input-complete campaign run',
+  limitations: ['Teleports, health restoration, injected pickups/enemy damage and forced completion are used.'],
+  physicsProfiles: config.profiles.filter(profile => profile.browserName === 'chromium' && !config.skipPhysics).map(profile => profile.label),
+  blockedRequests: [],
   checks: [],
   screenshots: [],
   status: 'running',
@@ -222,7 +195,7 @@ try {
 async function runLandscapeProfile(browserInstance, profile) {
   const level = LEVELS[config.levelId]
   const context = await browserInstance.newContext({
-    viewport: profile.viewport,
+    viewport: { width: profile.viewport.height, height: profile.viewport.width },
     userAgent: profile.userAgent,
     isMobile: profile.isMobile,
     hasTouch: profile.hasTouch,
@@ -230,6 +203,13 @@ async function runLandscapeProfile(browserInstance, profile) {
   })
 
   const page = await context.newPage()
+  await context.route('**/*', route => {
+    const url = new URL(route.request().url())
+    if (url.origin === new URL(config.baseUrl).origin) return route.continue()
+    summary.blockedRequests.push({ profile: profile.label, origin: url.origin, pathname: url.pathname })
+    return route.abort('blockedbyclient')
+  })
+  await context.routeWebSocket('**/*', socket => socket.close())
   attachDiagnostics(page, path.join(logsDir, `${profile.label}.log`), profile.label)
 
   try {
@@ -247,13 +227,8 @@ async function runLandscapeProfile(browserInstance, profile) {
     await page.goto(`${config.baseUrl}/?view=games&localPreview=shadow-runner`, {
       waitUntil: 'domcontentloaded',
     })
-    await page.locator('.shadow-runner-landscape-stage').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    await assertLandscapeReady(page, profile)
-    await page.getByRole('button', { name: /Select Level/i }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    await page.waitForFunction(() => {
-      const playfield = document.querySelector('.shadow-runner-playfield')
-      return Boolean(playfield && Number.parseFloat(getComputedStyle(playfield).opacity) >= 0.99)
-    }, null, { timeout: DEFAULT_TIMEOUT_MS })
+    await page.locator('.runner-title').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    await assertPortraitMenu(page, page.locator('.runner-title'), profile)
     await delay(120)
     const titlePath = await capture(page, `${profile.label}-01-title.png`)
     await assertImageNonBlank(titlePath, `${profile.label} title screenshot`)
@@ -262,20 +237,22 @@ async function runLandscapeProfile(browserInstance, profile) {
       await page.getByRole('button', { name: LEVELS.tutorial.titleButton }).click()
     } else {
       await page.getByRole('button', { name: /Select Level/i }).click()
-      await page.getByText('Level Map').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+      await page.locator('.runner-campaign').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
       await capture(page, `${profile.label}-02-map.png`)
-      await page.getByRole('button', { name: new RegExp(`${escapeRegExp(level.title)} details`, 'i') }).click()
-      await page.getByText(level.title, { exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+      const chapter = page.locator('.runner-campaign').getByRole('button', {
+        name: new RegExp(`^${escapeRegExp(level.title)} details, (Ready|Cleared|Full clear|Perfect route)$`, 'i'),
+      })
+      await chapter.scrollIntoViewIfNeeded()
+      await chapter.click()
       await assertLevelDetails(page, level, profile)
       await capture(page, `${profile.label}-03-level-details.png`)
-      await page.getByRole('button', { name: /^(Start|Replay)$/i }).click()
+      await page.setViewportSize(profile.viewport)
+      await page.getByRole('dialog', { name: level.title, exact: true }).getByRole('button', { name: /^(Start|Replay)$/i }).click()
     }
 
-    await page.getByText(level.title, { exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    await page.setViewportSize(profile.viewport)
     await page.locator('.shadow-runner-game-stage canvas').waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-    await page.waitForFunction(() => !document.body.innerText.includes('Loading Level'), null, {
-      timeout: DEFAULT_TIMEOUT_MS,
-    })
+    await beginDelivery(page, level, profile)
     await assertActiveGameplay(page, level, profile)
     await delay(3000)
 
@@ -289,45 +266,81 @@ async function runLandscapeProfile(browserInstance, profile) {
       viewport: profile.viewport,
       screenshot: gameplayPath,
     })
+  } catch (error) {
+    const state = await readShadowRunnerDebug(page).catch(() => null)
+    const evidencePath = path.join(artifactDir, `${profile.label}-failure-state.json`)
+    await writeJson(evidencePath, { error: serializeError(error), state, text: await page.locator('body').innerText().catch(() => '') })
+    summary.failureEvidence = evidencePath
+    await capture(page, `${profile.label}-failure.png`).catch(() => {})
+    throw error
   } finally {
     await context.close().catch(() => {})
   }
 }
 
 async function assertLevelDetails(page, level, profile) {
-  if (!level.detailChecks?.length) return
-
-  const pageText = await page.locator('body').innerText({ timeout: DEFAULT_TIMEOUT_MS })
-  for (const pattern of level.detailChecks) {
-    assert(pattern.test(pageText), `${profile.label}: missing ${config.levelId} detail text matching ${pattern}`)
-  }
-  record(`${profile.label} ${config.levelId} detail copy visible`, {
-    checks: level.detailChecks.map(pattern => pattern.source),
-  })
+  const dialog = page.getByRole('dialog', { name: level.title, exact: true })
+  await dialog.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await dialog.getByText(level.delivery, { exact: true }).waitFor()
+  const text = await dialog.innerText()
+  assert(text.includes(`Chapter ${config.levelId.slice(6)} /`), `${profile.label}: chapter identity missing from details`)
+  assert(/Coins\s+\d+/.test(text) && /Enemies\s+\d+/.test(text), `${profile.label}: chapter totals missing from details`)
+  await assertPortraitMenu(page, dialog, profile)
+  record(`${profile.label} ${config.levelId} chapter identity and delivery visible`, { title: level.title, delivery: level.delivery })
 }
 
 async function assertActiveGameplay(page, level, profile) {
-  if (!level.gameplayChecks?.length) return
+  const snapshot = await readShadowRunnerDebug(page)
+  assert(snapshot?.levelId === config.levelId, `${profile.label}: wrong active route: ${snapshot?.levelId}`)
+  assert(snapshot?.objective === level.objective, `${profile.label}: wrong route objective: ${snapshot?.objective}`)
+  if (level.objectiveHud) await page.locator('.runner-hud').getByLabel(level.objectiveHud, { exact: true }).waitFor()
+  record(`${profile.label} ${config.levelId} active route identity and objective`, { levelId: snapshot.levelId, objective: snapshot.objective })
+}
 
-  for (const pattern of level.gameplayChecks) {
-    await page.getByText(pattern).waitFor({ timeout: 4000 }).catch(() => {
-      throw new Error(`${profile.label}: missing ${config.levelId} gameplay text matching ${pattern}`)
-    })
+async function assertPortraitMenu(page, menu, profile) {
+  assert(await page.getByRole('dialog', { name: 'Rotate Phone', exact: true }).isVisible() === false, `${profile.label}: portrait menu blocked by rotate gate`)
+  for (const button of await menu.getByRole('button').all()) {
+    await button.scrollIntoViewIfNeeded()
+    const box = await button.boundingBox()
+    const viewport = page.viewportSize()
+    assert(box && box.x >= -1 && box.y >= -1 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1,
+      `${profile.label}: portrait menu command clipped: ${await button.innerText()}`)
   }
-  record(`${profile.label} ${config.levelId} gameplay copy visible`, {
-    checks: level.gameplayChecks.map(pattern => pattern.source),
-  })
+  record(`${profile.label} portrait menu usable`)
+}
+
+async function beginDelivery(page, level, profile) {
+  const briefing = page.getByRole('dialog', { name: level.title, exact: true })
+  await briefing.getByRole('button', { name: 'Begin delivery', exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await briefing.getByText(level.delivery, { exact: true }).waitFor()
+  await page.waitForFunction(() => Boolean(window.__shadowRunnerDebug?.().player), null, { timeout: DEFAULT_TIMEOUT_MS })
+  const before = await readShadowRunnerDebug(page)
+  await page.setViewportSize({ width: profile.viewport.height, height: profile.viewport.width })
+  await page.getByRole('dialog', { name: 'Rotate Phone', exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await delay(180)
+  await page.setViewportSize(profile.viewport)
+  await assertLandscapeReady(page, profile)
+  const paused = await readShadowRunnerDebug(page)
+  assert(paused.activeTimeMs === before.activeTimeMs && paused.player.x === before.player.x && paused.player.y === before.player.y,
+    `${profile.label}: initial briefing/rotate gate did not pause gameplay`)
+  const interruption = page.getByRole('dialog', { name: 'Pause', exact: true })
+  await interruption.getByRole('button', { name: 'Resume', exact: true }).click()
+  await briefing.getByRole('button', { name: 'Begin delivery', exact: true }).waitFor()
+  const returned = await readShadowRunnerDebug(page)
+  assert(returned.activeTimeMs === before.activeTimeMs, `${profile.label}: rotation Resume bypassed the initial briefing`)
+  await briefing.getByRole('button', { name: 'Begin delivery', exact: true }).click()
+  await briefing.waitFor({ state: 'hidden' })
+  await page.waitForFunction(time => window.__shadowRunnerDebug?.().activeTimeMs > time, before.activeTimeMs, { timeout: DEFAULT_TIMEOUT_MS })
+  record(`${profile.label} explicit Begin delivery resumes paused route`, { activeTimeBefore: before.activeTimeMs })
 }
 
 async function assertLandscapeReady(page, profile) {
+  await page.getByRole('dialog', { name: 'Rotate Phone', exact: true }).waitFor({ state: 'hidden', timeout: DEFAULT_TIMEOUT_MS })
   const state = await page.evaluate(() => {
-    const gate = document.querySelector('.shadow-runner-rotate-gate')
-    const stage = document.querySelector('.shadow-runner-landscape-stage')
-    const gateVisible = Boolean(gate && getComputedStyle(gate).display !== 'none')
+    const stage = document.querySelector('.runner-session-stage')
     const stageVisible = Boolean(stage && getComputedStyle(stage).display !== 'none')
 
     return {
-      gateVisible,
       stageVisible,
       width: window.innerWidth,
       height: window.innerHeight,
@@ -335,7 +348,6 @@ async function assertLandscapeReady(page, profile) {
   })
 
   assert(state.stageVisible, `${profile.label}: Shadow Runner landscape stage is not visible`)
-  assert(!state.gateVisible, `${profile.label}: rotate gate is visible in landscape phone viewport`)
   assert(state.width > state.height, `${profile.label}: expected landscape viewport`)
   record(`${profile.label} landscape stage visible`, state)
 }
@@ -357,19 +369,30 @@ async function assertHudAndControls(page, profile) {
     const selectors = {
       playableStage: '[aria-label="Shadow Runner playable level"]',
       movement: '[aria-label="Movement controls"]',
+      left: '.runner-controls [aria-label="Move left"]',
+      right: '.runner-controls [aria-label="Move right"]',
+      crouch: '.runner-controls [aria-label="Crouch"]',
       jump: '[aria-label="Jump"]',
       attack: '[aria-label="Sword attack"]',
-      pause: '[aria-label="Open pause menu"]',
-      coins: '[aria-label^="Coins collected"]',
-      score: '[aria-label^="Score"]',
-      health: '[aria-label^="Lives"]',
+      pause: '.runner-hud [aria-label="Open pause menu"]',
+      coins: '.runner-hud [aria-label^="Coins collected"]',
+      enemies: '.runner-hud [aria-label^="Enemies defeated"]',
+      score: '.runner-hud .runner-score',
+      lives: '.runner-hud [aria-label^="Lives"]',
+      health: '.runner-hud [role="meter"][aria-label="Health"]',
     }
 
     const entries = Object.entries(selectors).map(([name, selector]) => {
       const element = document.querySelector(selector)
       if (!element) return [name, null]
       const rect = element.getBoundingClientRect()
+      let visible = true
+      for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+        const style = getComputedStyle(ancestor)
+        if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) visible = false
+      }
       return [name, {
+        visible,
         left: rect.left,
         top: rect.top,
         right: rect.right,
@@ -386,19 +409,34 @@ async function assertHudAndControls(page, profile) {
     }
   })
 
+  assertHudGeometry(state, profile)
+  record(`${profile.label} HUD and controls visible`, state.boxes)
+}
+
+function assertHudGeometry(state, profile) {
   for (const [name, box] of Object.entries(state.boxes)) {
     assert(box, `${profile.label}: missing Shadow Runner control/HUD element: ${name}`)
+    assert(box.visible, `${profile.label}: ${name} is hidden`)
     assert(box.width > 0 && box.height > 0, `${profile.label}: ${name} has an empty box`)
-    assert(box.right > 0 && box.bottom > 0 && box.left < state.width && box.top < state.height, `${profile.label}: ${name} is outside the viewport`)
+    assert(box.left >= -1 && box.top >= -1 && box.right <= state.width + 1 && box.bottom <= state.height + 1,
+      `${profile.label}: ${name} is outside the viewport: ${JSON.stringify(box)}`)
   }
 
   const jump = state.boxes.jump
   const attack = state.boxes.attack
-  const movement = state.boxes.movement
   assert(jump.top > state.height * 0.44, `${profile.label}: jump control is too high for a phone layout`)
   assert(attack.top > state.height * 0.34, `${profile.label}: attack control is too high for a phone layout`)
-  assert(movement.width >= state.width * 0.3, `${profile.label}: movement zone is too narrow`)
-  record(`${profile.label} HUD and controls visible`, state.boxes)
+  const controls = ['left', 'right', 'crouch', 'jump', 'attack', 'pause']
+  for (const [index, name] of controls.entries()) {
+    const box = state.boxes[name]
+    const minimum = name === 'pause' ? 44 : name === 'crouch' ? 54 : 72
+    assert(box.width >= minimum && box.height >= minimum, `${profile.label}: ${name} touch target is smaller than ${minimum}px`)
+    for (const otherName of controls.slice(index + 1)) {
+      const other = state.boxes[otherName]
+      assert(box.right <= other.left || other.right <= box.left || box.bottom <= other.top || other.bottom <= box.top,
+        `${profile.label}: ${name} overlaps ${otherName}`)
+    }
+  }
 }
 
 async function exerciseGameplayControls(page, level, profile) {
@@ -413,34 +451,41 @@ async function exerciseGameplayControls(page, level, profile) {
   const before = await readShadowRunnerDebug(page)
   assert(before?.player, `${profile.label}: missing Shadow Runner player debug state`)
 
-  await page.evaluate(() => window.__shadowRunnerQa?.move('right', true))
-  await page.waitForFunction(
-    () => (window.__shadowRunnerDebug?.().player?.velocityX ?? 0) > 0,
-    null,
-    { timeout: DEFAULT_TIMEOUT_MS },
-  )
-  await delay(420)
-  await page.evaluate(() => window.__shadowRunnerQa?.move('right', false))
+  await holdDirectionButton(page, 'Move right', async () => {
+    await page.waitForFunction(x => (window.__shadowRunnerDebug?.().player?.x ?? 0) >= x + 30, before.player.x, { timeout: 5000 })
+  })
   const afterRun = await readShadowRunnerDebug(page)
-  const minimumTravel = profile.browserName === 'webkit' ? 4 : 30
+  const minimumTravel = 30
   assert(
     (afterRun?.player?.x ?? 0) >= (before.player.x ?? 0) + minimumTravel,
-    `${profile.label}: movement touch zone did not move the player `
+    `${profile.label}: Move right button did not move the player `
       + `(x ${before.player.x} -> ${afterRun?.player?.x ?? 'missing'})`,
   )
 
+  await holdDirectionButton(page, 'Move left', async () => {
+    await page.waitForFunction(x => (window.__shadowRunnerDebug?.().player?.x ?? x) <= x - 20, afterRun.player.x, { timeout: 5000 })
+  })
+  await page.waitForFunction(() => Math.abs(window.__shadowRunnerDebug?.().player?.velocityX ?? 999) < 1, null, { timeout: 3000 })
+  const right = page.getByRole('button', { name: 'Move right', exact: true })
+  await right.dispatchEvent('pointerdown', { pointerId: 71, pointerType: 'touch', button: 0 })
+  await page.waitForFunction(() => (window.__shadowRunnerDebug?.().player?.velocityX ?? 0) > 0)
+  await right.dispatchEvent('pointercancel', { pointerId: 71, pointerType: 'touch', button: 0 })
+  await page.waitForFunction(() => Math.abs(window.__shadowRunnerDebug?.().player?.velocityX ?? 999) < 1, null, { timeout: 3000 })
+  assert(await right.getAttribute('data-pressed') === 'false', `${profile.label}: pointer cancellation left movement pressed`)
   await page.keyboard.down('KeyS')
-  let crouching
   try {
-    await page.waitForFunction(
-      standingHeight => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? standingHeight) < standingHeight,
-      afterRun?.player?.bodyHeight ?? 70,
-      { timeout: 3000 },
-    )
-    crouching = await readShadowRunnerDebug(page)
+    await page.waitForFunction(() => window.__shadowRunnerDebug?.().player?.crouching === true, null, { timeout: 3000 })
   } finally {
     await page.keyboard.up('KeyS')
   }
+  await page.waitForFunction(() => window.__shadowRunnerDebug?.().player?.crouching === false, null, { timeout: 3000 })
+  await setCrouch(page, true)
+  await page.waitForFunction(
+    standingHeight => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? standingHeight) < standingHeight,
+    afterRun?.player?.bodyHeight ?? 70,
+    { timeout: 3000 },
+  )
+  const crouching = await readShadowRunnerDebug(page)
   assert(
     (crouching?.player?.bodyHeight ?? 99) < (afterRun?.player?.bodyHeight ?? 0),
     `${profile.label}: crouch did not reduce the player hitbox`,
@@ -450,6 +495,7 @@ async function exerciseGameplayControls(page, level, profile) {
   await page.getByRole('button', { name: 'Jump' }).click()
   await delay(120)
   const jumping = await readShadowRunnerDebug(page)
+  assert(await page.getByRole('button', { name: 'Crouch', exact: true }).getAttribute('aria-pressed') === 'false', `${profile.label}: jump did not release crouch toggle`)
   assert(
     (jumping?.player?.velocityY ?? 0) < 0,
     `${profile.label}: jump did not produce upward velocity`,
@@ -457,8 +503,13 @@ async function exerciseGameplayControls(page, level, profile) {
   await page.getByRole('button', { name: 'Sword attack' }).click()
 
   await page.getByRole('button', { name: 'Open pause menu' }).click()
-  await page.getByText('Pause', { exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
-  await page.getByRole('button', { name: /Resume/i }).click()
+  const pause = page.getByRole('dialog', { name: 'Pause', exact: true })
+  await pause.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  const paused = await readShadowRunnerDebug(page)
+  await delay(180)
+  const stillPaused = await readShadowRunnerDebug(page)
+  assert(stillPaused.activeTimeMs === paused.activeTimeMs, `${profile.label}: pause menu advanced active gameplay time`)
+  await pause.getByRole('button', { name: 'Resume', exact: true }).click()
 
   if (config.levelId === 'level-5') {
     await assertLevelFiveCheckpointAndPools(page, profile)
@@ -479,12 +530,83 @@ async function exerciseGameplayControls(page, level, profile) {
     await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
     await capture(page, `${profile.label}-07-complete.png`)
   }
-  record(`${profile.label} ${config.levelId} gameplay controls and completion`, {
+  record(`${profile.label} ${config.levelId} gameplay controls and QA-assisted completion`, {
     startX: before.player.x,
     runX: afterRun?.player?.x,
     jumpVelocityY: jumping?.player?.velocityY,
     level: level.title,
   })
+}
+
+async function holdDirectionButton(page, name, check) {
+  const button = page.getByRole('button', { name, exact: true })
+  const box = await button.boundingBox()
+  assert(box, `${name} button is missing`)
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  try {
+    assert(await button.getAttribute('data-pressed') === 'true', `${name} did not enter its pressed state`)
+    await check()
+  } finally {
+    await page.mouse.up()
+  }
+  assert(await button.getAttribute('data-pressed') === 'false', `${name} remained pressed after release`)
+}
+
+async function setCrouch(page, pressed) {
+  const button = page.getByRole('button', { name: 'Crouch', exact: true })
+  const current = await button.getAttribute('aria-pressed')
+  assert(current === 'true' || current === 'false', 'Crouch must expose aria-pressed')
+  if (current !== String(pressed)) await button.tap()
+  assert(await button.getAttribute('aria-pressed') === String(pressed), 'Crouch toggle did not update aria-pressed')
+}
+
+async function visitDiagnosticCheckpoint(page, checkpoint, profile) {
+  const sample = snapshot => ({
+    activeTimeMs: snapshot?.activeTimeMs, checkpointId: snapshot?.checkpointId, respawnPending: snapshot?.respawnPending,
+    player: snapshot?.player && Object.fromEntries(['x', 'y', 'velocityX', 'velocityY', 'bodyTop', 'bodyBottom', 'bodyHeight', 'crouching', 'standingBlocked', 'health', 'lives'].map(key => [key, snapshot.player[key]])),
+  })
+  const initial = await page.evaluate(({ x, y }) => {
+    const before = window.__shadowRunnerDebug?.()
+    window.__shadowRunnerQa?.teleport(x, y)
+    return { before, immediate: window.__shadowRunnerDebug?.() }
+  }, checkpoint)
+  const frameStates = await page.evaluate(() => new Promise(resolve => {
+    requestAnimationFrame(() => {
+      const frameOne = window.__shadowRunnerDebug?.()
+      requestAnimationFrame(() => resolve({ frameOne, frameTwo: window.__shadowRunnerDebug?.() }))
+    })
+  }))
+  const probe = {
+    checkpoint, before: sample(initial.before), immediate: sample(initial.immediate),
+    frameOne: sample(frameStates.frameOne), frameTwo: sample(frameStates.frameTwo), trajectory: [],
+    bodyCoordinateLimit: 'Debug exposes body top/bottom/height but not body x/left/right.',
+  }
+  if (frameStates.frameTwo?.checkpointId !== checkpoint.id) {
+    await holdDirectionButton(page, 'Move right', async () => {
+      await page.waitForFunction(({ id, x }) => {
+        const state = window.__shadowRunnerDebug?.()
+        return state?.checkpointId === id || (state?.player?.x ?? 0) >= x + 20 || state?.respawnPending
+      }, checkpoint, { timeout: 3000 }).catch(error => {
+        summary.checkpointFailure = probe
+        throw error
+      })
+    })
+    probe.input = { control: 'Move right', targetX: checkpoint.x + 20, afterRelease: sample(await readShadowRunnerDebug(page)) }
+  }
+  const deadline = Date.now() + DEFAULT_TIMEOUT_MS
+  while (Date.now() < deadline) {
+    const state = sample(await readShadowRunnerDebug(page))
+    probe.trajectory.push(state)
+    if (state.checkpointId === checkpoint.id) {
+      record(`${profile.label} QA-assisted checkpoint activated`, probe)
+      return
+    }
+    if (state.player?.lives < probe.before.player?.lives) break
+    await delay(80)
+  }
+  summary.checkpointFailure = probe
+  throw new Error(`${profile.label}: diagnostic checkpoint ${checkpoint.id} did not activate; see summary.checkpointFailure. Last state: ${JSON.stringify(probe.trajectory.at(-1))}`)
 }
 
 async function assertLevelFiveCheckpointAndPools(page, profile) {
@@ -615,9 +737,9 @@ async function assertLevelSixGameplay(page, profile) {
   }, null, { timeout: DEFAULT_TIMEOUT_MS })
 
   const heartState = await page.evaluate(() => ({
-    aria: document.querySelector('[aria-label^="Lives"]')?.getAttribute('aria-label'),
-    hearts: Array.from(document.querySelectorAll('[data-heart-state]'))
-      .map(heart => heart.getAttribute('data-heart-state')),
+    aria: document.querySelector('.runner-hud [aria-label^="Lives"]')?.getAttribute('aria-label'),
+    hearts: Array.from(document.querySelectorAll('.runner-hud .runner-lives [data-full]'))
+      .map(heart => heart.getAttribute('data-full') === 'true' ? 'full' : 'empty'),
   }))
   assert(heartState.hearts.filter(state => state === 'full').length === 2, `${profile.label}: losing a life did not remove one full heart`)
   assert(heartState.hearts.filter(state => state === 'empty').length === 1, `${profile.label}: lost life did not render one empty heart`)
@@ -913,26 +1035,20 @@ async function assertLevelEightGameplay(page, profile) {
     `${profile.label}: Relay Sanctum relocked after checkpoint respawn`,
   )
 
-  const dpadBox = await page.locator('.shadow-runner-dpad').boundingBox()
-  assert(dpadBox, `${profile.label}: movement d-pad was not measurable`)
-  const crouchTap = {
-    x: dpadBox.x + dpadBox.width * 0.5,
-    y: dpadBox.y + dpadBox.height * 0.79,
-  }
   const standingHeight = snapshot?.player?.bodyHeight ?? 0
-  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await setCrouch(page, true)
   await page.waitForFunction(
     expected => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? expected) < expected,
     standingHeight,
     { timeout: DEFAULT_TIMEOUT_MS },
   )
-  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await setCrouch(page, false)
   await page.waitForFunction(
     expected => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? 0) >= expected,
     standingHeight,
     { timeout: DEFAULT_TIMEOUT_MS },
   )
-  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await setCrouch(page, true)
   await page.getByRole('button', { name: 'Jump' }).click()
   await page.waitForFunction(() => {
     const player = window.__shadowRunnerDebug?.().player
@@ -945,7 +1061,7 @@ async function assertLevelEightGameplay(page, profile) {
   })
   await delay(140)
   const beforeCrawl = await readShadowRunnerDebug(page)
-  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await setCrouch(page, true)
   await page.waitForFunction(
     expected => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? expected) < expected,
     standingHeight,
@@ -987,7 +1103,7 @@ async function assertLevelEightGameplay(page, profile) {
     await page.evaluate(() => window.__shadowRunnerQa?.teleport(3230, 616))
     await delay(120)
   }
-  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await setCrouch(page, false)
 
   await page.evaluate(() => window.__shadowRunnerQa?.collect('wraithlight', 0))
   await page.waitForFunction(
@@ -1113,12 +1229,7 @@ async function assertLevelNineGameplay(page, profile) {
   ]
 
   for (const checkpoint of checkpoints) {
-    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), checkpoint)
-    await page.waitForFunction(
-      expected => window.__shadowRunnerDebug?.().checkpointId === expected,
-      checkpoint.id,
-      { timeout: DEFAULT_TIMEOUT_MS },
-    )
+    await visitDiagnosticCheckpoint(page, checkpoint, profile)
   }
 
   let snapshot = await readShadowRunnerDebug(page)
@@ -1192,6 +1303,7 @@ async function assertLevelNineGameplay(page, profile) {
     null,
     { timeout: DEFAULT_TIMEOUT_MS },
   )
+  await page.locator('.runner-hud .runner-powers').getByLabel(/^Sunsteel Edge \d+ seconds remaining/).waitFor()
   const beforeSunsteel = await readShadowRunnerDebug(page)
   await page.getByRole('button', { name: 'Sword attack' }).click()
   await page.waitForFunction(
@@ -1199,6 +1311,10 @@ async function assertLevelNineGameplay(page, profile) {
     beforeSunsteel?.player?.sunsteelEdgeCharges ?? 0,
     { timeout: DEFAULT_TIMEOUT_MS },
   )
+  await page.waitForFunction(() => {
+    const debug = window.__shadowRunnerDebug?.()
+    return debug && debug.activeTimeMs >= debug.deadlines.attackUntil
+  }, null, { timeout: 3000 })
 
   await page.evaluate(() => window.__shadowRunnerQa?.teleport(3300, 616))
   const beforeStorm = await readShadowRunnerDebug(page)
@@ -1212,9 +1328,10 @@ async function assertLevelNineGameplay(page, profile) {
   await page.evaluate(() => window.__shadowRunnerQa?.teleport(3160, 616))
   await page.waitForFunction(
     () => {
-      const pools = window.__shadowRunnerDebug?.().pools
-      return (pools?.projectiles?.stormBombs ?? 0) === 0
-        && (pools?.candleHazards?.stormHazards ?? 0) > 0
+      const debug = window.__shadowRunnerDebug?.()
+      return (debug?.pools?.projectiles?.stormBombs ?? 0) === 0
+        && debug?.floorHazards?.some(hazard => hazard.kind === 'storm'
+          && hazard.left < 3340 && hazard.right > 3260)
     },
     null,
     { timeout: 5000 },
@@ -1222,6 +1339,11 @@ async function assertLevelNineGameplay(page, profile) {
   snapshot = await readShadowRunnerDebug(page)
   assert((snapshot?.pools?.projectiles?.total ?? 99) <= 48, `${profile.label}: Level 9 projectile pool exceeded its cap`)
   assert((snapshot?.pools?.candleHazards?.total ?? 99) <= 24, `${profile.label}: Level 9 hazard pool exceeded its cap`)
+  const landedStorm = snapshot?.floorHazards?.find(hazard => hazard.kind === 'storm'
+    && hazard.left < 3340 && hazard.right > 3260)
+  assert(landedStorm && Math.abs(landedStorm.bottom - 616) < 0.1
+    && Math.abs(landedStorm.top - 590) < 0.1, `${profile.label}: Storm fire must sit above its contacted road`)
+  record(`${profile.label} level-9 storm floor alignment`, landedStorm)
   await capture(page, `${profile.label}-05-level-9-storm-systems.png`)
 
   if (fullPhysicsPass) {
@@ -1327,12 +1449,6 @@ async function assertLevelNineGameplay(page, profile) {
     await capture(page, `${profile.label}-06-captain-last-watch.png`)
   }
 
-  const dpadBox = await page.locator('.shadow-runner-dpad').boundingBox()
-  assert(dpadBox, `${profile.label}: movement d-pad was not measurable`)
-  const crouchTap = {
-    x: dpadBox.x + dpadBox.width * 0.5,
-    y: dpadBox.y + dpadBox.height * 0.79,
-  }
   const crouchLanes = [
     { startX: 900, endX: 1250 },
     { startX: 3900, endX: 4250 },
@@ -1347,12 +1463,10 @@ async function assertLevelNineGameplay(page, profile) {
       window.__shadowRunnerQa?.teleport(startX, 616)
     }, lane)
     await delay(120)
-    const laneStart = await readShadowRunnerDebug(page)
-    if ((laneStart?.player?.bodyHeight ?? 70) >= 60) {
-      await page.touchscreen.tap(crouchTap.x, crouchTap.y)
-    }
+    await setCrouch(page, true)
     await page.waitForFunction(
-      () => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? 70) < 60,
+      () => window.__shadowRunnerDebug?.().player?.crouching === true
+        && window.__shadowRunnerDebug().player.bodyHeight < 44,
       null,
       { timeout: DEFAULT_TIMEOUT_MS },
     )
@@ -1378,14 +1492,11 @@ async function assertLevelNineGameplay(page, profile) {
       await delay(100)
       const inside = await readShadowRunnerDebug(page)
       assert(
-        (inside?.player?.bodyHeight ?? 70) < 60,
+        inside?.player?.crouching === true && inside.player.bodyHeight < 44,
         `${profile.label}: crouched player did not fit lane ${lane.startX}`,
       )
     }
-    const laneEnd = await readShadowRunnerDebug(page)
-    if ((laneEnd?.player?.bodyHeight ?? 70) < 60) {
-      await page.touchscreen.tap(crouchTap.x, crouchTap.y)
-    }
+    await setCrouch(page, false)
   }
 
   snapshot = await readShadowRunnerDebug(page)
@@ -1491,23 +1602,19 @@ async function assertLevelTenGameplay(page, profile) {
   const checkpoints = [
     { x: 2360, y: 616, id: 'relay-checkpoint-approach' },
     { x: 5000, y: 616, id: 'relay-checkpoint-prism' },
+    { x: 6420, y: 616, id: 'relay-checkpoint-foundry-entry' },
     { x: 7440, y: 616, id: 'relay-checkpoint-gears' },
     { x: 10020, y: 616, id: 'relay-checkpoint-beam' },
     { x: 12620, y: 616, id: 'relay-checkpoint-choir' },
-    { x: 15520, y: 196, id: 'relay-checkpoint-glass' },
+    { x: 15240, y: 616, id: 'relay-checkpoint-glass' },
     { x: 18040, y: 616, id: 'relay-checkpoint-crown' },
     { x: 20420, y: 616, id: 'relay-checkpoint-lock' },
-    { x: 23340, y: 184, id: 'relay-checkpoint-last' },
+    { x: 23040, y: 616, id: 'relay-checkpoint-last' },
     { x: 23960, y: 616, id: 'relay-checkpoint-sovereign' },
   ]
 
   for (const [checkpointIndex, checkpoint] of checkpoints.entries()) {
-    await page.evaluate(({ x, y }) => window.__shadowRunnerQa?.teleport(x, y), checkpoint)
-    await page.waitForFunction(
-      expected => window.__shadowRunnerDebug?.().checkpointId === expected,
-      checkpoint.id,
-      { timeout: DEFAULT_TIMEOUT_MS },
-    )
+    await visitDiagnosticCheckpoint(page, checkpoint, profile)
     if (fullPhysicsPass && checkpointIndex % 2 === 1) {
       await delay(160)
       await capture(
@@ -1531,8 +1638,20 @@ async function assertLevelTenGameplay(page, profile) {
   )
 
   const beforeSoundToggle = await readShadowRunnerDebug(page)
-  await page.getByRole('button', { name: 'Pause' }).click()
-  await page.getByRole('button', { name: /Sound (?:On|Off)/i }).click()
+  await page.getByRole('button', { name: 'Open pause menu', exact: true }).click()
+  const pauseDialog = page.getByRole('dialog', { name: 'Pause', exact: true })
+  const soundEffects = pauseDialog.getByRole('checkbox', { name: 'Sound effects', exact: true })
+  if (await soundEffects.count()) {
+    const enabled = await soundEffects.isChecked()
+    await soundEffects.setChecked(!enabled)
+    assert(await soundEffects.isChecked() === !enabled, `${profile.label}: Sound effects checkbox did not toggle`)
+  } else {
+    // The pre-finale preview still uses the original Sound On/Off command.
+    const soundCommand = pauseDialog.getByRole('button', { name: /^Sound (?:On|Off)$/i })
+    const wasOn = (await soundCommand.innerText()).trim() === 'Sound On'
+    await soundCommand.click()
+    await pauseDialog.getByRole('button', { name: wasOn ? 'Sound Off' : 'Sound On', exact: true }).waitFor()
+  }
   await delay(180)
   const afterSoundToggle = await readShadowRunnerDebug(page)
   assert(
@@ -1593,6 +1712,7 @@ async function assertLevelTenGameplay(page, profile) {
     null,
     { timeout: DEFAULT_TIMEOUT_MS },
   )
+  await page.locator('.runner-hud .runner-powers').getByLabel(/^Dawnfire Aegis \d+ seconds remaining/).waitFor()
   await page.evaluate(() => window.__shadowRunnerQa?.collect('mastery', 1))
   await page.waitForFunction(
     () => window.__shadowRunnerDebug?.().player?.masteryItems === 1,
@@ -1606,6 +1726,7 @@ async function assertLevelTenGameplay(page, profile) {
     null,
     { timeout: DEFAULT_TIMEOUT_MS },
   )
+  await page.locator('.runner-hud .runner-powers').getByLabel(/^Aether Step \d+ seconds remaining/).waitFor()
   await page.evaluate(() => window.__shadowRunnerQa?.collect('mastery', 0))
   await page.waitForFunction(
     () => window.__shadowRunnerDebug?.().player?.masteryItems === 2,
@@ -1614,20 +1735,15 @@ async function assertLevelTenGameplay(page, profile) {
   )
   await capture(page, `${profile.label}-05-level-10-powers.png`)
 
-  const dpadBox = await page.locator('.shadow-runner-dpad').boundingBox()
-  assert(dpadBox, `${profile.label}: Level 10 movement d-pad was not measurable`)
-  const crouchTap = {
-    x: dpadBox.x + dpadBox.width * 0.5,
-    y: dpadBox.y + dpadBox.height * 0.79,
-  }
   await page.evaluate(() => {
     window.__shadowRunnerQa?.restore()
     window.__shadowRunnerQa?.teleport(1010, 616)
   })
   await delay(120)
-  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await setCrouch(page, true)
   await page.waitForFunction(
-    () => (window.__shadowRunnerDebug?.().player?.bodyHeight ?? 70) < 60,
+    () => window.__shadowRunnerDebug?.().player?.crouching === true
+      && window.__shadowRunnerDebug().player.bodyHeight < 44,
     null,
     { timeout: DEFAULT_TIMEOUT_MS },
   )
@@ -1646,7 +1762,7 @@ async function assertLevelTenGameplay(page, profile) {
     await delay(120)
   }
   snapshot = await readShadowRunnerDebug(page)
-  assert((snapshot?.player?.bodyHeight ?? 70) < 60, `${profile.label}: Level 10 first crouch lane cannot be traversed crouched`)
+  assert(snapshot?.player?.crouching === true && snapshot.player.bodyHeight < 44, `${profile.label}: Level 10 first crouch lane cannot be traversed crouched`)
   if (fullPhysicsPass) {
     assert(
       (snapshot?.player?.coins ?? 0) >= (beforeCrouch?.player?.coins ?? 0) + 2,
@@ -1654,7 +1770,7 @@ async function assertLevelTenGameplay(page, profile) {
     )
   }
   await capture(page, `${profile.label}-05a-crouch-machinery.png`)
-  await page.touchscreen.tap(crouchTap.x, crouchTap.y)
+  await setCrouch(page, false)
 
   await page.evaluate(() => window.__shadowRunnerQa?.teleport(3000, 616))
   await page.waitForFunction(
@@ -1776,18 +1892,83 @@ async function assertLevelTenGameplay(page, profile) {
       barrierActive: crownEncounterAfterRespawn?.barrierActive,
     })}`,
   )
+  // QA-assisted setup is not a campaign playthrough; delivery itself uses real input.
+  await page.keyboard.down('KeyJ')
   await page.keyboard.press('Digit3')
-  await page.getByRole('dialog', { name: 'Dawn Relay Spire finale' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  await page.waitForFunction(() => window.__shadowRunnerDebug?.().deliveryState === 'ready')
+  const beforeIgnition = await readShadowRunnerDebug(page)
+  await delay(250)
+  assert((await readShadowRunnerDebug(page)).deliveryState === 'ready', 'Held attack must not ignite on arrival')
+  await page.getByRole('button', { name: 'Open pause menu' }).click()
+  await page.getByRole('button', { name: 'Resume', exact: true }).click()
+  // A second keydown without keyup is native repeat, including after Phaser resets keys on pause.
+  await page.keyboard.down('KeyJ')
+  await delay(120)
+  assert((await readShadowRunnerDebug(page)).deliveryState === 'ready', 'Held key repeat after resume must not ignite')
+  await page.keyboard.up('KeyJ')
+  await page.getByRole('button', { name: 'Crouch', exact: true }).click()
+  await page.waitForFunction(() => window.__shadowRunnerDebug?.().player.crouching === true)
+  await capture(page, `${profile.label}-07-relay-ready.png`)
+  await page.getByRole('button', { name: 'Ignite relay', exact: true }).click()
+  await page.waitForFunction(() => window.__shadowRunnerDebug?.().deliveryState === 'igniting')
+  assert((await readShadowRunnerDebug(page)).player.crouching === false, 'The courier must stand to deliver at the clear pedestal')
+  await page.getByRole('button', { name: 'Open pause menu' }).click()
+  const pausedIgnition = await readShadowRunnerDebug(page)
+  await delay(500)
+  const stillPausedIgnition = await readShadowRunnerDebug(page)
+  assert(stillPausedIgnition.deliveryState === 'igniting'
+    && stillPausedIgnition.activeTimeMs === pausedIgnition.activeTimeMs
+    && stillPausedIgnition.player.score === beforeIgnition.player.score, 'Paused ignition must not advance or award completion')
+  await capture(page, `${profile.label}-07-relay-ignition-paused.png`)
+  await page.getByRole('button', { name: 'Resume', exact: true }).click()
+  await capture(page, `${profile.label}-07-relay-igniting.png`)
+  const finale = page.getByRole('dialog', { name: 'Dawn Relay Spire finale', exact: true })
+  await finale.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  const delivered = await readShadowRunnerDebug(page)
+  assert(delivered.deliveryState === 'delivered' && delivered.player.score === beforeIgnition.player.score + 300,
+    'World delivery must precede the cinematic and award the ordinary completion bonus once')
+  record(`${profile.label} real-input relay ignition after QA-assisted setup`, {
+    beforeIgnition, pausedIgnition, stillPausedIgnition, delivered,
+  })
   await capture(page, `${profile.label}-07-dawn-restored-finale.png`)
-  for (let attempt = 0; attempt < 5; attempt += 1) {
+  const finaleCommands = []
+  for (let attempt = 0; attempt < 10; attempt += 1) {
     if (await page.getByRole('dialog', { name: 'Level Complete' }).count()) break
-    const advance = page.getByRole('button', { name: /Continue|View Results/i })
-    if (await advance.count()) {
-      await advance.click()
-      await delay(120)
+    const advance = finale.getByRole('button', { name: /^(Follow the signal|See the dawn|Continue|View Results)$/i })
+    await advance.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    if (await page.locator('.runner-finale').count()) {
+      await page.waitForFunction(() => {
+        const scene = document.querySelector('.runner-finale img')
+        return scene?.complete && scene.naturalWidth > 0
+      })
+      await finale.evaluate(async element => { await Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {}))) })
+      for (const [size, viewport] of [['phone', profile.viewport], ['compact', { width: 568, height: 320 }]]) {
+        await page.setViewportSize(viewport)
+        const bounds = await finale.evaluate(element => {
+          const caption = element.querySelector('.runner-finale-caption').getBoundingClientRect()
+          return [...element.querySelectorAll('h2,.runner-finale-story > p:last-child,.runner-finale-footer button')].map(item => {
+            const rect = item.getBoundingClientRect()
+            return { name: item.textContent, left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+              visible: rect.left >= 0 && rect.right <= innerWidth && rect.top >= caption.top && rect.bottom <= innerHeight }
+          })
+        })
+        assert(bounds.every(item => item.visible), `${profile.label} finale ${attempt} ${size} content is clipped: ${JSON.stringify(bounds)}`)
+        await capture(page, `${profile.label}-07-ending-${attempt}-${size}.png`)
+      }
+      await page.setViewportSize(profile.viewport)
     }
+    finaleCommands.push(await advance.innerText())
+    await advance.click()
+    await delay(120)
   }
   await page.getByRole('dialog', { name: 'Level Complete' }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  if (finaleCommands.includes('Follow the signal')) {
+    assert(JSON.stringify(finaleCommands) === JSON.stringify(['Follow the signal', 'See the dawn', 'Continue', 'View Results']), 'Cinematic must follow world delivery and preserve ordered restoration')
+    await page.getByRole('button', { name: 'Replay ending' }).click()
+    await finale.getByRole('button', { name: 'Follow the signal' }).waitFor()
+    await finale.getByRole('button', { name: 'Skip cinematic' }).click()
+    await page.getByRole('dialog', { name: 'Level Complete' }).waitFor()
+  }
   await capture(page, `${profile.label}-08-level-10-complete.png`)
 
   snapshot = await readShadowRunnerDebug(page)
@@ -1798,6 +1979,7 @@ async function assertLevelTenGameplay(page, profile) {
     dawnfireAegisActive: snapshot?.player?.dawnfireAegisActive,
     aetherStepActive: snapshot?.player?.aetherStepActive,
     fullPhysicsPass,
+    finaleCommands,
     pools: snapshot?.pools,
   })
 }
@@ -1828,6 +2010,7 @@ async function ensurePreviewServer() {
     logLine(`Reusing preview server at ${config.baseUrl}`)
     return { cleanup: async () => {} }
   }
+  if (config.existingServer) throw new Error(`Existing preview unavailable at ${config.baseUrl}; refusing to build or start a server`)
 
   if (!config.skipBuild) {
     await runLoggedCommand({
@@ -1845,6 +2028,7 @@ async function ensurePreviewServer() {
     config.host,
     '--port',
     String(config.port),
+    '--strictPort',
   ], {
     cwd: repoRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -1853,7 +2037,10 @@ async function ensurePreviewServer() {
   child.stdout.on('data', chunk => void appendFile(previewLogPath, chunk))
   child.stderr.on('data', chunk => void appendFile(previewLogPath, chunk))
 
-  await waitForUrl(config.baseUrl, 20_000)
+  if (!await waitForUrl(config.baseUrl, 20_000)) {
+    await stopChildProcess(child)
+    throw new Error(`Preview unavailable at ${config.baseUrl}`)
+  }
   logLine(`Started preview server at ${config.baseUrl}`)
 
   return {
@@ -1886,7 +2073,7 @@ async function waitForUrl(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url)
+      const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(Math.min(timeoutMs, 1500)) })
       if (response.ok) return true
     } catch {
       // keep polling
@@ -1972,6 +2159,7 @@ function parseArgs(argv) {
     reuseServer: process.env.npm_config_reuse_server === 'false' ? false : true,
     skipBuild: process.env.npm_config_skip_build === 'true',
     skipPhysics: process.env.npm_config_skip_physics === 'true',
+    existingServer: false,
     runName: process.env.npm_config_run_name || null,
     levelId: process.env.npm_config_level || 'tutorial',
     profiles: process.env.npm_config_profiles || 'landscape',
@@ -1983,6 +2171,7 @@ function parseArgs(argv) {
     else if (current === '--headless') parsed.headed = false
     else if (current === '--skip-build') parsed.skipBuild = true
     else if (current === '--skip-physics') parsed.skipPhysics = true
+    else if (current === '--existing-server') parsed.existingServer = true
     else if (current === '--no-reuse-server') parsed.reuseServer = false
     else if (current.startsWith('--base-url=')) parsed.baseUrl = current.slice('--base-url='.length)
     else if (current === '--base-url' && argv[index + 1]) parsed.baseUrl = argv[++index]
@@ -2006,6 +2195,7 @@ function buildConfig(parsedArgs) {
 
   const baseUrl = parsedArgs.baseUrl || `http://${DEFAULT_HOST}:${DEFAULT_PORT}`
   const base = new URL(baseUrl)
+  assertLoopbackUrl(base)
   const profiles = parsedArgs.profiles
     .split(',')
     .map(profile => profile.trim())
@@ -2030,12 +2220,20 @@ function buildConfig(parsedArgs) {
     port: Number(base.port || DEFAULT_PORT),
     headless: !parsedArgs.headed,
     slowMo: parsedArgs.slowMo,
-    reuseServer: parsedArgs.reuseServer,
-    skipBuild: parsedArgs.skipBuild,
+    reuseServer: parsedArgs.existingServer || parsedArgs.reuseServer,
+    skipBuild: parsedArgs.existingServer || parsedArgs.skipBuild,
+    existingServer: parsedArgs.existingServer,
     skipPhysics: parsedArgs.skipPhysics,
     levelId: parsedArgs.levelId,
     profiles,
     artifactDir: path.join('output', 'playwright', slugify(parsedArgs.runName || `shadow-runner-${parsedArgs.levelId}-${timestampToken()}`)),
+  }
+}
+
+function assertLoopbackUrl(base) {
+  if (base.protocol !== 'http:' || !['127.0.0.1', 'localhost', '[::1]'].includes(base.hostname)
+    || base.username || base.password || base.pathname !== '/' || base.search || base.hash) {
+    throw new Error('Shadow Runner diagnostic preview must be a loopback HTTP origin')
   }
 }
 

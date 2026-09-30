@@ -1,4 +1,5 @@
 import { SHADOW_RUNNER_ASSETS } from '../assets/manifest'
+import { SHADOW_RUNNER_TUTORIAL_LEVEL } from './tutorial'
 import { SHADOW_RUNNER_LEVEL_EIGHT } from './levelEight'
 import {
   SHADOW_RUNNER_LEVEL_NINE,
@@ -199,6 +200,8 @@ export interface ShadowRunnerFinaleBeat {
   title: string
   body: string
   durationMs: number
+  asset?: string
+  actionLabel?: string
 }
 
 export interface ShadowRunnerFinaleConfig {
@@ -329,6 +332,7 @@ export interface ShadowRunnerLevelConfig {
   enemy?: ShadowRunnerEnemyConfig
   enemies?: ShadowRunnerEnemyConfig[]
   finish: ShadowRunnerRect
+  finishInteraction?: 'ignite-relay'
   finale?: ShadowRunnerFinaleConfig
 }
 
@@ -350,39 +354,9 @@ export interface ShadowRunnerCampaignLevel {
   playableLevelId?: ShadowRunnerPlayableLevelId
 }
 
-const BASE_BACKGROUND = SHADOW_RUNNER_ASSETS.home.background
+const BASE_BACKGROUND = SHADOW_RUNNER_ASSETS.rebuild.eastGateMoonriseBackground
 
-export const SHADOW_RUNNER_TUTORIAL_LEVEL: ShadowRunnerLevelConfig = {
-  id: 'tutorial',
-  title: 'Tutorial Run',
-  subtitle: 'Learn The Route',
-  objective: 'Reach the east gate',
-  introLine: 'Learn the courier steps before the moon road opens.',
-  completionLine: 'The first shadow route is open.',
-  backgroundAsset: BASE_BACKGROUND,
-  worldWidth: 1580,
-  worldHeight: 540,
-  playerStart: { id: 'start', x: 112, y: 404 },
-  finish: { id: 'east-gate', x: 1430, y: 282, width: 74, height: 150 },
-  platforms: [
-    { id: 'west-walkway', x: 0, y: 432, width: 520, height: 72 },
-    { id: 'broken-step-a', x: 638, y: 398, width: 148, height: 42 },
-    { id: 'broken-step-b', x: 890, y: 368, width: 182, height: 42 },
-    { id: 'east-ledge', x: 1192, y: 404, width: 388, height: 76 },
-  ],
-  tiltPlatforms: [
-    { id: 'tilt-bridge', x: 1020, y: 354, width: 168, height: 28, visualHeight: 54, visualOffsetY: -12, wobbleDurationMs: 1250, wobbleRotation: 0.075 },
-  ],
-  spikes: [
-    { id: 'pit-spikes', x: 532, y: 486, width: 132, height: 28 },
-  ],
-  coins: [
-    { id: 'coin-1', x: 330, y: 338 },
-    { id: 'coin-2', x: 690, y: 318 },
-    { id: 'coin-3', x: 950, y: 292 },
-    { id: 'coin-4', x: 1240, y: 322 },
-  ],
-}
+export { SHADOW_RUNNER_TUTORIAL_LEVEL }
 
 export const SHADOW_RUNNER_FULL_LEVEL_ONE: ShadowRunnerLevelConfig = {
   id: 'level-1',
@@ -464,7 +438,7 @@ export const SHADOW_RUNNER_LEVEL_TWO: ShadowRunnerLevelConfig = {
   objective: 'Cross the market roofs',
   introLine: 'Cross the lantern roofs before the clockwork patrols tighten.',
   completionLine: 'Lantern Market cleared. A second route marker glows.',
-  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.lanternMarketBackground,
+  backgroundAsset: SHADOW_RUNNER_ASSETS.rebuild.lanternMarketBackground,
   worldWidth: 3420,
   worldHeight: 540,
   playerStart: { id: 'start', x: 120, y: 396 },
@@ -485,7 +459,7 @@ export const SHADOW_RUNNER_LEVEL_TWO: ShadowRunnerLevelConfig = {
     },
     {
       id: 'market-roof-sentry-b',
-      kind: 'clockwork-sentry',
+      kind: 'lantern-bandit-scout',
       x: 2385,
       y: 374,
       health: 3,
@@ -493,6 +467,8 @@ export const SHADOW_RUNNER_LEVEL_TWO: ShadowRunnerLevelConfig = {
       patrolLeft: 2250,
       patrolRight: 2635,
       direction: 1,
+      patrolSpeed: 112,
+      contactDamage: 1,
     },
     {
       id: 'market-gate-sentry',
@@ -553,7 +529,7 @@ export const SHADOW_RUNNER_LEVEL_THREE: ShadowRunnerLevelConfig = {
   objective: 'Cross the ivy viaduct',
   introLine: 'Keep moving when the old bridge tilts.',
   completionLine: 'Ivy Viaduct holds. The sealed road remembers the Runner.',
-  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.ivyViaductBackground,
+  backgroundAsset: SHADOW_RUNNER_ASSETS.rebuild.ivyViaductBackground,
   worldWidth: 4720,
   worldHeight: 540,
   playerStart: { id: 'start', x: 118, y: 400 },
@@ -682,7 +658,7 @@ export const SHADOW_RUNNER_LEVEL_FOUR: ShadowRunnerLevelConfig = {
   objective: 'Find the forged order',
   introLine: 'Find forged records. Crouch low. Watch arrows.',
   completionLine: 'Bell Tower cleared. The forged line is in your satchel.',
-  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.bellTowerBackground,
+  backgroundAsset: SHADOW_RUNNER_ASSETS.rebuild.bellTowerBackground,
   worldWidth: 6120,
   worldHeight: 540,
   playerStart: { id: 'start', x: 118, y: 398 },
@@ -870,7 +846,7 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
   objective: 'Slip through the fair',
   introLine: 'Shield up. Stay low. Pick coin risks.',
   completionLine: 'Candle Fair cleared. The ruined route is yours.',
-  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.candleFairBackground,
+  backgroundAsset: SHADOW_RUNNER_ASSETS.rebuild.candleFairBackground,
   worldWidth: 8900,
   worldHeight: 720,
   playerStart: { id: 'start', x: 118, y: 552 },
@@ -878,7 +854,7 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
     { id: 'fair-first-volley', label: 'Fair Entrance', x: 2158, y: 584 },
     { id: 'fair-high-route', label: 'Candle Walk', x: 4420, y: 614 },
     { id: 'fair-gauntlet', label: 'Ruined Gauntlet', x: 6226, y: 520 },
-    { id: 'fair-final-entry', label: 'East Gate Approach', x: 8050, y: 584 },
+    { id: 'fair-final-checkpoint', label: 'East Gate Approach', x: 8050, y: 584 },
   ],
   enemies: [
     {
@@ -1099,7 +1075,7 @@ export const SHADOW_RUNNER_LEVEL_FIVE: ShadowRunnerLevelConfig = {
     { id: 'coin-21', x: 4808, y: 398 },
     { id: 'coin-22', x: 5032, y: 268 },
     { id: 'coin-23', x: 5244, y: 134 },
-    { id: 'coin-24', x: 5386, y: 220 },
+    { id: 'coin-24', x: 5386, y: 148 },
     { id: 'coin-25', x: 5570, y: 252 },
     { id: 'coin-26', x: 5818, y: 512 },
     { id: 'coin-27', x: 6036, y: 512 },
@@ -1147,7 +1123,7 @@ export const SHADOW_RUNNER_LEVEL_SIX: ShadowRunnerLevelConfig = {
   objective: 'Break the gear lock',
   introLine: 'Catch the clock. Slow the yard. Break the gear lock.',
   completionLine: 'Clockmaker Yard cleared. The machine road stands still.',
-  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.clockmakerYardBackground,
+  backgroundAsset: SHADOW_RUNNER_ASSETS.rebuild.clockmakerYardBackground,
   worldWidth: 10260,
   worldHeight: 720,
   playerStart: { id: 'start', x: 118, y: 552 },
@@ -1156,7 +1132,7 @@ export const SHADOW_RUNNER_LEVEL_SIX: ShadowRunnerLevelConfig = {
     { id: 'yard-high-route', label: 'Counterweight Walk', x: 4060, y: 614 },
     { id: 'yard-gear-run', label: 'Gear Run', x: 6610, y: 584 },
     { id: 'yard-gauntlet', label: 'Machine Gauntlet', x: 8460, y: 614 },
-    { id: 'yard-final-approach', label: 'Clock Gate Approach', x: 9360, y: 584 },
+    { id: 'yard-final-checkpoint', label: 'Clock Gate Approach', x: 9360, y: 584 },
   ],
   enemies: [
     {
@@ -1335,7 +1311,7 @@ export const SHADOW_RUNNER_LEVEL_SEVEN: ShadowRunnerLevelConfig = {
   objective: 'Recover the three Moon Shards',
   introLine: 'Recover every shard. Cross the moon road. Do not trust the bridges.',
   completionLine: 'Moonlit Causeway cleared. The shard is whole again.',
-  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.moonlitCausewayBackground,
+  backgroundAsset: SHADOW_RUNNER_ASSETS.rebuild.moonlitCausewayBackground,
   worldWidth: 12740,
   worldHeight: 760,
   playerStart: { id: 'start', x: 118, y: 584 },
@@ -1375,7 +1351,7 @@ export const SHADOW_RUNNER_LEVEL_SEVEN: ShadowRunnerLevelConfig = {
       patrolSpeed: 176, contactDamage: 4,
     },
     {
-      id: 'causeway-stalker-b', kind: 'moon-stalker', x: 4680, y: 616,
+      id: 'causeway-stalker-b', kind: 'moon-stalker', x: 4680, y: 604,
       health: 5, maxHealth: 5, patrolLeft: 4480, patrolRight: 5100, direction: 1,
       patrolSpeed: 182, attackRange: 470, attackCooldownMs: 1040, contactDamage: 3,
     },
@@ -1637,7 +1613,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyLabel: 'Courier Trial',
     routeType: 'Training Route',
     mechanicPreview: 'Longer gate run, two sentries, two tilt bridges, wider spike gaps',
-    thumbnail: SHADOW_RUNNER_ASSETS.levels.eastGateRunThumbnail320,
+    thumbnail: SHADOW_RUNNER_ASSETS.rebuild.eastGateMoonriseThumbnail,
     locationButton: SHADOW_RUNNER_ASSETS.levels.eastGateRunLocationButton,
     mapPosition: { left: 18, top: 59 },
     playableLevelId: 'level-1',
@@ -1651,7 +1627,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyLabel: 'Market Timing',
     routeType: 'Rooftop Route',
     mechanicPreview: 'Market roof chain with three sentries, faster tilt bridges, and denser spikes',
-    thumbnail: SHADOW_RUNNER_ASSETS.levels.lanternMarketThumbnail320,
+    thumbnail: SHADOW_RUNNER_ASSETS.rebuild.lanternMarketThumbnail,
     locationButton: SHADOW_RUNNER_ASSETS.levels.lanternMarketLocationButton,
     mapPosition: { left: 44, top: 58 },
     playableLevelId: 'level-2',
@@ -1665,7 +1641,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyLabel: 'Bridge Pressure',
     routeType: 'Crumbling Route',
     mechanicPreview: 'Heavier barrel pressure, faster tilt bridges, tighter spike pits',
-    thumbnail: SHADOW_RUNNER_ASSETS.levels.ivyViaductThumbnail320,
+    thumbnail: SHADOW_RUNNER_ASSETS.rebuild.ivyViaductThumbnail,
     locationButton: SHADOW_RUNNER_ASSETS.levels.ivyViaductLocationButton,
     mapPosition: { left: 35, top: 37 },
     playableLevelId: 'level-3',
@@ -1679,7 +1655,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyLabel: 'Vertical Climb',
     routeType: 'Tower Route',
     mechanicPreview: 'Required low-clearance platforms, Tower Archers, scroll thieves, and hard bonus routes',
-    thumbnail: SHADOW_RUNNER_ASSETS.levels.bellTowerThumbnail320,
+    thumbnail: SHADOW_RUNNER_ASSETS.rebuild.bellTowerThumbnail,
     locationButton: SHADOW_RUNNER_ASSETS.levels.bellTowerLocationButton,
     mapPosition: { left: 64, top: 49 },
     playableLevelId: 'level-4',
@@ -1693,7 +1669,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyLabel: 'Trick Hazards',
     routeType: 'Fairground Route',
     mechanicPreview: 'Shielded archer volleys, Candle Jesters, fall-risk high routes',
-    thumbnail: SHADOW_RUNNER_ASSETS.levels.candleFairThumbnail320,
+    thumbnail: SHADOW_RUNNER_ASSETS.rebuild.candleFairThumbnail,
     locationButton: SHADOW_RUNNER_ASSETS.levels.candleFairLocationButton,
     mapPosition: { left: 77, top: 25 },
     playableLevelId: 'level-5',
@@ -1707,7 +1683,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyLabel: 'Clockwork Pace',
     routeType: 'Machine Route',
     mechanicPreview: 'Chrono Lantern time fields, Lantern Bandit Scouts, gear gauntlets',
-    thumbnail: SHADOW_RUNNER_ASSETS.levels.clockmakerYardThumbnail320,
+    thumbnail: SHADOW_RUNNER_ASSETS.rebuild.clockmakerYardThumbnail,
     locationButton: SHADOW_RUNNER_ASSETS.levels.clockmakerYardLocationButton,
     mapPosition: { left: 56, top: 31 },
     playableLevelId: 'level-6',
@@ -1721,7 +1697,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyLabel: 'Causeway Chase',
     routeType: 'Timed Route',
     mechanicPreview: 'Moon Shards, Shadow Surge, Moon Stalkers, shield pockets, brutal tilt bridges',
-    thumbnail: SHADOW_RUNNER_ASSETS.levels.moonlitCausewayThumbnail320,
+    thumbnail: SHADOW_RUNNER_ASSETS.rebuild.moonlitCausewayThumbnail,
     locationButton: SHADOW_RUNNER_ASSETS.levels.moonlitCausewayLocationButton,
     mapPosition: { left: 78, top: 61 },
     playableLevelId: 'level-7',
@@ -1735,7 +1711,7 @@ export const SHADOW_RUNNER_CAMPAIGN_LEVELS: ShadowRunnerCampaignLevel[] = [
     difficultyLabel: 'Hidden Paths',
     routeType: 'Branching Route',
     mechanicPreview: 'Wraithlight paths, Mirror Ward reflections, Relay Seals, guarded ambushes',
-    thumbnail: SHADOW_RUNNER_ASSETS.levels.courierCatacombsThumbnail320,
+    thumbnail: SHADOW_RUNNER_ASSETS.rebuild.courierCatacombsThumbnail,
     locationButton: SHADOW_RUNNER_ASSETS.levels.courierCatacombsLocationButton,
     mapPosition: { left: 38, top: 84 },
     playableLevelId: 'level-8',

@@ -209,6 +209,66 @@
 
 - Current production passed headed WebKit/iPhone 13 emulation: both players' canvas touches persisted moves, realtime turns and match chat updated, portrait-to-landscape containment and camera controls worked. Exact test-session cleanup passed; no screenshots.
 - Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790296822651/summary.json`. Canonical QA now handles late release notes, foreground settling and closed-page diagnostic capture. Actual iPhone/Android sound, thermal performance and installed-PWA behavior remain unverified.
+## September 24 Shadow Runner Foundry and Lock local routes
+
+- Foundry east local runner-foundry-east-local-2026-09-25T03-21-45-585Z passes Chromium932x430 and WebKit740x390 at12HP/three lives. Its135 sampled Arcade cases validate supported fresh-calm offsets and jump timing, not full-level completion.
+- Lock local runner-lock-local-2026-09-25T03-43-33-631Z passes both engines on runtime D5XrMwCL / Games CJHjhsgw. All11steps finish, Warden/archer defeated, checkpoint activated, three lives and zero page errors. Android minimum5HP heals naturally to12HP at the checkpoint; WebKit remains12HP. Final WebKit screenshot reviewed.
+- Setup injects only Lock placement18980/616. No forced guard deaths, restored health or granted powers. Normal controls drive all later actions; browser-emulated keyboard input is not physical-phone touch proof. Remote requests/WebSockets blocked, no external data created. This does not close any full-route, mastery or boss acceptance cell.
+-54 actual-Arcade arrow cases and386Node checks pass, with lint/typecheck/build at92.68MiB. Full Jest passes300suites/2,604tests with16existing auth TODOs. Full normal runner-lock-defense-route-20260924-02 is terminal: WebKit194steps/five Flames reaches Sovereign Last Light at2/24HP before exhausting lives; Chromium20steps stalls healthy under gap04. Both report zero page errors and matching hashes. Neither is accepted completion. Replay01 was cancelled before completion for the retry-adapter correction; six verified task-owned processes terminated and absence verified.
+- Actual-Arcade reproduces the gap04 underside hit atx3608. A20px earlier input takeoff passes45sampled cases and both local engines in runner-prism-entry-local-2026-09-25T03-58-17-024Z at12HP/three lives. Explicit setup placement3500/616 and prior Lancer clearance; no geometry/health/power alteration. Screenshot reviewed.202focused Jest,386Node and lint pass after that policy change. Full replay, boss victory/ending, mastery and physical-device checks remain open. No push, deploy or backend mutation.
+
+## September 24 Shadow Runner Relay crawl cover
+
+- Pre-fix local runner-crawl-ascent-local-2026-09-25T03-00-04-808Z survived but finished Chromium6HP/WebKit3HP after repeated covered-passage orb damage. Installed Arcade regressions reproduced close-muzzle roof escape at 30/60/120fps.
+- Post-fix runner-crawl-ascent-local-2026-09-25T03-08-49-393Z passes both phone viewports on runtime BCEXLdJE / Games Cu5aidEp. Both retain 12HP while covered, defeat caster/lancer, keep three lives, finish at8/12HP and report no page errors. Exposed exit/combat damage remains. Screenshot reviewed.
+- The local setup logs placement21704/616 and the preceding Rival's defeat, not powers, restore or completion. No external data created. This is not full-route or physical-device proof. Full normal runner-relay-cover-route-20260924-01 is terminal, with zero page errors and matching hashes. Chromium162steps/four Flames activates Crown and naturally recovers there, then exhausts lives in Lock's arrow corridor. WebKit53steps/12HP/three lives stalls at Foundry's east wind anchor; fresh calm at x7525/7527 misses the7516target's8px tolerance. Neither reaches the revised crawl in its full attempt; mastery/boss/ending/release remain open.
+- Normal and mastery route checkpoint targets now pass their actual activation line; game trigger positions are unchanged. Eight new projectile regressions plus full Jest300suites/2,581tests pass (16existingTODOs), final379Node checks and lint/typecheck/build pass at92.68MiB. No push.
+
+## September 24 Shadow Runner supported fire
+
+- Frozen runtime D3EwwbQ8 / Games Dk5xkFzQ. runner-impact-systems-20260924-02 passes 50 QA-assisted systems checks across Chromium 932x430 and WebKit 740x390. Both storm damage rectangles are exactly y590-616, above the y616 road. Reviewed fresh images show the fire at road height. The command used --skip-physics; this is not route or physical-phone acceptance.
+- Probe01 failed: an existing remote pooled fire satisfied the old wait while the preceding Sunsteel attack could destroy the new grenade. The smoke now waits for attack completion and a visible target-location fire. Target bounds remain strict; failed evidence retained. External requests blocked, no remote data created.
+- Fresh runner-late-ascent-local-2026-09-25T02-54-14-036Z passes both engines on the same build, full health/three lives, checkpoint active and zero page errors. Local setup placement/prior enemy clearance remain explicit. Screenshots reviewed/shared.
+- Actual-engine impact/tilt tests cover fast hits at 30/60/120fps, non-floor contacts, crouched overlap, moving supports, expiry and pooling. Full Jest 299 suites / 2,573 tests passes with 16 existing auth TODOs; 377 Node, lint, TypeScript and build pass. Full-route, creative/finale, mastery, real-device and deployment gates remain open. No push.
+
+## September 24 Shadow Runner late Ascent
+
+- Frozen runtime CfymhNKG / Games gNhltiKh. Local runner-late-ascent-local-2026-09-25T02-21-10-764Z passes932x430Chromium and740x390WebKit: five steps, minimum/final12HP, three lives, last checkpoint active, both nearby threats alive, zero page errors. Screenshots reviewed and shared. Browser sizing/keyboard inputs are not physical-phone multitouch evidence.
+- Setup explicitly places the runner at22596/616 and defeats the preceding caster/lancer. No restore, power grant, clock override or hazard disabling; remote traffic blocked and no external data created.
+- Earlier probes retained real failures: grenade/wind waits stalled, standing checkpoint alignment drifted backward, and a12px positional tolerance stopped short of the actual checkpoint trigger. The final route removes the second wait, braces through the exit, and targets23064for activation. Assertions remain strict.
+-225sampled real-Arcade geometry/wind cases pass independently.377Node checks and production build pass. Full regression passes298Jest suites/2564tests with16existing auth TODOs, lint, app TypeScript, docs integrity175 and diff-check. Unassisted runner-late-ascent-drop-route-20260924-01 is terminal: both engines exhaust natural lives before this crossing, with zero page errors/matching hashes. Android172steps/four Flames ends during crawl06; WebKit152steps/three Flames ends during Crown retries. Checkpoint/resource preservation works, but ordinary victory is not accepted. Some storm impact bodies below their contacted surface require follow-up validation. Campaign/mastery/finale/device/release acceptance remains open; no push/backend mutation.
+
+## September 24 Shadow Runner Crown to Lock
+
+- Frozen runtime CuWoSaKx / Games BenChcKr. Local runner-crown-local-2026-09-25T01-26-07-655Z passes932x430Chromium and740x390WebKit: both guards defeated, Flame4/Aether naturally acquired after setup, ten steps, three lives, Android9HP/WebKit8HP, no page errors.
+- Initial failures are retained. The01-11-19Android trace cleared combat/Flame4 but died at the exit; authored Lock arrows overlapped Crown. After shortening only those lifetimes,01-22-24Android passed while WebKit's driver repeated an already-collected Flame.01-24-14WebKit passed while Android's waiting anchor conflicted with its jump boundary. Guarded grounded pickup confirmation and the safe18536anchor fix these driver defects; no assertions or finite-life checks were removed.
+- Setup explicitly logs three prerequisite-objective placements, one pre-input restore, prior-drone clearance and initial Crown placement. It can acquire earlier powers during setup. These local passes must not be described as unassisted normal campaign proof. Remote traffic is blocked; no external data created. Screenshots reviewed and shared.
+- Final regression passes298Jest suites/2547tests (16existing auth TODOs),374Node checks, lint, app TypeScript, build, docs integrity175 and diff-check. The physics includes90real Arcade beam/approach cases plus nine safe-anchor jump cases. Production build remains467files/92.68MiB. Campaign/mastery/finale and physical-device gates remain open. No push or backend change.
+- Full real-input runner-crown-exit-route-20260924-01 is terminal: Android177/WebKit178completed steps include naturally earned five Flames and refuge crossing, not victory. Both stop at gap-23-step. Android exhausts lives after earlier Crown/Lock losses; WebKit dies there once, recovers at Lock, then stalls with1HP/two lives. No page errors, no gameplay setup/restore/forced kills. Recovery preserves consumed powers/dead enemies and naturally exercises the earned-Flame skip. Last wind-exposed jump/approach and later boss/ending remain unproven.
+
+## September 24 Shadow Runner movement baseline
+
+- Frozen runtime Dj4VLLIi / Games uXUgEAQo includes frame-independent held-input movement. Local932x430Chromium and740x390WebKit Ascent replay runner-ascent-local-2026-09-25T00-35-50-743Z passes with12HP/3lives, natural Aether pickup and no page errors.
+- Foundry local runner-foundry-local-2026-09-25T00-34-23-817Z crosses in both engines. Chromium defeats both guards and reaches Gearwing checkpoint; WebKit loses a life fighting the lancer. Survival is not accepted. No gameplay assertions were relaxed to turn that failure green.
+- Removed mid-route screenshot capture: its observation delay let wind push the runner off a small ledge during the automated input pause. Terminal screenshots remain. Prior Foundry/checkpoint and Ascent/refuge images were reviewed and shown to Tayler.
+- Local setup logs a single placement and one cleared prior enemy; all subsequent actions use real controls. Remote requests remain blocked. This is not a full normal/mastery playthrough or physical-device performance/control proof.
+
+- Full normal runner-movement-opening-20260924-01 passes tutorial and East Gate on both engines, with zero deaths/page errors and matching runtime hashes. Tutorial collected4/4coins and1/1enemy; East Gate collected4/10coins and2/2enemies. This proves ordinary completion, not East Gate mastery or physical multi-touch.
+- FullLevel10 runner-movement-relay-20260924-01 is terminal and failed in both engines. Android reaches Crown/Flame4 after two Foundry respawns; WebKit clears Foundry without dying, reaches Lock, then exhausts lives on Crown retries. Both have matching frozen hashes, zero page errors and preserved spent powers/earned progress. Traces show Crown jumps during active high beams and Lock descent damage; no finale completion is claimed. All browser runs are closed; the task-owned preview remains available.
+
+## September 24 Shadow Runner Ascent refuge
+
+- Frozen runtime BvWWij5K / Games B3gqxZbo. Full normal checkpoint replay runner-ascent-refuge-20260924-01 failed before Ascent in Foundry on both engines. Zero page errors; no full-route acceptance.
+- Local diagnostic runner-ascent-local-2026-09-25T00-03-58-662Z passes932x430Chromium and740x390WebKit: two real-input jumps, supported crouched wind waits, natural Aether pickup, unchanged12HP/3lives. Reviewed both refuge images; custom masonry matches the collision deck. Screenshots shown to Tayler alongside the earlier gameplay and ending captures.
+- Setup explicitly teleports once and defeats only the prior Rival; no health restoration, power grant, hazard disabling or clock reset. Remote requests/sockets blocked, no external test data created. This is focused crossing proof, not full gameplay or physical-device evidence.
+- Earlier Android runs failed: first blew back off an edge landing, second waited unnecessarily under incoming fire after acquiring Aether. The policy now targets21992on the far floor and confirms the pickup immediately while bracing.405actual-policy Arcade cases cover80-180msobservations, three FPS values, nine arrival phases and offsets+/-8px.
+
+## September 24 Shadow Runner world ignition and ending
+
+- `output/playwright/runner-world-ignition-20260924-03` passes50checks on740x390WebKit and932x430Chromium, with each ending scene also checked at568x320. Reviewed ready/igniting and cinematic screenshots: no stale boss warning, readable captions/actions, existing custom flame visible.
+- Actual controls verify held attack cannot ignite on arrival or repeat after pause/resume, crouched arrival stands on delivery, paused ignition freezes time and score, completion awards once, four scenes advance in order, and replay/skip returns to results. Reduced motion and teardown fences have focused unit coverage.
+- QA-assisted location/objective/boss setup is explicitly separate from actual delivery inputs. This is not a full campaign playthrough or physical iPhone/Android installed-PWA, audio, thermal or thumb-ergonomics proof. No remote test data created.
+- Frozen build Cn4wBTsm / DdIks5Uj. Run02 failed on the harness's incorrect top-level crouch field, corrected to player.crouching for run03. Full-route and final release acceptance remain open; no rebuild deployed.
 
 ## September 21 Shadow Circuit directional terrain polish
 
@@ -798,3 +858,16 @@ The automated mobile PWA visual loop passed across the core installed-home-scree
 That statement applies to the recorded May artifact set, not the July 10 local
 candidate. Use the candidate checkpoint above until new browser and device
 evidence is recorded.
+## September 30 Shadow Runner Sovereign and ending
+
+- Frozen runtime `DMlMFKUa` / Games `CrV_mDmd` passes the explicitly QA-assisted
+  arena diagnostic on Android Chromium932x430 and iPhone WebKit740x390: boss,
+  ignition, four user-advanced cinematic scenes, matching stored results,
+  three lives and no page errors. Compact ending screenshot reviewed.
+- `runner-boss-local-2026-09-30T14-46-54-393Z` logs objective placement, prior
+  guard clearance and initial restore. It does not certify a full campaign route.
+- Full `runner-sovereign-beam-route-20260930-01` is unaccepted; Android exhausts
+  lives and iPhone reaches five Flames/12HP/three lives then stalls in final wind.
+  Follow-up Crown corridor and input-bracing changes await new-build replay.
+- Physical installed-PWA touch, media-card/background and sustained device
+  performance remain unverified. No rebuild production deploy yet.

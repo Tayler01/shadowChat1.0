@@ -2,6 +2,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { prepareRelayLancer } from './process-shadow-runner-rebuild-sprites.mjs';
+import { prepareRecoveredEnemies } from './process-shadow-runner-recovered-enemies.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = path.join(
@@ -253,40 +255,10 @@ await Promise.all([
     .webp({ quality: 89, effort: 6 })
     .toFile(path.join(runtimeRoot, 'ui', 'dawn-relay-spire-thumbnail-160x90.webp')),
   sharp(path.join(sourceRoot, 'dawn-relay-spire-terrain-machinery-v1-transparent.png'))
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toFile(path.join(runtimeRoot, 'props', 'dawn-relay-spire-terrain-machinery-v1-transparent.png')),
-  makeGridStrip({
-    sourceName: 'relay-lancer-v1-6f-transparent.png',
-    outputDirectory: 'enemies',
-    outputName: 'relay-lancer-v1-6f-128.png',
-    columns: 6,
-    rows: 1,
-    frameSize: 128,
-  }),
-  makeGridStrip({
-    sourceName: 'prism-caster-v1-6f-transparent.png',
-    outputDirectory: 'enemies',
-    outputName: 'prism-caster-v1-6f-128.png',
-    columns: 6,
-    rows: 1,
-    frameSize: 128,
-  }),
-  makeGridStrip({
-    sourceName: 'gearwing-drone-v1-6f-transparent.png',
-    outputDirectory: 'enemies',
-    outputName: 'gearwing-drone-v1-6f-128.png',
-    columns: 6,
-    rows: 1,
-    frameSize: 128,
-  }),
-  makeGridStrip({
-    sourceName: 'sentry-sovereign-v1-10f-transparent.png',
-    outputDirectory: 'enemies',
-    outputName: 'sentry-sovereign-v1-10f-192.png',
-    columns: 5,
-    rows: 2,
-    frameSize: 192,
-  }),
+    .webp({ lossless: true, effort: 6 })
+    .toFile(path.join(runtimeRoot, 'props', 'dawn-relay-spire-terrain-machinery-v1-transparent.webp')),
+  prepareRelayLancer({ publish: true }),
+  prepareRecoveredEnemies({ publish: true, level: 10 }),
   makeGridStrip({
     sourceName: 'dawnfire-aegis-4f-transparent.png',
     outputDirectory: 'collectibles',

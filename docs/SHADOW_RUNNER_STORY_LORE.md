@@ -1,397 +1,263 @@
 # Shadow Runner Story And Lore
 
-Status: first narrative foundation for the 10-map Shadow Runner campaign.
+Status: source-aligned campaign canon, reviewed 2026-09-24 in the dirty
+`C:/repos/chat2.0-main` checkout for remaining rebuild item S01.
 
-This document turns the current playable prototype, asset direction, and concept
-art into a coherent story direction. It is written to support level design,
-asset generation, UI copy, and future implementation without forcing cutscenes
-or long reading into a phone-first platformer.
+This document separates story currently authored in the game from historical
+worldbuilding and uncommitted ideas. "Implemented" below means present in the
+reviewed source, not shipped, visually verified, or accepted through a full
+playthrough. Level 10 traversal work is concurrent and outside this review.
 
-## Runtime Alignment - 2026-06-11
+## Source Authority
 
-- Map 1 runtime name: East Gate Run.
-- Current player-facing objective: "Reach the east gate."
-- HUD hearts represent lives, not hit-point health.
-- Red overhead bars above the player and enemies represent current health and
-  deplete as damage is taken.
-- Gold coins are both score pickups and Runner route marks in lore.
-- The east gate is the first finish marker and the first proof that the old
-  route can still open.
+- [campaignStory.ts](../src/features/games/shadow-runner/game/campaignStory.ts):
+  tutorial/chapter acts, delivery briefings, dispatches, and failure copy.
+- [campaignMoments.ts](../src/features/games/shadow-runner/game/campaignMoments.ts):
+  22 spatial discoveries, two per tutorial/chapter, with authored landmarks.
+- [levels.ts](../src/features/games/shadow-runner/game/levels.ts) and
+  [tutorial.ts](../src/features/games/shadow-runner/game/tutorial.ts): opening
+  level IDs, names, objectives, and Moon Shard configuration.
+- [levelEight.ts](../src/features/games/shadow-runner/game/levelEight.ts),
+  [levelNine.ts](../src/features/games/shadow-runner/game/levelNine.ts), and
+  [levelTen.ts](../src/features/games/shadow-runner/game/levelTen.ts): late
+  districts, required pickups/enemies, and the four-beat finale.
+- [createShadowRunnerPhaserGame.ts](../src/features/games/shadow-runner/game/createShadowRunnerPhaserGame.ts):
+  `checkFinish` enforces objective items, required enemies, and Moon Shards.
+  [ShadowRunnerGame.tsx](../src/features/games/shadow-runner/ShadowRunnerGame.tsx)
+  and [RunnerFinale.tsx](../src/features/games/shadow-runner/components/RunnerFinale.tsx)
+  present completion dispatches and the ending.
 
-## Current Game Review
+These sources take precedence over the historical ideas below. Briefing
+`delivery` text describes story purpose; level `objective` text describes the
+route task. They need not be identical. Do not replace source copy with the
+old prototype intro drafts.
 
-Shadow Runner already has a strong identity:
+## Current Core Story
 
-- Format: 2D Phaser platformer inside Shadow Chat Entertainment.
-- Primary play mode: phone-first landscape, 16:9, low-chrome controls.
-- Current level goal: run, jump, double-jump, crouch, attack, collect, survive,
-  defeat or bypass the first enemy, and reach the finish gate.
-- Visual tone: Game Boy Color inspired medieval fantasy, moonlit castle ruins,
-  parchment UI, purple banners, gold accents, torchlight, and old stone.
-- Hero: a hooded shadow knight messenger with glowing gold eyes, cloak, sword,
-  and satchel.
-- First enemy: Clockwork Sentry, with patrol, attack, hit, and defeated states.
-- Current HUD language: hearts, coin count, score, pause, objective, and level
-  complete banner.
-- Existing level text anchor: "Reach the east gate", which becomes the first
-  story beat.
+The Relay has fallen silent. The Last Runner is the last courier who still
+remembers the oath: "the message moves." The tutorial begins with a sealed
+letter beside the old road. Its spatial discovery says it is addressed to
+someone inside the east gate, not to the machines guarding it.
 
-Narrative gap: the game currently has a clear playable route but only a light
-story wrapper. The strongest next move is to make every level feel like a
-dangerous delivery, with story carried through mission scrolls, map names,
-collectibles, enemy introductions, and environmental props instead of long
-dialogue.
+In East Gate Run, someone behind a burning window still awaits a message.
+The satchel carries the names of couriers who vanished during the lockdown;
+the discovery places names in its lining, written in different hands with
+one space empty. The story does not name the recipient or equate the first
+letter, the lining's names, and the later recovered order as one document.
+Do not invent that relationship or a named sender.
 
-## Research Takeaways
+The delivery grows from reopening a road to recovering and carrying an
+authentic command. Market warnings predate the lockdown. Cut viaduct anchors
+show deliberate sabotage. The archives preserve the Captain's genuine seal
+but altered words. False beacons and clockwork machinery repeat that lie.
+The instruction originates at Dawn Relay Spire.
 
-These references shaped the direction:
+Three Moon Shards on Moonlit Causeway recover the words: "protect the people,
+not the silence." The courier memorials hold the next seals. The Rival reads
+the names and yields the delivery in the L8 dispatch. The Captain's L9
+dispatch identifies the Sovereign as the author of the rewritten order.
+The finale confirms the Sovereign forged the lockdown and silenced couriers
+who could contradict it, then depicts the true order reopening the roads.
 
-- Henry Jenkins frames game designers as "narrative architects" and argues that
-  spaces can stage, embed, and enable story. For Shadow Runner, each map should
-  reveal history through route design, props, gates, banners, and ruins.
-  Source: https://web.mit.edu/~21fms/People/henry3/games%26narrative.html
-- Game Developer's environmental storytelling guidance emphasizes arranging
-  objects so players infer meaningful events. Shadow Runner can use sealed
-  letters, broken sentries, message pedestals, abandoned camps, and banner
-  changes as readable story evidence.
-  Source: https://www.gamedeveloper.com/design/environmental-storytelling
-- GDC Vault's mobile narrative session summary warns against heavy tap-through
-  exposition while still giving players purpose. Shadow Runner should use short
-  mission text, collectible snippets, and post-level reveals.
-  Source: https://www.gdcvault.com/play/1025964/Storytelling-in-Small-Spaces-Practical
-- MDA gives a useful check: mechanics create dynamics, which create emotional
-  experience. Shadow Runner's mechanics are movement, risk, combat, and
-  collection; the desired feelings are speed, danger, mystery, and duty.
-  Source: https://www.cs.northwestern.edu/~hunicke/MDA.pdf
-- ARG design notes point toward optional community mystery: distributed clues
-  and player collaboration can deepen a story. Shadow Chat can later hide
-  optional lore codes in posts, News, or entertainment drops, but the core game
-  should remain complete without external hunting.
-  Source: https://kairos.technorhetoric.net/22.2/praxis/ehrenberg-et-al/index.html
+## Ten Districts And Chapter Order
 
-## Core Fantasy
+The tutorial is a prologue, not an eleventh district. Its ID is `tutorial`,
+its title is **Tutorial Run**, its delivery is "Carry the first sealed
+message," and its route objective is "Pass the training sentry and reach the
+east gate."
 
-You are the last Shadow Runner, an oathbound courier who moves by moonlight
-through the broken messenger roads of a fallen castle-city.
+The objectives below reproduce level configuration text. Story beats summarize
+the chapter briefings, dispatches, and spatial discoveries.
 
-The kingdom once survived because messages always moved. Warnings crossed the
-walls before armies arrived. Cures reached plague towers before dawn. Names of
-the missing traveled home. The Runners were not kings, knights, or spies. They
-were the thin line between silence and survival.
+| ID | Current District | Configured Objective | Story Purpose And Reveal |
+| --- | --- | --- | --- |
+| `level-1` | East Gate Run | Reach the east gate | Reopen the route; a window still burns and the satchel carries missing couriers' names. |
+| `level-2` | Lantern Market Roofs | Cross the market roofs | Follow courier marks above stolen letters; recover a warning stamped before lockdown. |
+| `level-3` | Ivy Viaduct | Cross the ivy viaduct | Restore the crossing; cut anchors establish sabotage, and a sentry tried to protect a dispatch from its own command. |
+| `level-4` | Bell Tower Archives | Find the forged order | Recover the altered page; the Captain's seal is genuine but the words were changed after entering the Relay. |
+| `level-5` | Candle Fair Ruins | Slip through the fair | Pass false beacons bearing the forged order's mark; a machine, not a messenger, repeats the lie. |
+| `level-6` | Clockmaker Yard | Break the gear lock | Carry a Chrono Lantern into the machinery; trace the master instruction to the spire and learn that three shards remember the true words. |
+| `level-7` | Moonlit Causeway | Recover the three Moon Shards | Recover the authentic command; the Rival's trail leads toward the memorial road. |
+| `level-8` | Courier Catacombs | Recover three Relay Seals and open the relay door | Recover the dead couriers' seals; the dispatch has the Rival read the names and tell the Runner to finish the delivery. The route also requires defeating the Rival Courier. |
+| `level-9` | Captain Gate | Recover four Watchfire Crests and defeat the Moonlit Captain | Confront the Captain's guarded silence; he lowers his blade and identifies the Sovereign's rewriting of his order. |
+| `level-10` | Dawn Relay Spire | Restore five Relay Flames and defeat the Sentry Sovereign | Carry the true order to the crown, reach the ignition pedestal, and restore the city's roads and messages. |
 
-Then the Moonlit Relay went dark.
+### Three Acts
 
-The old gates locked. Clockwork guards woke with corrupted orders. Bandits
-learned that sealed letters were worth more than gold. Rival couriers started
-selling routes to the highest bidder. Somewhere beyond the east gate, the last
-true message is still waiting to be delivered.
+- **I - The road still opens (L1-L3):** a waiting recipient, stolen warnings,
+  and a sabotaged crossing turn a delivery into evidence of deliberate isolation.
+- **II - The poisoned message (L4-L7):** distinguish the Captain's seal from
+  the forged words, follow their machine repetition, and recover the true command.
+- **III - Deliver at dawn (L8-L10):** carry the memorial seals past the Rival,
+  confront the Captain, expose the Sovereign, and restore communication.
 
-Shadow Runner begins with one simple command:
+Dawn is the narrative urgency. The earlier "another hundred years" penalty,
+revenge-versus-delivery choice, and mounted chase are not current story promises.
 
-Reach the east gate.
-
-## Story Pillars
-
-- Every run is a delivery. The player is not wandering; they are carrying
-  something that matters.
-- Speed is moral pressure. Moving quickly is not only skill expression, it is
-  the fantasy of outrunning silence.
-- Coins are route marks. Gold coins can stay as score objects, but lore treats
-  them as old Runner tokens left to mark safe jumps and hidden paths.
-- Sentries are tragic, not evil. The clockwork guards were built to protect the
-  Relay; their orders have been rewritten.
-- Purple means authority. Purple banners, crests, and coins mark the old
-  Moonlit Court and its loyalist routes.
-- Light is memory. Torches, embers, moon shards, and glowing eyes are signs that
-  a message, person, or place has not fully disappeared.
-- The player should understand the story even if they skip every optional text
-  prompt.
-
-## Key Lore
-
-### The Moonlit Relay
-
-The Relay was a chain of towers, gates, couriers, and sealed moon-glass posts
-that carried messages across the realm. It was not magic in the flashy sense.
-It was old craft: moon shards, trained runners, watch captains, and clockwork
-locks that opened only for sworn deliveries.
-
-When the Relay failed, whole districts became isolated maps.
-
-### The Shadow Runners
-
-The Runners were a neutral order. They delivered across battle lines, plague
-wards, royal courts, mines, villages, and prison keeps. Their rule was simple:
-the message moves.
-
-The player character is the youngest surviving Runner. They carry:
-
-- a sword for road danger
-- a satchel for sealed letters
-- a hood to cross forbidden districts unnoticed
-- gold-lit eyes from a moon-glass oath ritual
-
-Working name: The Last Runner.
-
-### The East Gate
-
-The current prototype's finish gate becomes the first major threshold. It is
-the gate between the safe outer wall and the broken messenger roads.
-
-Level 1 is not "the whole quest." It is the moment the Runner proves the route
-can still be opened.
-
-### Moon Shards
-
-Moon shards are late-campaign collectibles or level-completion keys. Each shard
-stores one lost route memory: a bridge alignment, a gate password, an old
-captain's final order, or a map fragment. Ten maps can each hide one shard.
-
-### Sealed Letters
-
-The sealed letter is the main story object. A level can begin with a mission
-scroll and end with a letter stamp, wax seal, or short decoded line.
-
-Example:
-
-> East Gate opened. The Relay still hears us.
-
-Use sparingly in-game. One line per map is enough.
-
-## Main Characters
+## Characters And Responsibility
 
 ### The Last Runner
 
-The player. Hooded, quick, brave, and mostly silent. Their personality comes
-from motion: they keep going, even when the road says stop.
+The player is an oathbound courier, not a newly named monarch or chosen ruler.
+The authored arc values people and their messages over treasure or enforced
+silence. No personal name, age, or moon-glass origin ritual is established by
+the reviewed story sources.
 
-### The Rival Messenger
+### The Rival Messenger / Rival Courier
 
-A mini-boss and recurring antagonist. They know Runner routes but no longer
-believe in the oath. They race the player, steal letters, and test whether the
-Last Runner is loyal or naive.
+Story copy calls this character the Rival or a rival courier; the enemy kind is
+`rival-courier`, and the L8 finish prompt says "Defeat the Rival Courier."
+The Rival is ahead on the causeway and contests the catacomb seals. L8's
+dispatch gives them a change of heart after reading the names. The ending
+places the Rival beside the Captain at the east gate. It does not establish
+a death, a mounted race, or a player-selected redemption branch.
 
-Story function: gives the player a human mirror, not just monsters.
+L9's briefing now establishes that the reconciled Rival turns back to guide
+survivors home. Other couriers still defend the Captain's road. The later
+`rival-courier` enemy instances are those hostile couriers, not a reversal of
+the named Rival's reconciliation. This changes no enemy IDs or earned progress.
 
 ### The Moonlit Captain
 
-The campaign's visible villain for the middle and late maps. Once the commander
-of the Relay Guard, now enforcing the lockdown under a corrupted interpretation
-of "protect the message."
+The Captain sealed the road to contain the false command. His seal is genuine;
+the altered instruction is not his original order. He remains an obstacle,
+guarding silence long after losing sight of what it protects. L9 requires
+defeating him, then its dispatch says he lowers his blade. The finale's Captain
+survives to stand at the east gate. Defeat here must not be retold as death.
 
-Twist: the Captain did not destroy the Relay. He sealed it because something
-used the Relay to spread a false command.
+### The Sentry Sovereign
 
-### The Clockwork Sentry Chief
+The current final boss is **Sentry Sovereign**, enemy ID `sentry-sovereign`,
+not the prototype's Clockwork Sentry Chief. L9 names him as the one who rewrote
+the Captain's order to preserve his own command. The finale finds his mark
+inside the broken seal and explicitly attributes the forged lockdown and
+silencing of couriers to him. The Captain's containment response and the
+Sovereign's authorship are distinct, not competing explanations of the fall.
 
-Heavy boss version of the sentries. Built as the master lock of the Relay
-machine. It cannot tell the difference between courier, thief, and invader
-anymore.
+## Courier Objects And Story Delivery
 
-### The Candle Jester
+- **Sealed letter and satchel:** authored narrative objects, carrying the first
+  delivery, names, and later the recovered order. There is no ten-letter-fragment
+  collection contract in the reviewed campaign configuration.
+- **Gold coins:** score pickups; the current story also describes gold courier
+  marks on surviving stones. The older token/oath symbolism remains design
+  background, not proof that every coin marks a safe jump.
+- **Moon Shards:** three required pickups in L7, not one hidden shard in every
+  district. They recover the authentic command, not an optional true ending.
+- **Relay Seals:** three required L8 objectives, plus the required Rival fight.
+- **Watchfire Crests:** four required L9 objectives, plus the required Captain.
+- **Relay Flames:** five required L10 objectives, plus the required Sovereign.
+- **Spatial discoveries:** two authored moments per tutorial/chapter carry
+  local evidence such as cut anchors, scraped parchment, memorial names, and
+  relay prisms. Trigger configuration is not proof of discovery readability,
+  landmark visibility, or persistence during a real playthrough.
+- **Optional mastery pickups:** remain distinct from mandatory delivery objects;
+  the finale's configured completion requirements do not require every coin,
+  bonus scroll, or mastery pickup.
 
-An enemy archetype that turns light into misdirection. Good for trick platforms,
-torch puzzles, decoy coins, and fake safe routes.
+## Current Ending
 
-### The Lantern Bandit Scout
+L10's finish is `relay-ignition-pedestal`. The finish check requires all five
+Relay Flames and the defeat of `sentry-sovereign` before completion. The
+configured finale then presents these beats:
 
-Early enemy archetype. Small, readable, fast, and greedy for sealed letters.
-They introduce the idea that messages are now black-market treasure.
+1. **Master Lock Broken:** the Sovereign's mark exposes the forgery and the
+   silencing of couriers. The original order is in the Runner's satchel.
+2. **Relay Restored:** the Runner presses the true order into the Master Lock;
+   five flames become the signal to open the roads and let the city speak.
+3. **Every Road Answers:** the Bell Tower rings, market lanterns return, the
+   missing couriers' names leave the catacombs, and Captain Gate's watch lowers
+   its blades.
+4. **Campaign Complete:** the Rival and Captain wait at the east gate; the
+   first ordinary letter of the new day awaits. "The Last Runner delivered
+   the dawn."
 
-### The Scroll Thief
+"Light the relay" and "Deliver the dawn" are finale advance-button labels in
+`RunnerFinale`, not evidence of a separate playable ignition mechanic.
+Outward restoration and the reunion are authored ending copy; this review
+does not certify corresponding world-state changes or their visual delivery.
+No ten-shard or mastery-only alternate ending is configured here. S08-S10
+ending integration and acceptance remain separate from this S01 reconciliation.
 
-Midgame enemy archetype. Dashes at the player's satchel and fits maps about
-archives, bridges, and delivery records.
+## Reconciled Continuity And Open Presentation
 
-## Factions
+- **Rival identity:** L9's briefing distinguishes the returning ally from the
+  other hostile couriers. `captain-rival-moonwell`, `relay-rival-01`, and
+  `relay-rival-02` retain their stable implementation IDs and enemy kind.
+  Distinct in-world character presentation remains part of visual acceptance;
+  copy does not prove that players can visually tell these couriers apart.
+- **Seal order:** L8's three seals are collected at x=4020, 8920, and14580,
+  before its required final Rival fight. Its dispatch now has the Rival read
+  the satchel names and lower their blade, without promising a later seal
+  handoff. The completion line follows the recovered seals to Captain Gate.
 
-- Shadow Runners: courier order, mostly gone.
-- Moonlit Court: old authority marked by purple and gold.
-- Relay Guard: soldiers and sentries created to protect the routes.
-- Lantern Bandits: scavengers who sell letters, route keys, and crests.
-- Candle Jesters: chaos faction that profits from confusion and false signals.
-- Rival Runners: former couriers who broke the oath after the Relay failed.
+The tutorial recipient remains unnamed, and the transition from words recovered
+in moon-glass to an "original order" in the satchel is not further explained.
+These are unspecified connective details, not grounds to invent a sender,
+recipient, physical transcription scene, or extra quest.
 
-## Ten-Map Campaign
+## Historical Foundation And Future Ideas
 
-The campaign should feel like one overnight delivery from moonrise to first
-light. Each map introduces one mechanic or enemy idea, one district, and one
-lore reveal.
+Everything in this section is preserved design background, not implemented
+canon or an approved next milestone.
 
-| Map | Name | Gameplay Promise | Story Beat | Key Asset Hooks |
-| --- | --- | --- | --- | --- |
-| 1 | East Gate Run | Basic route, coins, spikes, double jump, first Clockwork Sentry, finish gate | The Last Runner reopens the first locked route | Current prototype, east gate, sentry, gold coins |
-| 2 | Lantern Market Roofs | Rooftop jumps, lantern hazards, first bandit scouts | Bandits are stealing sealed letters and selling route marks | Lantern Bandit Scout, torch brazier, purple banners |
-| 3 | Ivy Viaduct | Mossy platforms, crumbling bridges, spike pits, moving/falling stones | The Relay roads are physically collapsing, not just locked | Mossy tiles, bridge planks, shallow pit markers |
-| 4 | Bell Tower Archives | Vertical climbs, arrow slits, scroll pickups, thief ambushes | The Runner finds the first proof that the lockdown order was forged | Scroll Thief, message pedestal, sealed letter |
-| 5 | Candle Fair Ruins | Trick hazards, fake pickups, swinging lanterns, jester enemies | The Candle Jesters are spreading false signals to keep districts isolated | Candle Jester, torch embers, pickup sparkle |
-| 6 | Gearvault Causeway | Clockwork platforms, stronger sentries, pressure plates, levers | The old guard machines are following corrupted route commands | Shield Squire, Clockwork Sentry Guard, levers |
-| 7 | Moonshard Hollow | Cavern-like ruins, mushroom brigands, hidden moon shards, optional rooms | Moon shards reveal the Relay was sabotaged from inside the court | Mushroom Brigand, moon shard, bonus scroll |
-| 8 | The Rival's Road | Chase/race map, dash hazards, mounted rival encounter | The Rival Messenger steals the final route seal and dares the Runner to follow | Rival Messenger, crest coin, fast route tokens |
-| 9 | Captain's Keep | Boss climb, guard waves, shielded captain duel | The Moonlit Captain reveals he sealed the Relay to contain a false command | Moonlit Captain, locked gate, checkpoint banners |
-| 10 | Dawn Relay Spire | Finale map, mixed mechanics, Sentry Chief boss, timed final delivery | The Runner restores the Relay and chooses to carry messages again by dawn | Clockwork Sentry Chief, moon shards, level-end banner |
+### Superseded Campaign Outline
 
-## Campaign Arc
+The original prototype-era sequence used **Gearvault Causeway** for map 6,
+**Moonshard Hollow** for map 7, **The Rival's Road** for map 8, and **Captain's
+Keep** for map 9. These are historical names, not additional current districts
+or aliases that should replace Clockmaker Yard, Moonlit Causeway, Courier
+Catacombs, or Captain Gate.
 
-### Act 1 - The Road Still Opens
+The old map-8 mounted chase/seal theft, map-7 proof of sabotage from inside the
+court, Clockwork Sentry Chief finale, and choice between revenge and delivery
+were proposals. Current source establishes Sovereign authorship and the
+four-beat ending above. The former "first release" tasks to add an L1 intro and
+a locked ten-map menu are a prototype snapshot, not today's implementation plan.
 
-Maps 1-3 prove that the Runner can still move through the old routes. The
-world feels dangerous but readable: stone, torches, gates, bandits, spikes, and
-coins. The story question is simple: can one courier cross what everyone else
-has abandoned?
+### Retained Worldbuilding Seeds
 
-### Act 2 - The Message Was Poisoned
+- A neutral courier order carried warnings, cures, and missing people's names
+  across hostile borders. Its youngest survivor, a moon-glass oath ritual, and
+  gold-lit eyes as ritual evidence were proposed backstory, not established facts.
+- Moonlit Court purple/gold heraldry, Relay Guard origins, Lantern Bandits,
+  Candle Jesters as an organized misinformation faction, and oath-breaking
+  Rival Runners were faction concepts. Enemy names alone do not establish
+  their politics or membership.
+- Moon-glass posts, craft-bound locks, light as memory, and sentries that once
+  bowed to sealed satchels remain possible environmental language.
+- Suggested scenes included empty message pedestals, burned scrolls, damaged
+  sentries beneath intact banners, and post-boss debris. Do not describe these
+  as visible evidence unless the level actually stages them.
+- Sample optional scroll lines included "Runner tokens are not payment" and
+  "No gate is loyal. It only repeats the last order it was given." They are
+  writing seeds, not verified collectible text.
 
-Maps 4-7 reveal that the problem is not only decay. Someone used the Relay to
-spread a false command. The sentries are not awake by accident. The archives
-were edited. The jester routes and stolen scrolls are symptoms of a larger
-signal failure.
+### Uncommitted Systems And Questions
 
-### Act 3 - Deliver At Dawn
+One shard per map, a ten-shard true ending, ten reconstructable letter
+fragments, crest-unlocked galleries, wax-seal completion stamps, and moon-glass
+menu glints remain historical ideas. They must not obscure the current required
+L7 shards or promise an ending unavailable to ordinary campaign completion.
 
-Maps 8-10 turn the Runner's mission into a race. The Rival Messenger forces a
-choice between revenge and delivery. The Captain becomes understandable but
-still dangerous. The final spire restores the Relay, but only if the player
-uses every skill learned across the campaign.
+A canon personal name, further Rival backstory, shared lore with Shadow War or
+Shadow Checkers, recovered-fragment Shado posts, and optional community codes
+remain undecided. The historical News tie-in is not authorization to resume
+the paused News domain. The campaign must not depend on external clue hunting.
 
-## Map Intro Copy
+### Historical Research References
 
-Keep intros short enough to read on a phone before play begins.
+The original design drew on environmental narrative, concise mobile exposition,
+and mechanics supporting the feeling of speed, danger, mystery, and duty.
+These references are retained for provenance, not newly revalidated research:
 
-1. East Gate Run: "First route. First seal. Reach the east gate before the
-   sentries remember your name."
-2. Lantern Market Roofs: "The market went dark, then started selling letters by
-   lantern light."
-3. Ivy Viaduct: "The old bridge remembers every footstep. Some stones still
-   keep the oath. Some do not."
-4. Bell Tower Archives: "A forged order hides in the tower records. Find the
-   line that locked the city."
-5. Candle Fair Ruins: "The jesters kept the torches burning so nobody could
-   tell which shadows were real."
-6. Gearvault Causeway: "The machines were made to guard the Relay. Tonight they
-   guard the lie."
-7. Moonshard Hollow: "Below the road, broken moon-glass still carries pieces of
-   old messages."
-8. The Rival's Road: "A runner without an oath is still fast. Catch them before
-   the seal is sold."
-9. Captain's Keep: "The Captain did not flee the fall. He locked the door and
-   called it loyalty."
-10. Dawn Relay Spire: "The last message must arrive before sunrise, or the
-    Relay sleeps another hundred years."
-
-## Collectibles And Lore Delivery
-
-### Gold Coins
-
-Primary score trail. In lore, these are Runner route marks that show safe jumps
-and reward risky lines.
-
-### Purple Crest Coins
-
-Optional challenge coins for alternate paths. They mark old court authority and
-can unlock gallery/lore entries.
-
-### Moon Shards
-
-One hidden shard per map. Collecting all 10 can unlock the true final message
-or a post-campaign epilogue screen.
-
-### Sealed Letters
-
-Level completion stamps. Each map delivers one letter fragment. Together, the
-10 letters reconstruct the false command and the real warning.
-
-### Bonus Scrolls
-
-Optional micro-lore. One or two sentences maximum.
-
-Example scrolls:
-
-- "Runner tokens are not payment. They are promises that someone crossed here
-  and lived."
-- "The sentries used to bow when a sealed satchel passed. Now they raise their
-  spears."
-- "No gate is loyal. It only repeats the last order it was given."
-
-## Environmental Story Hooks
-
-Use props to tell small stories without stopping play:
-
-- A broken sentry beside an intact purple banner means the guard resisted the
-  corrupted order.
-- Gold coins over a spike pit mean another Runner marked a desperate shortcut.
-- Empty message pedestals show where route records were stolen.
-- Burned scrolls near Candle Jesters show deliberate misinformation.
-- A locked gate with moon shards nearby shows that the route can still remember
-  the right courier.
-- Clockwork debris after a boss creates visible proof that the road is changing.
-
-## Integration With Shadow Chat
-
-Keep the base game self-contained, but leave room for Shadow Chat-native lore:
-
-- Entertainment picker: Shadow Runner remains a game players open from Shadow
-  Chat, not a separate app.
-- Optional future posts: Shado can post "recovered route fragments" in General
-  Chat after new maps ship.
-- Optional News tie-in: fake in-universe headlines could announce recovered
-  districts, but only after the game has enough content to support it.
-- Optional community mystery: hidden codes in level names or completion stamps
-  can unlock a bonus scroll. This should be optional, not required to understand
-  the campaign.
-
-## Implementation Hooks
-
-### Level Select
-
-Use the 10-map structure as the eventual Levels menu:
-
-- locked maps show a dimmed parchment tile
-- completed maps show a wax seal
-- perfect maps show a purple crest
-- moon-shard completion shows a small moon-glass glint
-
-### Mission Scroll On Title
-
-The existing mission scroll stand is the ideal place for one rotating line:
-
-- current map name
-- current delivery objective
-- best score or collected shards
-- unlocked lore clue
-
-### HUD Objective
-
-Keep objectives direct and physical:
-
-- Reach the east gate
-- Find the archive seal
-- Catch the rival runner
-- Light the Relay brazier
-- Break the master lock
-
-Avoid abstract objectives like "discover the truth" during gameplay. Save that
-for map intros and completion copy.
-
-### First Release Scope
-
-For the next playable milestone, do not try to implement all lore systems.
-Recommended next story-facing additions:
-
-1. Add the Map 1 intro line before starting Level One.
-2. Rename Level One in UI to "East Gate Run".
-3. Add one level-complete line after the current coin/score summary.
-4. Add the 10-map list to the Levels menu as locked parchment entries.
-5. Keep Moon Shards and Sealed Letters as planned systems until at least Map 2
-   or Map 3 exists.
-
-## Open Questions
-
-- Should the player character get a canon name, or stay as "the Last Runner"?
-- Should the Rival Messenger be redeemable, defeated, or left ambiguous?
-- Should the Moonlit Captain be the final boss, or should the Sentry Chief be
-  the final mechanical boss after the Captain reveal?
-- Do we want the true ending to require all 10 moon shards, or should shards
-  unlock bonus lore only?
-- Should Shadow War and Shadow Checkers eventually share the same Moonlit Court
-  world, or stay visually related but narratively separate?
+- Henry Jenkins, narrative architecture:
+  https://web.mit.edu/~21fms/People/henry3/games%26narrative.html
+- Game Developer, environmental storytelling:
+  https://www.gamedeveloper.com/design/environmental-storytelling
+- GDC, storytelling in small spaces:
+  https://www.gdcvault.com/play/1025964/Storytelling-in-Small-Spaces-Practical
+- MDA framework:
+  https://www.cs.northwestern.edu/~hunicke/MDA.pdf
+- Optional collaborative mystery background:
+  https://kairos.technorhetoric.net/22.2/praxis/ehrenberg-et-al/index.html

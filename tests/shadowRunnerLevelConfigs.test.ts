@@ -139,7 +139,7 @@ describe('Shadow Runner level configuration contract', () => {
     expect(campaignLevel?.playableLevelId).toBe('level-8')
     expect(campaignLevel?.mechanicPreview).toContain('Mirror Ward')
     expect(SHADOW_RUNNER_ASSETS.levels.courierCatacombsBackground).toContain('courier-catacombs-background.webp')
-    expect(SHADOW_RUNNER_ASSETS.levels.courierCatacombsProps).toContain('courier-catacombs-terrain-props-v1-transparent.png')
+    expect(SHADOW_RUNNER_ASSETS.levels.courierCatacombsProps).toContain('courier-catacombs-terrain-props-v1-transparent.webp')
     expect(SHADOW_RUNNER_ASSETS.enemies.cryptWardenStrip).toContain('crypt-warden-v1-6f-128.png')
   })
 
@@ -165,7 +165,10 @@ describe('Shadow Runner level configuration contract', () => {
     expect(levelNine.objectivePickups).toHaveLength(4)
     expect(levelNine.masteryPickups).toHaveLength(6)
     expect(levelNine.galeMantlePickups).toHaveLength(4)
-    expect(levelNine.sunsteelEdgePickups).toHaveLength(4)
+    expect(levelNine.sunsteelEdgePickups).toHaveLength(5)
+    expect(levelNine.sunsteelEdgePickups?.filter(pickup => (pickup.scoreValue ?? 0) > 0)).toHaveLength(4)
+    expect(levelNine.sunsteelEdgePickups?.find(pickup => pickup.id === 'captain-sunsteel-moonwell-order'))
+      .toMatchObject({ x: 12820, y: 302, durationMs: 9000, charges: 6, healthRestore: 0, scoreValue: 0 })
     expect(enemies).toHaveLength(28)
     expect([...enemyKinds]).toEqual(expect.arrayContaining([
       'gate-pikeman',
@@ -182,7 +185,7 @@ describe('Shadow Runner level configuration contract', () => {
     expect(campaignLevel?.playableLevelId).toBe('level-9')
     expect(campaignLevel?.difficultyLabel).toBe('Stormwatch Siege')
     expect(campaignLevel?.mechanicPreview).toContain('Gale Mantle')
-    expect(campaignLevel?.thumbnail).toContain('captain-gate-thumbnail-320x180.webp')
+    expect(campaignLevel?.thumbnail).toBe(SHADOW_RUNNER_ASSETS.rebuild.captainGateThumbnail)
     expect(campaignLevel?.locationButton).toContain('level-9-captain-gate-location-button-v2.webp')
   })
 
@@ -199,7 +202,7 @@ describe('Shadow Runner level configuration contract', () => {
     expect(levelTen.campaignLevel).toBe(10)
     expect(levelTen.worldWidth).toBe(26400)
     expect(levelTen.worldWidth).toBeGreaterThan(levelNine.worldWidth * 1.28)
-    expect(levelTen.checkpoints).toHaveLength(10)
+    expect(levelTen.checkpoints).toHaveLength(11)
     expect(levelTen.coins).toHaveLength(122)
     expect(levelTen.tiltPlatforms).toHaveLength(4)
     expect(levelTen.movingPlatforms).toHaveLength(8)
@@ -237,7 +240,7 @@ describe('Shadow Runner level configuration contract', () => {
     expect(campaignLevel?.playableLevelId).toBe('level-10')
     expect(campaignLevel?.difficultyLabel).toBe('Sovereign Trial')
     expect(campaignLevel?.mechanicPreview).toContain('Dawnfire Aegis')
-    expect(campaignLevel?.thumbnail).toContain('dawn-relay-spire-thumbnail-320x180.webp')
+    expect(campaignLevel?.thumbnail).toBe(SHADOW_RUNNER_ASSETS.rebuild.dawnRelaySpireThumbnail)
     expect(campaignLevel?.locationButton).toContain('level-10-dawn-relay-spire-location-button-v2.webp')
   })
 
@@ -311,7 +314,8 @@ describe('Shadow Runner level configuration contract', () => {
     })
 
     level.crouchGates?.forEach(gate => {
-      expect(616 - (gate.y + gate.height)).toBeGreaterThanOrEqual(60)
+      expect(616 - (gate.y + gate.height)).toBeGreaterThan(26.9568)
+      expect(616 - (gate.y + gate.height)).toBeLessThan(54.6)
       const lowCoins = level.coins.filter(coin => (
         coin.x >= gate.x + 10
         && coin.x <= gate.x + gate.width - 10
@@ -400,12 +404,10 @@ describe('Shadow Runner level configuration contract', () => {
       ))
       const enablingPickup = dispatch.requiredPower === 'dawnfire-aegis'
         ? level.dawnfireAegisPickups?.find(pickup => (
-            pickup.x < dispatch.x
-            && dispatch.x - pickup.x <= 1400
+            Math.abs(dispatch.x - pickup.x) <= 1400
           ))
         : level.aetherStepPickups?.find(pickup => (
-            pickup.x < dispatch.x
-            && dispatch.x - pickup.x <= 1400
+            Math.abs(dispatch.x - pickup.x) <= 1400
           ))
 
       expect(dispatch.requiredPower).toMatch(/^(dawnfire-aegis|aether-step)$/)
@@ -414,10 +416,10 @@ describe('Shadow Runner level configuration contract', () => {
     })
 
     const dispatchRoutes = [
-      ['last-dispatch-2', 'relay-crouch-step-02', 'relay-crouch-cap-02'],
+      ['last-dispatch-2', 'relay-access-prism-b-lower', 'relay-crouch-step-02', 'relay-high-prism-b'],
       ['last-dispatch-4', 'relay-dispatch-step-04a', 'relay-dispatch-step-04b', 'relay-high-beam-b'],
       ['last-dispatch-6', 'relay-dispatch-step-06', 'relay-high-crown-a'],
-      ['last-dispatch-8', 'relay-crouch-step-06', 'relay-crouch-cap-06', 'relay-high-ascent-b'],
+      ['last-dispatch-8', 'relay-access-ascent-b-lower', 'relay-crouch-step-06', 'relay-high-ascent-b'],
     ]
     dispatchRoutes.forEach(([dispatchId, ...routeIds]) => {
       const dispatch = level.masteryPickups?.find(candidate => candidate.id === dispatchId)
@@ -574,7 +576,8 @@ describe('Shadow Runner level configuration contract', () => {
     const supports = [...level.platforms, ...(level.movingPlatforms ?? [])]
 
     level.crouchGates?.forEach(gate => {
-      expect(616 - (gate.y + gate.height)).toBeGreaterThanOrEqual(60)
+      expect(616 - (gate.y + gate.height)).toBeGreaterThan(26.9568)
+      expect(616 - (gate.y + gate.height)).toBeLessThan(54.6)
       const lowCoins = level.coins.filter(coin => (
         coin.x >= gate.x + 16
         && coin.x <= gate.x + gate.width - 16
@@ -896,7 +899,7 @@ describe('Shadow Runner level configuration contract', () => {
     const readablePlatforms = levelFive.platforms.filter(platform =>
       platform.terrainSet === 'candleBright' || platform.terrainSet === 'candleShelf')
 
-    expect(SHADOW_RUNNER_ASSETS.levels.candleFairTerrainReadable).toContain('candle-fair-terrain-v2-transparent.png')
+    expect(SHADOW_RUNNER_ASSETS.levels.candleFairTerrainReadable).toContain('candle-fair-terrain-v2-transparent.webp')
     expect(readablePlatforms.length).toBeGreaterThanOrEqual(24)
     expect(levelFive.platforms.some(platform => platform.id === 'fair-bridge-landing-chip')).toBe(true)
   })

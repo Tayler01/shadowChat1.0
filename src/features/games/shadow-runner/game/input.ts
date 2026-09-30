@@ -22,3 +22,19 @@ export function createShadowRunnerInputState(): ShadowRunnerInputState {
     attackPresses: 0,
   }
 }
+
+export function releaseShadowRunnerInputs(state: ShadowRunnerInputState) {
+  // Event counters stay monotonic across pause, blur and pointer cancellation.
+  for (const action of SHADOW_RUNNER_ACTIONS) state[action] = false
+}
+
+export function setShadowRunnerAction(state: ShadowRunnerInputState, action: ShadowRunnerAction, pressed: boolean) {
+  if (pressed && !state[action]) {
+    if (action === 'jump') {
+      state.crouch = false
+      state.jumpPresses += 1
+    }
+    if (action === 'attack') state.attackPresses += 1
+  }
+  state[action] = pressed
+}

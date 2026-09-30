@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import sharp from 'sharp';
+import { prepareRecoveredEnemies } from './process-shadow-runner-recovered-enemies.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sourceRoot = path.join(
@@ -254,8 +255,8 @@ await Promise.all([
     .webp({ quality: 88, effort: 6 })
     .toFile(path.join(runtimeRoot, 'ui', 'captain-gate-thumbnail-160x90.webp')),
   sharp(path.join(sourceRoot, 'captain-gate-terrain-props-v1-transparent.png'))
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
-    .toFile(path.join(runtimeRoot, 'props', 'captain-gate-terrain-props-v1-transparent.png')),
+    .webp({ lossless: true, effort: 6 })
+    .toFile(path.join(runtimeRoot, 'props', 'captain-gate-terrain-props-v1-transparent.webp')),
 ]);
 
 await Promise.all([
@@ -267,14 +268,7 @@ await Promise.all([
     frameSize: 128,
     frameBoundaries: [247, 480, 725, 1085, 1295],
   }),
-  makeStrip({
-    sourceName: 'storm-grenadier-v1-6f-transparent.png',
-    outputDirectory: 'enemies',
-    outputName: 'storm-grenadier-v1-6f-128.png',
-    frameCount: 6,
-    frameSize: 128,
-    frameBoundaries: [241, 480, 745, 1060, 1274],
-  }),
+  prepareRecoveredEnemies({ publish: true, level: 9 }),
   makeStrip({
     sourceName: 'watch-captain-v1-8f-transparent.png',
     outputDirectory: 'enemies',

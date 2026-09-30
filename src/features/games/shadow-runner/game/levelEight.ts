@@ -88,8 +88,8 @@ export const SHADOW_RUNNER_LEVEL_EIGHT: ShadowRunnerLevelConfig = {
   subtitle: 'The Undelivered Road',
   objective: 'Recover three Relay Seals and open the relay door',
   introLine: 'The courier dead kept the first road. Recover their seals before the Rival does.',
-  completionLine: 'Courier Catacombs cleared. The Rival trail leads to Captain Gate.',
-  backgroundAsset: SHADOW_RUNNER_ASSETS.levels.courierCatacombsBackground,
+  completionLine: 'Courier Catacombs cleared. The recovered seals open the road to Captain Gate.',
+  backgroundAsset: SHADOW_RUNNER_ASSETS.rebuild.courierCatacombsBackground,
   worldWidth: 16200,
   worldHeight: 760,
   playerStart: { id: 'catacomb-start', x: 112, y: FLOOR_Y },
@@ -118,7 +118,8 @@ export const SHADOW_RUNNER_LEVEL_EIGHT: ShadowRunnerLevelConfig = {
     platform('catacomb-ossuary-floor-b', 7900, 540),
     platform('catacomb-second-seal-floor', 8560, 540, 'catacomb-rubble-floor'),
     platform('catacomb-pursuit-floor-a', 9220, 480),
-    platform('catacomb-pursuit-floor-b', 10180, 480, 'catacomb-rubble-floor'),
+    // Keep the upper route at616 while the recovery road below retains44px clearance.
+    platform('catacomb-pursuit-floor-b', 10180, 480, 'catacomb-rubble-floor', FLOOR_Y, 44),
     platform('catacomb-pursuit-exit', 11320, 320),
     platform('catacomb-crawl-floor-c', 11760, 540),
     platform('catacomb-crawl-floor-d', 12780, 600, 'catacomb-rubble-floor'),
@@ -142,7 +143,7 @@ export const SHADOW_RUNNER_LEVEL_EIGHT: ShadowRunnerLevelConfig = {
 
     platform('catacomb-vault-step-a', 4620, 190, 'catacomb-medium-ledge', 490, 42),
     platform('catacomb-vault-step-b', 4860, 190, 'catacomb-medium-ledge', 372, 42),
-    platform('catacomb-vault-return-a', 5370, 190, 'catacomb-medium-ledge', 380, 42),
+    platform('catacomb-vault-return-a', 5370, 130, 'catacomb-medium-ledge', 380, 42),
     platform('catacomb-vault-return-b', 5600, 180, 'catacomb-medium-ledge', 498, 42),
 
     platform('catacomb-ossuary-cover-a', 6820, 200, 'catacomb-overhang', 500, 116),
@@ -219,7 +220,10 @@ export const SHADOW_RUNNER_LEVEL_EIGHT: ShadowRunnerLevelConfig = {
     ...coinPath('catacomb-coin-vault-high', [
       [4680, 432], [4900, 314], [5170, 204], [5400, 322],
     ]),
-    ...coinLine('catacomb-coin-ossuary-low', 6700, 4, 92, 548),
+    // Follow the visible cover top instead of placing the last two coins inside it.
+    ...coinPath('catacomb-coin-ossuary-low', [
+      [6700, 548], [6792, 548], [6884, 446], [6976, 446],
+    ]),
     ...coinLine('catacomb-coin-crawl-c', 7370, 4, 50, 596),
     ...coinPath('catacomb-coin-ossuary-high', [
       [7100, 430], [7340, 312], [7650, 194], [7940, 314],
@@ -254,7 +258,7 @@ export const SHADOW_RUNNER_LEVEL_EIGHT: ShadowRunnerLevelConfig = {
     { id: 'catacomb-wraithlight-fork', x: 2380, y: 546, durationMs: 12000, healthRestore: 2, scoreValue: 180 },
     { id: 'catacomb-wraithlight-vault', x: 4520, y: 546, durationMs: 11500, healthRestore: 2, scoreValue: 180 },
     { id: 'catacomb-wraithlight-pursuit', x: 9360, y: 546, durationMs: 12000, healthRestore: 2, scoreValue: 190 },
-    { id: 'catacomb-wraithlight-echo', x: 11900, y: 546, durationMs: 12500, healthRestore: 2, scoreValue: 200 },
+    { id: 'catacomb-wraithlight-echo', x: 11800, y: 546, durationMs: 12500, healthRestore: 2, scoreValue: 200 },
   ],
   mirrorWardPickups: [
     { id: 'catacomb-mirror-ossuary', x: 6640, y: 546, durationMs: 11000, reflectionCharges: 6, scoreValue: 170 },
