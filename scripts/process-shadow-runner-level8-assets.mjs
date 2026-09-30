@@ -213,9 +213,9 @@ await Promise.all([
     .webp({ quality: 88, effort: 6 })
     .toFile(path.join(runtimeRoot, 'ui', 'courier-catacombs-thumbnail-160x90.webp')),
   sharp(path.join(sourceRoot, 'courier-catacombs-terrain-props-v1-transparent.png'))
-    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .webp({ lossless: true, effort: 6 })
     .toFile(
-      path.join(runtimeRoot, 'props', 'courier-catacombs-terrain-props-v1-transparent.png'),
+      path.join(runtimeRoot, 'props', 'courier-catacombs-terrain-props-v1-transparent.webp'),
     ),
 ]);
 

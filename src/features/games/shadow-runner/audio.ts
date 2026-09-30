@@ -79,6 +79,8 @@ const SHADOW_RUNNER_SOUND_COOLDOWN_MS: Partial<Record<ShadowRunnerSoundEvent, nu
   coin: 45,
 }
 
+export const SHADOW_RUNNER_SOUND_LOAD_TIMEOUT_MS = 8000
+
 const yieldAfterSoundDecode = () => new Promise<void>(resolve => {
   if (typeof window === 'undefined') {
     resolve()
@@ -114,6 +116,7 @@ export function createShadowRunnerSfxController(): ShadowRunnerSfxController {
   let disposed = false
   const buffers = new Map<ShadowRunnerSoundEvent, AudioBuffer>()
   const loading = new Map<ShadowRunnerSoundEvent, Promise<void>>()
+  const loadControllers = new Set<AbortController>()
   const lastPlayedAt = new Map<ShadowRunnerSoundEvent, number>()
 
   const getContext = () => {
@@ -128,24 +131,37 @@ export function createShadowRunnerSfxController(): ShadowRunnerSfxController {
     const existing = loading.get(event)
     if (existing) return existing
 
-    const task = (async () => {
+    const controller = new AbortController()
+    loadControllers.add(controller)
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    let onAbort: () => void = () => undefined
+    const cancelled = new Promise<never>((_, reject) => {
+      onAbort = () => reject(new Error('Sound loading cancelled or timed out'))
+      controller.signal.addEventListener('abort', onAbort, { once: true })
+      timeout = setTimeout(() => controller.abort(), SHADOW_RUNNER_SOUND_LOAD_TIMEOUT_MS)
+    })
+    const task = Promise.race([(async () => {
       const audioContext = getContext()
       if (!audioContext) return
 
-      const response = await fetch(SHADOW_RUNNER_SOUND_ASSETS[event])
+      const response = await fetch(SHADOW_RUNNER_SOUND_ASSETS[event], { signal: controller.signal })
       if (!response.ok) {
         throw new Error(`Unable to load Shadow Runner sound: ${event}`)
       }
       const arrayBuffer = await response.arrayBuffer()
+      if (disposed || controller.signal.aborted) return
       const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0))
-      if (!disposed) {
+      if (!disposed && !controller.signal.aborted) {
         buffers.set(event, decoded)
       }
-    })()
+    })(), cancelled])
       .catch(error => {
-        console.warn('[ShadowRunner] SFX preload failed', event, error)
+        if (!disposed) console.warn('[ShadowRunner] SFX preload failed', event, error)
       })
       .finally(() => {
+        clearTimeout(timeout)
+        controller.signal.removeEventListener('abort', onAbort)
+        loadControllers.delete(controller)
         loading.delete(event)
       })
 
@@ -194,6 +210,8 @@ export function createShadowRunnerSfxController(): ShadowRunnerSfxController {
 
   const dispose = () => {
     disposed = true
+    loadControllers.forEach(controller => controller.abort())
+    loadControllers.clear()
     buffers.clear()
     loading.clear()
     lastPlayedAt.clear()

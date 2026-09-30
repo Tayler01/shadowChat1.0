@@ -30,6 +30,7 @@ export interface ShadowRunnerDawnfireProperties {
 }
 
 export interface ShadowRunnerHudState {
+  deliveryState?: 'locked' | 'ready' | 'igniting' | 'delivered'
   lives: number
   maxLives: number
   health: number

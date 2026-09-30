@@ -46,7 +46,7 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<AuthenticatedUser | void>;
-  refreshProfile: () => Promise<AuthenticatedUser | null>;
+  refreshProfile: (options?: { ownerId?: string; signal?: AbortSignal }) => Promise<AuthenticatedUser | null>;
   uploadAvatar: (file: File) => Promise<string | void>;
   uploadBanner: (file: File) => Promise<string | void>;
 }
@@ -85,8 +85,13 @@ function useProvideAuth() {
   const explicitSignOutRef = useRef(false);
   const authChangeRecoveryRef = useRef<Promise<boolean> | null>(null);
   const restoreRetryTimeoutRef = useRef<number | null>(null);
+  const profileRefreshEpochRef = useRef(0);
+  const profileRefreshRequestRef = useRef(0);
+  const profileRefreshOwnerRef = useRef<string | null>(null);
 
   const applyUser = (nextUser: AuthenticatedUser | null) => {
+    profileRefreshEpochRef.current += 1;
+    profileRefreshOwnerRef.current = nextUser?.id ?? null;
     userRef.current = nextUser;
     setUser(nextUser);
   };
@@ -436,6 +441,14 @@ function useProvideAuth() {
           return;
         }
 
+        // Invalidate pending profile reads before the deferred auth task can
+        // yield to an old account's response. No Supabase work in this callback.
+        if (event !== 'TOKEN_REFRESHED' || session?.user?.id !== userRef.current?.id) {
+          profileRefreshEpochRef.current += 1;
+        }
+        profileRefreshOwnerRef.current = event === 'SIGNED_OUT' || event === 'PASSWORD_RECOVERY'
+          ? null : session?.user?.id ?? null;
+
         // Supabase warns against awaiting more Supabase calls inside this
         // callback because it can deadlock auth operations. Defer the work
         // until after the callback returns.
@@ -447,6 +460,7 @@ function useProvideAuth() {
 
     return () => {
       mountedRef.current = false;
+      profileRefreshEpochRef.current += 1;
       clearRestoreRetry();
       subscription.unsubscribe();
     };
@@ -675,14 +689,29 @@ function useProvideAuth() {
     }
   };
 
-  const refreshProfile = async () => {
+  const refreshProfile = async (options?: { ownerId?: string; signal?: AbortSignal }) => {
+    const ownerId = options?.ownerId ?? user?.id;
+    if (!ownerId || !mountedRef.current || explicitSignOutRef.current
+      || options?.signal?.aborted || userRef.current?.id !== ownerId
+      || profileRefreshOwnerRef.current !== ownerId) {
+      return null;
+    }
+    const epoch = profileRefreshEpochRef.current;
+    const requestId = ++profileRefreshRequestRef.current;
+    const isCurrent = () => mountedRef.current
+      && !explicitSignOutRef.current
+      && !options?.signal?.aborted
+      && userRef.current?.id === ownerId
+      && profileRefreshOwnerRef.current === ownerId
+      && profileRefreshEpochRef.current === epoch
+      && profileRefreshRequestRef.current === requestId;
     try {
       const profile = await getCurrentUser();
-      if (profile) {
-        applyUser(profile);
-      }
+      if (!isCurrent() || !profile || profile.id !== ownerId) return null;
+      applyUser(profile);
       return profile;
     } catch (err) {
+      if (!isCurrent()) return null;
       const message = err instanceof Error ? err.message : 'Profile refresh failed';
       setError(message);
       throw err;
@@ -747,4 +776,3 @@ export function useAuth() {
   }
   return context;
 }
-

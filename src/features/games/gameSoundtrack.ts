@@ -13,6 +13,8 @@ export interface GameSoundtrackController {
   dispose: () => void
 }
 
+export const GAME_SOUNDTRACK_LOAD_TIMEOUT_MS = 30_000
+
 export function createGameSoundtrackController(volume = 0.42): GameSoundtrackController {
   const AudioContextCtor = typeof window === 'undefined'
     ? undefined
@@ -20,10 +22,17 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
   let context: AudioContext | null = null
   let gain: GainNode | null = null
   let activeSource: AudioBufferSourceNode | null = null
+  let activeSourceUrl: string | null = null
+  let buffer: AudioBuffer | null = null
   let disposed = false
   let playRequestId = 0
-  const buffers = new Map<string, AudioBuffer>()
-  const loading = new Map<string, Promise<AudioBuffer | null>>()
+  let pending: {
+    source: string
+    controller: AbortController
+    promise: Promise<boolean>
+  } | null = null
+
+  const isHidden = () => typeof document !== 'undefined' && document.hidden
 
   const getContext = () => {
     if (disposed || !AudioContextCtor) return null
@@ -41,6 +50,8 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
   const stopSource = () => {
     const source = activeSource
     activeSource = null
+    activeSourceUrl = null
+    buffer = null
 
     if (!source) return
 
@@ -55,95 +66,36 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
     } catch {
       // Disconnect is best-effort cleanup.
     }
+
+    source.buffer = null
   }
 
   const closeContext = () => {
     const audioContext = context
+    const audioGain = gain
     context = null
     gain = null
 
-    if (audioContext && audioContext.state !== 'closed') {
-      void audioContext.close().catch(() => undefined)
+    try {
+      audioGain?.disconnect()
+    } catch {
+      // Disconnect is best-effort cleanup.
     }
-  }
-
-  const loadBuffer = (source: string) => {
-    const cached = buffers.get(source)
-    if (cached) return Promise.resolve(cached)
-
-    const existing = loading.get(source)
-    if (existing) return existing
-
-    const task = (async () => {
-      const audioContext = getContext()
-      if (!audioContext) return null
-
-      const response = await fetch(source)
-      if (!response.ok) {
-        throw new Error(`Unable to load game soundtrack: ${source}`)
-      }
-
-      const arrayBuffer = await response.arrayBuffer()
-      const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0))
-      buffers.set(source, decoded)
-      return decoded
-    })()
-      .catch(error => {
-        console.warn('[Games] Soundtrack preload failed', source, error)
-        return null
-      })
-      .finally(() => {
-        loading.delete(source)
-      })
-
-    loading.set(source, task)
-    return task
-  }
-
-  const play = async (source: string) => {
-    if (!source || disposed) return false
-    if (typeof document !== 'undefined' && document.hidden) return false
-
-    const requestId = ++playRequestId
-    const audioContext = getContext()
-    if (!audioContext || !gain) return false
 
     try {
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume()
+      if (audioContext && audioContext.state !== 'closed') {
+        void audioContext.close().catch(() => undefined)
       }
-
-      if (disposed || requestId !== playRequestId) return false
-
-      const buffer = await loadBuffer(source)
-      if (!buffer || disposed || requestId !== playRequestId) return false
-      if (typeof document !== 'undefined' && document.hidden) return false
-
-      const playbackContext = getContext()
-      if (!playbackContext || !gain) return false
-
-      if (playbackContext.state === 'suspended') {
-        await playbackContext.resume()
-      }
-
-      if (disposed || requestId !== playRequestId) return false
-
-      stopSource()
-      const nextSource = playbackContext.createBufferSource()
-      nextSource.buffer = buffer
-      nextSource.loop = true
-      nextSource.connect(gain)
-      nextSource.start()
-      activeSource = nextSource
-      return true
-    } catch (error) {
-      console.warn('[Games] Soundtrack playback failed', source, error)
-      return false
+    } catch {
+      // Closing an already interrupted context is best-effort.
     }
   }
 
   const stop = (options: StopOptions = {}) => {
     playRequestId += 1
+    const request = pending
+    pending = null
+    request?.controller.abort()
     stopSource()
 
     if (options.closeContext) {
@@ -151,12 +103,115 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
     }
   }
 
+  const play = (source: string): Promise<boolean> => {
+    if (!source || disposed) return Promise.resolve(false)
+    if (isHidden()) {
+      stop({ closeContext: true })
+      return Promise.resolve(false)
+    }
+
+    if (pending?.source === source && !pending.controller.signal.aborted) {
+      return pending.promise
+    }
+
+    const reuseActiveSource = activeSourceUrl === source && activeSource !== null
+      && context?.state !== 'closed'
+    if (reuseActiveSource && context?.state === 'running') return Promise.resolve(true)
+
+    // Keep only the selected soundtrack, never a history of decoded tracks.
+    if (!reuseActiveSource) stop()
+
+    const requestId = ++playRequestId
+    const controller = new AbortController()
+    const isCurrent = () => !disposed && !controller.signal.aborted
+      && requestId === playRequestId && !isHidden() && context?.state !== 'closed'
+    let cancel!: () => void
+    const cancelled = new Promise<boolean>(resolve => {
+      cancel = () => resolve(false)
+      controller.signal.addEventListener('abort', cancel, { once: true })
+    })
+    const timeout = setTimeout(() => {
+      console.warn('[Games] Soundtrack load timed out', source)
+      controller.abort()
+    }, GAME_SOUNDTRACK_LOAD_TIMEOUT_MS)
+
+    const task = (async () => {
+      const audioContext = getContext()
+      if (!audioContext || !gain) return false
+
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume()
+      }
+      if (!isCurrent()) return false
+      if (reuseActiveSource) return true
+
+      const response = await fetch(source, { signal: controller.signal })
+      if (!isCurrent()) return false
+      if (!response.ok) {
+        throw new Error(`Unable to load game soundtrack: ${source}`)
+      }
+
+      const arrayBuffer = await response.arrayBuffer()
+      if (!isCurrent()) return false
+
+      // Decode cannot be aborted. Never retain its late result after cancellation.
+      await audioContext.decodeAudioData(arrayBuffer).then(decoded => {
+        if (isCurrent()) buffer = decoded
+      })
+      if (!isCurrent() || !buffer) return false
+
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume()
+      }
+      if (!isCurrent()) return false
+
+      const nextSource = audioContext.createBufferSource()
+      activeSource = nextSource
+      activeSourceUrl = source
+      nextSource.buffer = buffer
+      nextSource.loop = true
+      nextSource.connect(gain)
+      nextSource.start()
+      return true
+    })().catch(error => {
+      if (isCurrent()) console.warn('[Games] Soundtrack playback failed', source, error)
+      return false
+    })
+
+    // Settle callers even when a browser's resume/decode or fetch ignores abort.
+    const promise = Promise.race([task, cancelled])
+      .then(played => {
+        const playing = played && isCurrent()
+        if (!playing && requestId === playRequestId) stop({ closeContext: true })
+        return playing
+      })
+      .finally(() => {
+        clearTimeout(timeout)
+        controller.signal.removeEventListener('abort', cancel)
+        if (pending?.controller === controller) pending = null
+      })
+    pending = { source, controller, promise }
+    return promise
+  }
+
+  const handlePageHide = () => stop({ closeContext: true })
+  const handleVisibilityChange = () => {
+    if (isHidden()) handlePageHide()
+  }
+
   const dispose = () => {
     disposed = true
     stop({ closeContext: true })
-    buffers.clear()
-    loading.clear()
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+    if (typeof window !== 'undefined') window.removeEventListener('pagehide', handlePageHide)
   }
+
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+  }
+  if (typeof window !== 'undefined') window.addEventListener('pagehide', handlePageHide)
 
   return {
     setVolume: (value: number) => {

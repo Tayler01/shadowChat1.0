@@ -7,11 +7,15 @@ import type {
 } from './levels'
 
 const FLOOR_Y = 616
+// Keep the load-bearing roof top aligned; 44px below fits crouch, not standing.
+const CROUCH_ROOF_Y = 446
+const CROUCH_ROOF_HEIGHT = FLOOR_Y - 44 - CROUCH_ROOF_Y
+const CROUCH_COIN_Y = FLOOR_Y - 18
 
 export const SHADOW_RUNNER_LEVEL_NINE_ASSETS = {
-  background: SHADOW_RUNNER_ASSETS.levels.captainGateBackground,
+  background: SHADOW_RUNNER_ASSETS.rebuild.captainGateBackground,
   thumbnail160: SHADOW_RUNNER_ASSETS.levels.captainGateThumbnail160,
-  thumbnail320: SHADOW_RUNNER_ASSETS.levels.captainGateThumbnail320,
+  thumbnail320: SHADOW_RUNNER_ASSETS.rebuild.captainGateThumbnail,
   locationButton: SHADOW_RUNNER_ASSETS.levels.captainGateLocationButton,
 } as const
 
@@ -150,9 +154,21 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
     platform('captain-moonwell-high-a', 11600, 360, 'captain-medium-ledge', 300, 42),
     platform('captain-moonwell-high-b', 12400, 360, 'captain-medium-ledge', 230, 42),
     platform('captain-moonwell-high-c', 13000, 360, 'captain-medium-ledge', 330, 42),
+    // Permanent stairs allow the Order 5 climb and a staged return after Gale expires.
+    platform('captain-span-step-a', 14120, 160, 'captain-medium-ledge', 496, 34),
+    platform('captain-span-step-b', 14280, 160, 'captain-medium-ledge', 388, 34),
     platform('captain-span-high', 14400, 360, 'captain-medium-ledge', 280, 42),
     platform('captain-inner-high-a', 16900, 360, 'captain-medium-ledge', 280, 42),
     platform('captain-inner-high-b', 17600, 360, 'captain-medium-ledge', 300, 42),
+
+    // Optional Orders and underside coins have ordinary-jump approaches and staged returns.
+    platform('captain-order-two-step', 7990, 410, 'captain-medium-ledge', 430, 34),
+    platform('captain-moonwell-step-a', 12840, 160, 'captain-medium-ledge', 496, 34),
+    platform('captain-moonwell-step-b', 12700, 160, 'captain-medium-ledge', 370, 34),
+    platform('captain-moonwell-coin65-recovery', 12280, 320, 'captain-medium-ledge', 366, 34),
+    platform('captain-moonwell-east-low', 13520, 160, 'captain-medium-ledge', 496, 34),
+    platform('captain-moonwell-east-high', 13380, 160, 'captain-medium-ledge', 410, 34),
+    platform('captain-inner-order-step', 17980, 180, 'captain-medium-ledge', 460, 34),
 
     platform('captain-recovery-banner', 7350, 900, 'captain-rubble-floor', 700, 42),
     platform('captain-recovery-banner-step', 8230, 150, 'captain-recovery-step', 650, 34),
@@ -169,24 +185,24 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
     { id: 'captain-tilt-signal', visualId: 'captain-counterweight-bridge', terrainSet: 'captain', x: 2850, y: 604, width: 240, height: 34, visualHeight: 66, visualOffsetY: -13, wobbleDurationMs: 940, wobbleRotation: 0.122, slideForce: 1040, maxSlideSpeed: 182 },
     { id: 'captain-tilt-murder', visualId: 'captain-counterweight-bridge', terrainSet: 'captain', x: 5770, y: 604, width: 260, height: 34, visualHeight: 66, visualOffsetY: -13, wobbleDurationMs: 920, wobbleRotation: 0.125, slideForce: 1060, maxSlideSpeed: 186 },
     { id: 'captain-tilt-banner', visualId: 'captain-counterweight-bridge', terrainSet: 'captain', x: 7350, y: 604, width: 260, height: 34, visualHeight: 66, visualOffsetY: -13, wobbleDurationMs: 900, wobbleRotation: 0.128, slideForce: 1080, maxSlideSpeed: 190 },
-    { id: 'captain-tilt-moonwell', visualId: 'captain-counterweight-bridge', terrainSet: 'captain', x: 11950, y: 604, width: 260, height: 34, visualHeight: 66, visualOffsetY: -13, wobbleDurationMs: 880, wobbleRotation: 0.13, slideForce: 1100, maxSlideSpeed: 194 },
+    { id: 'captain-tilt-moonwell', visualId: 'captain-counterweight-bridge', terrainSet: 'captain', x: 11950, y: 604, width: 290, height: 34, visualHeight: 66, visualOffsetY: -13, wobbleDurationMs: 880, wobbleRotation: 0.13, slideForce: 1100, maxSlideSpeed: 194 },
     { id: 'captain-tilt-span', visualId: 'captain-counterweight-bridge', terrainSet: 'captain', x: 14970, y: 604, width: 260, height: 34, visualHeight: 66, visualOffsetY: -13, wobbleDurationMs: 860, wobbleRotation: 0.132, slideForce: 1120, maxSlideSpeed: 198 },
     { id: 'captain-tilt-inner', visualId: 'captain-counterweight-bridge', terrainSet: 'captain', x: 16550, y: 604, width: 260, height: 34, visualHeight: 66, visualOffsetY: -13, wobbleDurationMs: 840, wobbleRotation: 0.134, slideForce: 1140, maxSlideSpeed: 202 },
   ],
   movingPlatforms: [
-    { id: 'captain-lift-signal', visualId: 'captain-lift', terrainSet: 'captain', x: 3180, y: 568, width: 150, height: 32, endY: 350, speed: 88, pauseMs: 950 },
-    { id: 'captain-lift-banner-a', visualId: 'captain-lift', terrainSet: 'captain', x: 7160, y: 568, width: 150, height: 32, endY: 370, speed: 92, pauseMs: 900 },
-    { id: 'captain-lift-banner-b', visualId: 'captain-lift', terrainSet: 'captain', x: 8000, y: 530, width: 150, height: 32, endY: 290, speed: 96, pauseMs: 900 },
-    { id: 'captain-lift-moonwell', visualId: 'captain-lift', terrainSet: 'captain', x: 11700, y: 568, width: 150, height: 32, endY: 350, speed: 94, pauseMs: 920 },
+    { id: 'captain-lift-signal', visualId: 'captain-lift', terrainSet: 'captain', x: 2980, y: 568, width: 150, height: 32, endY: 350, speed: 88, pauseMs: 950 },
+    { id: 'captain-lift-banner-a', visualId: 'captain-lift', terrainSet: 'captain', x: 6900, y: 568, width: 150, height: 32, endY: 370, speed: 92, pauseMs: 900 },
+    { id: 'captain-lift-banner-b', visualId: 'captain-lift', terrainSet: 'captain', x: 7700, y: 530, width: 150, height: 32, endY: 290, speed: 96, pauseMs: 900 },
+    { id: 'captain-lift-moonwell', visualId: 'captain-lift', terrainSet: 'captain', x: 12010, y: 568, width: 150, height: 32, endY: 350, speed: 94, pauseMs: 920 },
     { id: 'captain-lift-inner', visualId: 'captain-lift', terrainSet: 'captain', x: 16680, y: 568, width: 150, height: 32, endY: 330, speed: 98, pauseMs: 880 },
   ],
   crouchGates: [
-    { id: 'captain-crouch-outer', visualId: 'captain-overhang', terrainSet: 'captain', x: 940, y: 446, width: 280, height: 108 },
-    { id: 'captain-crouch-signal', visualId: 'captain-overhang', terrainSet: 'captain', x: 3940, y: 446, width: 280, height: 108 },
-    { id: 'captain-crouch-murder', visualId: 'captain-overhang', terrainSet: 'captain', x: 6180, y: 446, width: 280, height: 108 },
-    { id: 'captain-crouch-barracks', visualId: 'captain-overhang', terrainSet: 'captain', x: 9920, y: 446, width: 280, height: 108 },
-    { id: 'captain-crouch-moonwell', visualId: 'captain-overhang', terrainSet: 'captain', x: 13080, y: 446, width: 280, height: 108 },
-    { id: 'captain-crouch-span', visualId: 'captain-overhang', terrainSet: 'captain', x: 15380, y: 446, width: 280, height: 108 },
+    { id: 'captain-crouch-outer', visualId: 'captain-overhang', terrainSet: 'captain', x: 940, y: CROUCH_ROOF_Y, width: 280, height: CROUCH_ROOF_HEIGHT },
+    { id: 'captain-crouch-signal', visualId: 'captain-overhang', terrainSet: 'captain', x: 3940, y: CROUCH_ROOF_Y, width: 280, height: CROUCH_ROOF_HEIGHT },
+    { id: 'captain-crouch-murder', visualId: 'captain-overhang', terrainSet: 'captain', x: 6180, y: CROUCH_ROOF_Y, width: 280, height: CROUCH_ROOF_HEIGHT },
+    { id: 'captain-crouch-barracks', visualId: 'captain-overhang', terrainSet: 'captain', x: 9920, y: CROUCH_ROOF_Y, width: 280, height: CROUCH_ROOF_HEIGHT },
+    { id: 'captain-crouch-moonwell', visualId: 'captain-overhang', terrainSet: 'captain', x: 13080, y: CROUCH_ROOF_Y, width: 280, height: CROUCH_ROOF_HEIGHT },
+    { id: 'captain-crouch-span', visualId: 'captain-overhang', terrainSet: 'captain', x: 15380, y: CROUCH_ROOF_Y, width: 280, height: CROUCH_ROOF_HEIGHT },
   ],
   spikes: [
     { id: 'captain-spikes-outer-a', x: 720, y: 706, width: 100, height: 28, damage: 3 },
@@ -206,18 +222,18 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
     ...coinPath('captain-coin-outer-main', [
       [160, 548], [260, 548], [360, 548], [1840, 548], [1940, 548], [2040, 548],
     ]),
-    ...coinLine('captain-coin-crouch-outer', 980, 3, 72, 596),
+    ...coinLine('captain-coin-crouch-outer', 980, 3, 72, CROUCH_COIN_Y),
     ...coinPath('captain-coin-signal-main', [
-      [2300, 548], [2420, 548], [3280, 548], [3400, 548], [3980, 548], [4100, 548], [4220, 548],
+      [2300, 548], [2420, 548], [3280, 548], [3400, 548], [3980, 392], [4100, 392], [4180, 392],
     ]),
     ...coinPath('captain-coin-signal-high', [
       [3260, 500], [3300, 420], [3340, 342], [3420, 246], [3500, 246],
     ]),
-    ...coinLine('captain-coin-crouch-signal', 3980, 3, 72, 596),
+    ...coinLine('captain-coin-crouch-signal', 3980, 3, 72, CROUCH_COIN_Y),
     ...coinPath('captain-coin-murder-main', [
-      [4520, 548], [4640, 548], [5240, 548], [5360, 548], [6200, 548], [6320, 548], [6440, 548],
+      [4520, 548], [4640, 548], [5240, 548], [5360, 548], [6220, 392], [6320, 392], [6420, 392],
     ]),
-    ...coinLine('captain-coin-crouch-murder', 6220, 3, 72, 596),
+    ...coinLine('captain-coin-crouch-murder', 6220, 3, 72, CROUCH_COIN_Y),
     ...coinPath('captain-coin-rampart-main', [
       [6820, 548], [6940, 548], [7780, 548], [7900, 548], [8500, 548], [8620, 548], [8740, 548],
     ]),
@@ -225,20 +241,20 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
       [7160, 450], [7240, 364], [7960, 350], [8020, 286], [8100, 186],
     ]),
     ...coinPath('captain-coin-barracks-main', [
-      [9220, 548], [9340, 548], [9940, 548], [10060, 548], [10720, 548], [10840, 548], [10960, 548],
+      [9220, 548], [9340, 548], [9960, 392], [10060, 392], [10720, 548], [10840, 548], [10960, 548],
     ]),
-    ...coinLine('captain-coin-crouch-barracks', 9960, 3, 72, 596),
+    ...coinLine('captain-coin-crouch-barracks', 9960, 3, 72, CROUCH_COIN_Y),
     ...coinPath('captain-coin-moonwell-main', [
-      [11420, 548], [11540, 548], [12380, 548], [12500, 548], [13120, 548], [13240, 548],
+      [11420, 548], [11540, 548], [12380, 548], [12500, 548], [13120, 398], [13240, 398],
     ]),
     ...coinPath('captain-coin-moonwell-high', [
       [11720, 430], [11780, 246], [12480, 310], [12580, 176], [13160, 276],
     ]),
-    ...coinLine('captain-coin-crouch-moonwell', 13120, 3, 72, 596),
+    ...coinLine('captain-coin-crouch-moonwell', 13120, 3, 72, CROUCH_COIN_Y),
     ...coinPath('captain-coin-span-main', [
-      [13720, 548], [13840, 548], [14440, 548], [14560, 548], [15420, 548], [15540, 548],
+      [13720, 548], [13840, 548], [14180, 442], [14340, 334], [15420, 392], [15540, 392],
     ]),
-    ...coinLine('captain-coin-crouch-span', 15420, 3, 72, 596),
+    ...coinLine('captain-coin-crouch-span', 15420, 3, 72, CROUCH_COIN_Y),
     ...coinPath('captain-coin-inner-main', [
       [16020, 548], [16140, 548], [16980, 548], [17100, 548], [17700, 548], [17820, 548],
     ]),
@@ -252,7 +268,8 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
   ],
   shieldPickups: [
     { id: 'captain-shield-murder', x: 4520, y: 548, durationMs: 10000, guardCharges: 5, scoreValue: 120 },
-    { id: 'captain-shield-span', x: 13760, y: 548, durationMs: 10000, guardCharges: 5, scoreValue: 130 },
+    { id: 'captain-shield-murder-bridge', x: 5600, y: 558, durationMs: 9000, guardCharges: 4, scoreValue: 0 },
+    { id: 'captain-shield-span', x: 13540, y: 558, durationMs: 10000, guardCharges: 5, scoreValue: 130 },
     { id: 'captain-shield-arena', x: 18480, y: 548, durationMs: 9000, guardCharges: 4, scoreValue: 140 },
   ],
   chronoPickups: [
@@ -272,17 +289,20 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
     { id: 'captain-gale-outer', x: 1840, y: 548, durationMs: 10000, healthRestore: 2, speedMultiplier: 1.08, fallDamageCap: 1, scoreValue: 210 },
     { id: 'captain-gale-banner', x: 6840, y: 548, durationMs: 10000, healthRestore: 2, speedMultiplier: 1.08, fallDamageCap: 1, scoreValue: 220 },
     { id: 'captain-gale-moonwell', x: 11440, y: 548, durationMs: 10000, healthRestore: 2, speedMultiplier: 1.08, fallDamageCap: 1, scoreValue: 230 },
-    { id: 'captain-gale-inner', x: 16040, y: 548, durationMs: 10000, healthRestore: 2, speedMultiplier: 1.08, fallDamageCap: 1, scoreValue: 240 },
+    // Retain the pickup ID/value, but grant fresh Gale before the Order 5 stairs.
+    { id: 'captain-gale-inner', x: 14060, y: 548, durationMs: 10000, healthRestore: 2, speedMultiplier: 1.08, fallDamageCap: 1, scoreValue: 240 },
   ],
   sunsteelEdgePickups: [
     { id: 'captain-sunsteel-murder', x: 4600, y: 548, durationMs: 9000, healthRestore: 2, charges: 6, attackDamageBonus: 1, guardDamage: 2, reachBonus: 20, scoreValue: 230 },
     { id: 'captain-sunsteel-barracks', x: 9480, y: 548, durationMs: 9000, healthRestore: 2, charges: 6, attackDamageBonus: 1, guardDamage: 2, reachBonus: 20, scoreValue: 240 },
     { id: 'captain-sunsteel-span', x: 14000, y: 548, durationMs: 9000, healthRestore: 2, charges: 6, attackDamageBonus: 1, guardDamage: 2, reachBonus: 20, scoreValue: 250 },
     { id: 'captain-sunsteel-arena', x: 18240, y: 548, durationMs: 9000, healthRestore: 2, charges: 6, attackDamageBonus: 1, guardDamage: 2, reachBonus: 20, scoreValue: 260 },
+    // Keep the ground combat pickup intact; this one serves the optional upper Order.
+    { id: 'captain-sunsteel-moonwell-order', x: 12820, y: 302, durationMs: 9000, healthRestore: 0, charges: 6, attackDamageBonus: 1, guardDamage: 2, reachBonus: 20, scoreValue: 0 },
   ],
   objectiveLabel: 'Watchfire Crests',
   objectivePickups: [
-    { id: 'captain-watchfire-crest-1', x: 4200, y: 548, scoreValue: 375 },
+    { id: 'captain-watchfire-crest-1', x: 4320, y: 548, scoreValue: 375 },
     { id: 'captain-watchfire-crest-2', x: 10800, y: 548, scoreValue: 400 },
     { id: 'captain-watchfire-crest-3', x: 17180, y: 548, scoreValue: 425 },
     { id: 'captain-watchfire-crest-4', x: 17880, y: 548, scoreValue: 450 },
@@ -319,12 +339,12 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
     { id: 'captain-volley-arena-high', x: 18100, y: 180, width: 1700, height: 470, direction: -1, spawnX: 19840, laneY: 410, intervalMs: 2640, delayMs: 1280, speed: 600, lifetimeMs: 3900, damage: 3 },
   ],
   enemies: [
-    enemy('captain-sentry-outer', 'clockwork-sentry', 1040, 900, 1320, 'captain-encounter-outer'),
+    enemy('captain-sentry-outer', 'clockwork-sentry', 1280, 1250, 1380, 'captain-encounter-outer'),
     enemy('captain-stalker-outer', 'moon-stalker', 1940, 1820, 2140, 'captain-encounter-outer', { contactDamage: 3, attackRange: 420 }),
 
     enemy('captain-pikeman-signal', 'gate-pikeman', 2400, 2280, 2740, 'captain-encounter-signal', { guard: 3, attackRange: 330, attackCooldownMs: 1420, contactDamage: 3 }),
     enemy('captain-grenadier-signal', 'storm-grenadier', 3400, 3220, 3660, 'captain-encounter-signal', { attackRange: 620, attackCooldownMs: 1780, projectileSpeed: 340, projectileDamage: 3, projectileArcHeight: 190, projectileWarningMs: 700, hazardDurationMs: 1300 }),
-    enemy('captain-archer-signal', 'tower-archer', 4100, 4100, 4100, 'captain-encounter-signal', { attackRange: 760, attackCooldownMs: 1580, projectileSpeed: 540, projectileDamage: 3 }),
+    enemy('captain-archer-signal', 'tower-archer', 4280, 4280, 4280, 'captain-encounter-signal', { attackRange: 760, attackCooldownMs: 1580, projectileSpeed: 540, projectileDamage: 3 }),
 
     enemy('captain-pikeman-murder', 'gate-pikeman', 4660, 4480, 4920, 'captain-encounter-murder', { guard: 3, attackRange: 340, attackCooldownMs: 1380 }),
     enemy('captain-archer-murder', 'tower-archer', 5300, 5300, 5300, 'captain-encounter-murder', { attackRange: 780, attackCooldownMs: 1500, projectileSpeed: 550, projectileDamage: 3 }),
@@ -335,18 +355,18 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
     enemy('captain-stalker-banner', 'moon-stalker', 8600, 8460, 8960, 'captain-encounter-banner', { attackRange: 430, attackCooldownMs: 1260 }),
 
     enemy('captain-pikeman-barracks', 'gate-pikeman', 9300, 9180, 9600, 'captain-encounter-barracks-seal', { guard: 3, health: 7, maxHealth: 7, attackRange: 350 }),
-    enemy('captain-grenadier-barracks', 'storm-grenadier', 10000, 9880, 10340, 'captain-encounter-barracks-seal', { attackRange: 660, attackCooldownMs: 1640, projectileSpeed: 360, projectileDamage: 3, projectileArcHeight: 210, projectileWarningMs: 670, hazardDurationMs: 1350 }),
+    enemy('captain-grenadier-barracks', 'storm-grenadier', 10280, 10240, 10360, 'captain-encounter-barracks-seal', { attackRange: 660, attackCooldownMs: 1640, projectileSpeed: 360, projectileDamage: 3, projectileArcHeight: 210, projectileWarningMs: 670, hazardDurationMs: 1350 }),
     enemy('captain-warden-barracks', 'crypt-warden', 10800, 10620, 11080, 'captain-encounter-barracks-seal', { guard: 3, health: 7, maxHealth: 7, attackRange: 280 }),
     enemy('captain-archer-barracks', 'tower-archer', 11000, 11000, 11000, 'captain-encounter-barracks-exit', { attackRange: 760, attackCooldownMs: 1480, projectileSpeed: 560, projectileDamage: 3 }),
     enemy('captain-lurker-barracks', 'tomb-lurker', 11200, 11080, 11260, 'captain-encounter-barracks-exit', { attackRange: 350, attackCooldownMs: 1260 }),
 
     enemy('captain-pikeman-moonwell', 'gate-pikeman', 11480, 11380, 11820, 'captain-encounter-moonwell', { guard: 3, attackRange: 350 }),
     enemy('captain-grenadier-moonwell', 'storm-grenadier', 12480, 12340, 12780, 'captain-encounter-moonwell', { attackRange: 680, attackCooldownMs: 1600, projectileSpeed: 365, projectileDamage: 3, projectileArcHeight: 220, projectileWarningMs: 660, hazardDurationMs: 1350 }),
-    enemy('captain-rival-moonwell', 'rival-courier', 13300, 13100, 13540, 'captain-encounter-moonwell', { health: 8, maxHealth: 8, patrolSpeed: 206, attackRange: 450, attackCooldownMs: 1220 }),
+    enemy('captain-rival-moonwell', 'rival-courier', 13520, 13420, 13560, 'captain-encounter-moonwell', { health: 8, maxHealth: 8, patrolSpeed: 206, attackRange: 450, attackCooldownMs: 1220 }),
 
     enemy('captain-pikeman-span', 'gate-pikeman', 13800, 13680, 14140, 'captain-encounter-span', { guard: 3, attackRange: 360 }),
     enemy('captain-archer-span', 'tower-archer', 14600, 14600, 14600, 'captain-encounter-span', { health: 5, maxHealth: 5, attackRange: 820, attackCooldownMs: 1420, projectileSpeed: 580, projectileDamage: 3 }),
-    enemy('captain-grenadier-span', 'storm-grenadier', 15520, 15360, 15780, 'captain-encounter-span', { attackRange: 700, attackCooldownMs: 1540, projectileSpeed: 375, projectileDamage: 3, projectileArcHeight: 230, projectileWarningMs: 650, hazardDurationMs: 1400 }),
+    enemy('captain-grenadier-span', 'storm-grenadier', 15750, 15700, 15860, 'captain-encounter-span', { attackRange: 700, attackCooldownMs: 1540, projectileSpeed: 375, projectileDamage: 3, projectileArcHeight: 230, projectileWarningMs: 650, hazardDurationMs: 1400 }),
 
     enemy('captain-pikeman-inner', 'gate-pikeman', 16120, 15980, 16420, 'captain-encounter-inner-seal', { guard: 3, health: 7, maxHealth: 7, attackRange: 370 }),
     enemy('captain-grenadier-inner', 'storm-grenadier', 17000, 16920, 17280, 'captain-encounter-inner-seal', { attackRange: 720, attackCooldownMs: 1500, projectileSpeed: 385, projectileDamage: 3, projectileArcHeight: 240, projectileWarningMs: 650, hazardDurationMs: 1400 }),
@@ -374,7 +394,8 @@ export const SHADOW_RUNNER_LEVEL_NINE: ShadowRunnerLevelConfig = {
     { id: 'captain-encounter-signal', x: 2200, y: 180, width: 2200, height: 550, enemyIds: ['captain-pikeman-signal', 'captain-grenadier-signal', 'captain-archer-signal'] },
     { id: 'captain-encounter-murder', x: 4400, y: 180, width: 2300, height: 550, enemyIds: ['captain-pikeman-murder', 'captain-archer-murder', 'captain-jester-murder'] },
     { id: 'captain-encounter-banner', x: 6700, y: 160, width: 2400, height: 570, enemyIds: ['captain-pikeman-banner', 'captain-grenadier-banner', 'captain-stalker-banner'] },
-    { id: 'captain-encounter-barracks-seal', x: 9100, y: 180, width: 1500, height: 550, enemyIds: ['captain-pikeman-barracks', 'captain-grenadier-barracks', 'captain-warden-barracks'], sealed: true },
+    // Enclose the warden's full patrol and put the exit barrier on the continuous barracks floor.
+    { id: 'captain-encounter-barracks-seal', x: 9100, y: 180, width: 2200, height: 550, enemyIds: ['captain-pikeman-barracks', 'captain-grenadier-barracks', 'captain-warden-barracks'], sealed: true },
     { id: 'captain-encounter-barracks-exit', x: 10600, y: 220, width: 700, height: 510, enemyIds: ['captain-archer-barracks', 'captain-lurker-barracks'] },
     { id: 'captain-encounter-moonwell', x: 11300, y: 140, width: 2300, height: 590, enemyIds: ['captain-pikeman-moonwell', 'captain-grenadier-moonwell', 'captain-rival-moonwell'] },
     { id: 'captain-encounter-span', x: 13600, y: 140, width: 2300, height: 590, enemyIds: ['captain-pikeman-span', 'captain-archer-span', 'captain-grenadier-span'] },

@@ -229,14 +229,14 @@ Do not set a numeric speedup promise before a physical-device baseline. Practica
 
 ## Focused evidence
 
-- [Chat/realtime review](../output/audit-2026-09-30/chat-performance.md)
-- [Notification review](../output/audit-2026-09-30/notifications.md)
-- [Composer/upload review](../output/audit-2026-09-30/composer-uploads.md)
-- [Startup/background review](../output/audit-2026-09-30/startup-background.md)
-- [Read-position addendum](../output/audit-2026-09-30/read-position.md)
-- [Pins addendum](../output/audit-2026-09-30/pins-scroll.md)
-- [Live database review](../output/audit-2026-09-30/server-database.md)
-- [Live notification operations review](../output/audit-2026-09-30/server-notifications.md)
-- [Live hosting checks](../output/audit-2026-09-30/server-hosting.md)
+- Chat/realtime review: `output/audit-2026-09-30/chat-performance.md`
+- Notification review: `output/audit-2026-09-30/notifications.md`
+- Composer/upload review: `output/audit-2026-09-30/composer-uploads.md`
+- Startup/background review: `output/audit-2026-09-30/startup-background.md`
+- Read-position addendum: `output/audit-2026-09-30/read-position.md`
+- Pins addendum: `output/audit-2026-09-30/pins-scroll.md`
+- Live database review: `output/audit-2026-09-30/server-database.md`
+- Live notification operations review: `output/audit-2026-09-30/server-notifications.md`
+- Live hosting checks: `output/audit-2026-09-30/server-hosting.md`
 
-The files under `output/` are local audit artifacts. This report is the durable repository deliverable; preserve the accompanying evidence if transferring the audit to another checkout.
+The files under `output/` are ignored local audit artifacts, not repository links or release dependencies. They may be absent in a fresh checkout. This report is the durable repository deliverable; preserve the accompanying evidence if transferring the audit to another checkout.

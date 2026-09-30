@@ -1,0 +1,610 @@
+{
+  "schemaVersion": 1,
+  "key": "prism-caster",
+  "sourceSha256": "62f717baa5a735cb02f03cff959a6f0ec950cc40868c9045952674562c2ac712",
+  "legacySha256": "78e288a36191ee1343242d6e581a8df046d40b6d20afd3c58a87e1c4f6241976",
+  "sourceDimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "segmentation": "8-connected alpha > 0; every source component owned exactly once",
+  "sourceScale": 0.30179028132992325,
+  "sourceVisiblePixels": 193465,
+  "anchorKind": "torso center X and supporting foot/robe tip Y",
+  "targetAnchor": {
+    "x": 128,
+    "y": 123
+  },
+  "review": "Separate projectile belongs to cast-release, floating diamonds to their original pose; low debris at x1248 belongs to defeated, not hit. Torso X does not follow effect bounds.",
+  "recommendedCatalog": {
+    "frameCount": 6,
+    "frameWidth": 256,
+    "frameSize": 128,
+    "scale": 0.8,
+    "body": {
+      "width": 44,
+      "height": 72,
+      "offsetX": 106,
+      "offsetY": 56
+    }
+  },
+  "legacyWorldBodyRect": {
+    "left": -17.6,
+    "top": -57.6,
+    "width": 35.2,
+    "height": 57.6
+  },
+  "recommendedWorldBodyRect": {
+    "left": -17.6,
+    "top": -57.6,
+    "width": 35.2,
+    "height": 57.6
+  },
+  "frames": [
+    {
+      "name": "hover-a",
+      "frame": 1,
+      "sourceBounds": {
+        "left": 48,
+        "top": 312,
+        "width": 202,
+        "height": 391
+      },
+      "sourceAnchor": {
+        "x": 157,
+        "y": 703
+      },
+      "sourceComponents": [
+        {
+          "id": 1,
+          "pixels": 32093,
+          "left": 48,
+          "top": 312,
+          "width": 202,
+          "height": 391
+        },
+        {
+          "id": 11,
+          "pixels": 863,
+          "left": 193,
+          "top": 368,
+          "width": 35,
+          "height": 67
+        }
+      ],
+      "sourceVisiblePixels": 32956,
+      "placement": {
+        "left": 95,
+        "top": 5,
+        "width": 61,
+        "height": 118,
+        "transformedAnchor": {
+          "x": 127.91584158415841,
+          "y": 123
+        }
+      },
+      "cropSha256": "df6767615a86de11fa82f1bc269870f13b5e4a66184bffbbd6cca3b8301d56ef",
+      "frameSha256": "7656bfc9da1377de5b241a2da43a832402301af4245ace7e0b620d3da6904af7"
+    },
+    {
+      "name": "hover-b",
+      "frame": 2,
+      "sourceBounds": {
+        "left": 271,
+        "top": 315,
+        "width": 227,
+        "height": 385
+      },
+      "sourceAnchor": {
+        "x": 404,
+        "y": 700
+      },
+      "sourceComponents": [
+        {
+          "id": 2,
+          "pixels": 33479,
+          "left": 271,
+          "top": 315,
+          "width": 227,
+          "height": 385
+        },
+        {
+          "id": 7,
+          "pixels": 1434,
+          "left": 300,
+          "top": 349,
+          "width": 60,
+          "height": 87
+        },
+        {
+          "id": 13,
+          "pixels": 791,
+          "left": 440,
+          "top": 383,
+          "width": 31,
+          "height": 62
+        }
+      ],
+      "sourceVisiblePixels": 35704,
+      "placement": {
+        "left": 88,
+        "top": 7,
+        "width": 69,
+        "height": 116,
+        "transformedAnchor": {
+          "x": 128.4273127753304,
+          "y": 123
+        }
+      },
+      "cropSha256": "a1947f531c87422eed1036dfed9a05755740b7a0fb23fe39423b908e939f8ab1",
+      "frameSha256": "89d6c1bb59d2563c9d03280cd753576a2f736f2f90dd8ba0e0aacdfd97e76517"
+    },
+    {
+      "name": "cast-charge",
+      "frame": 3,
+      "sourceBounds": {
+        "left": 515,
+        "top": 320,
+        "width": 176,
+        "height": 389
+      },
+      "sourceAnchor": {
+        "x": 612,
+        "y": 709
+      },
+      "sourceComponents": [
+        {
+          "id": 3,
+          "pixels": 32091,
+          "left": 515,
+          "top": 320,
+          "width": 176,
+          "height": 389
+        },
+        {
+          "id": 20,
+          "pixels": 5,
+          "left": 662,
+          "top": 408,
+          "width": 3,
+          "height": 2
+        },
+        {
+          "id": 30,
+          "pixels": 1,
+          "left": 644,
+          "top": 486,
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "sourceVisiblePixels": 32097,
+      "placement": {
+        "left": 99,
+        "top": 6,
+        "width": 53,
+        "height": 117,
+        "transformedAnchor": {
+          "x": 128.21022727272728,
+          "y": 123
+        }
+      },
+      "cropSha256": "92273ff0c0c9b24dedb32d56dd40acc846a965ba4086d0494ad2bd42c40b8ee0",
+      "frameSha256": "a34a0d6353894a6f7f99d266aef1a80390134c4d2c0c80039953cd0f71ca2226"
+    },
+    {
+      "name": "cast-release",
+      "frame": 4,
+      "sourceBounds": {
+        "left": 708,
+        "top": 350,
+        "width": 357,
+        "height": 358
+      },
+      "sourceAnchor": {
+        "x": 834,
+        "y": 708
+      },
+      "sourceComponents": [
+        {
+          "id": 8,
+          "pixels": 28752,
+          "left": 708,
+          "top": 350,
+          "width": 259,
+          "height": 358
+        },
+        {
+          "id": 17,
+          "pixels": 3,
+          "left": 802,
+          "top": 397,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 19,
+          "pixels": 1,
+          "left": 900,
+          "top": 406,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 21,
+          "pixels": 1,
+          "left": 899,
+          "top": 408,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 22,
+          "pixels": 20,
+          "left": 1010,
+          "top": 443,
+          "width": 7,
+          "height": 4
+        },
+        {
+          "id": 24,
+          "pixels": 2074,
+          "left": 955,
+          "top": 451,
+          "width": 110,
+          "height": 44
+        },
+        {
+          "id": 26,
+          "pixels": 5,
+          "left": 992,
+          "top": 455,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 27,
+          "pixels": 9,
+          "left": 980,
+          "top": 460,
+          "width": 5,
+          "height": 3
+        },
+        {
+          "id": 29,
+          "pixels": 18,
+          "left": 969,
+          "top": 483,
+          "width": 7,
+          "height": 5
+        },
+        {
+          "id": 31,
+          "pixels": 3,
+          "left": 854,
+          "top": 487,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 34,
+          "pixels": 17,
+          "left": 994,
+          "top": 493,
+          "width": 6,
+          "height": 4
+        }
+      ],
+      "sourceVisiblePixels": 30903,
+      "placement": {
+        "left": 90,
+        "top": 15,
+        "width": 108,
+        "height": 108,
+        "transformedAnchor": {
+          "x": 128.11764705882354,
+          "y": 123
+        }
+      },
+      "cropSha256": "d8c96e5d12059534d36ca9320b004c3c142412f2842c19b0d95be72a3f6c153a",
+      "frameSha256": "114cd337138d787b0ca496337a51a9093e5a3095ecba9bb5fab97fd481e509c8"
+    },
+    {
+      "name": "hit",
+      "frame": 5,
+      "sourceBounds": {
+        "left": 1030,
+        "top": 333,
+        "width": 274,
+        "height": 379
+      },
+      "sourceAnchor": {
+        "x": 1182,
+        "y": 712
+      },
+      "sourceComponents": [
+        {
+          "id": 4,
+          "pixels": 32391,
+          "left": 1030,
+          "top": 333,
+          "width": 236,
+          "height": 379
+        },
+        {
+          "id": 5,
+          "pixels": 23,
+          "left": 1173,
+          "top": 337,
+          "width": 6,
+          "height": 6
+        },
+        {
+          "id": 6,
+          "pixels": 200,
+          "left": 1210,
+          "top": 342,
+          "width": 18,
+          "height": 18
+        },
+        {
+          "id": 9,
+          "pixels": 28,
+          "left": 1185,
+          "top": 351,
+          "width": 7,
+          "height": 7
+        },
+        {
+          "id": 10,
+          "pixels": 19,
+          "left": 1169,
+          "top": 367,
+          "width": 6,
+          "height": 5
+        },
+        {
+          "id": 12,
+          "pixels": 894,
+          "left": 1079,
+          "top": 381,
+          "width": 36,
+          "height": 73
+        },
+        {
+          "id": 14,
+          "pixels": 4,
+          "left": 1205,
+          "top": 383,
+          "width": 3,
+          "height": 2
+        },
+        {
+          "id": 15,
+          "pixels": 18,
+          "left": 1179,
+          "top": 388,
+          "width": 6,
+          "height": 5
+        },
+        {
+          "id": 16,
+          "pixels": 18,
+          "left": 1164,
+          "top": 396,
+          "width": 5,
+          "height": 6
+        },
+        {
+          "id": 18,
+          "pixels": 845,
+          "left": 1268,
+          "top": 401,
+          "width": 36,
+          "height": 63
+        },
+        {
+          "id": 25,
+          "pixels": 29,
+          "left": 1127,
+          "top": 454,
+          "width": 8,
+          "height": 6
+        },
+        {
+          "id": 28,
+          "pixels": 34,
+          "left": 1132,
+          "top": 472,
+          "width": 7,
+          "height": 8
+        },
+        {
+          "id": 32,
+          "pixels": 6,
+          "left": 1118,
+          "top": 490,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 33,
+          "pixels": 20,
+          "left": 1132,
+          "top": 492,
+          "width": 4,
+          "height": 7
+        },
+        {
+          "id": 35,
+          "pixels": 7,
+          "left": 1212,
+          "top": 499,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 36,
+          "pixels": 18,
+          "left": 1106,
+          "top": 503,
+          "width": 6,
+          "height": 5
+        },
+        {
+          "id": 37,
+          "pixels": 66,
+          "left": 1203,
+          "top": 511,
+          "width": 11,
+          "height": 11
+        },
+        {
+          "id": 38,
+          "pixels": 16,
+          "left": 1209,
+          "top": 531,
+          "width": 5,
+          "height": 6
+        },
+        {
+          "id": 42,
+          "pixels": 26,
+          "left": 1148,
+          "top": 663,
+          "width": 6,
+          "height": 6
+        },
+        {
+          "id": 46,
+          "pixels": 148,
+          "left": 1145,
+          "top": 685,
+          "width": 16,
+          "height": 13
+        }
+      ],
+      "sourceVisiblePixels": 34810,
+      "placement": {
+        "left": 82,
+        "top": 9,
+        "width": 83,
+        "height": 114,
+        "transformedAnchor": {
+          "x": 128.04379562043795,
+          "y": 123
+        }
+      },
+      "cropSha256": "471d2faa8383261b9068662757e33702c4b6f69fd3197072a67959f565048c90",
+      "frameSha256": "143299edac40c3807d36071a94b96e238a64d4a230e280235d29bc500f428130"
+    },
+    {
+      "name": "defeated",
+      "frame": 6,
+      "sourceBounds": {
+        "left": 1248,
+        "top": 446,
+        "width": 261,
+        "height": 265
+      },
+      "sourceAnchor": {
+        "x": 1414,
+        "y": 711
+      },
+      "sourceComponents": [
+        {
+          "id": 23,
+          "pixels": 24304,
+          "left": 1283,
+          "top": 446,
+          "width": 226,
+          "height": 261
+        },
+        {
+          "id": 39,
+          "pixels": 599,
+          "left": 1471,
+          "top": 531,
+          "width": 25,
+          "height": 55
+        },
+        {
+          "id": 40,
+          "pixels": 10,
+          "left": 1437,
+          "top": 574,
+          "width": 4,
+          "height": 4
+        },
+        {
+          "id": 41,
+          "pixels": 60,
+          "left": 1330,
+          "top": 581,
+          "width": 9,
+          "height": 9
+        },
+        {
+          "id": 43,
+          "pixels": 53,
+          "left": 1387,
+          "top": 672,
+          "width": 9,
+          "height": 9
+        },
+        {
+          "id": 44,
+          "pixels": 1178,
+          "left": 1405,
+          "top": 679,
+          "width": 70,
+          "height": 32
+        },
+        {
+          "id": 45,
+          "pixels": 420,
+          "left": 1248,
+          "top": 681,
+          "width": 36,
+          "height": 25
+        },
+        {
+          "id": 47,
+          "pixels": 242,
+          "left": 1364,
+          "top": 689,
+          "width": 22,
+          "height": 18
+        },
+        {
+          "id": 48,
+          "pixels": 129,
+          "left": 1342,
+          "top": 695,
+          "width": 15,
+          "height": 13
+        }
+      ],
+      "sourceVisiblePixels": 26995,
+      "placement": {
+        "left": 78,
+        "top": 43,
+        "width": 79,
+        "height": 80,
+        "transformedAnchor": {
+          "x": 128.24521072796935,
+          "y": 123
+        }
+      },
+      "cropSha256": "50efd5fd0c5c1a95da3cf7e5b12ceed772bd07efedaf87ce609713e63e4f17b6",
+      "frameSha256": "20b41473fdbdcdd1a74f2911053fe1cd02d00c2f00116caa85ede7e1ffab7b6d"
+    }
+  ],
+  "stripSha256": "cc55e38a415b570cfcbad96383ec9f7bee8c8794943f0930c0b947d2665aef05",
+  "stripBytes": 70361,
+  "decodedRgbaBytes": 786432,
+  "sourcePath": "source-assets/shadow-runner/level-assets/level-10/prism-caster-v1-6f-transparent.png",
+  "sourceArchivePath": "source-assets/shadow-runner/rebuild/recovered-enemies-v2/original-prism-caster-v1-6f-transparent.png",
+  "archivePath": "source-assets/shadow-runner/rebuild/legacy-prism-caster-v1-6f-128.png",
+  "runtimePath": "public/games/shadow-runner/level-assets/level-10/enemies/prism-caster-v2-6f-256x128.png"
+}

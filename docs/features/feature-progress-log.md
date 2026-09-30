@@ -1,8 +1,36 @@
+## September 30 Shadow Runner release candidate
+
+- Full campaign redesign retained: phone controls/HUD/map/journal, courier story,
+  recovery/save fixes, enemy/terrain repairs, custom chapter art and staged finale.
+- Completed nine transparent story landmarks, three act tableaux and separate
+  depth props for all ten districts. Selective loading and lossless atlas
+  optimization keep the production payload93.55MiB, below its deploy cap.
+- Both phone engines pass21 final UI/art/control/pause surfaces. Headed shared
+  auth/resume-send passes with verified cleanup. Existing boss/ending/reload and
+  critical late-route evidence is retained instead of repeated full bot loops.
+- Required production quality gates remain. Physical-phone performance, audio
+  and player feedback are explicitly not certified by browser emulation.
+
 ## September 30 composer media follow-up published
 
 - Tayler advanced the queued video paste work into this follow-up, along with inline thumbnails, shared caption/attachment Send, picker review, Pins loading bars and small keyboard-dismiss controls. [Implementation and platform investigation](composer-media-followup-2026-09-30.md) tracks verification and release.
 - Web build `abb22931` is pushed to main and live through manual Netlify deploy `6abd3281fceefa3eb468e003`. Public health/media guards, hosted two-account smoke/cleanup, server health and the required-restart broadcast passed. Unchanged production budgets passed after deferring optional preview/image-viewer UI.
 - Tayler's installed-PWA test found the native up/down/checkmark strip in every keyboard-comparison variant. The supplied screenshot confirms Home Screen context. The editor workaround is unsuccessful on this phone; the existing native wrapper's accessory suppression is prepared separately for signed-client testing. Physical video-preview and broader installed-PWA acceptance remain open.
+
+## September 30 Shadow Runner main integration and boss ending
+
+- Preserved rebuild while fast-forwarding main to `2e876b7d`; reconciled four
+  overlapping files and retained the recovery stash. Fresh build passes.
+- Both phone engines pass the QA-assisted local Sovereign fight and all four
+  ending beats with fresh ignition/results, three lives and no page errors.
+  Whole-route evidence remains separate: Chromium life exhaustion and WebKit
+  final-wind policy stall are retained, not counted as wins.
+- Added visible-beam-aware combat, final-road wind bracing and retry-safe Crown
+  beam headroom contracts. Independent Captain Span policy correction passes
+  focused checks. Account-save journal coordination and entry/resume medal refresh
+  fixes pass112focusedtests; integrated account behavior remains unverified.
+- Lint, docs, function inventory and dependency audit pass. Final integrated
+  campaign/full regression and production release are still pending; no push.
 
 ## September 30 chat smoothness published
 
@@ -329,6 +357,125 @@
 - Finished the interrupted hosted iPhone/WebKit gameplay check against current production; actual two-player touches, authoritative moves, realtime turns, chat, landscape layout and camera controls passed with exact QA cleanup.
 - Moved the validated late-popup dismissal and foreground settling into the canonical multiplayer script; bounded waits and closed-page failure capture preserve cleanup and useful errors. No game runtime changes or deployment in this pass.
 - Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790296822651/summary.json`. Physical-device acceptance and final reference-level visual polish remain open.
+## September 24 Shadow Runner Foundry and Lock route defense
+
+- Foundry east uses16px fresh-calm anchors,200ms second jump and crouched landing.135 sampled Arcade cases and both phone-browser local crossings pass at full health/three lives. Screenshot reviewed; no game geometry or wind changes.
+- Added camera-limited arrow bounds/velocity and exact player horizontal bounds to read-only QA snapshots. Input-only Lock defense reacts to visible volleys, permits one ordinary second jump, and stays inside verified clear-headroom corridors.54 actual-Arcade cases pass; rejected early candidates retained in test history.
+- Local runner-lock-local-2026-09-25T03-43-33-631Z passes all11steps/both guards/checkpoint on both engines. Three lives, no page errors; Android minimum5HP then normal checkpoint healing, WebKit12HP throughout. Only setup placement is injected. Screenshot reviewed; no full-route claim.
+- Lint/typecheck/build and386Node checks pass; runtime D5XrMwCL / Games CJHjhsgw,92.68MiB. Full Jest passes300suites/2,604tests with16existing auth TODOs. A failing-before regression fixed checkpoint retries dropping defense after a consumed power. Full normal replay01 was cancelled for that correction;02 is terminal: WebKit194steps/five Flames reaches Sovereign Last Light at2/24HP before exhausting lives. Chromium20steps stalls healthy under gap04; both attempts have zero page errors and matching hashes.
+- The recorded gap04 overshoot now has an actual-Arcade failure control. A20px earlier input takeoff passes45sampled cases and both local phone browsers at12HP/three lives in runner-prism-entry-local-2026-09-25T03-58-17-024Z. Setup is logged; geometry unchanged.202focused Jest,386Node and lint pass after that policy edit; full replay remains needed. No full-route cell closes. Campaign/mastery/finale/device/release gates stay open; no push or backend changes.
+
+## September 24 Shadow Runner Relay muzzle cover
+
+- Reproduced orbs escaping a low roof at 30/60/120fps when their muzzle started inside it. The factory now checks the scaled body across the whole muzzle reach against enabled solids. Eight regressions preserve open-shot damage/speed, clear launches, both directions, multi-orb attacks and disabled cover. No enemy-stat or power-placement change.
+- Corrected ten normal and ten mastery checkpoint move targets to finish past the real trigger line despite arrival tolerance. Game checkpoints are unchanged. Both new contracts failed before correction.
+- Full Jest passes 300 suites / 2,581 tests (16 existing auth TODOs); lint, app TypeScript, build and final 379 Node checks pass. Runtime BCEXLdJE / Games Cu5aidEp, 92.68 MiB.
+- Fresh local crawl probe 03-08-49 passes Chromium/WebKit: full health through cover, both guards defeated, all three lives, final 8/12HP and zero page errors. Setup placement/prior Rival kill are explicit; no restore or power grants. Reviewed screenshot. Full normal runner-relay-cover-route-20260924-01 is terminal: Chromium162steps/four Flames confirms Crown acquisition/recovery then exhausts lives in Lock's arrows; WebKit53steps stalls at Foundry's east wind anchor with12HP/three lives. Both have zero page errors/matching hashes. Next: Lock defense and physics-backed anchor tolerance; no full-route cell closes. Creative/mastery/finale/device/release work remains open; no push.
+
+## September 24 Shadow Runner projectile fire alignment
+
+- Fixed stale impact-sprite placement, storm bounds below the floor, wall/ceiling floor-fire spawning and detached moving-support hazards. Actual Arcade collision surfaces now own fire placement; tilt caps forward their process-callback body. Expiry and pooled reuse clear ownership.
+- Six original regressions failed before the fix. Now 96 focused tests, 299 full Jest suites / 2,573 tests (16 existing auth TODOs), 377 Node checks, lint, app TypeScript and build pass. Frozen runtime D3EwwbQ8 / Games Dk5xkFzQ, 92.68 MiB.
+- Both phone engines pass 50 QA-assisted systems checks in runner-impact-systems-20260924-02 with precise storm-floor alignment. Corrected the smoke's stale pooled-fire false positive and waited for the preceding sword to finish; physics-route portions explicitly skipped. Fresh late-Ascent local probe 02-54-14 passes both engines with full health, all lives, checkpoint active and no page errors. Screenshots reviewed/shared.
+- No full campaign route or mastery acceptance closes from these probes. Crown acquisition and caster-facing crawl/recovery remain next; creative, finale, physical-device and release work still open. No push, backend mutation or announcement.
+
+## September 24 Shadow Runner late Ascent recovery beat
+
+- Lowered/widened the custom-art gap23 perch to22700/520,192pxwide. Normal traversal now uses one ordinary jump and a wind-braced short drop; upper optional routes/rewards remain. Only the final grenadier's throw cooldown changes to4400ms, preserving damage and other enemies.
+- Visible grenade-warning readback and bounded input-only evasion have focused tests. Removed a redundant exposed wind wait; checkpoint targeting now crosses its actual trigger line and stays braced through the ground fight.
+-225actual-policy Arcade cases and377Node checks pass. Local runner-late-ascent-local-2026-09-25T02-21-10-764Z passes both engines with no damage,12HP/three lives, checkpoint activation and nearby threats active. Explicit setup placement/prior kills mean this is not full-route acceptance. Screenshots reviewed/shared.
+- Frozen runtime CfymhNKG / Games gNhltiKh,92.68MiB build. Refreshed regression passes298Jest suites/2564tests (16existing auth TODOs),377Node checks, lint/typecheck/build, docs integrity175 and diff-check. Real-start runner-late-ascent-drop-route-20260924-01 is terminal: Android172steps/four Flames ends at caster-facing crawl06 after Choir/Lock recovery; WebKit152steps/three Flames ends during Crown retries after a death before its checkpoint. Both exhaust natural lives with zero page errors and matching hashes. No full-route cell closes. Next: checkpoint acquisition and defense through consumed-power recovery/crawl approaches; preserve Dispatch8's reserved Dawnfire budget. Storm impact positioning needs a separate actual-Arcade audit. No push, backend mutation or full-goal completion.
+
+## September 24 Shadow Runner Crown defense and Lock separation
+
+- Input-only route driver follows actual alternating beam states, retreats from overhead geometry, carries observations between adjacent steps, and departs on fresh high-beam clearance. Earned Flame4 detours can be omitted only after witnessed checkpoint recovery; no gameplay state mutation.
+- Fixed authored Lock arrows reaching back into Crown's beams. Lifetimes3400/3500ms retain the full Lock firing corridor, speed, damage and cadence. Range regression reproduced the original overlap; no other volley or beam change.
+- Fixed driver-only pickup crouching/exact-coordinate re-visits and a waiting point beyond its own defensive jump boundary.90real Arcade beam cases and nine safe-anchor departures pass, plus374Node checks.
+- QA-assisted local runner-crown-local-2026-09-25T01-26-07-655Z passes both browsers at3lives, Android9HP/WebKit8HP, two guard kills and natural Flame4/Aether acquisition. No page errors. Setup is logged; full-route acceptance remains separate. Frozen runtime CuWoSaKx / Games BenChcKr,92.68MiB. Final regression passes298Jest suites/2547tests (16existing auth TODOs),374Node checks, lint/typecheck/build, docs integrity175 and diff-check. Screenshots shared; no push/backend mutation.
+- Full runner-crown-exit-route-20260924-01 is terminal: both engines naturally earn all five Flames and cross Ascent's refuge, but fail at gap-23-step before the boss. Android177completed steps includes Crown/Lock recovery then exhaustion; WebKit178steps includes one late-Ascent death/Lock respawn then a stall at22573/616,1HP/two lives. Zero page errors. Earned Flame4 skipping and spent-resource preservation are naturally exercised. No full-route cell closes. Next: supported late-Ascent wind staging under grenade/arrow pressure, plus combat/descent consistency.
+
+## September 24 Shadow Runner held movement and wind routes
+
+- Fixed shared Arcade drag cancelling held crouched wind control and varying run distance by render FPS. Running/crawling now retain authored speed at30/60/120fps in both directions; release braking and tilt support ownership remain intact.
+-145focused Relay/Captain Jest tests and365Node checks pass, including81Foundry/405Ascent sampled crossings. Lint/typecheck pass; full Jest now passes298suites/2537tests with16existing auth TODOs. Build Dj4VLLIi / uXUgEAQo passed with92.68MiBpayload before later test/policy-only edits.
+- Captain Moonwell mastery now waits for fresh calm at the actual descent takeoff. Foundry fights both guards before the lift and only jump-strikes on fresh calm; no enemy/health/wind nerfs. Mid-traversal screenshots were delaying controls, so the local probe now captures terminal outcomes only.
+- Both-engine Ascent local crossing passes in runner-ascent-local-2026-09-25T00-35-50-743Z. Foundry run00-34-23crosses on both; Android clears the guards/checkpoint, WebKit loses a life fighting the lancer. These are QA-assisted local probes, not full-route acceptance. Screenshots shown to Tayler. Full campaign, creative/finale and release gates remain open; no push or backend change.
+
+- Fresh normal routes runner-movement-opening-20260924-01 pass tutorial/East Gate on both engines, with no deaths or page errors and matching bundle hashes. Four normal cells are verified on this build, not mastery/finale acceptance.
+- FullLevel10 runner-movement-relay-20260924-01 failed on both engines by exhausting lives. Android recovered twice at Foundry, then died jumping into Crown's active high beam after Flame4; WebKit cleared Foundry alive, first died at Lock19971/545, then exhausted two Crown retries. No page errors; hashes match. Recovery preserves earned/spent state. Next: Foundry defense, Crown beam-aware fighting/Flame/departure, unnecessary earned-Flame revisits, and Lock volley descent. No boss/full-route acceptance or push.
+
+## September 24 Shadow Runner Ascent recovery refuge
+
+- Added one visible custom-masonry refuge over gap22; normal play now uses two single jumps and fresh calm windows beneath the phase platform. Preserved the upper mastery route, wind/phase timing, enemies and rewards.
+- Actual-policy Arcade coverage passes405crossings at30/60/120fps, five input cadences (80-180ms), nine arrival times and three offsets, with natural Aether pickup and no geometry/hazard defects. Three missing-refuge controls fail as expected. Route-specific16pxanchors are bounded and do not relax other routes.
+-162focused Jest,362Node, lint, TypeScript and build pass. Three diagnostic `.at()` compatibility errors fixed without changing the library target. Frozen runtime BvWWij5K / Games B3gqxZbo;92.68MiBpayload.
+- Both-engine normal checkpoint replay runner-ascent-refuge-20260924-01 failed in Foundry before the refuge (Android42steps/12HP/3lives; WebKit52steps/7HP/2lives). Zero page errors; driver wind anchoring and stair timing remain open. No full-route cell closes.
+- Separate QA-assisted local crossing runner-ascent-local-2026-09-25T00-03-58-662Z passes both engines at12HP/3lives with natural Aether pickup. Earlier Android diagnostics exposed edge landing reversal and needless waiting under fire; target moved farther onto floor and redundant wait removed. New script logs setup, inputs, trajectories and screenshots, blocks remote traffic, never reports campaign completion. Gameplay, refuge and ending images shown to Tayler. M4/M5/M6 remain open; no push/deploy/backend mutation.
+
+## September 24 Shadow Runner playable relay ignition
+
+- Level10 now requires a fresh grounded action after the five Flames and Sovereign defeat; the Flame control lights existing custom art in-world before scoring/saving and the four-scene ending. Other finishes and300/700/1200completion tiers are unchanged. Optional perfection never gates the ending.
+- Reproduced and fixed simultaneous binding edge leaks, pending pause inputs and Phaser reset/native-repeat edges. Stale boss-requirement toast clears at readiness; crouched delivery safely stands. Active-time ignition freezes on pause and is fenced on disposal/death.
+- Full Jest298suites/2507tests passed before final repeat/stance/toast refinements;144focused plus38smoke tests, lint/typecheck/build pass afterward. Build Cn4wBTsm / DdIks5Uj,92.68MiB. No release claims from counts alone.
+- Subsequent full regression passes 298 suites/2513 tests with 16 existing auth TODOs, including those final ending refinements. Separate Ascent physics work postdates this run; it is not final release QA.
+- Both phone engines pass50checks in runner-world-ignition-20260924-03, including held/repeated keys, crouched touch ignition, pause, exact scoring, four cinematic scenes, compact568x320layout, replay/skip. Reviewed screenshots. Setup uses QA helpers; no full-route proof is claimed. Run02's incorrect crouch readback path was corrected.
+- Normal checkpoint route runner-ignition-wind-route-20260924-01 is terminal. Both engines pass through Foundry/Choir/Crown/Lock, recover once at Crown, then stall at Ascent gap-22-step with two lives (Android9HP/150steps; WebKit12HP/152steps). Zero page errors. Jumping during a warning, followed by full gust force, is reproduced; sampled calm-window use of the existing step is next. Crown still needs deliberate alternating-beam combat/Flame timing; no general impossibility or nerf is established. M4/M5/M6 and all full-route gates remain open. No push/deploy/backend mutation.
+- Ascent sidecar uses real movement/wind/phase/Arcade and bobbing pickup collection, including late arrivals. Nine old-policy failures reproduce; an adjusted first leg lands234/243times (nine gate timeouts), but full phase-sync/calm candidate only passes15/81strict cases and is rejected. Diagnostic assertions are not acceptance; no production/policy change was integrated. Next: bounded anchoring and phase/wind coordination or revised intermediate landing, then full sequence and browser proof. All361Node checks pass.
+
+## September 24 Shadow Runner Choir landing pocket
+
+- Review exposed a66-second joint lift/beam wait and a post-launch cadence mismatch. Corrected the sidecar to actual route decisions/input events for waiting, crouch, both jumps, steering and landing; old configuration fails later-arrival coverage.
+- Moved only the Choir beams' start to12020, retaining endpoint13400, damage and rhythms. The landing pocket separates lift timing from the next beam corridor. Read-only pause-remaining metadata supports a bounded lift-only guard; no game-state injection. Deadline reduced to10seconds.
+-63physics crossings pass across30/60/120fps,80-100msinput sampling, offsets+/-8px and arrivals through180seconds.180focused Jest,359Node, lint/typecheck/build pass. Independent review found no additional concrete issue; pickup/crouch transition still needs live evidence.
+- Frozen both-engine normal checkpoint replay runner-choir-pocket-20260924-01 is terminal: WebKit clears Choir/Aether/crawl without further damage, then exhausts lives after Lock. Android fails earlier, but naturally respawns at the new Foundry checkpoint with spent resources preserved. Zero page errors; runtime Co0M94ZD / Games Be4nUe83. No full-route cell closes.
+- Reproduced driver failures accepting a wind-warning phase launch and a late calm departure after drift/knockback. Guards now require non-warning wind and supported calm onset; misses wait for the next cycle without extending deadlines.360Node checks and scoped lint pass; live replay remains open. Full campaign/creative/finale gates remain intact; S08 contextual in-world ignition implementation is prepared, not completed. No push/deploy/backend mutation.
+
+## September 24 Shadow Runner Foundry retries and Lock refuge
+
+- Natural finite-life replay now verifies two real respawns and retained resources/enemy defeats on both engines, but both runs still fail before completion. No normal/mastery matrix cell is closed.
+- Prism bridge walk-back and combined bridge/shelf recovery are bounded ordinary inputs. Independent review found and fixed a stale return flag with a before/after regression. Lock phase waiting now uses an existing ledge above both arrow lanes; physics passes at30/60/120fps with a bounded phase-window margin, not yet live-proven.
+- Added Foundry Approach checkpoint6420/616 to shorten spent-power retries from Prism5000. Existing checkpoint heal applies; lives, powers, enemies and rewards are not reset. All prior checkpoints retained. Updated62-point campaign census/source anchors/diagnostic inventory;107checkpoint/config/geometry and98access tests pass.
+- Lint/typecheck/build,353Node and fresh full Jest298suites/2471tests pass (16existing auth TODOs). Runtime v4ZWU05V / Games Cu_zwl90,92.68MiBpayload. Subsequent Choir cases pass the full105-test access file; Ascent guard passes24Relay Node checks and scoped lint.
+- Fresh runner-foundry-checkpoint-20260924-01 activates the new checkpoint on both engines. Android recovers twice and reaches Flame4 before exhausting lives; WebKit recovers once, clears Lock and the Ascent Rival, then stalls upright in wind with12HP/two lives. The supported Ascent approach now braces, pending replay. No full route accepted or new-anchor respawn claimed. No push/deploy/backend mutation.
+- Choir sidecar proves beam hit then lift-underside cancellation, plus36sampled collision/beam-clean gated crossings at30/60/120fps. Candidate timing and evidence limits recorded in the rebuild plan; not yet wired into browser policy. Next: live Choir synchronization, Ascent continuation, Crown defense and full remaining creative/campaign/finale acceptance. Workers and test/browser commands are terminal; owned4176preview retained.
+
+## September 24 Shadow Runner finite-life recovery verifier
+
+- Added opt-in normal-only checkpoint recovery with all ten L10 source-verified anchors. Default and mastery remain deathless. Only ordinary inputs are used; state is read-only, original time/life bounds retained, and completed normal recovery cannot claim Perfect Route.
+- Added exact collected power IDs and simulation respawn counter to detached debug snapshots. Revisiting spent pickups uses positional movement, never renewed buffs. Progress regressions, revived/healed enemies, lost checkpoints and late completion fail closed.
+- Independent review found and confirmed fixes for checkpoint identity loss, between-death enemy-health resets and post-read deadline acceptance.95targeted Node/110focused Jest, lint/typecheck/build pass; runtime BzdbK_lZ / Games BThqJzjc,92.68MiB. Full Node347predates the final three regression cases; full Jest297/2455is the prior build's result.
+- Live finite-life Chromium/WebKit run runner-finite-lives-20260924-01 pending. D09 remains open; no full-route, recovery-branch, physical-device or release acceptance claimed. No push/deploy/backend mutation.
+
+## September 24 Shadow Runner Foundry combat and story continuity
+
+- S01 lore reconciliation complete: ten source-authored districts, required Moon Shards, Captain/Rival and Sovereign continuity. Fixed L8's already-collected seal handoff and clarified L9's other hostile couriers. Playable ignition and visual world presentation remain open.
+- Phone chapter-copy smoke61surfaces passed; reviewed compact/iPhone/Comfort screens. Expanded smoke verifies Replay/Return commands can scroll fully into view and Return actually dismisses the chapter.
+- Wind-aware power pickup and grounded-road jump-strikes cleared Foundry drone/gap07 on both engines in runner-foundry-calm-jump-20260924-01. Both died during the guard approach before checkpoint.334Node checks pass; this is partial route evidence, not release acceptance.
+- Independent review found drone hit reactions could reuse attack deadlines to create an unwarned dive. Separate sprite-owned timing now cancels safely on combat/lifecycle events, preserves rejected-hit attacks and displays hit feedback.148focused Drone/Sovereign tests pass across all six drone configs; lint/typecheck/build pass. New runtime mB4Q3umh / Games D0iW5yjk,92.68MiB. Fresh full Jest297suites/2455tests passes (16existing auth TODOs), including repaired Captain fixture helper extraction without dropping assertions. No push/deploy/backend mutation; full campaign/mastery, finale and real-phone gates remain open.
+- Current-build replay runner-drone-reaction-live-20260924-01: Android completed127steps and collected Flame4 before dying in Crown beams at18671/551; WebKit cleared drone/gap07 but died in Foundry guard approach at7281/616. Both have zero page errors and matching hashes. Final UI smoke76surfaces passes across five profiles with reviewed compact/iPhone/Comfort action screens. D09 finite-life recovery and reactive Foundry/Crown defense are next; no new full-route acceptance cell. All test/browser commands are terminal; owned4176preview retained.
+
+## September 24 Shadow Runner route recovery and visible hazard observations
+
+- Foundry interior staging reached Choir on Chromium and WebKit in separate real-input runs. Repeats exposed unsafe unarmed staging and jump-strikes through Choir beam lanes; route candidates now attack during the approach and keep both Choir fights grounded/crouched. No enemy, hazard, reward or power nerfs.
+- Added bounded gap02 takeoff retry and Prism recovery-shelf return after actual missed-jump evidence. These use ordinary controls, retain deadlines/attempt caps, and cannot complete a skipped target or restore state. Recovery-branch live acceptance remains separate.
+- Added read-only camera-limited active floor-hazard collision bounds and a supported crouched Captain corridor response. Independent worker added28snapshot cases;81focused Jest and329Node checks pass, as do lint/typecheck/build. Final runtime Dlh6S3Ed / Games CzHBB-rc;92.68MiBpayload. Captain visible-fire run passed Murder Hall/Moonwell in both engines but died in Span; no flame was present during guarded steps, so no live avoidance claim.
+- Full route/mastery, finite-life recovery, art/story/finale and phone acceptance remain open. No rebuild push/deploy/backend change. Evidence details in SHADOW_RUNNER_REBUILD_2026-09.md.
+- Final runner-prism-shelf-recovery-20260924-01 runs crossed Prism without needing fallback, then both died during Foundry staging. Armed approach alone remains insufficient; calm-versus-gust movement is the next investigation. Independent review reproduced and fixed retreat overshoot and out-of-shelf retry edges with exact regressions;138targeted Node checks/scoped ESLint pass after fixes, with no live branch acceptance claim.
+
+## September 24 Shadow Runner Captain and Relay environment depth
+
+- Generated four original ImageGen masters: storm fortress, pre-restoration relay citadel, transparent watch banner and hanging relay cage. Prompts/masters retained in source-assets/shadow-runner/rebuild; six optimized derivatives including thumbnails total472,322bytes, with provenance in processed-manifest.json.
+- Captain/Relay use new chapter art, bounded panorama movement and separate architectural layers (14/16 props). Per-level loading deduplicates textures, decor adds no colliders or per-frame allocations, and pause/Comfort freeze positions. Gameplay geometry and combat are unchanged. Dawn restoration remains reserved for the ending.
+- 133 focused Jest and320Node checks pass. Fresh full Jest:296suites/2325tests passed,16existingTODOs. Lint, app typecheck, build, docs and diff checks pass;92.68MiBdeploy payload stays below the unchanged100MBcap. Chromium/WebKit short actual-input art probes pass for both chapters, including nonblank canvas, layer movement ratios, asset loading and pause. Evidence: output/playwright/runner-captain-depth-20260924-01 and runner-relay-depth-20260924-01. Final runtime Dia_cFHy/Games Ch5JUuF6 hashes match those browser proofs. Reviewed screenshots show readable terrain/enemies; these are not full-route proofs.
+- Independent bounded review found no concrete integration regression and reproduced all six derivatives byte-for-byte in memory. Reviewer closed. Full district landmarks/story/act progression, routes, boss/ending and real-phone release acceptance remain open; no push/deploy/backend change.
+
+## September 24 Shadow Runner main integration and lossless atlases
+
+- Fast-forwarded the dedicated main checkout to bf08a5b9 while preserving rebuild changes and all upstream game work. Resolved four overlapping files; 226 non-overlapping pre-integration files remained byte-identical. Retained the integration autostash as a backup and left the older unrelated stash untouched.
+- Preserved shared landscape gating and soundtrack volume controls alongside bounded/cancellable audio lifetimes. Full integrated Jest: 296 suites, 2315 passed, 16 existing TODOs.
+- Eight custom terrain atlases now use lossless WebP with archived PNG provenance and exact visible RGBA regression checks. Removed verified duplicate runtime PNGs; saved 5,517,643 bytes. The integrated deployment payload now passes the unchanged 100MB cap at 92.22MiB. Updated runtime URLs and Level8/9/10 processing outputs.
+- Post-conversion: 69 focused Jest tests, 320 Node checks, lint, app typecheck and build pass. All 22 chapter/engine launch-pause checks pass; Chromium/WebKit each decode all eight atlases at authored dimensions. Evidence: output/playwright/runner-integrated-atlases-20260924-01. This is not full-route or real-phone performance proof.
+- Five-profile UI smoke passed its original checks, but visual review found a title/back-button text overlap. Expanded assertions reproduced it; compact landscape spacing fix passes all 51 surfaces on the rebuilt UI, including WebKit/Comfort, with reviewed screenshots. Evidence: output/playwright/runner-integrated-ui-20260924-02. Final Level10 launch/pause passes both engines; final runtime yfAiSLcB, Games BObss4Y4. Archive-only atlas regeneration reproduces all hashes. Full campaign art/story, Level9/10 routes, finale and release gates remain open. No rebuild commit, push, deploy, backend mutation or announcement.
 
 ## September 21 Shadow Circuit directional terrain polish
 
@@ -381,6 +528,203 @@
 - Checkpoints: modeled scene and visible preview; host/game integration and parity; rules, multiplayer, mobile and build verification.
 - Contract and evidence: [SHADOW_CHECKERS_UNITY.md](SHADOW_CHECKERS_UNITY.md).
 - Existing unrelated AGENT.md, AGENTS.md and docs/AGENT_REFERENCE.md edits remain untouched. The user authorized preparing the production replacement on September 13; main-only release checks are in progress. Routine screenshots are disabled.
+
+## September 8 Shadow Runner Campaign Rebuild
+
+- September24: fixed actual fallen-enemy physics recovery. Sprite-only placement
+  carried15px/31px of old fall motion into the floor at60/30fps; body reset now
+  preserves spawn contact and existing health. Three NPCs tested at30/60/120fps.
+  Relocated the existing Span Shield before the exposed approach with full bob
+  reach; WebKit collected it and crossed the bridge before a later death.
+  47Shadow Runner suites/894tests,317Node checks, lint/typecheck/build/budgets pass.
+  Fresh DNhwPwXV replay: Android cleared the Stalker but died at Murder Hall's
+  floor flame; WebKit cleared Span and died at15965 in the Inner pikeman fight.
+  Both had zero page errors; neither sampled an enemy-fall recovery, so that
+  fix's proof is the installed Arcade regression, not browser recovery yet.
+  Full routes/mastery remain unaccepted. All replay processes are terminal.
+- Read-only Foundry review identifies likely bomb knockback, not Lancer contact,
+  in the earlier west-edge death. Local main is five commits behind origin/main;
+  shared audio/orientation/package changes need integration without losing either
+  workstream. No push, deploy, backend mutation or scope reduction.
+
+- September12 phase/protection continuation: normal Relay strategy now clears
+  all seven phase undersides. CRPBoA1b run reached Flame4, then died while
+  waiting in archer fire; crouched-wait retry died earlier to Foundry knockback.
+  Full clear/repeatability remain open, not replaced by partial success.
+- Independent L9 review led to a finite bridge Shield at5600/558,9seconds,
+  4configured charges,0pickup points/no healing; actual block scoring and
+  stacking rules preserved. Full bob reach, single collection, expiry,
+  depletion and unchanged objectives tested.100focused Jest/317Node plus lint,
+  typecheck and D8aKiKum build/budgets pass. Both-engine input replay is pending.
+  No release, backend mutation or scope reduction.
+
+- September12 Catacombs depth pass: custom ImageGen panorama and genuine-alpha
+  hanging lantern, preserved masters/prompts, optimized derivatives and exact
+  manifest provenance. Two separate bounded layers honor live Comfort and pause.
+  Di-c5dCm/DnKSvZSp phone art checks pass on Chromium/WebKit, including ordinary
+  input, distinct camera rates, actual pixels, loaded assets and one canvas.
+  Latest art/catalog checks:315Node,116focused Jest, lint/typecheck/build pass.
+  Full-route spectral readability and normal/mastery acceptance remain open.
+- Latest late-level replays still fail: L9 died at the Murder Hall Jester before
+  reaching the grounded Rival change; L10 hit by a drone during phase boarding.
+  New production recovery gate stops Gearwing drones chaining dives outside
+  their patrol or before regaining flight height. Nine regression cases failed
+  before and pass after;58focused AI/lifecycle/boss tests pass. CRPBoA1b replay
+  cleared the full Foundry sequence through both guards, gaps07-09 and Flame2;
+  died below phase04 at gap10. Fresh phase boarding is the next strategy to test.
+  Full-level/repeated survival remains open. No push, deploy or backend mutation.
+
+- September12 continuation: generated and integrated Candle Fair panorama/thumbnail
+  with preserved ImageGen master/prompt, provenance, bounded Comfort-aware movement
+  and reviewed Chromium/WebKit phone launch/pause screenshots. Phase02 input strategy
+  now witnesses fresh solidity, boards, then descends crouched; late normal routes
+  remain under replay. L9 Span/Inner strategy reviewed from actual damage/wind traces.
+  Full308Node checks, lint, typecheck and DFLQg13v build/budgets pass. Full Jest refresh
+  completed:290suites/2279tests pass,16pre-existing auth-invite TODOs remain.
+  No release or scope reduction.
+- Latest frozen DFLQg13v input evidence: L10 phase boarding, crouched descent,
+  Chrono, stair, drone kill, gap07 and Aether succeeded within a natural run.
+  Standing grenade-fight input then released bracing in active wind and died;
+  the next fix is supported braced combat. L9 Rival survival is variable and
+  prevented the revised Span/Inner strategy from being reached in the latest run.
+  Neither level has a full accepted normal clear. Latest Node310/310 pass.
+
+- September12 resume: old workers are confirmed absent; full scope is resumed,
+  not reduced to the release-only estimate. Captain's seven access/recovery
+  shelves and dedicated optional Moonwell Sunsteel are integrated from passing
+  actual-Arcade proposals; the pickup adds no healing or score and preserves
+  the ground combat pickup. A failing regression exposed the Moonwell normal
+  landing inside a lift shaft; the deck extends30px and normal/mastery target
+  its clear east apron after observed wind rest.153focused Jest/35Captain Node
+  checks and fresh application typecheck pass. Full browser survival, mastery,
+  final campaign/art/finale acceptance and deployment remain open. No push.
+- September9 acceptance checkpoint: L8 Android ordinary route now clears with
+  all3seals,12HP/3lives and zero deaths/pageerrors on DD4iaELO/BCPRIUrO.
+  Actual L9 exact-overlap melee failure is fixed with86focused passing checks.
+  Fresh L9/L10 ordinary attempts still expose wind/projectile survival risks;
+  bounded observed wind timing and destination-landing input corrections are
+  being replayed. Driver/Relay63Node checks pass. Full Jest was284/289suites,
+  2206/2231tests passing,9failures/16TODOs, not accepted. Loading dialog overlap
+  and stale tutorial smoke text now have18/38passing targeted checks; remaining
+  Captain/NPC fixture failures are under review. No release; goal remains open.
+- September9 late-route batch: widened the L8 Vault launch corridor, restaged
+  ten L9/L10 roof-intersecting NPCs and added ground-NPC roof collision. Four
+  Sovereign tell/cancellation/beam defects now have passing regressions. L10
+  upper routes and lift shafts are integrated using existing generated masonry;
+  91 live-config physics checks include all eight lift board/carry/exit paths.
+  Frozen D_fQu21F/BnkhcSnl build passes budgets; ordinary L8/L9 input replays
+  run next. Earlier CcpzYQAN natural-death failures remain preserved. All late
+  normal/mastery route acceptance and final release remain open; no push.
+- September9 resumed: ceiling-safe shared lift carry and calibrated moving deck
+  art are integrated. Four Captain shafts now have full-body lateral clearance,
+  with unchanged pace/height and no enemy spawn move.67 helper/shaft/bridge and
+  70 shaft/geometry/config checks pass; full lint/build/budgets pass. Frozen
+  CcpzYQAN/Drx-lVfx build is in ordinary L8/L9 Android replay. Echo route now
+  verifies its natural Mirror Ward before exit;34 policy checks pass. Captain
+  mastery targets need updating for the new shafts; L10 access/NPC/boss work
+  remains active. Neither final acceptance nor release is claimed.
+- September9 00:30ET: input-only L9 exposed a real projectile/tilt callback
+  argument-order crash. Actual PhysicsGroup regression reproduces it then
+  passes with cap-first dispatch.137focused tests/scopedlint/type/build pass.
+  Actors now draw above terrain so feet/crouch bodies stay visible. New frozen
+  CAWCh3Br/pvZdJTZM build awaits visual retake and ordinary L9 input replay.
+  L8 reaches later Echo passages but survival policy is still being refined;
+  high mastery access and player lift/ceiling audits remain open. No release.
+- September9: L5 Android input-only mastery clears44coins/all10enemies;
+  L7 normal clears all3required shards. Both deathless, zero pageerrors.
+  Captain bridge art now anchors actual deck row147, not decorative rail101;
+  body geometry unchanged.98focused tests/type/build pass. New frozen build
+  C-4U6pus/bftSXMf_; fresh two-engine contact screenshots run next.
+- M2 behavior accepted with an explicit WebKit unload-fetch diagnostic limit:
+  standalone caught-fetch and signed-out non-Runner controls reproduce it.
+  Raw80/81,17/18 and23/27 records are preserved, not called console-clean.
+- Ten fresh bridge idle/jump cases pass across both engines, with native/capped
+  rendering and documented NPC isolation. WebKit actual48-53/20-21fps, not60/30.
+  Walk/crouch/end-fall evidence is older uninterrupted trials and physics tests.
+  Thirty actual-Arcade crouch checks
+  cover29 passages plus a negative control; no geometry correction needed.
+  Captain bridge plank contact still has a visual review open. Late routes run next.
+- Fresh DRzpbwV9/Cs_BzWrF build fixes browser-confirmed tilt exit cleanup after
+  Arcade nulls its world. Actual plugin shutdown/destroy regressions reproduce
+  the failure then pass;132 focused tests, scoped lint/typecheck/build pass.
+  Fresh WebKit journal and bridge quit/replay browser retakes remain required.
+- Moving-lift audit:13 lifts,14 intersecting patrol pairs,90 installed-Phaser
+  cases; no enemy trap/fall/reset reproduced. Keep spawns. Transient NPC/lift
+  penetration remains a visual collision follow-up, not accepted gameplay.
+  Browser matrix retains exclusive use of frozen ahbG1Kyp/DMsuHE_K.
+- Direct-main release is explicitly authorized after the remaining gates pass.
+  Fresh correlated WebKit narrative retake and late mastery routes remain open;
+  no push/deploy or production data mutation has occurred.
+- Fresh integrated build ahbG1Kyp/DMsuHE_K passes typecheck/build/budgets
+  (86.53MiB417files),161 focused integration tests and19 asset checks. Whole
+  enemy poses, actual rotating-deck contact and supported Captain seal layout
+  are integrated. Two-engine bridge diagnostics run next; no release yet.
+- 23:02ET source checkpoint: L8 recovery crawl and L10 Choir exit traps corrected
+  with actual-body tests; original enemy-pose recovery and rotating bridge
+  integration underway. L8-L10 normal candidates are wired, not yet played.
+  L10 harness now observes powers/objectives/boss death and the four ending
+  buttons without fabricating progress.49 focused contracts pass.
+- Chromium soundtrack lifecycle passes actual playback; local Windows WebKit
+  lacks Web Audio entirely, so only its graceful silent fallback is verified.
+  Physical iPhone audio/lock-screen checks remain open.
+- Latest verified snapshot CUiitMrL:22/22 all-chapter phone launches/pause pass;
+  calibrated ground contact reviewed on Candle/Clockmaker/Relay screenshots;
+  compact checkpoint art12/12 checks pass. Rebuilt tutorial/East Gate normal
+  and mastery cleared in both engines, eight deathless ordinary-input wins.
+- L6 Chromium normal now clears with12HP/three lives,22coins and10of12enemies.
+  L7 first shard and two checkpoints traversed, then an optional stalker fight
+  stalled. Trace exposed an enemy spawned12px inside its floor and resetting
+  under the map. Targeted correction and all-grounded-spawn audit are underway.
+- Static terrain art has28 calibrated contact frames. New custom ImageGen
+  masonry covers24 Relay and five Captain rectangular steps/cover. Captain is
+  source-only after CUiitMrL;84 focused tests and six asset checks pass.
+- A newly confirmed Lancer atlas-cutting defect splits nonuniform source poses
+  between frames. Replacement sprite source/processing is in progress; rejected
+  opaque checkerboard drafts are not runtime assets. Bridge geometry has47
+  isolated tests, but integrated rotating-contact work remains open.
+- No rebuild commit, push, database mutation, deployment or announcement yet.
+
+- Active goal: audit and rebuild tutorial plus all ten levels on `main` in
+  `C:/repos/chat2.0-main`; source/live baseline `aefb1e5c` verified.
+- Scope, 29 ranked findings, chapter outline, custom art production brief and
+  acceptance gates: [Shadow Runner Rebuild](../SHADOW_RUNNER_REBUILD_2026-09.md).
+- Complete: three independent source/geometry/UI-art audits, linked catalog
+  read, existing two-engine Level10 smoke, 22 all-level phone launch/pause cases.
+- In progress: M1 runtime recovery/timing/collision, account-safe progress and
+  loading, impossible-item and crouch geometry repairs. M2 phone presentation
+  and story foundation begins alongside disjoint reliability patches.
+- Historical first input-only wins: tutorial and route 1, keyboard and button
+  movement on both engines; eight wins, no deaths, both route-1 enemies defeated.
+  Tutorial geometry has since been rebuilt; its previous proofs are historical.
+  These do not prove all coins or perfection. Evidence is retained under
+  `output/playwright/runner-input-proof-*` with inputs, trajectories and hashes.
+- M2 integration: readable chapter list plus illustrated map, Continue Journey,
+  saved best-run display, dispatch journal, portrait menus, Comfort sound gates,
+  and truthful save-status details. Engine alone loads required route assets.
+- Full app Jest: 259 suites passed, 1,619 tests passed, 16 todo. Subsequent
+  ending component adds eight passing focused tests; totals overlap.
+- L2-L4 input-only normal/mastery sweep: 11 of 12 engine/mode cases passed.
+  Chromium L4 mastery died naturally at the second archer; WebKit full clear
+  passed. Preserve that failure for difficulty review, not a completion claim.
+- Ending now has player-paced relay ignition, two new custom ImageGen scenes,
+  keyboard focus containment, image retry and replay without duplicate credit.
+  Fresh two-engine finale/compact acceptance passed. Compact title overlap was caught by
+  screenshot review and patched with an explicit overlap regression assertion.
+- Lifecycle stale-debug cleanup is fixed: six cases and 78 checks passed on
+  both engines, with no retained destroyed-scene references.
+- Shared pickup centers now match scaled, bobbing sprites. L5 original crouch
+  coin and gauntlet shield passed real-input retakes. Chromium L5 normal cleared
+  all ten enemies with no deaths; mastery and L6 route work remain open.
+- Tutorial now teaches jump/double-jump/crouch/combat in a forgiving 2,760px
+  courtyard. Twenty-two earned local story notes and a paused journal are wired.
+- New Ivy, Bell Tower and Clockmaker backgrounds join opening/Market/Causeway
+  art. Geometry-aware generated checkpoint wayposts add no collision bodies.
+  Fresh build and budgets passed (86.25 MiB payload); 22 phone launch/art checks
+  and new narrative UI acceptance are running next.
+- Open: remaining input-only complete routes, all mastery paths, new art rollout, combat
+  balance, repeated lifecycle/performance and physical-device validation.
+- No rebuild release or announcement posted. Passing diagnostic teleports do
+  not count as legitimate playthrough proof.
 
 ## Documentation Status - July 15, 2026
 

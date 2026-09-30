@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
@@ -11,6 +12,84 @@ import { SHADOW_RUNNER_ASSETS } from '../src/features/games/shadow-runner/assets
 const repoRoot = path.resolve(fileURLToPath(new URL('..', import.meta.url)))
 const publicRoot = path.join(repoRoot, 'public')
 const runnerPublicRoot = path.join(publicRoot, 'games', 'shadow-runner')
+
+test('lossless terrain atlases preserve every visible source pixel and archive provenance', async () => {
+  const archive = 'source-assets/shadow-runner/optimized-atlases/'
+  const runtime = 'public/games/shadow-runner/level-assets/'
+  const records = JSON.parse(readFileSync(path.join(repoRoot, archive, 'manifest.json'), 'utf8'))
+  assert.equal(records.length, 8)
+  assert.equal(new Set(records.map(record => record.output)).size, 8)
+  const urls = new Set(flattenAssetUrls(SHADOW_RUNNER_ASSETS))
+  const hash = bytes => createHash('sha256').update(bytes).digest('hex')
+  let savedBytes = 0
+  for (const record of records) {
+    assert.ok(record.source.startsWith(archive) && !record.source.includes('..'))
+    assert.equal(record.originalRuntime, runtime + record.source.slice(archive.length))
+    assert.equal(record.output, record.originalRuntime.replace(/\.png$/, '.webp'))
+    assert.ok(urls.has(record.output.replace(/^public/, '')), record.output)
+    assert.equal(existsSync(path.join(repoRoot, record.originalRuntime)), false, 'Do not deploy duplicate PNGs')
+    const source = readFileSync(path.join(repoRoot, record.source))
+    const output = readFileSync(path.join(repoRoot, record.output))
+    assert.equal(hash(source), record.sourceSha256)
+    assert.equal(hash(output), record.sha256)
+    assert.equal(source.length, record.originalBytes)
+    assert.equal(output.length, record.bytes)
+    assert.equal(record.encoding, 'lossless-webp')
+    assert.ok(output.length < source.length)
+    const original = await sharp(source).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    const encoded = await sharp(output).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    for (const decoded of [original, encoded]) {
+      assert.deepEqual([decoded.info.width, decoded.info.height, decoded.info.channels], [record.width, record.height, 4])
+      for (let pixel = 0; pixel < decoded.data.length; pixel += 4) {
+        if (decoded.data[pixel + 3] === 0) decoded.data.fill(0, pixel, pixel + 3)
+      }
+    }
+    assert.ok(original.data.equals(encoded.data), `Visible pixel mismatch: ${record.output}`)
+    assert.equal(hash(encoded.data), record.visibleRgbaSha256)
+    savedBytes += source.length - output.length
+  }
+  assert.ok(savedBytes > 5_000_000, `Expected meaningful deploy savings, got ${savedBytes}`)
+})
+
+test('rebuild art retains source provenance, optimized bounds and genuine terrain transparency', async () => {
+  const sourceRoot = path.join(repoRoot, 'source-assets/shadow-runner/rebuild')
+  const records = JSON.parse(readFileSync(path.join(sourceRoot, 'processed-manifest.json'), 'utf8'))
+  const art = [SHADOW_RUNNER_ASSETS.rebuild, SHADOW_RUNNER_ASSETS.storyLandmarks, SHADOW_RUNNER_ASSETS.districtDepth]
+  assert.deepEqual(records.map(item => `/games/shadow-runner/rebuild/${item.filename}`).sort(), art.flatMap(Object.values).sort())
+  for (const record of records) {
+    const bytes = readFileSync(path.join(runnerPublicRoot, 'rebuild', record.filename))
+    const original = readFileSync(path.join(sourceRoot, record.source))
+    const image = await sharp(bytes).metadata()
+    assert.equal(createHash('sha256').update(bytes).digest('hex'), record.sha256, record.filename)
+    assert.equal(createHash('sha256').update(original).digest('hex'), record.sourceSha256, record.source)
+    assert.deepEqual([image.width, image.height, bytes.length], [record.width, record.height, record.bytes])
+    assert.ok(bytes.length <= 300_000, `${record.filename} exceeds its reviewed per-image budget`)
+    if (record.filename.includes('waypost')) {
+      assert.equal(image.hasAlpha, true, 'Waypost must not ship a baked checkerboard')
+      const { data, info } = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      const alpha = []
+      for (let index = 3; index < data.length; index += info.channels) alpha.push(data[index])
+      assert.ok(alpha.filter(value => value === 0).length > info.width * info.height / 4)
+      assert.ok(alpha.some(value => value >= 250), 'Waypost needs a visible opaque core')
+      const occupiedRows = Array.from({ length: info.height }, (_, y) =>
+        Array.from({ length: info.width }, (_, x) => data[(y * info.width + x) * 4 + 3]).some(value => value > 128))
+      assert.ok(occupiedRows.findIndex(Boolean) <= 2, 'Waypost top must not be buried in a padded frame')
+      assert.ok(occupiedRows.lastIndexOf(true) >= info.height - 3, 'Waypost feet must meet the bottom-origin anchor')
+      assert.ok(occupiedRows.filter(Boolean).length >= info.height * 0.9, 'Waypost cannot shrink inside its own frame')
+    }
+    if (record.filename.includes('walkway')) {
+      assert.equal(image.hasAlpha, true)
+      const { data, info } = await sharp(bytes).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      let transparent = 0
+      let opaque = 0
+      for (let index = 3; index < data.length; index += info.channels) {
+        if (data[index] === 0) transparent += 1
+        if (data[index] >= 250) opaque += 1
+      }
+      assert.ok(transparent > 0 && opaque > info.width * info.height / 2, 'Terrain needs real alpha and a substantial opaque body')
+    }
+  }
+})
 const runtimeCatalogPath = path.join(
   repoRoot,
   'src',
@@ -48,7 +127,7 @@ const LEVEL_NINE_DIMENSIONS = new Map([
   [SHADOW_RUNNER_ASSETS.levels.captainGateThumbnail160, [160, 90]],
   [SHADOW_RUNNER_ASSETS.levels.captainGateThumbnail320, [320, 180]],
   [SHADOW_RUNNER_ASSETS.enemies.gatePikemanStrip, [768, 128]],
-  [SHADOW_RUNNER_ASSETS.enemies.stormGrenadierStrip, [768, 128]],
+  [SHADOW_RUNNER_ASSETS.enemies.stormGrenadierStrip, [1536, 128]],
   [SHADOW_RUNNER_ASSETS.enemies.watchCaptainStrip, [1024, 128]],
   [SHADOW_RUNNER_ASSETS.levels.galeMantleStrip, [256, 64]],
   [SHADOW_RUNNER_ASSETS.levels.sunsteelEdgeStrip, [256, 64]],
@@ -63,10 +142,10 @@ const LEVEL_TEN_DIMENSIONS = new Map([
   [SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireProps, [1536, 1024]],
   [SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireThumbnail160, [160, 90]],
   [SHADOW_RUNNER_ASSETS.levels.dawnRelaySpireThumbnail320, [320, 180]],
-  [SHADOW_RUNNER_ASSETS.enemies.relayLancerStrip, [768, 128]],
-  [SHADOW_RUNNER_ASSETS.enemies.prismCasterStrip, [768, 128]],
-  [SHADOW_RUNNER_ASSETS.enemies.gearwingDroneStrip, [768, 128]],
-  [SHADOW_RUNNER_ASSETS.enemies.sentrySovereignStrip, [1920, 192]],
+  [SHADOW_RUNNER_ASSETS.enemies.relayLancerStrip, [1536, 128]],
+  [SHADOW_RUNNER_ASSETS.enemies.prismCasterStrip, [1536, 128]],
+  [SHADOW_RUNNER_ASSETS.enemies.gearwingDroneStrip, [1536, 192]],
+  [SHADOW_RUNNER_ASSETS.enemies.sentrySovereignStrip, [3840, 192]],
   [SHADOW_RUNNER_ASSETS.levels.dawnfireAegisStrip, [256, 64]],
   [SHADOW_RUNNER_ASSETS.levels.aetherStepStrip, [256, 64]],
   [SHADOW_RUNNER_ASSETS.levels.relayFlameStrip, [256, 64]],

@@ -1,0 +1,1026 @@
+{
+  "schemaVersion": 1,
+  "key": "gearwing-drone",
+  "sourceSha256": "3b6dfac1899d37572291ac99b73a8d215fa04747d0019b41aa6a7f2f47545ed7",
+  "legacySha256": "30be76e24cf43d529836444f4d437f4ec7460f3de13ac9f9b02e6dfa7889fda9",
+  "sourceDimensions": {
+    "width": 1536,
+    "height": 1024
+  },
+  "segmentation": "8-connected alpha > 0; every source component owned exactly once",
+  "sourceScale": 0.3575757575757576,
+  "sourceVisiblePixels": 129967,
+  "anchorKind": "reviewed central chassis, excluding wings, beak and effects",
+  "targetAnchor": {
+    "x": 128,
+    "y": 130
+  },
+  "review": "Full poses are separated by transparent corridors. Whole-component containment is required even for these ROIs. Extra 64px vertical padding retains source scale and lets chassis center match the unchanged world collision-body center.",
+  "recommendedCatalog": {
+    "frameCount": 6,
+    "frameWidth": 256,
+    "frameSize": 192,
+    "scale": 0.76,
+    "body": {
+      "width": 56,
+      "height": 44,
+      "offsetX": 100,
+      "offsetY": 108
+    }
+  },
+  "legacyWorldBodyRect": {
+    "left": -21.28,
+    "top": -63.84,
+    "width": 42.56,
+    "height": 33.44
+  },
+  "recommendedWorldBodyRect": {
+    "left": -21.28,
+    "top": -63.84,
+    "width": 42.56,
+    "height": 33.44
+  },
+  "frames": [
+    {
+      "name": "flight-folded",
+      "frame": 1,
+      "sourceBounds": {
+        "left": 24,
+        "top": 410,
+        "width": 179,
+        "height": 185
+      },
+      "sourceAnchor": {
+        "x": 142,
+        "y": 514
+      },
+      "sourceComponents": [
+        {
+          "id": 15,
+          "pixels": 14416,
+          "left": 24,
+          "top": 410,
+          "width": 179,
+          "height": 185
+        }
+      ],
+      "sourceVisiblePixels": 14416,
+      "placement": {
+        "left": 86,
+        "top": 93,
+        "width": 64,
+        "height": 66,
+        "transformedAnchor": {
+          "x": 128.18994413407822,
+          "y": 130.1027027027027
+        }
+      },
+      "cropSha256": "8598e89fdaa6ede06354b575f10a34a1d621ecac6163668a49cce89130e49a12",
+      "frameSha256": "727b9241a863a331a49dabe56e7fe94b6e4971886da31f5bc078145e2bb07843"
+    },
+    {
+      "name": "flight-raised",
+      "frame": 2,
+      "sourceBounds": {
+        "left": 253,
+        "top": 299,
+        "width": 236,
+        "height": 296
+      },
+      "sourceAnchor": {
+        "x": 392,
+        "y": 516
+      },
+      "sourceComponents": [
+        {
+          "id": 1,
+          "pixels": 30229,
+          "left": 253,
+          "top": 299,
+          "width": 236,
+          "height": 296
+        }
+      ],
+      "sourceVisiblePixels": 30229,
+      "placement": {
+        "left": 79,
+        "top": 52,
+        "width": 84,
+        "height": 106,
+        "transformedAnchor": {
+          "x": 128.47457627118644,
+          "y": 129.70945945945945
+        }
+      },
+      "cropSha256": "0fc9243237b558cdf2da8dbd9512d417d78fc380321995ff29f82fb13ca957f0",
+      "frameSha256": "8033572f4a8726fcebed7b66b9b4a5ba034de8d73b5082278d48f7b0b1cae59b"
+    },
+    {
+      "name": "dive-charge",
+      "frame": 3,
+      "sourceBounds": {
+        "left": 528,
+        "top": 320,
+        "width": 235,
+        "height": 331
+      },
+      "sourceAnchor": {
+        "x": 692,
+        "y": 561
+      },
+      "sourceComponents": [
+        {
+          "id": 2,
+          "pixels": 2265,
+          "left": 531,
+          "top": 320,
+          "width": 72,
+          "height": 143
+        },
+        {
+          "id": 3,
+          "pixels": 3,
+          "left": 600,
+          "top": 325,
+          "width": 1,
+          "height": 3
+        },
+        {
+          "id": 4,
+          "pixels": 1107,
+          "left": 587,
+          "top": 329,
+          "width": 37,
+          "height": 105
+        },
+        {
+          "id": 5,
+          "pixels": 22932,
+          "left": 551,
+          "top": 353,
+          "width": 212,
+          "height": 298
+        },
+        {
+          "id": 6,
+          "pixels": 2,
+          "left": 628,
+          "top": 359,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 7,
+          "pixels": 78,
+          "left": 630,
+          "top": 362,
+          "width": 16,
+          "height": 22
+        },
+        {
+          "id": 8,
+          "pixels": 6,
+          "left": 635,
+          "top": 385,
+          "width": 1,
+          "height": 6
+        },
+        {
+          "id": 11,
+          "pixels": 1,
+          "left": 528,
+          "top": 399,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 27,
+          "pixels": 1,
+          "left": 616,
+          "top": 435,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 56,
+          "pixels": 1,
+          "left": 605,
+          "top": 465,
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "sourceVisiblePixels": 26396,
+      "placement": {
+        "left": 69,
+        "top": 44,
+        "width": 84,
+        "height": 118,
+        "transformedAnchor": {
+          "x": 127.62127659574469,
+          "y": 129.9154078549849
+        }
+      },
+      "cropSha256": "cd53f3e550e2ab54d7b559462b3185d70f6231a1daf7e01e347c34c3cfa92de2",
+      "frameSha256": "b046b6838c889218d933e50b53f69d7f0bfee8615323f3cdb43cd22d5c8a979a"
+    },
+    {
+      "name": "dive-release",
+      "frame": 4,
+      "sourceBounds": {
+        "left": 818,
+        "top": 387,
+        "width": 257,
+        "height": 250
+      },
+      "sourceAnchor": {
+        "x": 988,
+        "y": 567
+      },
+      "sourceComponents": [
+        {
+          "id": 9,
+          "pixels": 24488,
+          "left": 820,
+          "top": 387,
+          "width": 255,
+          "height": 250
+        },
+        {
+          "id": 13,
+          "pixels": 1,
+          "left": 830,
+          "top": 402,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 14,
+          "pixels": 1,
+          "left": 836,
+          "top": 407,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 16,
+          "pixels": 3,
+          "left": 840,
+          "top": 410,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 17,
+          "pixels": 5,
+          "left": 844,
+          "top": 413,
+          "width": 5,
+          "height": 5
+        },
+        {
+          "id": 18,
+          "pixels": 2,
+          "left": 865,
+          "top": 415,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 19,
+          "pixels": 3,
+          "left": 850,
+          "top": 418,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 20,
+          "pixels": 1,
+          "left": 870,
+          "top": 419,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 21,
+          "pixels": 2,
+          "left": 854,
+          "top": 421,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 22,
+          "pixels": 1,
+          "left": 874,
+          "top": 422,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 23,
+          "pixels": 10,
+          "left": 858,
+          "top": 424,
+          "width": 8,
+          "height": 7
+        },
+        {
+          "id": 26,
+          "pixels": 7,
+          "left": 868,
+          "top": 432,
+          "width": 7,
+          "height": 6
+        },
+        {
+          "id": 30,
+          "pixels": 3,
+          "left": 876,
+          "top": 438,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 31,
+          "pixels": 1,
+          "left": 856,
+          "top": 439,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 40,
+          "pixels": 1,
+          "left": 863,
+          "top": 445,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 45,
+          "pixels": 1,
+          "left": 868,
+          "top": 449,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 50,
+          "pixels": 2,
+          "left": 874,
+          "top": 454,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 53,
+          "pixels": 3,
+          "left": 877,
+          "top": 456,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 55,
+          "pixels": 1,
+          "left": 881,
+          "top": 460,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 57,
+          "pixels": 1,
+          "left": 899,
+          "top": 466,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 73,
+          "pixels": 6,
+          "left": 818,
+          "top": 517,
+          "width": 6,
+          "height": 6
+        },
+        {
+          "id": 75,
+          "pixels": 115,
+          "left": 826,
+          "top": 524,
+          "width": 47,
+          "height": 39
+        },
+        {
+          "id": 79,
+          "pixels": 2,
+          "left": 831,
+          "top": 554,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 81,
+          "pixels": 3,
+          "left": 874,
+          "top": 563,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 89,
+          "pixels": 3,
+          "left": 913,
+          "top": 597,
+          "width": 3,
+          "height": 3
+        },
+        {
+          "id": 90,
+          "pixels": 1,
+          "left": 917,
+          "top": 600,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 91,
+          "pixels": 2,
+          "left": 847,
+          "top": 603,
+          "width": 2,
+          "height": 1
+        },
+        {
+          "id": 95,
+          "pixels": 1,
+          "left": 936,
+          "top": 630,
+          "width": 1,
+          "height": 1
+        }
+      ],
+      "sourceVisiblePixels": 24670,
+      "placement": {
+        "left": 67,
+        "top": 66,
+        "width": 92,
+        "height": 89,
+        "transformedAnchor": {
+          "x": 127.85603112840467,
+          "y": 130.07999999999998
+        }
+      },
+      "cropSha256": "d164aa5bf3d4bf8879f8ae76864090596cab2e77cc55211bb7bb8fddd93c670c",
+      "frameSha256": "40e7be2b9b66018e29c62dd2dae1540b79bc8d3002da173ca037e719a706912d"
+    },
+    {
+      "name": "hit",
+      "frame": 5,
+      "sourceBounds": {
+        "left": 1084,
+        "top": 398,
+        "width": 193,
+        "height": 236
+      },
+      "sourceAnchor": {
+        "x": 1198,
+        "y": 539
+      },
+      "sourceComponents": [
+        {
+          "id": 10,
+          "pixels": 18103,
+          "left": 1091,
+          "top": 398,
+          "width": 186,
+          "height": 223
+        },
+        {
+          "id": 12,
+          "pixels": 371,
+          "left": 1217,
+          "top": 401,
+          "width": 25,
+          "height": 29
+        },
+        {
+          "id": 24,
+          "pixels": 2,
+          "left": 1239,
+          "top": 427,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 25,
+          "pixels": 115,
+          "left": 1242,
+          "top": 429,
+          "width": 22,
+          "height": 52
+        },
+        {
+          "id": 28,
+          "pixels": 1,
+          "left": 1199,
+          "top": 435,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 29,
+          "pixels": 1,
+          "left": 1204,
+          "top": 437,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 32,
+          "pixels": 319,
+          "left": 1097,
+          "top": 439,
+          "width": 25,
+          "height": 26
+        },
+        {
+          "id": 33,
+          "pixels": 1,
+          "left": 1210,
+          "top": 439,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 34,
+          "pixels": 1,
+          "left": 1098,
+          "top": 440,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 35,
+          "pixels": 1,
+          "left": 1213,
+          "top": 440,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 36,
+          "pixels": 45,
+          "left": 1084,
+          "top": 441,
+          "width": 13,
+          "height": 25
+        },
+        {
+          "id": 37,
+          "pixels": 1,
+          "left": 1215,
+          "top": 441,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 38,
+          "pixels": 1,
+          "left": 1217,
+          "top": 442,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 39,
+          "pixels": 1,
+          "left": 1219,
+          "top": 443,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 41,
+          "pixels": 1,
+          "left": 1223,
+          "top": 445,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 42,
+          "pixels": 1,
+          "left": 1225,
+          "top": 446,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 43,
+          "pixels": 1,
+          "left": 1227,
+          "top": 447,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 44,
+          "pixels": 1,
+          "left": 1229,
+          "top": 448,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 46,
+          "pixels": 1,
+          "left": 1231,
+          "top": 449,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 48,
+          "pixels": 2,
+          "left": 1234,
+          "top": 451,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 49,
+          "pixels": 1,
+          "left": 1237,
+          "top": 453,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 52,
+          "pixels": 1,
+          "left": 1240,
+          "top": 455,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 54,
+          "pixels": 7,
+          "left": 1245,
+          "top": 459,
+          "width": 7,
+          "height": 7
+        },
+        {
+          "id": 58,
+          "pixels": 1,
+          "left": 1095,
+          "top": 467,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 59,
+          "pixels": 2,
+          "left": 1097,
+          "top": 468,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 60,
+          "pixels": 1,
+          "left": 1100,
+          "top": 470,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 61,
+          "pixels": 1,
+          "left": 1102,
+          "top": 471,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 62,
+          "pixels": 1,
+          "left": 1265,
+          "top": 481,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 63,
+          "pixels": 2,
+          "left": 1250,
+          "top": 483,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 64,
+          "pixels": 3,
+          "left": 1128,
+          "top": 486,
+          "width": 3,
+          "height": 1
+        },
+        {
+          "id": 65,
+          "pixels": 2,
+          "left": 1246,
+          "top": 486,
+          "width": 2,
+          "height": 1
+        },
+        {
+          "id": 66,
+          "pixels": 1,
+          "left": 1268,
+          "top": 486,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 67,
+          "pixels": 3,
+          "left": 1132,
+          "top": 487,
+          "width": 3,
+          "height": 1
+        },
+        {
+          "id": 68,
+          "pixels": 1,
+          "left": 1244,
+          "top": 487,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 69,
+          "pixels": 1,
+          "left": 1137,
+          "top": 488,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 70,
+          "pixels": 1,
+          "left": 1241,
+          "top": 488,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 71,
+          "pixels": 2,
+          "left": 1140,
+          "top": 489,
+          "width": 2,
+          "height": 1
+        },
+        {
+          "id": 77,
+          "pixels": 1,
+          "left": 1266,
+          "top": 544,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 78,
+          "pixels": 32,
+          "left": 1256,
+          "top": 547,
+          "width": 12,
+          "height": 24
+        },
+        {
+          "id": 84,
+          "pixels": 6,
+          "left": 1251,
+          "top": 571,
+          "width": 4,
+          "height": 4
+        },
+        {
+          "id": 85,
+          "pixels": 2,
+          "left": 1248,
+          "top": 575,
+          "width": 2,
+          "height": 2
+        },
+        {
+          "id": 86,
+          "pixels": 1,
+          "left": 1246,
+          "top": 577,
+          "width": 1,
+          "height": 1
+        },
+        {
+          "id": 87,
+          "pixels": 6,
+          "left": 1239,
+          "top": 578,
+          "width": 6,
+          "height": 2
+        },
+        {
+          "id": 93,
+          "pixels": 296,
+          "left": 1201,
+          "top": 609,
+          "width": 24,
+          "height": 25
+        }
+      ],
+      "sourceVisiblePixels": 19345,
+      "placement": {
+        "left": 87,
+        "top": 80,
+        "width": 69,
+        "height": 84,
+        "transformedAnchor": {
+          "x": 127.75647668393782,
+          "y": 130.18644067796612
+        }
+      },
+      "cropSha256": "e715013519539b612fa8a22d3082e078c7f71ec538311e78176dab1b2c195b98",
+      "frameSha256": "a0012a95f88211bfeefeab67460570b89bcd33f0a0ecd6cde2677f4981c93103"
+    },
+    {
+      "name": "defeated",
+      "frame": 6,
+      "sourceBounds": {
+        "left": 1305,
+        "top": 449,
+        "width": 208,
+        "height": 216
+      },
+      "sourceAnchor": {
+        "x": 1418,
+        "y": 585
+      },
+      "sourceComponents": [
+        {
+          "id": 47,
+          "pixels": 7,
+          "left": 1365,
+          "top": 449,
+          "width": 2,
+          "height": 4
+        },
+        {
+          "id": 51,
+          "pixels": 12931,
+          "left": 1325,
+          "top": 454,
+          "width": 188,
+          "height": 203
+        },
+        {
+          "id": 72,
+          "pixels": 9,
+          "left": 1431,
+          "top": 513,
+          "width": 3,
+          "height": 6
+        },
+        {
+          "id": 74,
+          "pixels": 193,
+          "left": 1479,
+          "top": 519,
+          "width": 17,
+          "height": 19
+        },
+        {
+          "id": 76,
+          "pixels": 60,
+          "left": 1466,
+          "top": 538,
+          "width": 9,
+          "height": 10
+        },
+        {
+          "id": 80,
+          "pixels": 47,
+          "left": 1499,
+          "top": 562,
+          "width": 9,
+          "height": 9
+        },
+        {
+          "id": 82,
+          "pixels": 47,
+          "left": 1334,
+          "top": 565,
+          "width": 9,
+          "height": 9
+        },
+        {
+          "id": 83,
+          "pixels": 194,
+          "left": 1305,
+          "top": 567,
+          "width": 17,
+          "height": 20
+        },
+        {
+          "id": 88,
+          "pixels": 194,
+          "left": 1486,
+          "top": 581,
+          "width": 20,
+          "height": 19
+        },
+        {
+          "id": 92,
+          "pixels": 13,
+          "left": 1477,
+          "top": 604,
+          "width": 8,
+          "height": 3
+        },
+        {
+          "id": 94,
+          "pixels": 951,
+          "left": 1315,
+          "top": 614,
+          "width": 40,
+          "height": 41
+        },
+        {
+          "id": 96,
+          "pixels": 137,
+          "left": 1451,
+          "top": 645,
+          "width": 13,
+          "height": 15
+        },
+        {
+          "id": 97,
+          "pixels": 15,
+          "left": 1407,
+          "top": 652,
+          "width": 5,
+          "height": 6
+        },
+        {
+          "id": 98,
+          "pixels": 81,
+          "left": 1371,
+          "top": 653,
+          "width": 17,
+          "height": 10
+        },
+        {
+          "id": 99,
+          "pixels": 29,
+          "left": 1438,
+          "top": 657,
+          "width": 10,
+          "height": 6
+        },
+        {
+          "id": 100,
+          "pixels": 3,
+          "left": 1384,
+          "top": 664,
+          "width": 3,
+          "height": 1
+        }
+      ],
+      "sourceVisiblePixels": 14911,
+      "placement": {
+        "left": 88,
+        "top": 82,
+        "width": 74,
+        "height": 77,
+        "transformedAnchor": {
+          "x": 128.2019230769231,
+          "y": 130.48148148148147
+        }
+      },
+      "cropSha256": "dde29a111c0c0cd806ed7fcf7ad3f54c76d1a7fcbae259482a9184a14b8ffe01",
+      "frameSha256": "d69c5642ac6f6ba70d4f462f565af572b970f1cb401b528e88da66d4a836d55e"
+    }
+  ],
+  "stripSha256": "f4ba1b93627823eae095766c54895143f80f0956d4afbc6524ad288baa8d3da8",
+  "stripBytes": 67420,
+  "decodedRgbaBytes": 1179648,
+  "sourcePath": "source-assets/shadow-runner/level-assets/level-10/gearwing-drone-v1-6f-transparent.png",
+  "sourceArchivePath": "source-assets/shadow-runner/rebuild/recovered-enemies-v2/original-gearwing-drone-v1-6f-transparent.png",
+  "archivePath": "source-assets/shadow-runner/rebuild/legacy-gearwing-drone-v1-6f-128.png",
+  "runtimePath": "public/games/shadow-runner/level-assets/level-10/enemies/gearwing-drone-v2-6f-256x192.png"
+}

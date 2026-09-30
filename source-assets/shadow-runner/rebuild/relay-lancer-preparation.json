@@ -1,0 +1,150 @@
+{
+  "source": "source-assets/shadow-runner/rebuild/relay-lancer-grid-master.png",
+  "sourceSha256": "4150c342c56ce72113aed6d9f90b2dbf1bf4e08d6e3f2d03a71764c4f7ba6996",
+  "filename": "relay-lancer-v2-6f-256x128.png",
+  "frameWidth": 256,
+  "frameHeight": 128,
+  "scale": 0.22857142857142856,
+  "bytes": 73624,
+  "sha256": "ece54e7ec09bceb5084a9c9a821e86d77e9e5c88507ad68b2f5a52a0e126317f",
+  "frames": [
+    {
+      "index": 0,
+      "pose": {
+        "x": 0,
+        "y": 0,
+        "width": 512,
+        "height": 512,
+        "bodyX": 240,
+        "feetY": 478
+      },
+      "feetY": 480,
+      "crop": {
+        "left": 112,
+        "top": 70,
+        "width": 236,
+        "height": 418
+      },
+      "targetX": 99,
+      "targetY": 34,
+      "width": 54,
+      "height": 94,
+      "corePixels": 47821
+    },
+    {
+      "index": 1,
+      "pose": {
+        "x": 512,
+        "y": 0,
+        "width": 512,
+        "height": 512,
+        "bodyX": 770,
+        "feetY": 475
+      },
+      "feetY": 477,
+      "crop": {
+        "left": 611,
+        "top": 107,
+        "width": 388,
+        "height": 378
+      },
+      "targetX": 92,
+      "targetY": 43,
+      "width": 89,
+      "height": 85,
+      "corePixels": 45874
+    },
+    {
+      "index": 2,
+      "pose": {
+        "x": 1024,
+        "y": 0,
+        "width": 512,
+        "height": 512,
+        "bodyX": 1280,
+        "feetY": 477
+      },
+      "feetY": 480,
+      "crop": {
+        "left": 1096,
+        "top": 85,
+        "width": 407,
+        "height": 403
+      },
+      "targetX": 86,
+      "targetY": 38,
+      "width": 93,
+      "height": 90,
+      "corePixels": 51678
+    },
+    {
+      "index": 3,
+      "pose": {
+        "x": 0,
+        "y": 512,
+        "width": 576,
+        "height": 512,
+        "bodyX": 240,
+        "feetY": 943
+      },
+      "feetY": 946,
+      "crop": {
+        "left": 55,
+        "top": 614,
+        "width": 512,
+        "height": 340
+      },
+      "targetX": 86,
+      "targetY": 52,
+      "width": 117,
+      "height": 76,
+      "corePixels": 50567
+    },
+    {
+      "index": 4,
+      "pose": {
+        "x": 576,
+        "y": 512,
+        "width": 448,
+        "height": 512,
+        "bodyX": 770,
+        "feetY": 943
+      },
+      "feetY": 946,
+      "crop": {
+        "left": 600,
+        "top": 593,
+        "width": 421,
+        "height": 361
+      },
+      "targetX": 89,
+      "targetY": 47,
+      "width": 96,
+      "height": 81,
+      "corePixels": 50760
+    },
+    {
+      "index": 5,
+      "pose": {
+        "x": 1024,
+        "y": 512,
+        "width": 512,
+        "height": 512,
+        "bodyX": 1280,
+        "feetY": 949
+      },
+      "feetY": 957,
+      "crop": {
+        "left": 1070,
+        "top": 730,
+        "width": 457,
+        "height": 235
+      },
+      "targetX": 80,
+      "targetY": 76,
+      "width": 104,
+      "height": 52,
+      "corePixels": 37286
+    }
+  ]
+}

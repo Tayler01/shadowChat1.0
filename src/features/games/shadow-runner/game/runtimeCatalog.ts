@@ -1,4 +1,9 @@
 import { SHADOW_RUNNER_ASSETS } from '../assets/manifest'
+import { SHADOW_RUNNER_OPENING_WALKWAY, usesShadowRunnerOpeningArt } from './runtimeOpeningArt'
+import { SHADOW_RUNNER_WAYPOST_TEXTURE } from './runtimeWayposts'
+import { getShadowRunnerDistrictDepth, SHADOW_RUNNER_DEPTH_ASSETS } from './runtimeDistrictDepth'
+import { getShadowRunnerStoryLandmarkAssets } from './runtimeNarrative'
+import { SHADOW_RUNNER_RELAY_MASONRY, usesShadowRunnerRelayMasonry, SHADOW_RUNNER_CAPTAIN_MASONRY, usesShadowRunnerCaptainMasonry } from './runtimePlatformArt'
 import type {
   ShadowRunnerEnemyKind,
   ShadowRunnerLevelConfig,
@@ -22,6 +27,9 @@ interface ShadowRunnerTerrainRuntime {
 interface ShadowRunnerEnemyRuntime {
   textureKey: string
   asset: string
+  frameCount: number
+  frameSize?: number
+  frameWidth?: number
   scale: number
   body: {
     width: number
@@ -146,6 +154,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'clockwork-sentry': {
     textureKey: 'clockwork-sentry',
     asset: SHADOW_RUNNER_ASSETS.enemies.clockworkSentryStrip,
+    frameCount: 6,
     scale: 0.68,
     body: { width: 50, height: 70, offsetX: 39, offsetY: 58 },
     maxVelocityX: 128,
@@ -161,6 +170,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'lantern-bandit-scout': {
     textureKey: 'lantern-bandit-scout',
     asset: SHADOW_RUNNER_ASSETS.enemies.lanternBanditScoutStrip,
+    frameCount: 5,
     scale: 0.62,
     body: { width: 44, height: 64, offsetX: 42, offsetY: 64 },
     maxVelocityX: 236,
@@ -176,6 +186,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'barrel-roller': {
     textureKey: 'barrel-roller',
     asset: SHADOW_RUNNER_ASSETS.enemies.barrelRollerStrip,
+    frameCount: 5,
     scale: 0.58,
     body: { width: 58, height: 48, offsetX: 35, offsetY: 72 },
     maxVelocityX: 196,
@@ -191,6 +202,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'scroll-thief': {
     textureKey: 'scroll-thief',
     asset: SHADOW_RUNNER_ASSETS.enemies.scrollThiefStrip,
+    frameCount: 5,
     scale: 0.62,
     body: { width: 44, height: 62, offsetX: 42, offsetY: 66 },
     maxVelocityX: 224,
@@ -206,6 +218,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'tower-archer': {
     textureKey: 'tower-archer',
     asset: SHADOW_RUNNER_ASSETS.enemies.towerArcherStrip,
+    frameCount: 5,
     scale: 0.66,
     body: { width: 44, height: 70, offsetX: 42, offsetY: 58 },
     maxVelocityX: 0,
@@ -221,6 +234,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'candle-jester': {
     textureKey: 'candle-jester',
     asset: SHADOW_RUNNER_ASSETS.enemies.candleJesterStrip,
+    frameCount: 5,
     scale: 0.64,
     body: { width: 44, height: 68, offsetX: 42, offsetY: 60 },
     maxVelocityX: 168,
@@ -236,6 +250,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'moon-stalker': {
     textureKey: 'moon-stalker',
     asset: SHADOW_RUNNER_ASSETS.enemies.moonStalkerStrip,
+    frameCount: 5,
     scale: 0.62,
     body: { width: 42, height: 66, offsetX: 43, offsetY: 62 },
     maxVelocityX: 276,
@@ -251,6 +266,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'tomb-lurker': {
     textureKey: 'tomb-lurker',
     asset: SHADOW_RUNNER_ASSETS.enemies.tombLurkerStrip,
+    frameCount: 6,
     scale: 0.78,
     body: { width: 44, height: 66, offsetX: 42, offsetY: 62 },
     maxVelocityX: 300,
@@ -266,6 +282,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'crypt-warden': {
     textureKey: 'crypt-warden',
     asset: SHADOW_RUNNER_ASSETS.enemies.cryptWardenStrip,
+    frameCount: 6,
     scale: 0.9,
     body: { width: 54, height: 82, offsetX: 37, offsetY: 46 },
     maxVelocityX: 210,
@@ -281,6 +298,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'rival-courier': {
     textureKey: 'rival-courier',
     asset: SHADOW_RUNNER_ASSETS.enemies.rivalCourierStrip,
+    frameCount: 6,
     scale: 0.82,
     body: { width: 42, height: 70, offsetX: 43, offsetY: 58 },
     maxVelocityX: 360,
@@ -296,6 +314,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'gate-pikeman': {
     textureKey: 'gate-pikeman',
     asset: SHADOW_RUNNER_ASSETS.enemies.gatePikemanStrip,
+    frameCount: 6,
     scale: 0.86,
     body: { width: 50, height: 80, offsetX: 39, offsetY: 48 },
     maxVelocityX: 168,
@@ -311,8 +330,10 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'storm-grenadier': {
     textureKey: 'storm-grenadier',
     asset: SHADOW_RUNNER_ASSETS.enemies.stormGrenadierStrip,
+    frameCount: 6,
+    frameWidth: 256,
     scale: 0.78,
-    body: { width: 44, height: 70, offsetX: 42, offsetY: 58 },
+    body: { width: 44, height: 70, offsetX: 106, offsetY: 58 },
     maxVelocityX: 196,
     defaultPatrolSpeed: 92,
     flipWhenFacingLeft: true,
@@ -326,6 +347,7 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'moonlit-captain': {
     textureKey: 'watch-captain',
     asset: SHADOW_RUNNER_ASSETS.enemies.watchCaptainStrip,
+    frameCount: 8,
     scale: 0.9,
     body: { width: 48, height: 78, offsetX: 40, offsetY: 50 },
     maxVelocityX: 336,
@@ -341,8 +363,10 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'relay-lancer': {
     textureKey: 'relay-lancer',
     asset: SHADOW_RUNNER_ASSETS.enemies.relayLancerStrip,
+    frameCount: 6,
+    frameWidth: 256,
     scale: 0.86,
-    body: { width: 50, height: 80, offsetX: 39, offsetY: 48 },
+    body: { width: 50, height: 80, offsetX: 103, offsetY: 48 },
     maxVelocityX: 228,
     defaultPatrolSpeed: 96,
     flipWhenFacingLeft: true,
@@ -356,8 +380,10 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'prism-caster': {
     textureKey: 'prism-caster',
     asset: SHADOW_RUNNER_ASSETS.enemies.prismCasterStrip,
+    frameCount: 6,
+    frameWidth: 256,
     scale: 0.8,
-    body: { width: 44, height: 72, offsetX: 42, offsetY: 56 },
+    body: { width: 44, height: 72, offsetX: 106, offsetY: 56 },
     maxVelocityX: 154,
     defaultPatrolSpeed: 58,
     flipWhenFacingLeft: true,
@@ -371,8 +397,11 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'gearwing-drone': {
     textureKey: 'gearwing-drone',
     asset: SHADOW_RUNNER_ASSETS.enemies.gearwingDroneStrip,
+    frameCount: 6,
+    frameWidth: 256,
+    frameSize: 192,
     scale: 0.76,
-    body: { width: 56, height: 44, offsetX: 36, offsetY: 44 },
+    body: { width: 56, height: 44, offsetX: 100, offsetY: 108 },
     maxVelocityX: 340,
     defaultPatrolSpeed: 124,
     flipWhenFacingLeft: true,
@@ -386,8 +415,11 @@ export const SHADOW_RUNNER_ENEMY_RUNTIME: Record<ShadowRunnerEnemyKind, ShadowRu
   'sentry-sovereign': {
     textureKey: 'sentry-sovereign',
     asset: SHADOW_RUNNER_ASSETS.enemies.sentrySovereignStrip,
+    frameCount: 10,
+    frameWidth: 384,
+    frameSize: 192,
     scale: 0.82,
-    body: { width: 84, height: 118, offsetX: 54, offsetY: 68 },
+    body: { width: 84, height: 118, offsetX: 150, offsetY: 68 },
     maxVelocityX: 390,
     defaultPatrolSpeed: 146,
     flipWhenFacingLeft: true,
@@ -404,66 +436,115 @@ export function getShadowRunnerTerrainRuntime(terrainSet?: ShadowRunnerRect['ter
   return SHADOW_RUNNER_TERRAIN_RUNTIME[terrainSet ?? 'stone']
 }
 
-export function getShadowRunnerRouteRuntimeAssets(level: ShadowRunnerLevelConfig) {
-  const terrainSets = new Set<ShadowRunnerTerrainSet>()
-  level.platforms.forEach(platform => terrainSets.add(platform.terrainSet ?? 'stone'))
-  level.tiltPlatforms?.forEach(platform => terrainSets.add(platform.terrainSet ?? 'stone'))
-  level.crouchGates?.forEach(gate => terrainSets.add(gate.terrainSet ?? 'stone'))
-  level.spectralPlatforms?.forEach(platform => terrainSets.add(platform.terrainSet ?? 'spectral'))
-  level.movingPlatforms?.forEach(platform => terrainSets.add(platform.terrainSet ?? 'stone'))
-  terrainSets.add(level.finish.terrainSet ?? 'stone')
+export type ShadowRunnerRuntimeAsset = {
+  key: string
+  url: string
+} & ({ type: 'image' } | {
+  type: 'spritesheet'
+  frameWidth: number
+  frameHeight: number
+  frameCount: number
+})
 
-  const isCaptainGate = (level.id as string) === 'level-9'
-  const isDawnRelay = (level.id as string) === 'level-10'
+function image(key: string, url: string): ShadowRunnerRuntimeAsset {
+  return { type: 'image', key, url }
+}
+
+function sheet(key: string, url: string, frameWidth: number, frameCount: number, frameHeight = frameWidth): ShadowRunnerRuntimeAsset {
+  return { type: 'spritesheet', key, url, frameWidth, frameHeight, frameCount }
+}
+
+export function getShadowRunnerRuntimeManifest(level: ShadowRunnerLevelConfig): ShadowRunnerRuntimeAsset[] {
+  const assets = [
+    image('shadow-runner-bg', level.backgroundAsset),
+    sheet('shadow-runner-idle', SHADOW_RUNNER_ASSETS.hero.menuIdleCapeStrip, 128, 8),
+    sheet('shadow-runner-run', SHADOW_RUNNER_ASSETS.hero.runStrip, 128, 6),
+    sheet('shadow-runner-jump', SHADOW_RUNNER_ASSETS.hero.jumpAirStrip, 128, 6),
+    sheet('shadow-runner-attack', SHADOW_RUNNER_ASSETS.hero.swordAttackStrip, 128, 5),
+    sheet('shadow-runner-landing-dust', SHADOW_RUNNER_ASSETS.level.landingDustStrip, 64, 6),
+    sheet('shadow-runner-sword-slash', SHADOW_RUNNER_ASSETS.level.swordSlashStrip, 96, 6),
+    sheet('shadow-runner-coin-sparkle', SHADOW_RUNNER_ASSETS.gameplay.coinSparkleStrip, 119, 4, 145),
+    image('shadow-runner-health-frame', SHADOW_RUNNER_ASSETS.gameplay.healthBarFrame),
+    image('shadow-runner-hit-spark', SHADOW_RUNNER_ASSETS.gameplay.hitSpark),
+    image('shadow-runner-east-gate', SHADOW_RUNNER_ASSETS.level.eastGate96),
+  ]
+  if (usesShadowRunnerOpeningArt(level.id) && level.platforms.some(platform => !platform.hidden)) {
+    assets.push(image(SHADOW_RUNNER_OPENING_WALKWAY.textureKey, SHADOW_RUNNER_ASSETS.rebuild.silverCourierWalkway))
+  }
+  if (level.checkpoints?.length) assets.push(image(SHADOW_RUNNER_WAYPOST_TEXTURE, SHADOW_RUNNER_ASSETS.rebuild.courierWaypost))
+  for (const key of new Set(getShadowRunnerDistrictDepth(level.id).map(prop => prop.texture))) {
+    assets.push(image(key, SHADOW_RUNNER_DEPTH_ASSETS[key]))
+  }
+  assets.push(...getShadowRunnerStoryLandmarkAssets(level))
+  if (level.platforms.some(usesShadowRunnerRelayMasonry)) assets.push(image(SHADOW_RUNNER_RELAY_MASONRY.textureKey, SHADOW_RUNNER_ASSETS.rebuild.relayMasonry))
+  if (level.platforms.some(usesShadowRunnerCaptainMasonry)) assets.push(image(SHADOW_RUNNER_CAPTAIN_MASONRY.textureKey, SHADOW_RUNNER_ASSETS.rebuild.captainMasonry))
+  const terrainSets = new Set<ShadowRunnerTerrainSet>()
+  const terrain = [
+    ...level.platforms, ...level.tiltPlatforms, ...(level.spectralPlatforms ?? []),
+    ...(level.phasePlatforms ?? []), ...(level.movingPlatforms ?? []),
+  ]
+  terrain.forEach(platform => terrainSets.add(platform.terrainSet ?? 'stone'))
+  terrainSets.add(level.finish.terrainSet ?? 'stone')
+  level.crouchGates?.forEach(gate => {
+    const set = gate.terrainSet
+    terrainSets.add(set && ['moon', 'clock', 'catacomb', 'captain', 'relay', 'candle', 'candleBright', 'candleShelf'].includes(set) ? set : 'bell')
+  })
+  // These visual dependencies are selected by gameplay, not by platform terrain.
+  if (level.shieldPickups?.length || terrainSets.has('candleBright') || terrainSets.has('candleShelf')) terrainSets.add('candle')
+  if (level.encounters?.some(encounter => encounter.sealed)) {
+    terrainSets.add(level.id === 'level-10' ? 'relay' : level.id === 'level-9' ? 'captain' : 'spectral')
+  }
   const enemyKinds = (level.enemies ?? (level.enemy ? [level.enemy] : []))
     .map(enemy => enemy.kind)
-  const assets = [
-    level.backgroundAsset,
-    ...Array.from(terrainSets, terrainSet => SHADOW_RUNNER_TERRAIN_RUNTIME[terrainSet].asset),
-    ...new Set(
-      enemyKinds.map(enemyKind => SHADOW_RUNNER_ENEMY_RUNTIME[enemyKind].asset),
-    ),
-    level.boosts?.length ? SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip : undefined,
-    level.boosts?.length ? SHADOW_RUNNER_ASSETS.levels.boostAuraStrip : undefined,
-    level.chronoPickups?.length ? SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip : undefined,
-    level.surgePickups?.length ? SHADOW_RUNNER_ASSETS.levels.shadowSurgeSigilStrip : undefined,
-    level.moonShardPickups?.length ? SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip : undefined,
-    level.wraithlightPickups?.length ? SHADOW_RUNNER_ASSETS.levels.wraithlightLanternStrip : undefined,
-    level.mirrorWardPickups?.length ? SHADOW_RUNNER_ASSETS.levels.mirrorWardStrip : undefined,
-    level.objectivePickups?.length
-      ? isDawnRelay
-        ? SHADOW_RUNNER_ASSETS.levels.relayFlameStrip
-        : isCaptainGate
-        ? SHADOW_RUNNER_ASSETS.levels.watchfireCrestStrip
-        : SHADOW_RUNNER_ASSETS.levels.relaySealStrip
-      : undefined,
-    level.masteryPickups?.length
-      ? isDawnRelay
-        ? SHADOW_RUNNER_ASSETS.levels.lastDispatchStrip
-        : isCaptainGate
-        ? SHADOW_RUNNER_ASSETS.levels.captainsOrdersStrip
-        : SHADOW_RUNNER_ASSETS.levels.courierCacheStrip
-      : undefined,
-    level.galeMantlePickups?.length
-      ? SHADOW_RUNNER_ASSETS.levels.galeMantleStrip
-      : undefined,
-    level.sunsteelEdgePickups?.length
-      ? SHADOW_RUNNER_ASSETS.levels.sunsteelEdgeStrip
-      : undefined,
-    level.dawnfireAegisPickups?.length
-      ? SHADOW_RUNNER_ASSETS.levels.dawnfireAegisStrip
-      : undefined,
-    level.aetherStepPickups?.length
-      ? SHADOW_RUNNER_ASSETS.levels.aetherStepStrip
-      : undefined,
-    enemyKinds.includes('storm-grenadier')
-      ? SHADOW_RUNNER_ASSETS.levels.stormBombStrip
-      : undefined,
-    enemyKinds.some(kind => kind === 'prism-caster' || kind === 'sentry-sovereign')
-      ? SHADOW_RUNNER_ASSETS.levels.relayOrbStrip
-      : undefined,
-    level.finale?.asset,
-  ]
+  if (enemyKinds.includes('tower-archer') || level.arrowVolleys?.length) terrainSets.add('bell')
+  terrainSets.forEach(set => {
+    const runtime = SHADOW_RUNNER_TERRAIN_RUNTIME[set]
+    if (runtime.asset) assets.push(image(runtime.textureKey, runtime.asset))
+  })
+  new Set(enemyKinds).forEach(kind => {
+    const runtime = SHADOW_RUNNER_ENEMY_RUNTIME[kind]
+    assets.push(sheet(runtime.textureKey, runtime.asset, runtime.frameWidth ?? runtime.frameSize ?? 128, runtime.frameCount, runtime.frameSize ?? 128))
+  })
+  if (level.tiltPlatforms.length) assets.push(image('shadow-runner-tilt-bridge', SHADOW_RUNNER_ASSETS.level.tiltBridge256))
+  if (level.spikes.length) assets.push(image('shadow-runner-spike-row', SHADOW_RUNNER_ASSETS.level.spikeRow64))
+  if (level.coins.length) assets.push(sheet('shadow-runner-coin', SHADOW_RUNNER_ASSETS.level.coinStrip48, 48, 8))
+  if (level.boosts?.length) {
+    assets.push(sheet('shadow-runner-moonheart', SHADOW_RUNNER_ASSETS.levels.moonheartCrestStrip, 64, 4))
+    assets.push(sheet('shadow-runner-boost-aura', SHADOW_RUNNER_ASSETS.levels.boostAuraStrip, 128, 4))
+  }
+  const pickups = [
+    [level.chronoPickups, 'shadow-runner-chrono-lantern', SHADOW_RUNNER_ASSETS.levels.chronoLanternStrip],
+    [level.surgePickups, 'shadow-runner-shadow-surge', SHADOW_RUNNER_ASSETS.levels.shadowSurgeSigilStrip],
+    [level.moonShardPickups, 'shadow-runner-moon-shard', SHADOW_RUNNER_ASSETS.levels.moonShardRelicStrip],
+    [level.wraithlightPickups, 'shadow-runner-wraithlight', SHADOW_RUNNER_ASSETS.levels.wraithlightLanternStrip],
+    [level.mirrorWardPickups, 'shadow-runner-mirror-ward', SHADOW_RUNNER_ASSETS.levels.mirrorWardStrip],
+    [level.galeMantlePickups, 'shadow-runner-gale-mantle', SHADOW_RUNNER_ASSETS.levels.galeMantleStrip],
+    [level.sunsteelEdgePickups, 'shadow-runner-sunsteel-edge', SHADOW_RUNNER_ASSETS.levels.sunsteelEdgeStrip],
+    [level.dawnfireAegisPickups, 'shadow-runner-dawnfire-aegis', SHADOW_RUNNER_ASSETS.levels.dawnfireAegisStrip],
+    [level.aetherStepPickups, 'shadow-runner-aether-step', SHADOW_RUNNER_ASSETS.levels.aetherStepStrip],
+  ] as const
+  pickups.forEach(([items, key, url]) => { if (items?.length) assets.push(sheet(key, url, 64, 4)) })
+  if (level.objectivePickups?.length) {
+    assets.push(level.id === 'level-10'
+      ? sheet('shadow-runner-relay-flame', SHADOW_RUNNER_ASSETS.levels.relayFlameStrip, 64, 4)
+      : level.id === 'level-9'
+        ? sheet('shadow-runner-watchfire-crest', SHADOW_RUNNER_ASSETS.levels.watchfireCrestStrip, 64, 4)
+        : sheet('shadow-runner-relay-seal', SHADOW_RUNNER_ASSETS.levels.relaySealStrip, 64, 4))
+  }
+  if (level.masteryPickups?.length) {
+    assets.push(level.id === 'level-10'
+      ? sheet('shadow-runner-last-dispatch', SHADOW_RUNNER_ASSETS.levels.lastDispatchStrip, 64, 4)
+      : level.id === 'level-9'
+        ? sheet('shadow-runner-captains-orders', SHADOW_RUNNER_ASSETS.levels.captainsOrdersStrip, 64, 4)
+        : sheet('shadow-runner-courier-cache', SHADOW_RUNNER_ASSETS.levels.courierCacheStrip, 64, 4))
+  }
+  if (enemyKinds.includes('storm-grenadier')) assets.push(sheet('shadow-runner-storm-bomb', SHADOW_RUNNER_ASSETS.levels.stormBombStrip, 64, 4))
+  if (enemyKinds.some(kind => kind === 'prism-caster' || kind === 'sentry-sovereign')) {
+    assets.push(sheet('shadow-runner-relay-orb', SHADOW_RUNNER_ASSETS.levels.relayOrbStrip, 64, 4))
+  }
+  return Array.from(new Map(assets.map(asset => [asset.key, asset])).values())
+}
 
-  return Array.from(new Set(assets.filter((asset): asset is string => Boolean(asset))))
+export function getShadowRunnerRouteRuntimeAssets(level: ShadowRunnerLevelConfig) {
+  return getShadowRunnerRuntimeManifest(level).map(asset => asset.url)
 }
