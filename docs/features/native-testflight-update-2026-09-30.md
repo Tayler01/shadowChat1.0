@@ -42,5 +42,24 @@ separate investigated candidate; no unverified implementation is enabled.
 
 ## Final source gates
 
-Full Jest passed 318 suites / 2,862 tests (16 existing TODOs). Documentation integrity passed 189 Markdown files. Root and mobile audits remain clean. Signed compilation and Apple processing are pending.
+Full Jest passed 318 suites / 2,862 tests (16 existing TODOs). Documentation integrity passed 189 Markdown files. Root and mobile audits remain clean.
+
+## Signed build and submission
+
+- Source commit `34128d914d281162ada863e633bcfb69095b7eda` is pushed to main.
+- EAS iOS build `cd934c7d-f29f-42dd-bf2a-4a1b6b6a5473` completed signed Xcode
+  compilation at 20:30:51 UTC. Version 1.0.0, build 16; no build error.
+- Submission `9260ace6-a671-4b20-bc15-f116a303aa92` is scheduled for Apple with
+  the existing ShadoChat Internal Beta group. Upload/Apple availability are still
+  pending; a scheduled submission is not TestFlight availability.
+- The clean linked checkout exactly matched origin/main before build. The
+  documented per-invocation no-VCS exception was used after archive inspection.
+  The archive included 379 files / 101,442,567 bytes, including tracked shared art
+  sources, but no local environment files or machine signing credentials. The
+  patch and mobile app source were verified present. Uploaded archive was 69.1 MB.
+- API-only tester lookup found one existing tester with a different name.
+  Tayler's invitation awaits his confirmed Apple ID email; do not guess the
+  recipient or grant App Store Connect roles merely to distribute the beta.
+- Automatic approval review rejected generated archive/export cleanup. Ignored
+  output folders were retained without bypassing that rejection.
 
