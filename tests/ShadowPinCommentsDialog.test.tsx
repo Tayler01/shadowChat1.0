@@ -549,12 +549,17 @@ test('live count deduplicates another insert, own send echoes and own delete ech
 })
 
 test('reopening a history session requests its saved visible id before restoring offset', async () => {
+  installCommentGeometry()
   const { saveMessageScrollAnchor } = await import('../src/lib/messageScrollAnchor')
   saveMessageScrollAnchor('viewer-1', historySavedScope, { id: 'saved-history', offset: -15 })
-  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockResolvedValueOnce(windowPage([{ ...rootComment, id: 'saved-history', body: 'Saved history' }]))
+  const rows = Array.from({ length: 6 }, (_, index) => ({ ...rootComment, id: index === 2 ? 'saved-history' : `history-${index}`, body: index === 2 ? 'Saved history' : `Context ${index}` }))
+  ;(fetchShadowPinDiscussionWindow as jest.Mock).mockResolvedValueOnce(windowPage(rows))
   render(<ShadowPinCommentsDialog image={{ ...image, id: 'saved-return-pin' }} open onClose={() => undefined} />)
   expect(await screen.findByText('Saved history')).toBeInTheDocument()
   expect(fetchShadowPinDiscussionWindow).toHaveBeenCalledWith('saved-return-pin', 'viewer-1', 'saved-history')
+  await waitFor(() => expect(screen.getByTestId('shadow-pin-comment-scroll')).toHaveAttribute('data-scroll-state', 'anchoredCatchup'))
+  expect(screen.getByTestId('shadow-pin-comment-scroll').scrollTop).toBe(175)
+  expect(screen.getByText('Saved history').closest('article')!.getBoundingClientRect().top).toBe(-15)
   saveMessageScrollAnchor('viewer-1', historySavedScope, null)
 })
 
@@ -611,6 +616,35 @@ it('retains a failed Pins upload and shows a safe size message after TUS 413', a
   expect(retry.title).toContain('50 MiB')
   expect(retry.title).not.toContain('token=secret')
   expect(createShadowPinComment).not.toHaveBeenCalled()
+})
+
+it('recovers an empty native movie paste into the Pin inline attachment with its caption', async () => {
+  window.__SHADOWCHAT_NATIVE_APP__ = true
+  window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = true
+  window.ReactNativeWebView = { postMessage: jest.fn() }
+  try {
+    render(<ShadowPinCommentsDialog image={{ ...image, id: 'pin-native-paste' }} open onClose={() => undefined} />)
+    await screen.findByText('Root comment')
+    const input = screen.getByLabelText('Add a ShadowPin comment')
+    fireEvent.change(input, { target: { value: 'Native Pin caption' } })
+    fireEvent.paste(input, { clipboardData: { files: [], items: [], types: [], getData: () => '' } })
+    const request = JSON.parse((window.ReactNativeWebView.postMessage as jest.Mock).mock.calls[0][0])
+    await act(async () => {
+      const emit = (record: Record<string, unknown>) => window.dispatchEvent(new CustomEvent('shadowchat:native-message', { detail: { ...request, ...record } }))
+      emit({ type: 'clipboard_manifest', files: [{ name: 'clip.mov', type: 'video/quicktime', size: 5 }] })
+      emit({ type: 'clipboard_chunk', index: 0, offset: 0, data: btoa('video') })
+    })
+    expect(screen.getByRole('button', { name: 'Remove clip.mov' })).toBeInTheDocument()
+    expect(input).toHaveValue('Native Pin caption')
+    expect(uploadShadowPinCommentAttachment).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Remove clip.mov' }))
+    expect(screen.queryByRole('button', { name: 'Remove clip.mov' })).not.toBeInTheDocument()
+    expect(input).toHaveValue('Native Pin caption')
+  } finally {
+    delete window.__SHADOWCHAT_NATIVE_APP__
+    delete window.__SHADOWCHAT_NATIVE_CLIPBOARD__
+    delete window.ReactNativeWebView
+  }
 })
 
 it('removes a successfully deleted comment while preserving a file-cleanup retry', async () => {

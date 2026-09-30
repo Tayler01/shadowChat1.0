@@ -153,6 +153,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     targetStatus: dataTargetStatus = 'not_requested',
     anchorStatus: dataAnchorStatus = 'not_requested',
     hasNewer = false,
+    setFollowingLatest,
   } = messagesApi
   const hasMore = dataHasOlder || legacyHasMore
   const { typingUsers } = useTyping(typingChannel)
@@ -289,6 +290,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     setFirstUnreadMessageId,
     handleUnreadScroll,
     scrollToBottom,
+    scrollToBottomIfFollowing,
     feedState,
     targetMessageId,
     lastObservedMessageId,
@@ -310,6 +312,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     getMessageCreatedAt,
     getElementId: getMessageElementId,
     onMarkReadToLatest: markGeneralChatRead,
+    onFollowingChange: setFollowingLatest,
   })
   const hasActiveScrollTarget = Boolean(initialMessageId || targetMessageId || firstUnreadMessageId)
 
@@ -449,7 +452,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       const el = containerRef.current
       if (!el) return
 
-      handleUnreadScroll()
+      const atBottom = handleUnreadScroll()
 
       if (!hasActiveScrollTarget && el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
         historyIntentRef.current = true
@@ -457,7 +460,7 @@ export const MessageList: React.FC<MessageListProps> = ({
         return
       }
 
-      if (el.scrollHeight - el.scrollTop - el.clientHeight <= HISTORY_LOAD_SCROLL_THRESHOLD) {
+      if (atBottom && el.scrollHeight - el.scrollTop - el.clientHeight <= HISTORY_LOAD_SCROLL_THRESHOLD) {
         revealNewerLoadedMessages()
       }
     })
@@ -611,9 +614,9 @@ export const MessageList: React.FC<MessageListProps> = ({
 
   useEffect(() => {
     if (autoScroll && visibleTypingUsers.length > 0) {
-      scrollToBottom('auto')
+      scrollToBottomIfFollowing()
     }
-  }, [autoScroll, scrollToBottom, visibleTypingUsers.length])
+  }, [autoScroll, scrollToBottomIfFollowing, visibleTypingUsers.length])
 
   useLayoutEffect(() => {
     if (combinedMessages.length === 0) {
@@ -956,7 +959,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       data-scroll-target-id={targetMessageId ?? ''}
       data-first-unread-id={firstUnreadMessageId ?? ''}
       data-read-cursor-id={cursor?.last_read_message_id ?? ''}
-      className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+      className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
     >
       {deepLinkStatus === 'targetUnavailable' && <div role="status" className="glass-panel p-4 text-center">
         <p>That message is no longer available.</p>

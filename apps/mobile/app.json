@@ -4,7 +4,7 @@
     "slug": "shadowchat",
     "owner": "shadowchat111s-team",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "shadowchat",
     "userInterfaceStyle": "dark",
@@ -25,7 +25,7 @@
           "INSendMessageIntent"
         ]
       },
-      "buildNumber": "16"
+      "buildNumber": "17"
     },
     "android": {
       "googleServicesFile": "./google-services.json",

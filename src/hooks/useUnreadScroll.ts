@@ -9,6 +9,7 @@ const TARGET_SETTLE_MS = 180
 const FOLLOW_LATEST_SETTLE_MS = 150
 const FOLLOW_LATEST_MAX_WAIT_MS = 800
 const INITIAL_TARGET_MAX_RAF_ATTEMPTS = 5
+const USER_SCROLL_SETTLE_MS = 180
 
 export type UnreadScrollFeedState =
   | 'resolvingInitial'
@@ -43,6 +44,7 @@ interface UseUnreadScrollOptions<TMessage> {
   markInitialVisibleRead?: boolean
   markVisibleOnScroll?: boolean
   onMarkReadToLatest: (message: TMessage) => Promise<void> | void
+  onFollowingChange?: (following: boolean) => void
 }
 
 type ObservedMessage<TMessage> = {
@@ -78,6 +80,7 @@ export function useUnreadScroll<TMessage>({
   markInitialVisibleRead = false,
   markVisibleOnScroll = false,
   onMarkReadToLatest,
+  onFollowingChange,
 }: UseUnreadScrollOptions<TMessage>) {
   const savedAnchor = useMemo(() => getSavedMessageScrollAnchor(readerId, surfaceKey), [readerId, surfaceKey])
   const positionTargetId = initialMessageId ?? (savedAnchor && messages.some(message => getMessageId(message) === savedAnchor.id) ? savedAnchor.id : null)
@@ -105,12 +108,18 @@ export function useUnreadScroll<TMessage>({
   const followMaxTimerRef = useRef<number | null>(null)
   const lastObservedMessageRef = useRef<ObservedMessage<TMessage> | null>(null)
   const onMarkReadRef = useRef(onMarkReadToLatest)
+  const onFollowingChangeRef = useRef(onFollowingChange)
+  onFollowingChangeRef.current = onFollowingChange
   const cursorRef = useRef(cursor)
   const messagesRef = useRef(messages)
   const loadingRef = useRef(loading)
   const cursorLoadingRef = useRef(cursorLoading)
   const restorationReadyRef = useRef(restorationReady)
   const anchoredPositionRef = useRef<MessageScrollAnchor | null>(null)
+  // Native scrolling owns the viewport from contact through momentum. A scroll
+  // event inside the bottom tolerance must not give ownership back mid-swipe.
+  const userScrollRef = useRef({ active: false, touching: false, moved: false, wasFollowing: false, top: 0, x: 0, y: 0, direction: 0 })
+  const userScrollSettleTimerRef = useRef<number | null>(null)
   messagesRef.current = messages
   cursorRef.current = cursor
   loadingRef.current = loading
@@ -153,6 +162,10 @@ export function useUnreadScroll<TMessage>({
   }, [])
 
   const setAutoScroll = useCallback((value: boolean) => {
+    if (value) userScrollRef.current.active = false
+    // Realtime retention must see takeover in the same native event, before a
+    // React effect or an incoming insert can evict the reader's visible rows.
+    onFollowingChangeRef.current?.(value)
     if (autoScrollRef.current === value) {
       return
     }
@@ -388,17 +401,20 @@ export function useUnreadScroll<TMessage>({
   }, [containerRef])
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    userScrollRef.current.active = false
+    userScrollRef.current.touching = false
     clearTargetSettleTimer()
     initialUnreadJumpDoneRef.current = true
     setReadyScope(scopeKey)
     initialUnreadReadHoldRef.current = false
     scrollContainerToBottom(behavior)
     setAutoScroll(true)
+    saveMessageScrollAnchor(readerId, surfaceKey, null)
     setFirstUnreadMessageId(null)
     setTargetMessageId(null)
     setFeedState('layoutSettling')
     scheduleMarkObservedRead(true)
-  }, [clearTargetSettleTimer, scopeKey, scheduleMarkObservedRead, scrollContainerToBottom, setAutoScroll, setFeedState, setTargetMessageId])
+  }, [clearTargetSettleTimer, readerId, scopeKey, surfaceKey, scheduleMarkObservedRead, scrollContainerToBottom, setAutoScroll, setFeedState, setTargetMessageId])
 
   const flushFollowLatest = useCallback(() => {
     cancelFollowLatest()
@@ -426,13 +442,42 @@ export function useUnreadScroll<TMessage>({
     }
   }, [containerRef, flushFollowLatest, scrollContainerToBottom, setFeedState])
 
+  const settleUserScroll = useCallback(() => {
+    if (userScrollSettleTimerRef.current !== null) window.clearTimeout(userScrollSettleTimerRef.current)
+    userScrollSettleTimerRef.current = window.setTimeout(() => {
+      userScrollSettleTimerRef.current = null
+      if (userScrollRef.current.touching) return
+      userScrollRef.current.active = false
+      const container = containerRef.current
+      if (container) {
+        anchoredPositionRef.current = captureMessageScrollAnchor(container)
+        if (!autoScrollRef.current) saveMessageScrollAnchor(readerId, surfaceKey, anchoredPositionRef.current)
+      }
+    }, USER_SCROLL_SETTLE_MS)
+  }, [containerRef, readerId, surfaceKey])
+
+  const scrollToBottomIfFollowing = useCallback(() => {
+    if (autoScrollRef.current && !userScrollRef.current.active) followLatest()
+  }, [followLatest])
+
   const handleScroll = useCallback(() => {
     const container = containerRef.current
     if (!container) return false
 
-    const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 28
+    const bottomGap = container.scrollHeight - container.scrollTop - container.clientHeight
+    const userScroll = userScrollRef.current
+    const scrollTop = Math.max(0, Math.min(container.scrollTop, container.scrollHeight - container.clientHeight))
+    const scrollDelta = scrollTop - userScroll.top
+    userScroll.top = scrollTop
+    if (userScroll.active) {
+      if (Math.abs(scrollDelta) > 0.5) userScroll.moved = true
+      settleUserScroll()
+    }
+    // Keep the generous tolerance while following, but require an actual return
+    // to the bottom after the user takes over. The first few swipe pixels count.
+    const atBottom = autoScrollRef.current ? bottomGap <= 28 : bottomGap <= 1 && (!userScroll.active || scrollDelta > 0)
     anchoredPositionRef.current = captureMessageScrollAnchor(container)
-    if (initialUnreadJumpDoneRef.current) saveMessageScrollAnchor(readerId, surfaceKey, atBottom ? null : anchoredPositionRef.current)
+    if (initialUnreadJumpDoneRef.current) saveMessageScrollAnchor(readerId, surfaceKey, atBottom || bottomGap <= 1 ? null : anchoredPositionRef.current)
     updateLastObservedMessage()
 
     if (
@@ -471,6 +516,7 @@ export function useUnreadScroll<TMessage>({
     markVisibleOnScroll,
     readerId,
     surfaceKey,
+    settleUserScroll,
   ])
 
   const captureScrollAnchor = useCallback(() => {
@@ -481,12 +527,22 @@ export function useUnreadScroll<TMessage>({
   }, [containerRef, readerId, surfaceKey])
   const restoreScrollAnchor = useCallback(() => {
     const container = containerRef.current
-    if (container && !autoScrollRef.current && initialUnreadJumpDoneRef.current) {
+    if (container && !autoScrollRef.current && !userScrollRef.current.active && initialUnreadJumpDoneRef.current) {
       restoreMessageScrollAnchor(container, anchoredPositionRef.current)
     }
   }, [containerRef])
 
   useLayoutEffect(restoreScrollAnchor, [messages, renderSignal, restoreScrollAnchor])
+
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    return () => {
+      if (!container || !initialUnreadJumpDoneRef.current) return
+      const visible = container.isConnected && container.getBoundingClientRect().height > 0
+      const anchor = visible ? captureMessageScrollAnchor(container) ?? anchoredPositionRef.current : anchoredPositionRef.current
+      saveMessageScrollAnchor(readerId, surfaceKey, autoScrollRef.current ? null : anchor)
+    }
+  }, [containerRef, readerId, renderSignal, surfaceKey])
 
   const completeTargetAfterSettle = useCallback((
     nextState: UnreadScrollFeedState,
@@ -529,6 +585,9 @@ export function useUnreadScroll<TMessage>({
   ])
 
   useLayoutEffect(() => {
+    userScrollRef.current.active = false
+    userScrollRef.current.touching = false
+    if (userScrollSettleTimerRef.current !== null) window.clearTimeout(userScrollSettleTimerRef.current)
     setReadyScope(null)
     initialUnreadJumpDoneRef.current = false
     initialUnreadTargetIdRef.current = null
@@ -554,6 +613,7 @@ export function useUnreadScroll<TMessage>({
       }
       clearTargetSettleTimer()
       cancelFollowLatest()
+      if (userScrollSettleTimerRef.current !== null) window.clearTimeout(userScrollSettleTimerRef.current)
     }
   }, [cancelFollowLatest, clearTargetSettleTimer])
 
@@ -563,6 +623,7 @@ export function useUnreadScroll<TMessage>({
     const previousOverflowAnchor = container.style.overflowAnchor
     container.style.overflowAnchor = 'none'
     const takeScrollControl = () => {
+      userScrollRef.current.active = true
       clearTargetSettleTimer()
       cancelFollowLatest()
       initialUnreadJumpDoneRef.current = true
@@ -574,14 +635,69 @@ export function useUnreadScroll<TMessage>({
       setFeedState('userScrolledUp')
       captureScrollAnchor()
     }
-    container.addEventListener('wheel', takeScrollControl, { passive: true })
-    container.addEventListener('touchmove', takeScrollControl, { passive: true })
+    const startTouch = (event: TouchEvent) => {
+      const touch = event.touches[0]
+      userScrollRef.current = { active: true, touching: true, moved: false, wasFollowing: autoScrollRef.current, top: container.scrollTop, x: touch?.clientX ?? 0, y: touch?.clientY ?? 0, direction: 0 }
+      // Pause before the browser's first scroll; waiting for touchmove leaves a
+      // resize/follow callback free to pull the first swipe back to the bottom.
+      cancelFollowLatest()
+      setAutoScroll(false)
+    }
+    const moveTouch = (event: TouchEvent) => {
+      const touch = event.touches[0]
+      const gesture = userScrollRef.current
+      if (touch && (Math.abs(touch.clientY - gesture.y) < 3 || Math.abs(touch.clientY - gesture.y) < Math.abs(touch.clientX - gesture.x))) return
+      gesture.moved = true
+      gesture.direction = touch ? Math.sign(gesture.y - touch.clientY) : 0
+      takeScrollControl()
+    }
+    const endTouch = () => {
+      const gesture = userScrollRef.current
+      gesture.touching = false
+      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 1
+      if (!gesture.moved && gesture.wasFollowing || gesture.direction > 0 && atBottom) {
+        setAutoScroll(true)
+        followLatest()
+      } else settleUserScroll()
+    }
+    const wheel = (event: WheelEvent) => {
+      if (!event.deltaY) return
+      // A push toward latest at the boundary is still bottom-follow intent.
+      if (event.deltaY > 0 && container.scrollHeight - container.scrollTop - container.clientHeight <= 1) {
+        setAutoScroll(true)
+        followLatest()
+        return
+      }
+      userScrollRef.current.top = container.scrollTop
+      takeScrollControl()
+      settleUserScroll()
+    }
+    const keydown = (event: KeyboardEvent) => {
+      const target = event.target
+      if (target instanceof HTMLElement && target.closest('input, textarea, [contenteditable="true"]')) return
+      if (!['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) return
+      const towardBottom = ['ArrowDown', 'PageDown', 'End'].includes(event.key) || event.key === ' ' && !event.shiftKey
+      if (towardBottom && container.scrollHeight - container.scrollTop - container.clientHeight <= 1) return
+      userScrollRef.current.top = container.scrollTop
+      takeScrollControl()
+      settleUserScroll()
+    }
+    container.addEventListener('wheel', wheel, { passive: true })
+    container.addEventListener('touchstart', startTouch, { passive: true })
+    container.addEventListener('touchmove', moveTouch, { passive: true })
+    container.addEventListener('touchend', endTouch, { passive: true })
+    container.addEventListener('touchcancel', endTouch, { passive: true })
+    container.addEventListener('keydown', keydown)
     return () => {
       container.style.overflowAnchor = previousOverflowAnchor
-      container.removeEventListener('wheel', takeScrollControl)
-      container.removeEventListener('touchmove', takeScrollControl)
+      container.removeEventListener('wheel', wheel)
+      container.removeEventListener('touchstart', startTouch)
+      container.removeEventListener('touchmove', moveTouch)
+      container.removeEventListener('touchend', endTouch)
+      container.removeEventListener('touchcancel', endTouch)
+      container.removeEventListener('keydown', keydown)
     }
-  }, [cancelFollowLatest, captureScrollAnchor, clearTargetSettleTimer, containerRef, enabled, scopeKey, setAutoScroll, setFeedState, setTargetMessageId])
+  }, [cancelFollowLatest, captureScrollAnchor, clearTargetSettleTimer, containerRef, enabled, followLatest, renderSignal, scopeKey, setAutoScroll, setFeedState, setTargetMessageId, settleUserScroll])
 
   useEffect(() => {
     if (!enabled) return
@@ -837,9 +953,9 @@ export function useUnreadScroll<TMessage>({
       return
     }
 
-    if (autoScroll && !initialUnreadReadHoldRef.current) {
+    if (autoScrollRef.current && !userScrollRef.current.active && !initialUnreadReadHoldRef.current) {
       setFeedState('newerAppend')
-      scrollToBottom('auto')
+      scrollToBottomIfFollowing()
       return
     }
 
@@ -859,7 +975,7 @@ export function useUnreadScroll<TMessage>({
     latestMessageKey,
     loading,
     messageCount,
-    scrollToBottom,
+    scrollToBottomIfFollowing,
     setFeedState,
     updateLastObservedMessage,
   ])
@@ -876,6 +992,7 @@ export function useUnreadScroll<TMessage>({
     setFirstUnreadMessageId,
     handleUnreadScroll: handleScroll,
     scrollToBottom,
+    scrollToBottomIfFollowing,
     markLatestRead: markObservedRead,
     captureScrollAnchor,
     restoreScrollAnchor,

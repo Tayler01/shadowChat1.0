@@ -1,3 +1,17 @@
+## September 30 shared mobile stability and native build 17
+
+- Physical build 16 toolbar removal is accepted. PWA toolbar remains and modal
+  typing is rejected. Shared bottom-scroll and keyboard-swipe fixes, native
+  movie paste recovery and rotation support are implemented for the next binary.
+- Full Jest 320 suites/2,898 tests, Node 402, Deno 23 and rolled-back native SQL
+  17 assertions passed. Production enrollment/bounded-worker migrations applied;
+  ACL and guarded worker health passed. Native delivery remains gated pending
+  current device enrollment. Integrated browser and build/deploy evidence is
+  tracked in [build 17](mobile-stability-build17-2026-09-30.md).
+- [App Store readiness](app-store-readiness-2026-09-30.md) identifies member
+  reporting/filtering, privacy/AI consent, review access, metadata and physical
+  acceptance work. Paused domains remain paused; no public submission occurred.
+
 ## September 30 native TestFlight refresh
 
 - Tayler resumed native testing and authorized publishing a fresh signed iPhone build. Build 16 updates Expo/React Native patches, suppresses the WebView keyboard accessory bar and supplies media permission descriptions while retaining the current hosted interface.

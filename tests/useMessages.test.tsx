@@ -591,7 +591,7 @@ describe('message fetching windows', () => {
     expect(olderQuery.lt).not.toHaveBeenCalledWith('created_at', anchor.created_at);
   });
 
-  it('marks newer realtime messages pending while an older window is anchored', async () => {
+  it.each(['older window', 'manual latest window', 'own-account other-device arrival'])('marks newer realtime messages pending in %s and fetches them on explicit latest', async (mode) => {
     let broadcastHandler: ((payload: any) => void) | undefined;
     workingClient.channel.mockImplementation(() => {
       const channel: any = {
@@ -611,21 +611,21 @@ describe('message fetching windows', () => {
     const { result } = await renderWithLatestWindow();
     await waitFor(() => expect(broadcastHandler).toBeDefined());
 
-    const pinnedQuery = createThenableQuery({ data: [], error: null });
-    const olderQuery = createThenableQuery({ data: [], error: null });
-    workingClient.from
-      .mockReturnValueOnce(pinnedQuery as any)
-      .mockReturnValueOnce(olderQuery as any);
-
-    await act(async () => {
-      await result.current.loadOlderMessages();
-    });
-
-    expect(result.current.windowMode).toBe('older');
+    if (mode === 'older window') {
+      const pinnedQuery = createThenableQuery({ data: [], error: null });
+      const olderQuery = createThenableQuery({ data: [], error: null });
+      workingClient.from.mockReturnValueOnce(pinnedQuery as any).mockReturnValueOnce(olderQuery as any);
+      await act(async () => { await result.current.loadOlderMessages(); });
+      expect(result.current.windowMode).toBe('older');
+    } else {
+      act(() => result.current.setFollowingLatest?.(false));
+      expect(result.current.windowMode).toBe('latest');
+    }
+    const retainedIds = result.current.messages.map(message => message.id);
 
     const realtimeMessage = {
       ...makeDbMessage('z-new', '2026-05-03T12:00:01.000Z'),
-      user_id: 'other-user',
+      user_id: mode === 'own-account other-device arrival' ? user.id : 'other-user',
     } as Message;
 
     await act(async () => {
@@ -634,6 +634,16 @@ describe('message fetching windows', () => {
 
     await waitFor(() => expect(result.current.hasNewer).toBe(true));
     expect(result.current.messages.some(message => message.id === realtimeMessage.id)).toBe(false);
+    expect(result.current.messages.map(message => message.id)).toEqual(retainedIds);
+    const updatedLatest = [...result.current.messages, realtimeMessage];
+    workingClient.from.mockReturnValueOnce(createThenableQuery({ data: [], error: null }) as any)
+      .mockReturnValueOnce(createThenableQuery({ data: [...updatedLatest].reverse(), error: null }) as any);
+    await act(async () => {
+      result.current.setFollowingLatest?.(true);
+      await result.current.loadLatestMessages();
+    });
+    expect(result.current.hasNewer).toBe(false);
+    expect(result.current.messages.some(message => message.id === realtimeMessage.id)).toBe(true);
   });
 });
 

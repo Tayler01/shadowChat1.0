@@ -74,6 +74,48 @@ type ExpoTransport = {
 }
 
 const notificationEnvironments = new Set(['development', 'preview', 'production'])
+export const NATIVE_CANARY_LIMITS = Object.freeze({
+  events: 2,
+  installationsPerEvent: 2,
+  concurrency: 2,
+  receipts: 5,
+  attempts: 3,
+  runtimeMs: 8_000,
+  providerMs: 3_000,
+  persistenceReserveMs: 2_000,
+})
+
+type NativeCanaryBudget = { deadlineMs: number; signal: AbortSignal }
+type NativeCanaryRuntime = {
+  delivery_mode: string
+  worker_invocation_enabled: boolean
+  receipt_reconciliation_enabled: boolean
+  all_users_enabled: boolean
+  canary_user_ids: string[]
+  enabled_categories: string[]
+  activation_watermark: string
+}
+
+export const isNativeCanaryEnabled = (runtime: NativeCanaryRuntime | null, action: string) => Boolean(
+  runtime && runtime.delivery_mode === 'active' && runtime.worker_invocation_enabled &&
+  !runtime.all_users_enabled && runtime.canary_user_ids.length > 0 &&
+  runtime.canary_user_ids.length <= 10 && runtime.enabled_categories.length > 0 &&
+  (action === 'deliver' || (action === 'receipts' && runtime.receipt_reconciliation_enabled)),
+)
+
+export const getNativeProviderTimeout = (deadlineMs: number, nowMs = Date.now()) => Math.max(
+  0,
+  Math.min(NATIVE_CANARY_LIMITS.providerMs, deadlineMs - nowMs - NATIVE_CANARY_LIMITS.persistenceReserveMs),
+)
+
+export const runNativeCanaryClaims = async <T>(
+  claims: T[],
+  process: (claim: T) => Promise<Record<string, unknown>>,
+) => {
+  if (claims.length > NATIVE_CANARY_LIMITS.events) throw new Error('Native canary claim bound exceeded')
+  // There is one claim round. Two events x two installations = <=4 messages.
+  return await Promise.all(claims.map(process))
+}
 const permanentlyRejectedExpoErrors = new Set([
   'DeviceNotRegistered',
   'InvalidCredentials',
@@ -222,12 +264,16 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 
-const getAdminClient = () => {
+const getAdminClient = (signal?: AbortSignal) => {
   const url = Deno.env.get('SUPABASE_URL')
   const serviceRole = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !serviceRole) throw new Error('Supabase service credentials are not configured')
   return createClient(url, serviceRole, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(signal ? { global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, {
+      ...init,
+      signal: init?.signal ? AbortSignal.any([signal, init.signal]) : signal,
+    }) } } : {}),
   })
 }
 
@@ -499,6 +545,7 @@ const processClaim = async (
   claim: OutboxClaim,
   expoTransport: ExpoTransport,
   deliveryEnvironment: string,
+  budget: NativeCanaryBudget,
 ) => {
   const [
     envelopeResult,
@@ -529,7 +576,11 @@ const processClaim = async (
       .select('id, platform, environment, foreground_until, channel_schema_version')
       .eq('user_id', claim.user_id)
       .eq('environment', deliveryEnvironment)
-      .is('revoked_at', null),
+      .is('revoked_at', null)
+      .neq('platform', 'web')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(NATIVE_CANARY_LIMITS.installationsPerEvent),
     supabase
       .from('notification_outbox_v2')
       .select('attempt_count, max_attempts')
@@ -555,7 +606,7 @@ const processClaim = async (
   }
 
   const preferences = (preferencesResult.data ?? {}) as Record<string, unknown>
-  const suppression = getNotificationSuppressionReason(preferences)
+  const suppression = getNotificationSuppressionReason(preferencesResult.data ? preferences : null)
   if (
     suppression ||
     !categoryEnabled(event.type, preferences)
@@ -637,6 +688,8 @@ const processClaim = async (
       token.provider === 'expo' &&
       token.environment === deliveryEnvironment
     ))
+    .filter((token, index, all) => all.findIndex(item => item.installation_id === token.installation_id) === index)
+    .slice(0, NATIVE_CANARY_LIMITS.installationsPerEvent)
   if (tokens.length === 0) {
     const existingStatuses = ((existingTargetData ?? []) as DeliveryTargetRow[])
       .map(target => target.status)
@@ -743,10 +796,10 @@ const processClaim = async (
     if (!target) {
       throw new Error('Native delivery target was not created')
     }
-    return shouldAttemptExpoTarget(target.status)
+    return shouldAttemptExpoTarget(target.status) && target.attempt_count < NATIVE_CANARY_LIMITS.attempts
   })
   const outboxAttempt = Number(outboxResult.data?.attempt_count ?? 0)
-  const outboxMaxAttempts = Number(outboxResult.data?.max_attempts ?? 0)
+  const outboxMaxAttempts = Math.min(NATIVE_CANARY_LIMITS.attempts, Number(outboxResult.data?.max_attempts ?? 0))
   const retryAfterSeconds = 20
   const canRetry = (
     outboxAttempt > 0 &&
@@ -798,23 +851,6 @@ const processClaim = async (
     return completeFromCurrentTargets()
   }
 
-  const attemptStartedAt = new Date().toISOString()
-  for (const token of attemptTokens) {
-    const target = targetByInstallation.get(token.installation_id)!
-    const { error: targetAttemptError } = await supabase
-      .from('notification_delivery_targets_v2')
-      .update({
-        attempt_count: target.attempt_count + 1,
-        last_error: null,
-        completed_at: null,
-        updated_at: attemptStartedAt,
-      })
-      .eq('id', target.id)
-      .eq('status', 'pending')
-    if (targetAttemptError) throw targetAttemptError
-    target.attempt_count += 1
-  }
-
   if (Date.parse(claim.expires_at) <= Date.now()) {
     await completeOutbox(
       supabase,
@@ -848,10 +884,36 @@ const processClaim = async (
     )
   })
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 8_000)
+  const providerTimeout = getNativeProviderTimeout(budget.deadlineMs)
+  if (providerTimeout < 500 || budget.signal.aborted) throw new Error('Native canary time budget exhausted')
+  // Mark a submission terminal before crossing the provider boundary. A worker
+  // crash or lost response cannot replay a provider-accepted notification.
+  // Only an explicit retryable rejection can restore pending status.
+  const attemptStartedAt = new Date().toISOString()
+  for (const token of attemptTokens) {
+    const target = targetByInstallation.get(token.installation_id)!
+    const { data: started, error: targetAttemptError } = await supabase
+      .from('notification_delivery_targets_v2')
+      .update({
+        status: 'failed',
+        attempt_count: target.attempt_count + 1,
+        last_error: 'Provider submission outcome unknown; automatic resend suppressed',
+        completed_at: attemptStartedAt,
+        updated_at: attemptStartedAt,
+      })
+      .eq('id', target.id)
+      .eq('status', 'pending')
+      .eq('attempt_count', target.attempt_count)
+      .select('id')
+    if (targetAttemptError) throw targetAttemptError
+    if (started?.length !== 1) throw new Error('Native target attempt is no longer owned')
+    target.attempt_count += 1
+    target.status = 'failed'
+  }
+  const timeout = setTimeout(() => controller.abort(), getNativeProviderTimeout(budget.deadlineMs))
   let response: Response
   try {
-    response = await expoTransport.send(messages, controller.signal)
+    response = await expoTransport.send(messages, AbortSignal.any([controller.signal, budget.signal]))
   } catch (caught) {
     const message = caught instanceof Error
       ? caught.message.slice(0, 500)
@@ -865,7 +927,7 @@ const processClaim = async (
           updated_at: new Date().toISOString(),
         })
         .eq('id', target.id)
-        .eq('status', 'pending')
+        .eq('status', 'failed')
       if (targetError) throw targetError
     }
     return completeFromCurrentTargets()
@@ -879,13 +941,16 @@ const processClaim = async (
       const { error: targetError } = await supabase
         .from('notification_delivery_targets_v2')
         .update({
+          status: 'pending',
+          completed_at: null,
           last_status_code: response.status,
           last_error: 'Expo provider is temporarily unavailable',
           updated_at: new Date().toISOString(),
         })
         .eq('id', target.id)
-        .eq('status', 'pending')
+        .eq('status', 'failed')
       if (targetError) throw targetError
+      target.status = 'pending'
     }
     return completeFromCurrentTargets()
   }
@@ -903,7 +968,7 @@ const processClaim = async (
           updated_at: now,
         })
         .eq('id', target.id)
-        .eq('status', 'pending')
+        .eq('status', 'failed')
       if (targetError) throw targetError
       target.status = 'failed'
     }
@@ -924,7 +989,7 @@ const processClaim = async (
           updated_at: new Date().toISOString(),
         })
         .eq('id', target.id)
-        .eq('status', 'pending')
+        .eq('status', 'failed')
       if (targetError) throw targetError
     }
     return completeFromCurrentTargets()
@@ -935,7 +1000,10 @@ const processClaim = async (
   for (let index = 0; index < attemptTokens.length; index += 1) {
     const token = attemptTokens[index]
     const ticket = tickets[index]
-    const decision = classifyExpoTicket(ticket)
+    const decision = ticket ? classifyExpoTicket(ticket) : {
+      status: 'failed' as const, retryable: false, invalid: false,
+      providerMessageId: null, error: 'Expo ticket missing; automatic resend suppressed',
+    }
     const target = targetByInstallation.get(token.installation_id)!
     const now = new Date().toISOString()
 
@@ -959,7 +1027,7 @@ const processClaim = async (
         updated_at: now,
       })
       .eq('id', target.id)
-      .eq('status', 'pending')
+      .eq('status', 'failed')
     if (targetUpdateError) throw targetUpdateError
     target.status = decision.status
 
@@ -984,6 +1052,8 @@ const checkExpoReceipts = async (
   supabase: ReturnType<typeof getAdminClient>,
   expoTransport: ExpoTransport,
   deliveryEnvironment: string,
+  runtime: NativeCanaryRuntime,
+  budget: NativeCanaryBudget,
 ) => {
   const now = new Date().toISOString()
   const affectedOutboxIds = new Set<string>()
@@ -995,8 +1065,12 @@ const checkExpoReceipts = async (
     .eq('transport', 'expo')
     .eq('status', 'accepted')
     .eq('notification_installations.environment', deliveryEnvironment)
+    .in('notification_installations.user_id', runtime.canary_user_ids)
+    .gte('created_at', runtime.activation_watermark)
+    .lt('receipt_attempt_count', NATIVE_CANARY_LIMITS.attempts)
     .lte('receipt_expires_at', now)
-    .limit(500)
+    .order('created_at', { ascending: true })
+    .limit(NATIVE_CANARY_LIMITS.receipts)
   if (expiredTargetsQueryError) throw expiredTargetsQueryError
   const expiredTargetIds = (expiredTargetRows ?? []).map(target => target.id)
   if (expiredTargetIds.length > 0) {
@@ -1025,13 +1099,15 @@ const checkExpoReceipts = async (
     .eq('transport', 'expo')
     .eq('status', 'accepted')
     .eq('notification_installations.environment', deliveryEnvironment)
+    .in('notification_installations.user_id', runtime.canary_user_ids)
+    .gte('created_at', runtime.activation_watermark)
     .not('provider_message_id', 'is', null)
     .lte('next_receipt_check_at', now)
     .gt('receipt_expires_at', now)
-    .lt('receipt_attempt_count', 8)
+    .lt('receipt_attempt_count', NATIVE_CANARY_LIMITS.attempts)
     .order('next_receipt_check_at', { ascending: true })
     .order('created_at', { ascending: true })
-    .limit(100)
+    .limit(Math.max(0, NATIVE_CANARY_LIMITS.receipts - expiredTargetIds.length))
   if (error) throw error
   let delivered = 0
   let invalid = 0
@@ -1039,25 +1115,56 @@ const checkExpoReceipts = async (
 
   if (data?.length) {
     const ids = data.map(item => item.provider_message_id)
+    // Reserve a receipt attempt before HTTP so transport errors and worker
+    // termination count toward the same three-attempt ceiling.
+    for (const target of data) {
+      const nextAttempt = Number(target.receipt_attempt_count ?? 0) + 1
+      const finalAttempt = nextAttempt >= NATIVE_CANARY_LIMITS.attempts
+      const { error: reservationError } = await supabase
+        .from('notification_delivery_targets_v2')
+        .update({
+          receipt_attempt_count: nextAttempt,
+          status: finalAttempt ? 'failed' : 'accepted',
+          next_receipt_check_at: finalAttempt ? null : new Date(Date.now() + 15 * 60_000).toISOString(),
+          completed_at: finalAttempt ? now : null,
+          last_error: 'Expo receipt lookup pending; attempt reserved',
+          updated_at: now,
+        })
+        .eq('id', target.id)
+        .eq('status', 'accepted')
+        .eq('receipt_attempt_count', target.receipt_attempt_count)
+      if (reservationError) throw reservationError
+    }
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 8_000)
-    let response: Response
+    const providerTimeout = getNativeProviderTimeout(budget.deadlineMs)
+    if (providerTimeout < 500 || budget.signal.aborted) throw new Error('Native receipt time budget exhausted')
+    const timeout = setTimeout(() => controller.abort(), providerTimeout)
+    let response: Response | null = null
+    let providerFailure: string | null = null
     try {
-      response = await expoTransport.getReceipts(ids, controller.signal)
+      response = await expoTransport.getReceipts(ids, AbortSignal.any([controller.signal, budget.signal]))
+    } catch (caught) {
+      providerFailure = getErrorMessage(caught).slice(0, 500)
     } finally {
       clearTimeout(timeout)
     }
-    if (!response.ok) throw new Error(`Expo receipt lookup failed (${response.status})`)
-    const payload = await response.json()
-    const receipts = payload.data as Record<string, ExpoTicket> | undefined
+    let receipts: Record<string, ExpoTicket> | undefined
+    if (response?.ok) {
+      try { receipts = (await response.json()).data } catch {
+        providerFailure = 'Expo returned an invalid receipt response'
+      }
+    } else if (response) {
+      providerFailure = `Expo receipt lookup failed (${response.status})`
+    }
 
     for (const target of data) {
       affectedOutboxIds.add(target.outbox_id)
       const receipt = receipts?.[target.provider_message_id]
       const nextAttemptCount = Number(target.receipt_attempt_count ?? 0) + 1
+      const reservedStatus = nextAttemptCount >= NATIVE_CANARY_LIMITS.attempts ? 'failed' : 'accepted'
       if (!receipt) {
         const exhausted = (
-          nextAttemptCount >= 8 ||
+          nextAttemptCount >= NATIVE_CANARY_LIMITS.attempts ||
           Date.parse(target.receipt_expires_at) <= Date.now()
         )
         const { error: missingReceiptError } = await supabase
@@ -1072,12 +1179,13 @@ const checkExpoReceipts = async (
               ).toISOString(),
             last_error: exhausted
               ? 'Expo delivery receipt was not returned before the retry limit'
-              : 'Expo delivery receipt is not available yet',
+              : providerFailure || 'Expo delivery receipt is not available yet',
             completed_at: exhausted ? now : null,
             updated_at: now,
           })
           .eq('id', target.id)
-          .eq('status', 'accepted')
+          .eq('status', reservedStatus)
+          .eq('receipt_attempt_count', nextAttemptCount)
         if (missingReceiptError) throw missingReceiptError
         if (exhausted) failed += 1
         continue
@@ -1100,7 +1208,8 @@ const checkExpoReceipts = async (
           updated_at: now,
         })
         .eq('id', target.id)
-        .eq('status', 'accepted')
+        .eq('status', reservedStatus)
+        .eq('receipt_attempt_count', nextAttemptCount)
       if (targetUpdateError) throw targetUpdateError
 
       if (deviceInvalid) {
@@ -1172,43 +1281,47 @@ export const handleNotificationDeliveryRequest = async (request: Request) => {
         worker: 'deliver-notifications-v2',
       })
     }
-    if (body.action !== 'deliver' && body.action !== 'receipts') {
+    // Legacy jobs cannot invoke broad delivery even if somebody resumes one.
+    if (body.action !== 'bounded_canary' || (body.task !== 'deliver' && body.task !== 'receipts')) {
       return json({ error: 'Unsupported notification worker action' }, 400)
     }
-    const supabase = getAdminClient()
-    const expoTransport = createExpoTransport()
-    if (body.action === 'receipts') {
-      return json(await checkExpoReceipts(
-        supabase,
-        expoTransport,
-        deliveryEnvironment,
-      ))
-    }
-
-    const startedAt = Date.now()
-    const maxRuntimeMs = 24_000
-    const batchSize = 12
-    const maxRounds = 4
-    let claimed = 0
-    let rounds = 0
-    const results: Array<Record<string, unknown>> = []
-    while (rounds < maxRounds && Date.now() - startedAt < maxRuntimeMs) {
+    const controller = new AbortController()
+    const budget = { deadlineMs: Date.now() + NATIVE_CANARY_LIMITS.runtimeMs, signal: controller.signal }
+    const timeout = setTimeout(() => controller.abort(), NATIVE_CANARY_LIMITS.runtimeMs)
+    const supabase = getAdminClient(controller.signal)
+    let workerLease: string | null = null
+    try {
+      const { data: runtime, error: runtimeError } = await supabase
+        .from('notification_v2_runtime_config')
+        .select('delivery_mode,worker_invocation_enabled,receipt_reconciliation_enabled,all_users_enabled,canary_user_ids,enabled_categories,activation_watermark')
+        .eq('singleton', true)
+        .maybeSingle()
+      if (runtimeError) throw runtimeError
+      if (!isNativeCanaryEnabled(runtime, body.task)) return json({ skipped: 'Native canary is disabled', claimed: 0 })
+      const { data: acquired, error: leaseError } = await supabase.rpc('acquire_native_notification_worker_v2', {
+        target_action: body.task,
+      })
+      if (leaseError) throw leaseError
+      workerLease = acquired
+      if (!workerLease) return json({ skipped: 'Native canary is idle or leased', claimed: 0 })
+      const expoTransport = createExpoTransport()
+      if (body.task === 'receipts') {
+        return json(await checkExpoReceipts(supabase, expoTransport, deliveryEnvironment, runtime!, budget))
+      }
       const { data, error } = await supabase.rpc('claim_notification_outbox_v2', {
-        batch_size: batchSize,
-        lease_seconds: 120,
+        batch_size: NATIVE_CANARY_LIMITS.events,
+        lease_seconds: 30,
       })
       if (error) throw error
       const claims = (data ?? []) as OutboxClaim[]
-      if (claims.length === 0) break
-      claimed += claims.length
-      rounds += 1
-      results.push(...await Promise.all(claims.map(async claim => {
+      const results = await runNativeCanaryClaims(claims, async claim => {
         try {
           return await processClaim(
             supabase,
             claim,
             expoTransport,
             deliveryEnvironment,
+            budget,
           )
         } catch (caught) {
           await completeOutbox(
@@ -1220,20 +1333,22 @@ export const handleNotificationDeliveryRequest = async (request: Request) => {
           ).catch(() => undefined)
           return { delivered: false, retryable: true }
         }
-      })))
-      if (claims.length < batchSize) break
+      })
+      return json({
+        claimed: claims.length,
+        rounds: claims.length > 0 ? 1 : 0,
+        accepted: results.reduce((sum, result) => sum + (typeof result.accepted === 'number' ? result.accepted : 0), 0),
+        delivered: results.filter(result => result.delivered).length,
+        retryable: results.filter(result => result.retryable).length,
+      })
+    } finally {
+      // If the deadline expires, the database lease naturally expires in 30s.
+      // Never start an unbounded release request after the invocation deadline.
+      if (workerLease && !controller.signal.aborted) {
+        await Promise.resolve(supabase.rpc('release_native_notification_worker_v2', { target_lease_token: workerLease })).catch(() => undefined)
+      }
+      clearTimeout(timeout)
     }
-    return json({
-      claimed,
-      rounds,
-      accepted: results.reduce((sum, result) => (
-        sum + (typeof result.accepted === 'number' ? result.accepted : 0)
-      ), 0),
-      delivered: results.filter(result => result.delivered).length,
-      retryable: results.filter(result => (
-        'retryable' in result && result.retryable
-      )).length,
-    })
   } catch (caught) {
     const message = caught instanceof Error ? caught.message : 'Notification delivery failed'
     return json(

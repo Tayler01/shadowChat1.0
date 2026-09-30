@@ -395,6 +395,50 @@ test('uses one DM realtime channel and hydrates an active-thread insert once', a
   await waitFor(() => expect(fetchDMConversations).toHaveBeenCalledTimes(2));
 });
 
+test.each(['u1', 'u2'])('preserves a manually owned DM window for an unseen realtime message from %s until explicit latest', async (senderId) => {
+  const conversation = { id: 'conv1', other_user: { id: 'u2', username: 'bob' }, unread_count: 0, last_message: null };
+  const retained = Array.from({ length: 200 }, (_, index) => ({
+    id: `old-${index}`, conversation_id: 'conv1', sender_id: 'u2', content: `retained ${index}`,
+    message_type: 'text', created_at: new Date(Date.UTC(2026, 3, 21, 12, 0, index)).toISOString(),
+    reactions: {}, sender: conversation.other_user,
+  }));
+  const incoming = { ...retained[199], id: 'new-during-gesture', sender_id: senderId, created_at: '2026-04-21T12:30:00.000Z' };
+  let latest = retained;
+  const handlers = new Map<string, (payload: { new: typeof incoming }) => void>();
+  const channel = {
+    on: jest.fn(function (_kind: string, config: {event: string}, handler: (payload: {new: typeof incoming}) => void) { handlers.set(config.event, handler); return this; }),
+    subscribe: jest.fn().mockReturnThis(), send: jest.fn(), state: 'joined',
+  };
+  const query = createQuery({
+    limit: jest.fn(() => Promise.resolve({data: [...latest].reverse(), error: null})),
+    maybeSingle: jest.fn().mockResolvedValue({data: incoming, error: null}),
+  });
+  (fetchDMConversations as jest.Mock).mockResolvedValue([conversation]);
+  workingClient.channel.mockReturnValue(channel as any);
+  workingClient.from.mockReturnValue(query as any);
+  const { result } = renderHook(() => useDirectMessages(), {wrapper: DirectMessagesProvider});
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  act(() => result.current.setCurrentConversation('conv1'));
+  await waitFor(() => expect(result.current.messages).toHaveLength(200));
+  const retainedIds = result.current.messages.map(message => message.id);
+  act(() => {
+    result.current.setFollowingLatest(false);
+    handlers.get('INSERT')?.({new: incoming});
+  });
+  await waitFor(() => expect(result.current.hasNewer).toBe(true));
+  expect(result.current.messages.map(message => message.id)).toEqual(retainedIds);
+  await act(async () => { await result.current.markAsRead('conv1'); });
+  expect(markDMMessagesRead).not.toHaveBeenCalled();
+  latest = [...retained, incoming];
+  await act(async () => {
+    result.current.setFollowingLatest(true);
+    await result.current.loadLatestMessages();
+  });
+  expect(result.current.hasNewer).toBe(false);
+  expect(result.current.messages.some(message => message.id === incoming.id)).toBe(true);
+  expect(result.current.messages).toHaveLength(200);
+});
+
 test('loads an authoritative historical message window without falling back when missing', async () => {
   const historicalMessage = {
     id: '00000000-0000-4000-8000-000000000031',
@@ -956,6 +1000,109 @@ describe('DirectMessagesView user search', () => {
 
     await waitFor(() => expect(setCurrentConversationMock).toHaveBeenCalledWith(null));
   });
+
+  test('a saved DM return completes across loading and retrieval callback changes', async () => {
+    const { saveMessageScrollAnchor } = await import('../src/lib/messageScrollAnchor')
+    saveMessageScrollAnchor('u1', 'dm:restore-latch-test', { id: 'saved-return-row', offset: -15 })
+    let resolveWindow!: (resolved: boolean) => void
+    const windowResult = new Promise<boolean>(resolve => { resolveWindow = resolve })
+    const loadMessageWindow = jest.fn(() => windowResult)
+    const row = {
+      id: 'saved-return-row', conversation_id: 'restore-latch-test', sender_id: 'u1', content: 'Saved return row',
+      attachments: [], reactions: [], read_by: ['u1'], created_at: '2026-09-30T12:00:00.000Z',
+    }
+    const model = {
+      conversations: [{ id: 'restore-latch-test', other_user: user, last_message: null, unread_count: 0 }],
+      currentConversation: 'restore-latch-test', messages: [row], messagesConversationId: 'restore-latch-test',
+      loading: false, messagesLoading: false, loadingMore: false, hasMore: false, hasNewer: false, sending: false,
+      setCurrentConversation: setCurrentConversationMock, startConversation: startConversationMock,
+      sendMessage: jest.fn(), editMessage: jest.fn(), deleteMessage: jest.fn(), toggleReaction: jest.fn(),
+      markAsRead: jest.fn(), loadOlderMessages: jest.fn(), loadLatestMessages: jest.fn(),
+      loadReadWindow: jest.fn().mockResolvedValue(true), loadMessageWindow,
+    }
+    dmSpy.mockImplementation(() => model as any)
+    const originalRect = HTMLElement.prototype.getBoundingClientRect
+    const geometry = jest.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function(this: HTMLElement) {
+      if (this.dataset.testid === 'dm-message-scroll') return { top: 0, bottom: 400, height: 400 } as DOMRect
+      if (this.dataset.messageId === row.id) {
+        const top = 700 - (this.closest('[data-testid="dm-message-scroll"]')?.scrollTop ?? 0)
+        return { top, bottom: top + 60, height: 60 } as DOMRect
+      }
+      return originalRect.call(this)
+    })
+    try {
+      const view = () => <DirectMessagesView onToggleSidebar={() => {}} currentView="dms" onViewChange={() => {}} initialConversation="restore-latch-test" />
+      const { rerender } = render(view())
+      await waitFor(() => expect(loadMessageWindow).toHaveBeenCalledWith(row.id))
+      model.messagesLoading = true
+      rerender(view())
+      model.loadReadWindow = jest.fn().mockResolvedValue(true)
+      model.messagesLoading = false
+      rerender(view())
+      await act(async () => { resolveWindow(true); await windowResult })
+      await waitFor(() => expect(screen.getByTestId('dm-message-scroll')).toHaveAttribute('data-scroll-state', 'anchoredCatchup'))
+      expect(loadMessageWindow).toHaveBeenCalledTimes(1)
+      expect(screen.getByTestId('dm-message-scroll').scrollTop).toBe(715)
+    } finally {
+      geometry.mockRestore()
+      saveMessageScrollAnchor('u1', 'dm:restore-latch-test', null)
+    }
+  })
+
+  test('loading latest jumps to the committed DM window without cancellable smooth travel', async () => {
+    const makeRow = (index: number) => ({
+      id: `jump-${index}`, conversation_id: 'latest-jump-test', sender_id: 'u1', content: `Latest row ${index}`,
+      attachments: [], reactions: [], read_by: ['u1'], created_at: `2026-09-30T12:${String(index % 60).padStart(2, '0')}:00.000Z`,
+    })
+    let resolveLatest!: () => void
+    const latest = new Promise<void>(resolve => { resolveLatest = resolve })
+    const model = {
+      conversations: [{ id: 'latest-jump-test', other_user: user, last_message: null, unread_count: 0 }],
+      currentConversation: 'latest-jump-test', messages: [makeRow(1)], messagesConversationId: 'latest-jump-test',
+      loading: false, messagesLoading: false, loadingMore: false, hasMore: false, hasNewer: true, sending: false,
+      setCurrentConversation: setCurrentConversationMock, startConversation: startConversationMock,
+      sendMessage: jest.fn(), editMessage: jest.fn(), deleteMessage: jest.fn(), toggleReaction: jest.fn(),
+      markAsRead: jest.fn(), loadOlderMessages: jest.fn(), loadLatestMessages: jest.fn(() => latest),
+    }
+    dmSpy.mockImplementation(() => model as any)
+    const height = jest.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(function(this: HTMLElement) {
+      return this.dataset.testid === 'dm-message-scroll' ? this.querySelectorAll('[data-message-id]').length * 100 : 0
+    })
+    const client = jest.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(400)
+    const originalScrollTo = HTMLElement.prototype.scrollTo
+    const scrollTo = jest.fn(function(this: HTMLElement, options: ScrollToOptions) {
+      this.scrollTop = options.top ?? 0
+      // A browser emits native scroll events during a smooth journey, which used
+      // to revoke follow before the jump reached the newly committed rows.
+      if (options.behavior === 'smooth') {
+        this.scrollTop /= 2
+        fireEvent.scroll(this)
+      }
+    })
+    HTMLElement.prototype.scrollTo = scrollTo as typeof HTMLElement.prototype.scrollTo
+    try {
+      render(<DirectMessagesView onToggleSidebar={() => {}} currentView="dms" onViewChange={() => {}} initialConversation="latest-jump-test" />)
+      const button = await screen.findByRole('button', { name: 'Load latest messages' })
+      fireEvent.click(button)
+      expect(model.loadLatestMessages).toHaveBeenCalledTimes(1)
+      scrollTo.mockClear()
+      await act(async () => {
+        model.messages = Array.from({length: 80}, (_, index) => makeRow(index + 1))
+        model.hasNewer = false
+        resolveLatest()
+        await latest
+      })
+      const container = screen.getByTestId('dm-message-scroll')
+      await waitFor(() => expect(container).toHaveAttribute('data-loaded-count', '80'))
+      expect(container.scrollTop).toBe(7600)
+      expect(scrollTo).toHaveBeenCalledWith({ top: 7600, behavior: 'auto' })
+      expect(scrollTo.mock.calls.some(([options]) => options.behavior === 'smooth')).toBe(false)
+    } finally {
+      height.mockRestore()
+      client.mockRestore()
+      HTMLElement.prototype.scrollTo = originalScrollTo
+    }
+  })
 
   test('failed exact-message targets focus the thread header and can retry after reopening', async () => {
     const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {

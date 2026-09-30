@@ -263,6 +263,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
     if (!user) return
     setSaving(true)
     setError(null)
+    let nativeEnableRequested = false
 
     try {
       if (nativeApp) {
@@ -276,6 +277,7 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
           challenge.challenge,
           challenge.credentialChallenge,
         )
+        nativeEnableRequested = true
         const state = await requestNativeNotificationEnable(
           requestId,
           enrollment.ticket,
@@ -323,7 +325,11 @@ export function usePushNotifications(options: UsePushNotificationsOptions = {}) 
       const message = err instanceof Error ? err.message : 'Failed to enable push notifications.'
       setError(message)
       if (nativeApp) {
-        requestNativeNotificationState()
+        setNativeStage('failed')
+        // A native snapshot cannot explain a hosted ticket failure and would
+        // clear its error with an unrelated idle state. Refresh only after the
+        // enable command actually reached the native registration pipeline.
+        if (nativeEnableRequested) requestNativeNotificationState()
       } else {
         setPermission(getNotificationPermission())
       }

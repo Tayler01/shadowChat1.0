@@ -45,6 +45,7 @@
   "scripts": {
     "postinstall": "patch-package --error-on-fail",
     "test:dependencies": "node --test tests/runtime-dependency-compatibility.test.cjs",
+    "test:clipboard": "node --test tests/native-clipboard-controller.test.cjs",
     "assets:brand": "node scripts/generate-brand-icons.mjs",
     "start": "expo start",
     "android": "expo run:android",

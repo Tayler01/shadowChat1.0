@@ -28,6 +28,7 @@ import { createRealtimeChannelName } from '../lib/realtimeChannelName';
 import { triggerDMPushNotification, triggerReactionPushNotification } from '../lib/push';
 import {
   createClientMessageId,
+  findMatchingMessageIndex,
   isClientMessageIdSchemaError,
   isMediaThumbnailSchemaError,
   isReplyToSchemaError,
@@ -1000,7 +1001,13 @@ export function useConversationMessages(conversationId: string | null) {
 
     const message = await hydrateConversationMessage(incoming.id);
     if (!message || activeConversationIdRef.current !== incoming.conversation_id) return;
-    if (hasNewerRef.current) return;
+    const exists = findMatchingMessageIndex(latestMessagesRef.current, message) >= 0;
+    if (hasNewerRef.current && !exists) return;
+    const newest = latestMessagesRef.current.filter(isServerDMCursorMessage).slice(-1)[0];
+    if (!followingLatestRef.current && !exists && (!newest || compareMessageKey(message, newest) > 0)) {
+      updateHasNewer(true);
+      return;
+    }
 
     messageChangesRef.current.set(message.id, { revision: ++messageRevisionRef.current, deleted: false });
 
@@ -1012,7 +1019,7 @@ export function useConversationMessages(conversationId: string | null) {
         delivery_status: 'sent',
       },
     ], 'latest').messages);
-  }, [hydrateConversationMessage]);
+  }, [hydrateConversationMessage, updateHasNewer]);
 
   const handleRealtimeUpdate = useCallback((incoming: Partial<DMMessage>) => {
     if (

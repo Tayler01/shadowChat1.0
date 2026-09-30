@@ -1,6 +1,6 @@
 {
   "reviewed_on": "2026-09-30",
-  "expected_total_security_definers": 156,
+  "expected_total_security_definers": 158,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
     "private.can_operator_read_moderation_evidence(uuid,uuid)",
@@ -47,6 +47,7 @@
     "private.reject_shado_live_append_only_mutation()",
     "private.request_notification_delivery_v2(text)",
     "private.request_notification_delivery_v2_after_insert()",
+    "private.request_bounded_native_notification_canary()",
     "private.request_web_push_recovery()",
     "private.resolve_notification_installation_credential_v2(uuid,text)",
     "private.revoke_signup_invite(uuid,uuid,text)",
@@ -115,9 +116,14 @@
     "shadow_pin_private.set_my_feed_mode_impl(text)"
   ],
   "anon_signatures": [
-    "is_username_available(text)"
+    "is_username_available(text)",
+    "redeem_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,text,text,text,text,integer,text)",
+    "register_native_notification_token_by_credential_v2(uuid,text,text)",
+    "revoke_notification_installation_by_credential_v2(uuid,text)",
+    "set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)"
   ],
   "internal_signatures": [
+    "acquire_native_notification_worker_v2(text)",
     "block_hype_message_reactions()",
     "bridge_mark_dm_messages_read(uuid,uuid)",
     "claim_edge_request(uuid,text,text,integer,integer)",
@@ -129,7 +135,6 @@
     "configure_notification_v2_runtime(text,text[],uuid[],boolean,boolean,boolean,text,timestamp with time zone)",
     "consume_edge_request_bucket(uuid,text,integer,integer,integer)",
     "consume_hype_bonus(uuid)",
-    "create_my_native_notification_enrollment_ticket_v2(text,uuid,text,text)",
     "create_art_board_link(uuid,uuid,text)",
     "delete_art_board_item(uuid)",
     "delete_art_board_link(uuid)",
@@ -144,12 +149,10 @@
     "log_user_role_change()",
     "probe_notification_v2_worker(text)",
     "read_edge_request_claim(uuid,text,text)",
-    "redeem_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,text,text,text,text,integer,text)",
+    "release_native_notification_worker_v2(uuid)",
     "refresh_message_hype_summary(uuid)",
     "refresh_shado_tv_channel_latest_video(uuid)",
     "register_my_native_notification_token_v2(uuid,text,text,text)",
-    "register_native_notification_token_by_credential_v2(uuid,text,text)",
-    "revoke_notification_installation_by_credential_v2(uuid,text)",
     "shadow_checkers_update_stats_and_crown(uuid,uuid,integer,integer,integer,integer)",
     "shadow_war_create_active_rematch(uuid,uuid,uuid)",
     "shadow_war_record_completed_session()",
@@ -159,7 +162,6 @@
     "sync_shado_tv_channel_latest_video()",
     "sync_user_admin_role()",
     "sync_user_presence_visibility()",
-    "set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)",
     "toggle_art_board_reaction(uuid,text)",
     "toggle_board_chat_pin(uuid)",
     "toggle_board_chat_reaction(uuid,text)",
@@ -312,6 +314,13 @@
     "status_message"
   ],
   "domains": [
+    {
+      "domain": "native_notification_enrollment",
+      "justification": "Ticket minting derives the owner from auth.uid() and binds a five-minute single-use ticket to the native installation, verifier challenge and device credential hash; no caller-selected identity is accepted.",
+      "signatures": [
+        "create_my_native_notification_enrollment_ticket_v2(text,uuid,text,text)"
+      ]
+    },
     {
       "domain": "release_receipts",
       "justification": "Records the signed-in user's release acknowledgement through a guarded cross-table write.",

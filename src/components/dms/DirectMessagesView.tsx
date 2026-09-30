@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   MessageSquare,
@@ -843,7 +843,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const [searchUsername, setSearchUsername] = useState('')
   const inboxSearchInputRef = useRef<HTMLInputElement>(null)
   const [startingUsername, setStartingUsername] = useState<string | null>(null)
-  const messagesRef = useRef<HTMLDivElement>(null)
+  const messagesRef = useRef<HTMLDivElement | null>(null)
+  const [messageScrollElement, setMessageScrollElement] = useState<HTMLDivElement | null>(null)
+  const registerMessageScroll = useCallback((element: HTMLDivElement | null) => {
+    messagesRef.current = element
+    setMessageScrollElement(element)
+  }, [])
   const activeConversationRef = useRef(currentConversation)
   activeConversationRef.current = currentConversation
   const loadedMessagesRef = useRef(messages)
@@ -853,8 +858,10 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   const [positionPresented, setPositionPresented] = useState(false)
   const [targetUnavailable, setTargetUnavailable] = useState(false)
   const [ignoreInitialTarget, setIgnoreInitialTarget] = useState(false)
+  const [pendingLatestJump, setPendingLatestJump] = useState<{ conversationId: string; generation: number } | null>(null)
   const savedDMAnchor = useMemo(() => getSavedMessageScrollAnchor(profile?.id, `dm:${currentConversation || 'none'}`), [currentConversation, profile?.id])
   const readRestoreScopeRef = useRef<string | null>(null)
+  const readRestoreMountedRef = useRef(true)
   const prevHeightRef = useRef(0)
   const prevScrollTopRef = useRef(0)
   const olderLoadInFlightRef = useRef(false)
@@ -883,19 +890,36 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   } = useReadCursor('dm', currentConversation, Boolean(profile?.id && currentConversation))
 
   useEffect(() => {
+    readRestoreMountedRef.current = true
+    return () => { readRestoreMountedRef.current = false }
+  }, [])
+
+  useEffect(() => {
+    initialTargetJumpDoneRef.current = null
+    setReplyTo(null)
+    setPositionPresented(false)
+    setTargetUnavailable(false)
+    setIgnoreInitialTarget(false)
+    readRestoreScopeRef.current = null
+    setRestoredReadScope(null)
+    setReadRestoreError(false)
+  }, [currentConversation, profile?.id])
+
+  useEffect(() => {
     if (!currentConversation || !selectedThreadLoaded || messagesLoading || cursorLoading || initialMessageId) return
     if (readRestoreScopeRef.current === currentConversation) return
     readRestoreScopeRef.current = currentConversation
-    let disposed = false
+    const generation = targetRequestScopeRef.current.generation
+    const ownsRestore = () => readRestoreMountedRef.current && targetRequestScopeRef.current.generation === generation
     setReadRestoreError(false)
     const restore = savedDMAnchor && loadMessageWindow
-      ? loadMessageWindow(savedDMAnchor.id).then(resolved => resolved || (loadReadWindow ? loadReadWindow() : true))
+      ? loadMessageWindow(savedDMAnchor.id).then(resolved => resolved || (ownsRestore() && loadReadWindow ? loadReadWindow() : true))
       : loadReadWindow ? loadReadWindow() : Promise.resolve(true)
     void restore.then(resolved => {
-      if (!disposed && resolved) setRestoredReadScope(currentConversation)
-      else if (!disposed) setReadRestoreError(true)
-    }).catch(() => { if (!disposed) setReadRestoreError(true) })
-    return () => { disposed = true }
+      if (!ownsRestore()) return
+      if (resolved) setRestoredReadScope(currentConversation)
+      else setReadRestoreError(true)
+    }).catch(() => { if (ownsRestore()) setReadRestoreError(true) })
   }, [currentConversation, cursorLoading, initialMessageId, loadReadWindow, messagesLoading, selectedThreadLoaded, savedDMAnchor, loadMessageWindow])
 
   useEffect(() => {
@@ -1154,6 +1178,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     setAutoScroll,
     handleUnreadScroll,
     scrollToBottom,
+    scrollToBottomIfFollowing,
     feedState,
     initialPositionReady,
     captureScrollAnchor,
@@ -1170,6 +1195,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     enabled: Boolean(profile?.id && currentConversation),
     surfaceKey: `dm:${currentConversation || 'none'}`,
     readerId: profile?.id,
+    renderSignal: messageScrollElement,
     initialMessageId: ignoreInitialTarget ? null : initialMessageId,
     getMessageId: getDMMessageId,
     getMessageCreatedAt: getDMMessageCreatedAt,
@@ -1178,12 +1204,13 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     markInitialVisibleRead: true,
     markVisibleOnScroll: true,
     onMarkReadToLatest: markDMReadToLatest,
+    onFollowingChange: setFollowingLatest,
   })
 
-  useEffect(() => { setFollowingLatest?.(autoScroll && feedState === 'bottomPinned') }, [autoScroll, feedState, setFollowingLatest])
   useEffect(() => { if (initialPositionReady) setPositionPresented(true) }, [initialPositionReady])
 
   const handleJumpToLatest = useCallback(async () => {
+    if (!currentConversation) return
     const generation = ++targetRequestScopeRef.current.generation
     if (hasNewer || readRestoreError || targetUnavailable) {
       await loadLatestMessages()
@@ -1194,10 +1221,22 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     setRestoredReadScope(currentConversation)
     setReadRestoreError(false)
 
-    requestAnimationFrame(() => {
-      if (targetRequestScopeRef.current.generation === generation) scrollToBottom()
-    })
-  }, [currentConversation, hasNewer, loadLatestMessages, readRestoreError, targetUnavailable, scrollToBottom])
+    setPendingLatestJump({ conversationId: currentConversation, generation })
+  }, [currentConversation, hasNewer, loadLatestMessages, readRestoreError, targetUnavailable])
+
+  useLayoutEffect(() => {
+    if (!pendingLatestJump) return
+    if (currentConversation !== pendingLatestJump.conversationId || targetRequestScopeRef.current.generation !== pendingLatestJump.generation) {
+      setPendingLatestJump(null)
+      return
+    }
+    if (messagesLoading || loadingMore || cursorLoading || messagesConversationId !== pendingLatestJump.conversationId) return
+    // Consume explicit latest intent after React commits the fetched window.
+    // Smooth travel generates intermediate off-bottom scroll events, which can
+    // otherwise relinquish following and let an anchor cancel the jump midway.
+    scrollToBottom('auto')
+    setPendingLatestJump(null)
+  }, [currentConversation, cursorLoading, loadingMore, messagesConversationId, messagesLoading, pendingLatestJump, scrollToBottom])
 
   const clearHistoryRetry = useCallback(() => {
     if (historyRetryTimerRef.current !== null) {
@@ -1247,28 +1286,17 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       const el = messagesRef.current
       if (!el) return
 
-      handleUnreadScroll()
+      const atBottom = handleUnreadScroll()
 
       if (el.scrollTop <= HISTORY_LOAD_SCROLL_THRESHOLD) {
         requestOlderMessages()
-      } else if (hasNewer && !loadingMore && el.scrollHeight - el.scrollTop - el.clientHeight <= HISTORY_LOAD_SCROLL_THRESHOLD) {
+      } else if (atBottom && hasNewer && !loadingMore && el.scrollHeight - el.scrollTop - el.clientHeight <= HISTORY_LOAD_SCROLL_THRESHOLD) {
         captureScrollAnchor()
         setAutoScroll(false)
         void loadNewerMessages?.().catch(() => undefined)
       }
     })
   }, [captureScrollAnchor, handleUnreadScroll, hasNewer, loadNewerMessages, loadingMore, requestOlderMessages, setAutoScroll])
-
-  useEffect(() => {
-    initialTargetJumpDoneRef.current = null
-    setReplyTo(null)
-    setPositionPresented(false)
-    setTargetUnavailable(false)
-    setIgnoreInitialTarget(false)
-    readRestoreScopeRef.current = null
-    setRestoredReadScope(null)
-    setReadRestoreError(false)
-  }, [currentConversation, profile?.id])
 
   useEffect(() => {
     const el = messagesRef.current
@@ -1291,9 +1319,9 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
   useEffect(() => {
     if (autoScroll && typingUsers.length > 0) {
-      scrollToBottom('auto')
+      scrollToBottomIfFollowing()
     }
-  }, [autoScroll, scrollToBottom, typingUsers.length])
+  }, [autoScroll, scrollToBottomIfFollowing, typingUsers.length])
 
   useEffect(() => {
     if (
@@ -1572,15 +1600,17 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
             </div>}
 
             <div
-              ref={messagesRef}
+              ref={registerMessageScroll}
               onScroll={handleScroll}
               role="log"
               aria-label={`Direct messages with ${currentConv.other_user?.display_name || 'this member'}`}
               data-testid="dm-message-scroll"
+              data-scroll-state={feedState}
+              data-following-latest={autoScroll}
               data-loaded-count={messages.length}
               data-rendered-count={messages.length}
               data-has-newer={String(hasNewer)}
-              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)+4rem)] scroll-pt-[calc(env(safe-area-inset-top)_+_4rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)] md:pt-4 md:scroll-pt-4"
+              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)+4rem)] scroll-pt-[calc(env(safe-area-inset-top)_+_4rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)] md:pt-4 md:scroll-pt-4"
             >
               <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
                 {targetAnnouncement || (uploading

@@ -1,8 +1,11 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { GeneralChatThreadSheet } from '../src/features/general-chat-threads/GeneralChatThreadSheet'
 
 let mockDesktop = false
+let mockHasNewer = false
+const mockSetFollowingLatest = jest.fn()
+const mockLoadNewer = jest.fn().mockResolvedValue(undefined)
 
 const mockRootMessage = {
   id: 'root-1',
@@ -55,15 +58,15 @@ jest.mock('../src/features/general-chat-threads/useGeneralChatThread', () => ({
     loading: false,
     loadedThreadId: 'root-1',
     firstUnreadMessageId: 'reply-1',
-    hasNewer: false,
-    loadNewer: jest.fn(),
+    hasNewer: mockHasNewer,
+    loadNewer: mockLoadNewer,
     error: null,
     hasOlder: false,
     loadingOlder: false,
     pendingReplyCount: 0,
     loadOlder: jest.fn(),
     refresh: jest.fn().mockResolvedValue(undefined),
-    setFollowingLatest: jest.fn(),
+    setFollowingLatest: mockSetFollowingLatest,
   }),
 }))
 
@@ -108,6 +111,28 @@ const messagesApi = {
 describe('GeneralChatThreadSheet mobile shell', () => {
   beforeEach(() => {
     mockDesktop = false
+    mockHasNewer = false
+    mockSetFollowingLatest.mockClear()
+    mockLoadNewer.mockClear()
+  })
+
+  test('publishes native takeover synchronously and holds forward pages through a bottom micro-swipe', () => {
+    mockHasNewer = true
+    render(<GeneralChatThreadSheet open threadId={mockRootMessage.id} currentView="chat" onViewChange={jest.fn()} onClose={jest.fn()} messagesApi={messagesApi as never} />)
+    const scroll = screen.getByTestId('general-chat-thread-scroll')
+    Object.defineProperty(scroll, 'scrollHeight', { configurable: true, value: 1000 })
+    Object.defineProperty(scroll, 'clientHeight', { configurable: true, value: 400 })
+    scroll.scrollTop = 600
+    fireEvent.touchStart(scroll, { touches: [{clientX: 100, clientY: 160}] })
+    expect(mockSetFollowingLatest).toHaveBeenLastCalledWith(false)
+    fireEvent.touchMove(scroll, { touches: [{clientX: 100, clientY: 176}] })
+    scroll.scrollTop = 595
+    fireEvent.scroll(scroll)
+    expect(mockLoadNewer).not.toHaveBeenCalled()
+    fireEvent.touchEnd(scroll)
+    scroll.scrollTop = 600
+    fireEvent.scroll(scroll)
+    expect(mockLoadNewer).toHaveBeenCalledTimes(1)
   })
 
   test('uses the shared mobile footer, keeps pending-send focus enabled, and layers actions above the sheet', () => {

@@ -21,6 +21,31 @@ export interface MobileViewportState {
   toastTopSpacePx: number
 }
 
+/** Publish measured changes only: settle timers must not restart scroll/layout work. */
+export function applyMobileViewportState(root: HTMLElement, state: MobileViewportState, offsetTop: number): boolean {
+  const properties: Record<string, string> = {
+    '--shadowchat-app-height': `${state.appHeight}px`,
+    '--shadowchat-visual-viewport-height': `${state.visualViewportHeight}px`,
+    '--shadowchat-keyboard-inset': `${state.keyboardInset}px`,
+    '--shadowchat-mobile-scroll-keyboard-inset': `${state.scrollKeyboardInset}px`,
+    '--shadowchat-toast-top': `calc(${offsetTop}px + env(safe-area-inset-top) + ${state.toastTopRem}rem)`,
+    '--shadowchat-toast-top-space': `${state.toastTopSpacePx}px`,
+  }
+  let changed = false
+  for (const [name, value] of Object.entries(properties)) {
+    if (root.style.getPropertyValue(name) === value) continue
+    root.style.setProperty(name, value)
+    changed = true
+  }
+  const keyboard = state.keyboardOpen ? 'open' : 'closed'
+  if (root.dataset.shadowchatKeyboard !== keyboard) {
+    root.dataset.shadowchatKeyboard = keyboard
+    changed = true
+  }
+  if (changed) window.dispatchEvent(new Event(MOBILE_VIEWPORT_UPDATED_EVENT))
+  return changed
+}
+
 export function computeMobileViewportState({
   layoutHeight,
   visualViewportHeight,

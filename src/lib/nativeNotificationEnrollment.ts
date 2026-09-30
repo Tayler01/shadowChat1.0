@@ -17,6 +17,20 @@ export type NativeNotificationEnrollmentTicket = {
 const NATIVE_NOTIFICATION_TICKET_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.[0-9a-f]{64}$/i
 
+const enrollmentRpcError = (error: unknown) => {
+  if (error instanceof Error) return error
+  const code = error && typeof error === 'object' && 'code' in error
+    ? error.code
+    : null
+  if (code === '42501') {
+    return new Error('Phone push setup is paused on the ShadoChat server.')
+  }
+  if (code === 'PGRST202') {
+    return new Error('Phone push setup is not available on the ShadoChat server yet.')
+  }
+  return new Error('ShadoChat could not authorize this phone for notifications. Try again.')
+}
+
 export const createNativeNotificationEnrollmentTicket = async (
   expectedUserId: string,
   requestId: string,
@@ -51,7 +65,9 @@ export const createNativeNotificationEnrollmentTicket = async (
       target_credential_challenge: credentialChallenge,
     },
   )
-  if (error) throw error
+  // PostgREST errors are plain objects. Convert them at the enrollment boundary
+  // so Settings preserves the actual failure instead of its generic toast.
+  if (error) throw enrollmentRpcError(error)
 
   const record = (
     data && typeof data === 'object' && !Array.isArray(data)

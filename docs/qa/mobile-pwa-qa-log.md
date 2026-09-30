@@ -1,3 +1,11 @@
+## September 30 current mobile stability checkpoint
+
+Tayler physically confirmed build 16 removes the accessory toolbar; its older
+pending notes below are historical. Build 17 adds rotation/native movie paste,
+while shared swipe/scroll repairs target both hosts. Server enrollment repair
+and bounded worker deployment are verified; native delivery awaits current
+physical enrollment. See [current evidence](../features/mobile-stability-build17-2026-09-30.md).
+
 ## September 30 native Build 16 TestFlight release
 
 - Current complete hosted UI is retained; the shared native WebView now requests accessory-toolbar suppression. Expo Doctor 20/20, mobile lint/types, fresh install, audit, compatibility tests and iOS export passed. Signed Xcode compilation and Apple processing passed; Build 16 is VALID and IN_BETA_TESTING in the existing group. Physical iPhone suppression, media permissions, account resume and notification acceptance remain pending Tayler's TestFlight check.
@@ -308,6 +316,17 @@
 - Not physical-device proof: installed PWA safe areas, landscape lock, audio, background/foreground and thermal performance remain pending.
 
 # Mobile PWA QA Log
+
+## September 30 shared gesture and native follow-up
+
+Shared swipe/viewport and bottom-scroll ownership fixes passed focused tests
+and six probes each across Chromium/WebKit. Probes used actual shared hooks;
+WebKit synthetic swipe/keyboard-scroll evidence does not certify physical
+touch or UIKeyboard animation. General/DM/Pins native video-paste staging
+passed client tests. Tayler confirms native build 16 removes the accessory
+toolbar, while PWA variants do not. See
+[build 17 evidence](../features/mobile-stability-build17-2026-09-30.md) and
+[physical follow-up](real-device-mobile-validation.md).
 
 ## September 13 Shadow Checkers Unity landscape checkpoint
 

@@ -51,7 +51,7 @@ const sizes = {
   lg: 'px-6 py-3 text-base',
 };
 
-export function Button({
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button({
   variant = 'primary',
   size = 'md',
   loading = false,
@@ -59,11 +59,12 @@ export function Button({
   className = '',
   disabled,
   ...props
-}: ButtonProps) {
+}: ButtonProps, ref) {
   const hasExplicitPosition = /(^|\s)!?(absolute|fixed|sticky|static)(\s|$)/.test(className);
 
   return (
     <button
+      ref={ref}
       className={`
         comfort-button group ${hasExplicitPosition ? '' : 'relative'} inline-flex min-h-[var(--comfort-control-min-size)] items-center justify-center overflow-hidden
         font-medium rounded-[var(--radius-sm)]
@@ -99,4 +100,4 @@ export function Button({
       </span>
     </button>
   );
-}
+});

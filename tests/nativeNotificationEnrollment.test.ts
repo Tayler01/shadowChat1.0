@@ -80,6 +80,22 @@ describe('native notification enrollment ticket authority', () => {
     expect(rpc).not.toHaveBeenCalled()
   })
 
+  it.each([
+    ['42501', 'Phone push setup is paused on the ShadoChat server.'],
+    ['PGRST202', 'Phone push setup is not available on the ShadoChat server yet.'],
+    ['XX000', 'ShadoChat could not authorize this phone for notifications. Try again.'],
+  ])('returns an actionable Error for plain PostgREST failure %s', async (code, message) => {
+    rpc.mockResolvedValueOnce({ data: null, error: { code, message: 'Internal server detail' } })
+
+    await expect(createNativeNotificationEnrollmentTicket(
+      userId,
+      requestId,
+      installationKey,
+      'b'.repeat(64),
+      'c'.repeat(64),
+    )).rejects.toThrow(message)
+  })
+
   it('rejects an account change before minting', async () => {
     mockedGetSessionWithTimeout.mockResolvedValue({
       data: {

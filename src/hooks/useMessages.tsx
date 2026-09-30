@@ -699,6 +699,8 @@ function useProvideMessages(): MessagesContextValue {
   const resetInFlightRef = useRef<Promise<void> | null>(null);
   const fetchRequestIdRef = useRef(0);
   const loadedOlderRef = useRef(false);
+  const followingLatestRef = useRef(true);
+  const setFollowingLatest = useCallback((following: boolean) => { followingLatestRef.current = following; }, []);
   const pendingIntentsRef = useRef(new Set<string>());
   const activeUserIdRef = useRef(user?.id);
   activeUserIdRef.current = user?.id;
@@ -815,10 +817,8 @@ function useProvideMessages(): MessagesContextValue {
         : true;
 
       if (
-        windowModeRef.current !== 'latest' &&
+        (windowModeRef.current !== 'latest' || !followingLatestRef.current || hasNewerRef.current) &&
         !existsInCurrentWindow &&
-        user &&
-        normalizedMessage.user_id !== user.id &&
         isNewerThanWindow
       ) {
         setHasNewerValue(true);
@@ -1124,7 +1124,7 @@ function useProvideMessages(): MessagesContextValue {
 
   const refreshVisibleMessages = useCallback(async () => {
     const container = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
-    const browsing = hasNewerRef.current || loadedOlderRef.current || Boolean(container && container.scrollHeight - container.scrollTop - container.clientHeight > 80)
+    const browsing = !followingLatestRef.current || hasNewerRef.current || loadedOlderRef.current || Boolean(container && container.scrollHeight - container.scrollTop - container.clientHeight > 80)
     if (!browsing) { await fetchMessages(); return }
     const finishReconnectTiming = beginChatTiming('reconnect', 'general')
     const snapshotRevision = messageRevisionRef.current
@@ -1848,6 +1848,7 @@ function useProvideMessages(): MessagesContextValue {
     loadNewerMessages,
     ensureMessageWindow,
     compactToLatestMessages,
+    setFollowingLatest,
     refreshThreadSummaries,
   };
 }

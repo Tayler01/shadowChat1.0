@@ -54,8 +54,11 @@ describe('ShadowPin Creator Studio entrypoint contracts', () => {
   test('mobile footer, visual viewport, safe area, and reduced-motion behavior stay centralized', () => {
     const studio = source('src/features/shadow-pin/creator/ShadowPinCreatorStudio.tsx')
     const app = source('src/App.tsx')
+    const viewport = source('src/lib/mobileViewport.ts')
 
-    expect(app).toContain("root.style.setProperty('--shadowchat-visual-viewport-height'")
+    expect(app).toContain('applyMobileViewportState(root, viewportState, viewportOffsetTop)')
+    expect(viewport).toContain("'--shadowchat-visual-viewport-height'")
+    expect(viewport).toContain('root.style.setProperty(name, value)')
     expect(app).toContain("window.visualViewport?.addEventListener('resize'")
     expect(studio).toContain('var(--shadowchat-visual-viewport-height,100dvh)')
     expect(studio).toContain('env(safe-area-inset-bottom)')

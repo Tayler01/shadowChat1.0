@@ -9,7 +9,208 @@ import {
   resolveNotificationSoundPreference,
   shouldAttemptExpoTarget,
   toExpoMessage,
+  NATIVE_CANARY_LIMITS,
+  isNativeCanaryEnabled,
+  getNativeProviderTimeout,
+  runNativeCanaryClaims,
 } from './index.ts'
+
+const canaryRuntime = {
+  delivery_mode: 'active', worker_invocation_enabled: true,
+  receipt_reconciliation_enabled: true, all_users_enabled: false,
+  canary_user_ids: ['11111111-1111-4111-8111-111111111111'],
+  enabled_categories: ['dm'], activation_watermark: new Date().toISOString(),
+}
+
+Deno.test('native canary gates fail closed for disabled, global and unscoped delivery', () => {
+  assert.equal(isNativeCanaryEnabled(canaryRuntime, 'deliver'), true)
+  assert.equal(isNativeCanaryEnabled(null, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, delivery_mode: 'disabled' }, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, all_users_enabled: true }, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, canary_user_ids: [] }, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, enabled_categories: [] }, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, receipt_reconciliation_enabled: false }, 'receipts'), false)
+})
+
+Deno.test('provider budget reserves persistence within an eight-second invocation', () => {
+  assert.equal(NATIVE_CANARY_LIMITS.runtimeMs, 8_000)
+  assert.ok(NATIVE_CANARY_LIMITS.events * NATIVE_CANARY_LIMITS.installationsPerEvent <= 5)
+  assert.equal(getNativeProviderTimeout(8_000, 0), 3_000)
+  assert.equal(getNativeProviderTimeout(4_000, 1_000), 1_000)
+  assert.equal(getNativeProviderTimeout(2_000, 1_000), 0)
+})
+
+Deno.test('one native claim round never starts more than two simultaneous events', async () => {
+  let active = 0
+  let peak = 0
+  const output = await runNativeCanaryClaims([1, 2], async id => {
+    active += 1
+    peak = Math.max(peak, active)
+    await new Promise(resolve => setTimeout(resolve, 1))
+    active -= 1
+    return { id }
+  })
+  assert.equal(peak, 2)
+  assert.deepEqual(output, [{ id: 1 }, { id: 2 }])
+  await assert.rejects(runNativeCanaryClaims([1, 2, 3], async () => ({})), /bound exceeded/)
+})
+
+const withWorkerMock = async (
+  fetchMock: typeof fetch,
+  run: () => Promise<void>,
+) => {
+  const previousFetch = globalThis.fetch
+  const overrides = { NOTIFICATION_V2_WORKER_SECRET: 'native-canary-test-secret',
+    NOTIFICATION_DELIVERY_ENVIRONMENT: 'preview', SUPABASE_URL: 'https://test.supabase.co',
+    SUPABASE_SERVICE_ROLE_KEY: 'test-service-role' }
+  const previous = Object.fromEntries(Object.keys(overrides).map(key => [key, Deno.env.get(key)]))
+  for (const [key, value] of Object.entries(overrides)) Deno.env.set(key, value)
+  globalThis.fetch = fetchMock
+  try { await run() } finally {
+    globalThis.fetch = previousFetch
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) Deno.env.delete(key)
+      else Deno.env.set(key, value)
+    }
+  }
+}
+const canaryRequest = (action = 'bounded_canary', task = 'deliver') => new Request('https://worker.test', {
+  method: 'POST', headers: { 'x-shadowchat-worker-secret': 'native-canary-test-secret' },
+  body: JSON.stringify({ action, task }),
+})
+
+Deno.test('legacy delivery and receipt actions cannot wake database or Expo work', async () => {
+  let calls = 0
+  await withWorkerMock(() => { calls += 1; throw new Error('Unexpected network') }, async () => {
+    for (const action of ['deliver', 'receipts']) {
+      assert.equal((await handleNotificationDeliveryRequest(canaryRequest(action))).status, 400)
+    }
+  })
+  assert.equal(calls, 0)
+})
+
+Deno.test('disabled runtime checks only its singleton row and never claims or calls a provider', async () => {
+  const paths: string[] = []
+  await withWorkerMock(input => {
+    paths.push(new URL(String(input)).pathname)
+    return Promise.resolve(Response.json([{ ...canaryRuntime, delivery_mode: 'disabled' }]))
+  }, async () => {
+    const result = await handleNotificationDeliveryRequest(canaryRequest())
+    assert.equal(result.status, 200)
+    assert.equal((await result.json()).claimed, 0)
+  })
+  assert.deepEqual(paths, ['/rest/v1/notification_v2_runtime_config'])
+})
+
+const createDeliveryFaultBackend = (provider: () => Promise<Response>, receipt = false) => {
+  const userId = canaryRuntime.canary_user_ids[0]
+  const eventId = '22222222-2222-4222-8222-222222222222'
+  const installationId = '33333333-3333-4333-8333-333333333333'
+  const target: Record<string, unknown> = { id: 'target', outbox_id: 'outbox', installation_id: installationId,
+    status: receipt ? 'accepted' : 'pending', attempt_count: 0,
+    provider_message_id: receipt ? 'ticket-one' : null,
+    receipt_attempt_count: receipt ? 2 : 0, receipt_expires_at: new Date(Date.now() + 60_000).toISOString() }
+  let providerCalls = 0
+  const fetchMock: typeof fetch = async (input, init) => {
+    const url = new URL(String(input))
+    if (url.host === 'exp.host') { providerCalls += 1; return await provider() }
+    const name = url.pathname.split('/').at(-1)
+    if (name === 'notification_v2_runtime_config') return Response.json([canaryRuntime])
+    if (name === 'acquire_native_notification_worker_v2') return Response.json('worker-lease')
+    if (name === 'release_native_notification_worker_v2' || name === 'validate_notification_outbox_v2_lease' || name === 'complete_notification_outbox_v2') return Response.json(true)
+    if (name === 'claim_notification_outbox_v2') return Response.json([{ outbox_id: 'outbox', lease_token: 'lease', event_id: eventId, user_id: userId, expires_at: new Date(Date.now() + 90_000).toISOString() }])
+    if (name === 'notification_outbox_v2') return Response.json([{ attempt_count: 1, max_attempts: 3 }])
+    if (name === 'notification_events') return Response.json([{ id: eventId, type: 'dm_message', entity_id: eventId, actor_id: null, conversation_id: null, read_at: null, resolved_at: null }])
+    if (name === 'notification_envelopes_v2') return Response.json([{ event_id: eventId, user_id: userId, category_key: 'dm', title: 'Message', body: 'Canary', private_title: 'Notification', private_body: null, actor_id: null, route: '/?view=dms', group_key: `dm:${eventId}`, priority: 'high', action_keys: ['open'], sound_id: 'system_default', android_channel_key: 'messages_v1', badge_category: 'dm', media_ref: null, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 90_000).toISOString() }])
+    if (name === 'notification_preferences') return Response.json([{ notifications_enabled: true }])
+    if (name === 'notification_installations') return Response.json([{ id: installationId, platform: 'ios', environment: 'preview', foreground_until: null, channel_schema_version: 2 }])
+    if (name === 'list_notification_native_delivery_tokens_v2') return Response.json([{ id: 'token', installation_id: installationId, provider: 'expo', environment: 'preview', token: 'ExponentPushToken[test]' }])
+    if (name === 'notification_delivery_targets_v2') {
+      if (receipt && url.searchParams.get('receipt_expires_at')?.startsWith('lte.')) return Response.json([])
+      if (init?.method === 'PATCH') Object.assign(target, JSON.parse(String(init.body)))
+      return Response.json([target])
+    }
+    if (name === 'get_app_badge_state_v2') return Response.json({ total: 0 })
+    if (name === 'notification_event_presentation_preferences' || name === 'notification_category_presentation_preferences') return Response.json([])
+    throw new Error(`Unexpected test backend call: ${name}`)
+  }
+  return { fetchMock, target, calls: () => providerCalls }
+}
+
+Deno.test('lost provider response stays terminal and is never resubmitted on recovery', async () => {
+  const backend = createDeliveryFaultBackend(() => Promise.reject(new Error('Connection lost')))
+  await withWorkerMock(backend.fetchMock, async () => {
+    assert.equal((await handleNotificationDeliveryRequest(canaryRequest())).status, 200)
+    assert.equal(backend.target.status, 'failed')
+    assert.equal((await handleNotificationDeliveryRequest(canaryRequest())).status, 200)
+  })
+  assert.equal(backend.calls(), 1)
+})
+
+Deno.test('accepted Expo targets are excluded from a subsequent claim', async () => {
+  const backend = createDeliveryFaultBackend(() => Promise.resolve(Response.json({ data: [{ status: 'ok', id: 'ticket-one' }] })))
+  await withWorkerMock(backend.fetchMock, async () => {
+    assert.equal((await handleNotificationDeliveryRequest(canaryRequest())).status, 200)
+    assert.equal(backend.target.status, 'accepted')
+    assert.equal((await handleNotificationDeliveryRequest(canaryRequest())).status, 200)
+  })
+  assert.equal(backend.calls(), 1)
+})
+
+Deno.test('explicit provider throttling permits a bounded retry', async () => {
+  let first = true
+  const backend = createDeliveryFaultBackend(() => {
+    if (first) { first = false; return Promise.resolve(new Response('', { status: 429 })) }
+    return Promise.resolve(Response.json({ data: [{ status: 'ok', id: 'ticket-two' }] }))
+  })
+  await withWorkerMock(backend.fetchMock, async () => {
+    assert.equal((await handleNotificationDeliveryRequest(canaryRequest())).status, 200)
+    assert.equal(backend.target.status, 'pending')
+    assert.equal((await handleNotificationDeliveryRequest(canaryRequest())).status, 200)
+    assert.equal(backend.target.status, 'accepted')
+  })
+  assert.equal(backend.calls(), 2)
+})
+
+Deno.test('a stalled database request aborts within the invocation deadline', async () => {
+  let observedAbort = false
+  await withWorkerMock((_input, init) => new Promise((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => {
+      observedAbort = true
+      reject(new DOMException('Aborted', 'AbortError'))
+    }, { once: true })
+  }), async () => {
+    const start = Date.now()
+    const response = await handleNotificationDeliveryRequest(canaryRequest())
+    assert.equal(response.status, 500)
+    assert.ok(Date.now() - start < NATIVE_CANARY_LIMITS.runtimeMs + 1_000)
+  })
+  assert.equal(observedAbort, true)
+})
+
+Deno.test('a failed final receipt HTTP attempt exhausts the reserved retry budget', async () => {
+  const backend = createDeliveryFaultBackend(() => Promise.reject(new Error('Receipt transport lost')), true)
+  await withWorkerMock(backend.fetchMock, async () => {
+    const response = await handleNotificationDeliveryRequest(canaryRequest('bounded_canary', 'receipts'))
+    assert.equal(response.status, 200)
+    assert.equal(backend.target.receipt_attempt_count, 3)
+    assert.equal(backend.target.status, 'failed')
+    assert.equal((await response.json()).failed, 1)
+  })
+  assert.equal(backend.calls(), 1)
+})
+
+Deno.test('a returned success receipt completes even the final reserved attempt', async () => {
+  const backend = createDeliveryFaultBackend(() => Promise.resolve(Response.json({ data: { 'ticket-one': { status: 'ok' } } })), true)
+  await withWorkerMock(backend.fetchMock, async () => {
+    const response = await handleNotificationDeliveryRequest(canaryRequest('bounded_canary', 'receipts'))
+    assert.equal(response.status, 200)
+    assert.equal(backend.target.receipt_attempt_count, 3)
+    assert.equal(backend.target.status, 'delivered')
+    assert.equal((await response.json()).delivered, 1)
+  })
+  assert.equal(backend.calls(), 1)
+})
 
 Deno.test('partial Expo success keeps the outbox retryable and does not resend accepted targets', () => {
   const accepted = classifyExpoTicket({ status: 'ok', id: 'ticket-one' })

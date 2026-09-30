@@ -174,12 +174,17 @@ describe('usePushNotifications in the native container', () => {
     )
     const { result } = renderHook(() => usePushNotifications())
     await waitFor(() => expect(result.current.loading).toBe(false))
+    mockedRequestNativeNotificationState.mockClear()
 
     await act(async () => {
       await expect(result.current.enablePush()).rejects.toThrow('Ticket mint failed.')
     })
 
     expect(mockedRequestNativeNotificationEnable).not.toHaveBeenCalled()
+    expect(mockedRequestNativeNotificationState).not.toHaveBeenCalled()
+    expect(result.current.error).toBe('Ticket mint failed.')
+    expect(result.current.nativeStage).toBe('failed')
+    expect(result.current.saving).toBe(false)
   })
 
   it('keeps a late native busy snapshot from permanently relocking the switch', async () => {

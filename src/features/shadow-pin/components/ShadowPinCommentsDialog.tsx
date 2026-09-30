@@ -37,6 +37,7 @@ import { useUnreadScroll } from '../../../hooks/useUnreadScroll'
 import { beginChatTiming, measureChatInputFrame } from '../../../lib/chatPerformance'
 import { useStagedAttachments } from '../../../hooks/useStagedAttachments'
 import { useComposerKeyboardDismiss } from '../../../hooks/useComposerKeyboardDismiss'
+import { useNativeVideoPaste } from '../../../hooks/useNativeVideoPaste'
 import { StagedAttachmentList } from '../../../components/chat/StagedAttachmentList'
 import { clipboardHasNoReadableContent, extractComposerFiles, hasClipboardFileIntent } from '../../../lib/composerAttachments'
 import { getWorkingClient } from '../../../lib/supabase'
@@ -524,14 +525,15 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
     if (!next || compareMessageKey({ created_at: next.last_read_at, id: next.last_read_message_id }, candidate) < 0) throw new Error('Earlier unread comments have not been observed.')
   }, [image.id, profileUser, ready, userId])
 
+  const followingRef = useRef(true)
   const { autoScroll, feedState, handleUnreadScroll, scrollToBottom, setAutoScroll, captureScrollAnchor, restoreScrollAnchor } = useUnreadScroll({
     containerRef: commentsScrollRef, messages: comments, loading, cursor, cursorLoading: !ready,
     restorationReady: ready && !targetUnavailable, enabled: open && !profileUser,
-    surfaceKey: `pin:${image.id}`, readerId: userId, initialMessageId: initialCommentId || (restoringSavedAnchor ? savedAnchor?.id : undefined),
+    surfaceKey: `pin:${image.id}`, readerId: userId, initialMessageId: initialCommentId,
     getMessageId: commentId, getMessageCreatedAt: commentCreatedAt, getElementId: commentElementId,
     markInitialVisibleRead: true, markVisibleOnScroll: true, onMarkReadToLatest: acknowledgeVisible,
+    onFollowingChange: following => { followingRef.current = following },
   })
-  const followingRef = useRef(autoScroll)
   followingRef.current = autoScroll
   useLayoutEffect(() => () => {
     const container = commentsScrollRef.current
@@ -796,15 +798,21 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
     imageId: string
   } | null>(null)
   const stageFiles = (files: File[]) => {
-    if (editing) { setError('Finish editing before attaching files.'); return }
+    if (editing) { setError('Finish editing before attaching files.'); return 0 }
     try {
       const result = attachments.addFiles(files)
       setError(result.errors.length ? result.errors.join(' ') : null)
-    } catch (stageError) { setError(stageError instanceof Error ? stageError.message : 'Unable to attach files.') }
+      return result.accepted
+    } catch (stageError) { setError(stageError instanceof Error ? stageError.message : 'Unable to attach files.'); return 0 }
   }
+  const { recoverVideoPaste, pastingVideo } = useNativeVideoPaste(`pin:${user?.id}:${image.id}:${open}`, stageFiles)
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = extractComposerFiles(event.clipboardData)
     if (!files.length) {
+      if ((hasClipboardFileIntent(event.clipboardData) || clipboardHasNoReadableContent(event.clipboardData)) && recoverVideoPaste()) {
+        event.preventDefault()
+        return
+      }
       if (hasClipboardFileIntent(event.clipboardData)) setError('This clipboard did not provide a file to paste. Use Attach files to choose it instead.')
       else if (clipboardHasNoReadableContent(event.clipboardData)) setError('Nothing usable came through from the clipboard. For a video, use Attach files instead.')
       return
@@ -1020,7 +1028,7 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
           </button>
         </div>
 
-        <div ref={commentsScrollRef} onScroll={handleUnreadScroll} data-testid="shadow-pin-comment-scroll" data-scroll-state={feedState} className="min-h-0 flex-1 overflow-y-auto p-4" style={{ overflowAnchor: 'none' }}>
+        <div ref={commentsScrollRef} onScroll={handleUnreadScroll} data-testid="shadow-pin-comment-scroll" data-scroll-state={feedState} className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4" style={{ overflowAnchor: 'none' }}>
           {targetUnavailable && <p role="status" className="p-4 text-sm">This comment is no longer available. <button type="button" className="min-h-11 underline" onClick={() => { setTargetUnavailable(false); void jumpToLatest() }}>Show latest comments</button></p>}
           {loading ? (
             <div className="flex min-h-40 items-center justify-center gap-2" role="status" aria-label="Loading ShadowPin comments"><Loader2 className="h-6 w-6 animate-spin text-[var(--text-gold)]" /><span className="sr-only">Loading comments</span></div>
@@ -1107,6 +1115,7 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
             </div>
             <button
               type="button"
+              ref={keyboard.gestureHandleRef}
               onClick={() => { if (suppressSendClickRef.current) { suppressSendClickRef.current = false; return }; void submit() }}
               onMouseDown={event => event.preventDefault()}
               onPointerDown={event => { suppressSendClickRef.current = false; keyboard.beginGesture(event) }}
@@ -1123,6 +1132,7 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
             </button>
           </div>
           <p id="shadow-pin-comment-composer-help" className="sr-only">Press Enter to post. Press Shift and Enter for a new line.</p>
+          {pastingVideo && <p role="status" className="mt-2 text-xs text-[var(--text-muted)]">Pasting video…</p>}
         </div>
         </div>
       </div>

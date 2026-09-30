@@ -47,6 +47,7 @@ export interface MessagesContextValue {
   loadNewerMessages: () => Promise<void>
   ensureMessageWindow: (targetMessageId: string | null, options?: EnsureMessageWindowOptions) => Promise<Message | null>
   compactToLatestMessages: () => void
+  setFollowingLatest?: (following: boolean) => void
   refreshThreadSummaries?: (rootMessageIds?: string[]) => Promise<void>
 }
 

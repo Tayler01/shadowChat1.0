@@ -24,6 +24,7 @@ import {
 } from 'react-native-webview';
 
 import { useNativeNotifications } from '@/hooks/useNativeNotifications';
+import { useNativeClipboardBridge } from '@/hooks/useNativeClipboardBridge';
 import {
   parseNativeWebMessage,
   publishNativeNotificationEnrollmentChallenge,
@@ -99,6 +100,7 @@ function ConfigurationNotice() {
 
 export default function ShadowChatAppScreen() {
   const webViewRef = useRef<WebView>(null);
+  const clipboardBridge = useNativeClipboardBridge(webViewRef, APP_ORIGIN);
   const authSyncRef = useRef<Promise<Session | null> | null>(null);
   const commandQueueRef = useRef<SerializedCommandQueue | null>(null);
   const notificationCommandQueueRef = useRef<SerializedCommandQueue | null>(null);
@@ -483,9 +485,10 @@ export default function ShadowChatAppScreen() {
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     if (!isAllowedAppUrl(event.nativeEvent.url)) return;
+    if (clipboardBridge.handle(event.nativeEvent.data, event.nativeEvent.url)) return;
     const message = parseNativeWebMessage(event.nativeEvent.data);
     if (message) processNativeMessage(message);
-  }, [processNativeMessage]);
+  }, [clipboardBridge, processNativeMessage]);
 
   const handleNavigationChange = useCallback((navigation: WebViewNavigation) => {
     setCanGoBack(navigation.canGoBack);
@@ -528,11 +531,14 @@ export default function ShadowChatAppScreen() {
         hideKeyboardAccessoryView
         contentInsetAdjustmentBehavior="never"
         decelerationRate="normal"
-        injectedJavaScriptBeforeContentLoaded={NATIVE_BOOTSTRAP_SCRIPT}
+        injectedJavaScriptBeforeContentLoaded={`window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = ${JSON.stringify(clipboardBridge.available)};${NATIVE_BOOTSTRAP_SCRIPT}`}
         javaScriptCanOpenWindowsAutomatically={false}
         javaScriptEnabled
         mediaPlaybackRequiresUserAction={false}
-        onContentProcessDidTerminate={() => setReloadKey(value => value + 1)}
+        onContentProcessDidTerminate={() => {
+          clipboardBridge.reset();
+          setReloadKey(value => value + 1);
+        }}
         onError={(event) => {
           setLoadError(
             event.nativeEvent.description || 'Could not load ShadoChat.'
@@ -548,14 +554,17 @@ export default function ShadowChatAppScreen() {
           setLoadError(null);
           publishNotificationState();
         }}
-        onLoadStart={() => setWebReady(false)}
+        onLoadStart={() => {
+          clipboardBridge.reset();
+          setWebReady(false);
+        }}
         onMessage={(event) => {
           void handleMessage(event);
         }}
         onNavigationStateChange={handleNavigationChange}
         onShouldStartLoadWithRequest={handleNavigationRequest}
         originWhitelist={['https://*', 'about:blank']}
-        pullToRefreshEnabled
+        pullToRefreshEnabled={false}
         setSupportMultipleWindows={false}
         sharedCookiesEnabled
         source={{

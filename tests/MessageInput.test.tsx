@@ -337,7 +337,7 @@ test('sends a pasted ShadowPin storage image link as an image message', async ()
   expect(textarea).toHaveValue('')
 })
 
-test('touch tapping the send button sends once and suppresses text selection', async () => {
+test('touch tapping the send button sends once with native panning disabled on the handle', async () => {
   const onSendMessage = jest.fn()
 
   render(<MessageInput onSendMessage={onSendMessage} />)
@@ -348,10 +348,7 @@ test('touch tapping the send button sends once and suppresses text selection', a
     fireEvent.change(textarea, { target: { value: 'tap send' } })
   })
 
-  const touchStart = createEvent.touchStart(sendButton)
-  const preventDefault = jest.spyOn(touchStart, 'preventDefault')
-  fireEvent(sendButton, touchStart)
-  expect(preventDefault).toHaveBeenCalled()
+  expect(sendButton).toHaveClass('touch-none')
 
   dispatchTouchPointer(sendButton, 'pointerDown', 100, 100)
   dispatchTouchPointer(sendButton, 'pointerUp', 100, 100)
@@ -785,6 +782,37 @@ test('a pasted video stays staged until regular Send includes its caption', asyn
   expect(onSendMessage).toHaveBeenCalledWith(JSON.stringify({ name: 'clip.mp4', size: 5, type: 'video/mp4', caption: 'Video caption' }), 'video', 'https://example.com/clip.mp4', undefined, undefined, expect.any(String), expect.any(Function))
 })
 
+test.each(['general', 'dm:recipient'])('empty native video paste stages and regular Send retains the caption in %s', async cacheKey => {
+  window.__SHADOWCHAT_NATIVE_APP__ = true
+  window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = true
+  window.ReactNativeWebView = { postMessage: jest.fn() }
+  try {
+    uploadChatFileAsset.mockResolvedValue({ path: 'clip.mov', publicUrl: 'https://example.com/clip.mov' })
+    const onSendMessage = jest.fn().mockResolvedValue({ id: 'sent' })
+    render(<MessageInput onSendMessage={onSendMessage} cacheKey={cacheKey} identityKey="native-account" />)
+    const textarea = screen.getByRole('textbox')
+    fireEvent.change(textarea, { target: { value: 'Native video caption' } })
+    fireEvent.paste(textarea, { clipboardData: { files: [], items: [], types: [], getData: () => '' } })
+    expect(screen.getByRole('status')).toHaveTextContent('Pasting video')
+    const request = JSON.parse((window.ReactNativeWebView.postMessage as jest.Mock).mock.calls[0][0])
+    await act(async () => {
+      const emit = (record: Record<string, unknown>) => window.dispatchEvent(new CustomEvent('shadowchat:native-message', { detail: { ...request, ...record } }))
+      emit({ type: 'clipboard_manifest', files: [{ name: 'clip.mov', type: 'video/quicktime', size: 5 }] })
+      emit({ type: 'clipboard_chunk', index: 0, offset: 0, data: btoa('video') })
+    })
+    expect(screen.getByRole('button', { name: 'Remove clip.mov' })).toBeInTheDocument()
+    expect(textarea).toHaveValue('Native video caption')
+    expect(uploadChatFileAsset).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+    await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(1))
+    expect(onSendMessage).toHaveBeenCalledWith(JSON.stringify({ name: 'clip.mov', size: 5, type: 'video/quicktime', caption: 'Native video caption' }), 'video', 'https://example.com/clip.mov', undefined, undefined, expect.any(String), expect.any(Function))
+  } finally {
+    delete window.__SHADOWCHAT_NATIVE_APP__
+    delete window.__SHADOWCHAT_NATIVE_CLIPBOARD__
+    delete window.ReactNativeWebView
+  }
+})
+
 test('retry preserves attachment caption, reply and message ID while sending new text as a separate intent', async () => {
   uploadChatImageAsset.mockResolvedValue({ path: 'photo.png', publicUrl: 'https://example.com/photo.png' })
   const onSendMessage = jest.fn().mockResolvedValueOnce(null).mockResolvedValue({ id: 'sent' })
@@ -967,6 +995,36 @@ test('a downward Send swipe dismisses input and cancels Hype without sending or 
     expect(textarea).not.toHaveClass('touch-none')
   } finally {
     jest.useRealTimers()
+  }
+})
+
+test('the mobile Send button claims native touch movement before a slow dismissal', () => {
+  const originalWidth = window.innerWidth
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  const onSendMessage = jest.fn()
+  try {
+    render(<MessageInput cacheKey="native-swipe-isolated" onSendMessage={onSendMessage} />)
+    const textarea = screen.getByRole('textbox')
+    fireEvent.change(textarea, { target: { value: 'Keep this native swipe draft' } })
+    act(() => textarea.focus())
+    const send = screen.getByRole('button', { name: 'Send message' })
+    dispatchTouchPointer(send, 'pointerDown', 150, 100)
+    fireEvent.touchStart(send, { touches: [{ identifier: 4, clientX: 150, clientY: 100 }] })
+    const smallMove = createEvent.touchMove(send, {
+      bubbles: true, cancelable: true, touches: [{ identifier: 4, clientX: 150, clientY: 103 }],
+    })
+    fireEvent(send, smallMove)
+    expect(smallMove.defaultPrevented).toBe(true)
+    expect(textarea).toHaveFocus()
+    fireEvent.touchMove(send, { touches: [{ identifier: 4, clientX: 150, clientY: 140 }] })
+    dispatchTouchPointer(send, 'pointerUp', 150, 140)
+    fireEvent.touchEnd(send, { touches: [] })
+    fireEvent.click(send)
+    expect(textarea).not.toHaveFocus()
+    expect(textarea).toHaveValue('Keep this native swipe draft')
+    expect(onSendMessage).not.toHaveBeenCalled()
+  } finally {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth })
   }
 })
 

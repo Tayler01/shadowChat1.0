@@ -33,6 +33,7 @@ import { buildAttachmentMessageContent, classifyComposerFile, clipboardHasNoRead
 import { useStagedAttachments, type AttachmentStageView } from '../../hooks/useStagedAttachments'
 import { measureChatInputFrame } from '../../lib/chatPerformance'
 import { useComposerKeyboardDismiss } from '../../hooks/useComposerKeyboardDismiss'
+import { useNativeVideoPaste } from '../../hooks/useNativeVideoPaste'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 const GifPicker = React.lazy(() => import('./GifPicker').then(module => ({ default: module.GifPicker })))
@@ -709,6 +710,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     e.target.value = ''
     if (files.length > 0) stageFiles(files)
   }
+  const { recoverVideoPaste, pastingVideo } = useNativeVideoPaste(composerScopeKey, stageFiles)
 
   const insertPastedText = (value: string) => {
     const textarea = textareaRef.current
@@ -723,6 +725,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = extractClipboardFiles(event.clipboardData)
     if (files.length === 0) {
+      if ((hasClipboardFileIntent(event.clipboardData) || clipboardHasNoReadableContent(event.clipboardData)) && recoverVideoPaste()) {
+        event.preventDefault()
+        return
+      }
       if (hasClipboardFileIntent(event.clipboardData)) {
         toast.error('This clipboard did not provide a file to paste. Use Attach files to choose it instead.')
       } else if (clipboardHasNoReadableContent(event.clipboardData)) {
@@ -1114,6 +1120,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </div>
 
         <div className="obsidian-input min-w-0 flex-1 overflow-hidden rounded-[var(--radius-md)]" data-composer-entry="true">
+          {pastingVideo && <div role="status" className="px-3.5 pt-2 text-xs text-[var(--text-muted)]">Pasting video…</div>}
           {staged.items.length > 0 && (
             <Suspense fallback={<div role="status" className="flex h-24 items-center px-3 text-sm text-[var(--text-muted)]">Loading attachment previews…</div>}>
               <StagedAttachmentList
@@ -1166,6 +1173,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
         <Button
           type="button"
+          ref={keyboard.gestureHandleRef}
           disabled={disabled || (!message.trim() && staged.items.length === 0 && !canLongPressHype && !keyboard.keyboardVisible)}
           aria-disabled={staged.busy || undefined}
           className={cn(
@@ -1181,7 +1189,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           onPointerUp={handleSendPointerEnd}
           onPointerLeave={clearHypeLongPressTimer}
           onPointerCancel={() => { clearHypeLongPressTimer(); keyboard.cancelGesture(); suppressNextSendClickRef.current = true }}
-          onTouchStart={event => event.preventDefault()}
           onContextMenu={event => event.preventDefault()}
           draggable={false}
           onClick={handleSendClick}

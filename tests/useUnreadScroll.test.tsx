@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { useUnreadScroll } from '../src/hooks/useUnreadScroll'
 import { MOBILE_VIEWPORT_UPDATED_EVENT } from '../src/lib/mobileViewport'
+import { getSavedMessageScrollAnchor, saveMessageScrollAnchor } from '../src/lib/messageScrollAnchor'
 
 type TestMessage = {
   id: string
@@ -393,6 +394,228 @@ describe('useUnreadScroll', () => {
       configurable: true,
       value: originalVisualViewport,
     })
+  })
+
+  it.each(['general_chat:main', 'dm:conversation', 'pin:image'])('hands %s to the first swipe before near-bottom events and delayed layout corrections', (surfaceKey) => {
+    useFakeTimersWithImmediateRaf()
+    let resizeCallback: ResizeObserverCallback | undefined
+    global.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) { resizeCallback = callback }
+      observe = jest.fn()
+      disconnect = jest.fn()
+    } as unknown as typeof ResizeObserver
+    const container = document.createElement('div')
+    const row = document.createElement('div')
+    row.dataset.messageId = 'm1'
+    row.id = 'message-m1'
+    container.appendChild(row)
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+    setRect(container, 0, 400)
+    let rowTop = 700
+    row.getBoundingClientRect = () => ({ top: rowTop - container.scrollTop, bottom: rowTop + 60 - container.scrollTop, height: 60 } as DOMRect)
+    const scrollTo = jest.fn((options: ScrollToOptions) => { container.scrollTop = options.top ?? 0 })
+    container.scrollTo = scrollTo as typeof container.scrollTo
+    const onFollowingChange = jest.fn()
+    const { result, rerender, unmount } = renderHook(({ messages }) => useUnreadScroll<TestMessage>({
+      containerRef: { current: container }, messages, cursor: null, surfaceKey, readerId: `gesture-${surfaceKey}`,
+      getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at,
+      getElementId: id => `message-${id}`, onMarkReadToLatest: jest.fn(),
+      onFollowingChange,
+    }), { initialProps: { messages: [makeMessage('m1', 1)] } })
+    expect(container.scrollTop).toBe(600)
+    act(() => resizeCallback?.([], {} as ResizeObserver)) // Arm a pending follow correction.
+    scrollTo.mockClear()
+    const touch = (type: string, y: number) => {
+      const event = new Event(type)
+      Object.defineProperty(event, 'touches', { value: [{ clientX: 120, clientY: y }] })
+      container.dispatchEvent(event)
+    }
+    act(() => {
+      touch('touchstart', 120)
+      expect(onFollowingChange).toHaveBeenLastCalledWith(false)
+      resizeCallback?.([], {} as ResizeObserver)
+      result.current.handleUnreadScroll() // Browser reports the old bottom first.
+    })
+    expect(result.current.autoScroll).toBe(false)
+    act(() => {
+      touch('touchmove', 130)
+      container.scrollTop = 596 // The first four pixels previously re-armed follow.
+      result.current.handleUnreadScroll()
+      rowTop += 30
+      setScrollMetrics(container, 1030)
+      resizeCallback?.([], {} as ResizeObserver)
+      window.dispatchEvent(new Event(MOBILE_VIEWPORT_UPDATED_EVENT))
+      window.dispatchEvent(new Event('focusin'))
+      jest.advanceTimersByTime(800)
+    })
+    expect(container.scrollTop).toBe(596)
+    expect(result.current.autoScroll).toBe(false)
+    expect(scrollTo).not.toHaveBeenCalled()
+    act(() => {
+      touch('touchend', 130)
+      container.scrollTop = 560 // Native momentum remains the owner after lift.
+      result.current.handleUnreadScroll()
+      resizeCallback?.([], {} as ResizeObserver)
+    })
+    expect(container.scrollTop).toBe(560)
+    act(() => jest.advanceTimersByTime(180))
+    act(() => {
+      rowTop += 20
+      setScrollMetrics(container, 1050)
+      resizeCallback?.([], {} as ResizeObserver)
+    })
+    expect(container.scrollTop).toBe(580) // Stable reading anchor resumes after momentum.
+    expect(getSavedMessageScrollAnchor(`gesture-${surfaceKey}`, surfaceKey)?.id).toBe('m1')
+    act(() => { container.scrollTop = 649; result.current.handleUnreadScroll() })
+    expect(result.current.autoScroll).toBe(true)
+    expect(getSavedMessageScrollAnchor(`gesture-${surfaceKey}`, surfaceKey)).toBeNull()
+    act(() => {
+      setScrollMetrics(container, 1120)
+      rerender({ messages: [makeMessage('m1', 1), makeMessage('m2', 2)] })
+    })
+    expect(container.scrollTop).toBe(720)
+    unmount()
+    container.remove()
+  })
+
+  it('persists the visible anchor after upstream media changes during a swipe and restores it on return', () => {
+    useFakeTimersWithImmediateRaf()
+    let resizeCallback: ResizeObserverCallback | undefined
+    global.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) { resizeCallback = callback }
+      observe = jest.fn()
+      disconnect = jest.fn()
+    } as unknown as typeof ResizeObserver
+    const container = document.createElement('div')
+    const row = document.createElement('div')
+    row.dataset.messageId = 'm1'
+    row.id = 'message-m1'
+    container.appendChild(row)
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+    setRect(container, 0, 400)
+    let rowTop = 700
+    row.getBoundingClientRect = () => ({ top: rowTop - container.scrollTop, bottom: rowTop + 60 - container.scrollTop, height: 60 } as DOMRect)
+    container.scrollTo = jest.fn((options: ScrollToOptions) => { container.scrollTop = options.top ?? 0 }) as typeof container.scrollTo
+    const options = {
+      containerRef: { current: container }, messages: [makeMessage('m1', 1)], cursor: null,
+      surfaceKey: 'general_chat:media-return', readerId: 'media-return-reader',
+      getMessageId: (message: TestMessage) => message.id, getMessageCreatedAt: (message: TestMessage) => message.created_at,
+      getElementId: (id: string) => `message-${id}`, onMarkReadToLatest: jest.fn(),
+    }
+    const first = renderHook(() => useUnreadScroll<TestMessage>(options))
+    const touch = (type: string, y: number) => {
+      const event = new Event(type)
+      Object.defineProperty(event, 'touches', { value: [{ clientX: 120, clientY: y }] })
+      container.dispatchEvent(event)
+    }
+    act(() => {
+      touch('touchstart', 120)
+      touch('touchmove', 130)
+      container.scrollTop = 595
+      first.result.current.handleUnreadScroll()
+      rowTop += 188
+      setScrollMetrics(container, 1188)
+      resizeCallback?.([], {} as ResizeObserver)
+      touch('touchend', 130)
+      jest.advanceTimersByTime(180)
+    })
+    expect(container.scrollTop).toBe(595)
+    expect(getSavedMessageScrollAnchor(options.readerId, options.surfaceKey)?.offset).toBe(293)
+    first.unmount()
+    container.scrollTop = 0
+    const reopened = renderHook(() => useUnreadScroll<TestMessage>(options))
+    act(() => jest.advanceTimersByTime(180))
+    expect(container.scrollTop).toBe(595)
+    expect(row.getBoundingClientRect().top).toBe(293)
+    reopened.unmount()
+    saveMessageScrollAnchor(options.readerId, options.surfaceKey, null)
+    container.remove()
+  })
+
+  it('binds user intent when a DM scrollport mounts after the enabled hook with a stable ref', () => {
+    useFakeTimersWithImmediateRaf()
+    const containerRef = { current: null as HTMLElement | null }
+    const onFollowingChange = jest.fn()
+    const options = {
+      containerRef, messages: [makeMessage('m1', 1)], cursor: null, surfaceKey: 'dm:late-mount',
+      getMessageId: (message: TestMessage) => message.id, getMessageCreatedAt: (message: TestMessage) => message.created_at,
+      getElementId: (id: string) => `message-${id}`, onMarkReadToLatest: jest.fn(), onFollowingChange,
+    }
+    const { result, rerender, unmount } = renderHook(({element}) => useUnreadScroll<TestMessage>({...options, renderSignal: element}), {
+      initialProps: {element: null as HTMLElement | null},
+    })
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+    container.scrollTo = jest.fn((value: ScrollToOptions) => { container.scrollTop = value.top ?? 0 }) as typeof container.scrollTo
+    act(() => {
+      containerRef.current = container
+      rerender({element: container})
+    })
+    act(() => result.current.scrollToBottom('auto'))
+    act(() => container.dispatchEvent(new TouchEvent('touchstart')))
+    expect(onFollowingChange).toHaveBeenLastCalledWith(false)
+    act(() => {
+      container.scrollTop = 595
+      result.current.handleUnreadScroll()
+      setScrollMetrics(container, 1095)
+      window.dispatchEvent(new Event('focusin'))
+      jest.advanceTimersByTime(800)
+    })
+    expect(result.current.autoScroll).toBe(false)
+    expect(container.scrollTop).toBe(595)
+    unmount()
+    container.remove()
+  })
+
+  it('pauses wheel following immediately, preserves own-send jumps, and resumes after a tap', () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+    container.scrollTo = jest.fn((options: ScrollToOptions) => { container.scrollTop = options.top ?? 0 }) as typeof container.scrollTo
+    const { result, unmount } = renderHook(() => useUnreadScroll<TestMessage>({
+      containerRef: { current: container }, messages: [makeMessage('m1', 1)], cursor: null, surfaceKey: 'surface',
+      getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at,
+      getElementId: id => `message-${id}`, onMarkReadToLatest: jest.fn(),
+    }))
+    act(() => container.dispatchEvent(new WheelEvent('wheel', { deltaY: 20 })))
+    expect(result.current.autoScroll).toBe(true)
+    act(() => {
+      container.dispatchEvent(new WheelEvent('wheel', { deltaY: -4 }))
+      container.scrollTop = 596
+      result.current.handleUnreadScroll()
+      result.current.scrollToBottomIfFollowing()
+      jest.advanceTimersByTime(800)
+    })
+    expect(container.scrollTop).toBe(596)
+    expect(result.current.autoScroll).toBe(false)
+    act(() => result.current.scrollToBottom('auto'))
+    expect(container.scrollTop).toBe(600)
+    expect(result.current.autoScroll).toBe(true)
+    act(() => {
+      container.dispatchEvent(new TouchEvent('touchstart'))
+      container.scrollTop = 620 // Safari may report rubber-band values beyond max.
+      result.current.handleUnreadScroll()
+    })
+    expect(result.current.autoScroll).toBe(false)
+    act(() => {
+      container.scrollTop = 600
+      container.dispatchEvent(new TouchEvent('touchend'))
+    })
+    expect(result.current.autoScroll).toBe(true)
+    act(() => {
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }))
+      container.scrollTop = 596
+      result.current.handleUnreadScroll()
+      result.current.scrollToBottomIfFollowing()
+    })
+    expect(result.current.autoScroll).toBe(false)
+    expect(container.scrollTop).toBe(596)
+    unmount()
+    container.remove()
   })
 
   it('uses a non-null cursor to expose the true first unread without marking the latest early', async () => {

@@ -1,7 +1,7 @@
 # Dependencies and generated native projects
 node_modules/
-android/
-ios/
+/android/
+/ios/
 
 # Expo caches and local bundle verification
 .expo/

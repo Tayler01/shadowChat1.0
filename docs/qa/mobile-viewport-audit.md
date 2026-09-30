@@ -1,5 +1,15 @@
 # Mobile Viewport Audit
 
+## September 30 keyboard gesture and bottom-scroll follow-up
+
+Repeated identical viewport snapshots no longer rewrite CSS or dispatch layout
+notifications. A bounded non-passive Send-side touch fence owns dismissal; native
+pull-to-refresh is disabled. Scroll/data ownership now changes synchronously so
+realtime window replacement cannot interrupt a micro-swipe. Delayed layout
+corrections stay off during active gesture/momentum. See
+[build 17 evidence](../features/mobile-stability-build17-2026-09-30.md); physical
+PWA/TestFlight keyboard animation remains a device acceptance item.
+
 ## September 30 inline media composer
 
 Media thumbnails now live inside the neutral entry container. No visible image/video

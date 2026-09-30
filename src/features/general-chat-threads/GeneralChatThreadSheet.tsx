@@ -122,6 +122,12 @@ export function GeneralChatThreadSheet({
     const index = first ? items.findIndex(message => message.id === first) : -1
     return index >= 0 ? items.slice(index).filter(message => message.user_id !== user?.id) : []
   }, [thread.firstUnreadMessageId, user?.id])
+  const followingIntentRef = useRef(true)
+  const { setFollowingLatest } = thread
+  const onFollowingChange = useCallback((following: boolean) => {
+    followingIntentRef.current = following
+    setFollowingLatest(following)
+  }, [setFollowingLatest])
   const {
     autoScroll, feedState, initialPositionReady, firstUnreadMessageId, handleUnreadScroll,
     scrollToBottom, setAutoScroll, captureScrollAnchor, restoreScrollAnchor,
@@ -133,14 +139,12 @@ export function GeneralChatThreadSheet({
     initialMessageId,
     getMessageId, getMessageCreatedAt: getCreatedAt, getElementId, getUnreadMessages,
     markVisibleOnScroll: true, onMarkReadToLatest: markLatestVisibleRead,
+    onFollowingChange,
   })
 
-  const followingIntentRef = useRef(autoScroll)
   followingIntentRef.current = autoScroll
   useEffect(() => { setPositionPresented(false) }, [threadId, user?.id, initialMessageId])
   useEffect(() => { if (initialPositionReady) setPositionPresented(true) }, [initialPositionReady])
-  const { setFollowingLatest } = thread
-  useEffect(() => { setFollowingLatest(autoScroll && feedState === 'bottomPinned') }, [autoScroll, feedState, setFollowingLatest])
   useEffect(() => { targetScrolledRef.current = null }, [open, threadId, positioningMessageId])
   useEffect(() => {
     if (!open || !positioningMessageId || feedState !== 'anchoredCatchup' || targetScrolledRef.current === positioningMessageId) return
@@ -159,9 +163,9 @@ export function GeneralChatThreadSheet({
   }, [isReducedMotion, scrollToBottom, thread, threadId])
 
   const handleScroll = useCallback((_event: UIEvent<HTMLDivElement>) => {
-    handleUnreadScroll()
+    const atBottom = handleUnreadScroll()
     const scroll = scrollRef.current
-    if (thread.hasNewer && !thread.loadingOlder && scroll && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 160 && feedState !== 'targetingDeepLink' && feedState !== 'targetingFirstUnread' && feedState !== 'resolvingInitial') {
+    if (atBottom && thread.hasNewer && !thread.loadingOlder && scroll && scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 160 && feedState !== 'targetingDeepLink' && feedState !== 'targetingFirstUnread' && feedState !== 'resolvingInitial') {
       captureScrollAnchor()
       setAutoScroll(false)
       void thread.loadNewer()

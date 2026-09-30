@@ -65,10 +65,10 @@
 /apps/mobile/yarn-error.log*
 
 # EAS may treat apps/mobile as the archive root even when it discovers this
-# repository-root ignore file. Keep unanchored fallbacks so generated native
-# trees and the 12 GB local dependency cache never enter a future upload.
+# repository-root ignore file. Anchor generated native trees to that root so
+# local Expo modules retain their own ios/android source directories.
 node_modules/
-android/
-ios/
+/android/
+/ios/
 output/
 .expo/

@@ -2,6 +2,16 @@
 
 This document turns the June 1, 2026 read-only audit into an implementation backlog and records status updates as fixes land.
 
+## September 30 mobile/native checkpoint
+
+Native TestFlight build 16's accessory-toolbar removal is physically confirmed.
+The current follow-up implements shared keyboard-swipe and bottom-scroll fixes,
+native movie clipboard transfer and device rotation. Production enrollment
+grants are repaired and a bounded worker is deployed, while native delivery
+remains gated pending fresh physical enrollment; legacy collectors stay stopped.
+See [current evidence](features/mobile-stability-build17-2026-09-30.md).
+App Store submission still requires the [readiness checklist](features/app-store-readiness-2026-09-30.md).
+
 ## Documentation Status - July 12, 2026
 
 This is the current source of truth for the audit backlog. It preserves the

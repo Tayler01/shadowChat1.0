@@ -21,7 +21,7 @@ import { useAdminRoleNotifications } from './hooks/useAdminRoleNotifications'
 import { useChannelBanExpirySweep } from './hooks/useChannelBanExpirySweep'
 import { useTheme } from './hooks/useTheme'
 import { WeatherProvider } from './hooks/useWeatherForecast'
-import { computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from './lib/mobileViewport'
+import { applyMobileViewportState, computeMobileViewportState } from './lib/mobileViewport'
 import {
   ACTIVITY_FEATURE_ENABLED,
   BOARDS_FEATURE_ENABLED,
@@ -248,14 +248,7 @@ function App() {
       })
       mobileAppHeightRef.current = viewportState.stableAppHeight
 
-      root.style.setProperty('--shadowchat-app-height', `${viewportState.appHeight}px`)
-      root.style.setProperty('--shadowchat-visual-viewport-height', `${viewportState.visualViewportHeight}px`)
-      root.style.setProperty('--shadowchat-keyboard-inset', `${viewportState.keyboardInset}px`)
-      root.style.setProperty('--shadowchat-mobile-scroll-keyboard-inset', `${viewportState.scrollKeyboardInset}px`)
-      root.style.setProperty('--shadowchat-toast-top', `calc(${viewportOffsetTop}px + env(safe-area-inset-top) + ${viewportState.toastTopRem}rem)`)
-      root.style.setProperty('--shadowchat-toast-top-space', `${viewportState.toastTopSpacePx}px`)
-      root.dataset.shadowchatKeyboard = viewportState.keyboardOpen ? 'open' : 'closed'
-      window.dispatchEvent(new Event(MOBILE_VIEWPORT_UPDATED_EVENT))
+      applyMobileViewportState(root, viewportState, viewportOffsetTop)
     }
 
     const scheduleMobileViewportUpdate = () => {

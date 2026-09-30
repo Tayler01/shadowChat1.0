@@ -1,5 +1,24 @@
 # Real-Device Mobile Validation
 
+## September 30 TestFlight build 17 follow-up
+
+- Tayler physically installed build 16 and confirmed accessory toolbar absence;
+  the Home Screen PWA still displays the toolbar. System-dialog typing was
+  rejected as unsuitable. This supersedes the parked/unverified native notes
+  below, which describe an earlier checkpoint.
+- RD-043: Build 17 permits rotation and adds native movie paste recovery. Verify
+  each landscape game opens after rotating, and Photos Copy/Paste stages the
+  reported 35 MiB movie with its caption/removal/regular Send. Check Allow/Deny
+  Paste and a cloud-backed video. Signed compilation is a separate gate.
+- RD-044: Recheck slow/medium/quick Send-side keyboard swipe and upward scrolling
+  from exact bottom in General, DMs and Pins, both PWA and TestFlight. Shared
+  hook engine tests passed; actual UIKeyboard transitions remain unverified.
+- RD-045: Production native enrollment grants are repaired. Enable phone push
+  in TestFlight, verify a current production installation/token, then enable
+  the bounded named-account DM canary. Verify background and terminated
+  display/open, foreground suppression, privacy and sign-out revocation.
+  Old native jobs and response collectors must remain paused.
+
 ## September 30 composer follow-up acceptance
 
 - RD-040: On Tayler's iOS 27 home-screen PWA, verify media tiles without detail rows,

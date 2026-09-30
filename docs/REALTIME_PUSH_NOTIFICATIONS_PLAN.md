@@ -8,6 +8,13 @@ while delivery was disabled and accumulated work that starved app boot, auth,
 Realtime, and message inserts. Those collectors and all native/TestFlight
 workers remain paused.
 
+The September 30 native repair adds a separate, default-paused bounded canary
+schedule and a replacement worker/claim path. Its account/category/watermark
+gates run before native projection or dispatch, and the legacy insertion
+dispatcher is removed. No old native schedule or response collector is resumed.
+See [bounded native canary and validation](features/native-notification-canary-2026-09-30.md).
+Physical TestFlight enrollment and delivery remain separate release checks.
+
 The active Web Push fallback is the bounded database `pg_cron`/`pg_net` path,
 restored by `20260805135200_enable_bounded_web_push_recovery_cron.sql` and
 verified read-only on September 30. It runs once per minute with a shared-secret

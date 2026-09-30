@@ -1,30 +1,22 @@
 {
-  "title": "Large video uploads and clearer paste feedback",
-  "summary": "The chat upload limit is aligned with the server, and unavailable clipboard attachments now get clear feedback. A new PWA keyboard experiment is available in Feedback.",
+  "title": "Smoother chat scrolling and keyboard gestures",
+  "summary": "Chat gives your scroll gesture priority, keeps incoming messages from shifting your reading position, and makes keyboard dismissal steadier.",
   "restartPolicy": "required_restart",
   "severity": "maintenance",
   "sections": [
     {
-      "heading": "Video upload reliability",
+      "heading": "Scroll and reading position",
       "items": [
-        "Chat accepts supported attachments up to 64 MiB. The server limit now matches the app.",
-        "Pins discussions keep their separate 50 MiB attachment limit.",
-        "Failed uploads keep their preview and draft for retry, with readable error feedback."
+        "Scrolling upward releases bottom-follow immediately, including the first few pixels of a drag.",
+        "Incoming messages wait behind the newer-messages control while you are reading, keeping the displayed chat window stable.",
+        "Delayed media, typing and keyboard layout updates respect your scroll gesture. General, DMs, threads and Pins share the fix."
       ]
     },
     {
-      "heading": "Paste feedback",
+      "heading": "Keyboard and phone push setup",
       "items": [
-        "Pasted video files still stage for review when the browser supplies them.",
-        "If a paste event provides no usable attachment, the composer points you to the attachment picker.",
-        "Text paste and your staged media continue to use the regular Send button."
-      ]
-    },
-    {
-      "heading": "PWA keyboard investigation",
-      "items": [
-        "Settings > Feedback > Open keyboard comparison now includes a System text dialog test.",
-        "This tests a different text-entry route; removal of Apple's toolbar is not yet verified.",
+        "The compact down chevron still dismisses the keyboard. A downward swipe near Send now owns its gesture without dragging the page.",
+        "Phone push enrollment is repaired on the server; native delivery is being validated separately with a limited tester canary.",
         "Tap Restart Now to load this update."
       ]
     }

@@ -58,6 +58,7 @@ mockUseUnreadScroll.mockImplementation(() => ({
   setFirstUnreadMessageId: jest.fn(),
   handleUnreadScroll: mockHandleUnreadScroll,
   scrollToBottom: mockScrollToBottom,
+  scrollToBottomIfFollowing: mockScrollToBottom,
   markLatestRead: mockMarkLatestRead,
 }))
 

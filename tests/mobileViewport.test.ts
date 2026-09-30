@@ -1,6 +1,25 @@
-import { computeMobileViewportState } from '../src/lib/mobileViewport'
+import { applyMobileViewportState, computeMobileViewportState, MOBILE_VIEWPORT_UPDATED_EVENT } from '../src/lib/mobileViewport'
 
 describe('computeMobileViewportState', () => {
+  it('publishes real keyboard transitions once while ignoring repeated settle measurements', () => {
+    const root = document.createElement('div')
+    const listener = jest.fn()
+    window.addEventListener(MOBILE_VIEWPORT_UPDATED_EVENT, listener)
+    const snapshot = {
+      layoutHeight: 852, visualViewportHeight: 512, visualViewportOffsetTop: 0,
+      isIOS: true, editableFocused: true, previousStableAppHeight: 852,
+    }
+    const state = computeMobileViewportState(snapshot)
+    expect(applyMobileViewportState(root, state, 0)).toBe(true)
+    expect(applyMobileViewportState(root, state, 0)).toBe(false)
+    expect(applyMobileViewportState(root, state, 0)).toBe(false)
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(applyMobileViewportState(root, computeMobileViewportState({ ...snapshot, editableFocused: false }), 0)).toBe(true)
+    expect(root.dataset.shadowchatKeyboard).toBe('closed')
+    expect(root.style.getPropertyValue('--shadowchat-keyboard-inset')).toBe('0px')
+    expect(listener).toHaveBeenCalledTimes(2)
+    window.removeEventListener(MOBILE_VIEWPORT_UPDATED_EVENT, listener)
+  })
   it('keeps the iOS app frame stable while reserving the keyboard inset', () => {
     const state = computeMobileViewportState({
       layoutHeight: 852,
