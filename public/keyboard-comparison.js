@@ -44,9 +44,42 @@ if (pickerMode !== 'none') {
   host.append(picker)
 }
 const events = []
+let dialogDraft = ''
+const dialogStatus = document.getElementById('dialog-status')
+const dialogOutput = document.getElementById('dialog-draft')
+document.getElementById('open-dialog').addEventListener('click', () => {
+  editor.blur()
+  // Browser-owned text panel: https://developer.apple.com/documentation/webkit/wkuidelegate
+  // This separate input route does not establish accessory visibility on iOS.
+  try {
+    const result = window.prompt('Keyboard comparison: enter sample text', dialogDraft)
+    if (result === null) {
+      dialogStatus.textContent = 'Cancelled or not shown by the browser. Previous draft kept; toolbar result unconfirmed.'
+    } else {
+      dialogDraft = result
+      dialogOutput.textContent = result || '(Empty draft)'
+      dialogStatus.textContent = 'Draft returned. Nothing sent. Check the iPhone screen to determine whether the toolbar appeared.'
+    }
+  } catch {
+    dialogStatus.textContent = 'The browser could not open the dialog. Previous draft kept; toolbar result unconfirmed.'
+  }
+  updateContext()
+})
 const updateContext = () => {
-  document.getElementById('context').textContent = `Home-screen context: ${navigator.standalone === true}\nEditor: ${editorMode}; picker: ${pickerMode}; form: ${formMode}\nViewport: ${Math.round(window.visualViewport?.width || innerWidth)} x ${Math.round(window.visualViewport?.height || innerHeight)}\n${navigator.userAgent}`
+  document.getElementById('context').textContent = `Home-screen context: ${navigator.standalone === true}\nEditor: ${editorMode}; picker: ${pickerMode}; form: ${formMode}\nEditContext constructor: ${typeof window.EditContext}; element property: ${'editContext' in HTMLElement.prototype}\nViewport: ${Math.round(window.visualViewport?.width || innerWidth)} x ${Math.round(window.visualViewport?.height || innerHeight)}\n${navigator.userAgent}`
 }
+editor.addEventListener('paste', event => {
+  const data = event.clipboardData
+  const summary = {
+    eventReceived: true,
+    formats: Array.from(data?.types || []),
+    items: Array.from(data?.items || []).map(item => ({ kind: item.kind, type: item.type })),
+    files: Array.from(data?.files || []).map(file => ({ type: file.type, bytes: file.size })),
+    plainTextProvided: Boolean(data?.getData('text/plain')),
+    htmlProvided: Boolean(data?.getData('text/html')),
+  }
+  document.getElementById('paste-report').textContent = JSON.stringify(summary, null, 2)
+})
 for (const type of ['focus', 'blur', 'beforeinput', 'input', 'compositionstart', 'compositionend', 'paste']) {
   editor.addEventListener(type, event => {
     events.push(`${type}${event.inputType ? `: ${event.inputType}` : ''}`)

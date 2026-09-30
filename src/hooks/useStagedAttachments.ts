@@ -34,7 +34,7 @@ export interface StagedAttachmentOptions<TUploaded> {
   cleanupScopeKey?: string
   cleanupNamespace?: string
   cleanupPersisted?: (path: string) => Promise<void>
-  errorMessage?: (error: unknown) => string
+  errorMessage?: (error: unknown, file: File) => string
 }
 
 let nextAttachmentId = 0
@@ -91,7 +91,7 @@ export function useStagedAttachments<TUploaded>(options: StagedAttachmentOptions
         const { kind } = classifyComposerFile(file)
         accepted.push({ id: makeId(), clientMessageId: createClientMessageId(), sendAttempted: false, cleanupScopeKey: config.cleanupScopeKey, cleanupNamespace: config.cleanupNamespace, file, kind, previewUrl: getPreviewUrl(file, kind), status: 'staged', progress: 0, error: null })
       } catch (error) {
-        errors.push(config.errorMessage?.(error) || (error instanceof Error ? error.message : 'Unsupported attachment'))
+        errors.push(config.errorMessage?.(error, file) || (error instanceof Error ? error.message : 'Unsupported attachment'))
       }
     }
     if (accepted.length > 0) update(current => [...current, ...accepted])
@@ -154,7 +154,7 @@ export function useStagedAttachments<TUploaded>(options: StagedAttachmentOptions
       return true
     } catch (error) {
       if (scope === scopeRef.current && itemsRef.current.some(item => item.id === id)) {
-        const message = controller.signal.aborted ? 'Upload canceled. You can retry.' : config.errorMessage?.(error) || (error instanceof Error ? error.message : 'Attachment failed')
+        const message = controller.signal.aborted ? 'Upload canceled. You can retry.' : config.errorMessage?.(error, initial.file) || (error instanceof Error ? error.message : 'Attachment failed')
         update(current => current.map(item => item.id === id ? { ...item, status: 'failed', error: message } : item))
       }
       return false

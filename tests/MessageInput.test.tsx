@@ -512,6 +512,59 @@ test('leaves plain text paste to the browser', () => {
   fireEvent(textarea, paste)
   expect(paste.defaultPrevented).toBe(false)
   expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument()
+  const toast = jest.requireMock('react-hot-toast').default as { error: jest.Mock }
+  expect(toast.error).not.toHaveBeenCalled()
+})
+
+test('explains when the browser advertises a pasted video but exposes no file', () => {
+  render(<MessageInput onSendMessage={jest.fn()} />)
+  const textarea = screen.getByRole('textbox')
+  const paste = createEvent.paste(textarea, {
+    clipboardData: {
+      files: [],
+      items: [{ kind: 'file', type: 'video/mp4', getAsFile: () => null }],
+      types: ['Files', 'text/plain'],
+      getData: () => 'still paste this text',
+    },
+  })
+  fireEvent(textarea, paste)
+  expect(paste.defaultPrevented).toBe(false)
+  const toast = jest.requireMock('react-hot-toast').default as { error: jest.Mock }
+  expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Use Attach files'))
+  expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument()
+})
+
+test('recognizes a media MIME hint without a File and explains an empty paste event', () => {
+  render(<MessageInput onSendMessage={jest.fn()} />)
+  const textarea = screen.getByRole('textbox')
+  const toast = jest.requireMock('react-hot-toast').default as { error: jest.Mock }
+  fireEvent.paste(textarea, {
+    clipboardData: { files: [], items: [{ kind: 'string', type: 'video/mp4' }], types: ['video/mp4'], getData: () => '' },
+  })
+  expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Use Attach files'))
+  toast.error.mockClear()
+  fireEvent.paste(textarea, { clipboardData: { files: [], items: [], types: [], getData: () => '' } })
+  expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Nothing usable came through'))
+})
+
+test('keeps caption and failed video stage after a 413 without showing TUS URL details', async () => {
+  const tusError = Object.assign(new Error('tus: unexpected response from https://storage.example/upload?token=private-token, response code: 413, response text: Maximum size exceeded'), {
+    originalResponse: { getStatus: () => 413 },
+  })
+  uploadChatFileAsset.mockRejectedValueOnce(tusError)
+  const onSendMessage = jest.fn()
+  const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
+  const video = new File(['video'], 'trip.mp4', { type: 'video/mp4' })
+  Object.defineProperty(video, 'size', { value: 35 * 1024 * 1024 })
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'The boat trip' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="file"]')!, { target: { files: [video] } })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  const retry = await screen.findByRole('button', { name: 'Retry trip.mp4' })
+  expect(screen.getByRole('textbox')).toHaveValue('The boat trip')
+  expect(retry.title).toContain('35 MiB')
+  expect(retry.title).toContain('64 MiB')
+  expect(retry.title).not.toContain('token=private-token')
+  expect(onSendMessage).not.toHaveBeenCalled()
 })
 
 test('stages a dropped file without sending it and rejects a fourth file', () => {

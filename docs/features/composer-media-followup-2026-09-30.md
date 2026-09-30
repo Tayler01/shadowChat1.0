@@ -125,3 +125,34 @@ Evidence lives under `output/playwright/composer-followup/`,
 `output/playwright/composer-followup-production/` and `output/release-evidence/`.
 Ignored private QA backups and the unsigned native export remain local after
 automatic approval review rejected their cleanup. They were not published.
+
+## Physical video report and PWA-only continuation
+
+Tayler reported a silent video paste and a picker upload rejected during TUS
+creation with HTTP 413. His description was "35 m"; selected byte size is not
+yet confirmed. Production's global Storage cap was 50 MiB while the chat bucket
+and client both allowed 64 MiB. The global cap is now 64 MiB, with all 15 bucket
+limits, MIME restrictions and visibility values preserved. Authenticated valid
+padded MP4 uploads of 35 and 55 MiB passed; 65 MiB failed with 413 as expected.
+Every attempted test object was deleted and absence verified. A true 35 MiB
+file fits both caps, so the original report is not fully explained by this drift.
+Main Pins videos use Bunny Stream's separate 150 MiB path; Pins discussion files
+retain their private 50 MiB cap. No Storage ACL/RLS change was made.
+
+The client patch handles missing clipboard file bytes, media-format hints and
+completely empty paste events with feedback, while preserving native text paste.
+Size errors include the selected file size and surface limit, retain the staged
+preview/caption, and omit raw TUS URLs. This does not create access to video bytes
+that iOS withholds or detect a paste action for which iOS emits no event.
+
+Tayler requires a PWA solution; the native-wrapper route is parked. The comparison
+page adds a distinct browser-owned `window.prompt()` experiment and live EditContext
+capability detection. The dialog is modal and usually single-line; it is not a
+production composer replacement. Chromium/WebKit acceptance, cancellation, empty
+drafts and focus/retention checks passed eight cases. Actual iPhone accessory
+visibility remains unverified. The page also reports paste-event formats, item
+kinds, file byte counts and text-presence booleans locally, without contents or
+filenames, so a silent OS clipboard path can be distinguished from app handling.
+
+Source validation, practical large-video client QA and publication of this next
+client patch are pending. The server alignment above is already applied.

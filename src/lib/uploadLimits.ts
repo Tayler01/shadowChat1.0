@@ -191,12 +191,43 @@ export const validateUpload = (
   return mimeType
 }
 
-export const getUploadErrorMessage = (error: unknown, fallback: string) => {
+export interface UploadErrorContext {
+  fileSizeBytes?: number
+  limitBytes?: number
+}
+
+const uploadResponseStatus = (error: unknown): number | null => {
+  if (!error || typeof error !== 'object') return null
+  const candidate = error as Record<string, unknown>
+  if (typeof candidate.status === 'number') return candidate.status
+  if (typeof candidate.statusCode === 'number') return candidate.statusCode
+  const response = candidate.originalResponse ?? candidate.response
+  if (!response || typeof response !== 'object') return null
+  const details = response as Record<string, unknown>
+  if (typeof details.status === 'number') return details.status
+  if (typeof details.getStatus === 'function') {
+    try {
+      const status = details.getStatus()
+      if (typeof status === 'number') return status
+    } catch { /* Use the safe message fallback. */ }
+  }
+  return null
+}
+
+const formatActualMebibytes = (bytes: number) => `${(bytes / MEBIBYTE).toFixed(1).replace(/\.0$/, '')} MiB`
+
+export const getUploadErrorMessage = (error: unknown, fallback: string, context: UploadErrorContext = {}) => {
   if (error instanceof UploadValidationError) return error.message
   const message = error instanceof Error ? error.message.trim() : ''
   const normalized = message.toLowerCase()
-  if (normalized.includes('maximum') || normalized.includes('too large')) {
-    return message || 'This file is too large to upload.'
+  if (
+    uploadResponseStatus(error) === 413 ||
+    /\b(?:response\s*code|status(?:\s*code)?|http)\s*[:=]?\s*413\b/i.test(message) ||
+    normalized.includes('maximum size') || normalized.includes('too large') || normalized.includes('payload too large')
+  ) {
+    const size = typeof context.fileSizeBytes === 'number' ? `${formatActualMebibytes(context.fileSizeBytes)} file` : 'file'
+    const limit = typeof context.limitBytes === 'number' ? ` The app allows up to ${formatMebibytes(context.limitBytes)}.` : ''
+    return `The upload service rejected this ${size} because of its size.${limit} Keep it staged and try a smaller file, or retry after the service limit is updated.`
   }
   if (
     normalized.includes('network') ||

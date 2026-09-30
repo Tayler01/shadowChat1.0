@@ -577,7 +577,40 @@ it('keeps mixed clipboard text with its staged file and reports invalid files', 
   expect(input).toHaveValue('Before caption after')
   expect(screen.getByRole('button', { name: 'Remove notes.txt' })).toBeInTheDocument()
   fireEvent.paste(input, { clipboardData: { files: [new File([], 'empty.txt', { type: 'text/plain' })], items: [], getData: () => '' } })
-  expect(screen.getByRole('alert')).toHaveTextContent('Choose a file between 1 byte and 50 MB.')
+  expect(screen.getByRole('alert')).toHaveTextContent('Choose a file between 1 byte and 50 MiB.')
+})
+
+it('explains unavailable video clipboard data in Pins while leaving ordinary text paste alone', async () => {
+  render(<ShadowPinCommentsDialog image={{ ...image, id: 'unavailable-paste-pin' }} open onClose={() => undefined} />)
+  await screen.findByText('Root comment')
+  const input = screen.getByLabelText('Add a ShadowPin comment')
+  fireEvent.paste(input, { clipboardData: { files: [], items: [{ kind: 'string', type: 'video/mp4' }], types: ['video/mp4'], getData: () => '' } })
+  expect(screen.getByRole('alert')).toHaveTextContent('Use Attach files')
+  fireEvent.paste(input, { clipboardData: { files: [], items: [], types: [], getData: () => '' } })
+  expect(screen.getByRole('alert')).toHaveTextContent('Nothing usable came through')
+  fireEvent.paste(input, { clipboardData: { files: [], items: [{ kind: 'string', type: 'text/plain' }], types: ['text/plain'], getData: () => 'normal text' } })
+  expect(screen.getByRole('alert')).toHaveTextContent('Nothing usable came through')
+})
+
+it('retains a failed Pins upload and shows a safe size message after TUS 413', async () => {
+  const tusError = Object.assign(new Error('tus: https://storage.example/upload?token=secret, response code: 413, Maximum size exceeded'), {
+    originalResponse: { getStatus: () => 413 },
+  })
+  ;(uploadShadowPinCommentAttachment as jest.Mock).mockRejectedValueOnce(tusError)
+  render(<ShadowPinCommentsDialog image={{ ...image, id: 'pin-413' }} open onClose={() => undefined} />)
+  await screen.findByText('Root comment')
+  const input = screen.getByLabelText('Add a ShadowPin comment')
+  fireEvent.change(input, { target: { value: 'Video caption' } })
+  const video = new File(['video'], 'trip.mp4', { type: 'video/mp4' })
+  Object.defineProperty(video, 'size', { value: 35 * 1024 * 1024 })
+  fireEvent.paste(input, { clipboardData: { files: [video], items: [], types: ['Files'], getData: () => '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Post comment' }))
+  const retry = await screen.findByRole('button', { name: 'Retry trip.mp4' })
+  expect(input).toHaveValue('Video caption')
+  expect(retry.title).toContain('35 MiB')
+  expect(retry.title).toContain('50 MiB')
+  expect(retry.title).not.toContain('token=secret')
+  expect(createShadowPinComment).not.toHaveBeenCalled()
 })
 
 it('removes a successfully deleted comment while preserving a file-cleanup retry', async () => {

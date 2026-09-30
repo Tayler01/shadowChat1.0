@@ -162,6 +162,12 @@ linked checks, and public health manifest as authority rather than an older SHA:
 7. **DB-002 - Completed July 10:** added reviewed MIME/size constraints for
    avatars, banners, message media, chat uploads, and voice recordings without
    deleting existing objects.
+   September 30 follow-up aligned the live global Storage ceiling from 50 to
+   64 MiB with the existing chat client/bucket contract, preserving every bucket
+   cap, MIME restriction and visibility setting. Authenticated 35/55 MiB TUS
+   uploads and 65 MiB rejection passed with verified exact-object cleanup.
+   The deployment guide now requires the read-only global/bucket preflight;
+   bucket migrations alone do not establish the effective upload limit.
 8. **PERF-001 - Completed July 10:** production CI now proves migration state,
    exact Function classification/JWT settings, Bridge hold state, frontend build
    identity, backend evidence, and post-deploy health before success.

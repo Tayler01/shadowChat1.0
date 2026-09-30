@@ -254,6 +254,45 @@ This project already includes:
 
 ## Supabase Deployment Steps
 
+### Storage upload limits
+
+Bucket migrations do not configure Supabase's project-wide upload ceiling.
+The effective limit is the smaller of the global Storage cap and the bucket
+cap. Before releasing upload changes, load the approved management credential
+into the shell without printing it, set `SUPABASE_PROJECT_REF`, and run:
+
+```powershell
+npm run supabase:storage-limits:verify
+```
+
+This read-only check fetches Management API Storage configuration and bucket
+metadata, compares the global cap with the actual chat client constant, and
+checks reviewed bucket caps and visibility. It never changes configuration.
+Use an explicitly authorized settings change to repair drift, then read back
+the setting and rerun the check. Do not raise individual bucket limits or change
+MIME, RLS or public/private settings to work around a global limit.
+
+On September 30, 2026, production's global cap was aligned from 52,428,800 bytes
+(50 MiB) to 67,108,864 bytes (64 MiB). All 15 bucket caps, MIME restrictions and
+visibility values remained unchanged. Chat uses the 64 MiB `chat-uploads`
+bucket; Pins comments retain a private 50 MiB bucket, and main Pins images use
+the 15 MiB `shadow-pin` bucket. Main Pins videos use Bunny Stream with their
+separate 150 MiB contract; that value does not justify raising Supabase's cap.
+The paused Bridge bucket's existing 100 MiB setting remains globally constrained.
+
+For a Storage size fix, verify authenticated resumable uploads against
+`https://<ref>.storage.supabase.co/storage/v1/upload/resumable` using 6 MiB
+chunks. September 30 probes uploaded valid padded MP4s of exactly 35 and 55 MiB;
+65 MiB was rejected with 413. Remove every exact test object path and verify
+absence. A reported “35 MB” cannot be classified as the original size-limit
+cause without recording the selected file's actual byte count: 35 MiB fits both
+the previous and repaired global caps. Browser/PWA paste, picker, progress,
+message insertion and playback still require separate evidence.
+
+Current references: [file limits](https://supabase.com/docs/guides/storage/uploads/file-limits),
+[resumable uploads](https://supabase.com/docs/guides/storage/uploads/resumable-uploads),
+[Storage configuration API](https://supabase.com/docs/reference/api/v1-get-storage-config).
+
 ### Schema
 
 ```powershell

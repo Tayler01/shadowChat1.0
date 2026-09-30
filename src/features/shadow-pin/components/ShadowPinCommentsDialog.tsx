@@ -38,13 +38,15 @@ import { beginChatTiming, measureChatInputFrame } from '../../../lib/chatPerform
 import { useStagedAttachments } from '../../../hooks/useStagedAttachments'
 import { useComposerKeyboardDismiss } from '../../../hooks/useComposerKeyboardDismiss'
 import { StagedAttachmentList } from '../../../components/chat/StagedAttachmentList'
-import { extractComposerFiles } from '../../../lib/composerAttachments'
+import { clipboardHasNoReadableContent, extractComposerFiles, hasClipboardFileIntent } from '../../../lib/composerAttachments'
 import { getWorkingClient } from '../../../lib/supabase'
+import { getUploadErrorMessage, UploadValidationError } from '../../../lib/uploadLimits'
 import { compareMessageKey, type UserReadCursor } from '../../../lib/readCursors'
 import { createRealtimeSubscriptionManager } from '../../../lib/realtimeSubscription'
 import { captureMessageScrollAnchor, getSavedMessageScrollAnchor, restoreMessageScrollAnchor, saveMessageScrollAnchor } from '../../../lib/messageScrollAnchor'
 
 const commentId = (comment: ShadowPinComment) => comment.id
+const PIN_COMMENT_ATTACHMENT_MAX_BYTES = 50 * 1024 * 1024
 const commentCreatedAt = (comment: ShadowPinComment) => comment.created_at
 const commentElementId = (id: string) => `shadow-pin-comment-${id}`
 const PublicProfileDialog = lazy(() =>
@@ -761,13 +763,17 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
 
   const attachments = useStagedAttachments<ShadowPinCommentAttachment>({
     scopeKey: `pin:${user?.id}:${image.id}`,
-    validate: file => { if (!file.size || file.size > 50 * 1024 * 1024) throw new Error('Choose a file between 1 byte and 50 MB.') },
+    validate: file => { if (!file.size || file.size > PIN_COMMENT_ATTACHMENT_MAX_BYTES) throw new UploadValidationError('Choose a file between 1 byte and 50 MiB.') },
     upload: (file, options) => uploadShadowPinCommentAttachment(image.id, file, options),
     cleanup: cleanupShadowPinCommentAttachment,
     cleanupPath: attachment => attachment.path,
     cleanupScopeKey: userId,
     cleanupNamespace: 'pins',
     cleanupPersisted: cleanupPersistedShadowPinCommentAttachment,
+    errorMessage: (error, file) => getUploadErrorMessage(error, 'Attachment failed. Try again.', {
+      fileSizeBytes: file.size,
+      limitBytes: PIN_COMMENT_ATTACHMENT_MAX_BYTES,
+    }),
     send: async (attachment) => {
       const generation = generationRef.current
       const created = await createShadowPinComment(image.id, '', replyTo?.id, attachment)
@@ -798,7 +804,11 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
   }
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = extractComposerFiles(event.clipboardData)
-    if (!files.length) return
+    if (!files.length) {
+      if (hasClipboardFileIntent(event.clipboardData)) setError('This clipboard did not provide a file to paste. Use Attach files to choose it instead.')
+      else if (clipboardHasNoReadableContent(event.clipboardData)) setError('Nothing usable came through from the clipboard. For a video, use Attach files instead.')
+      return
+    }
     event.preventDefault()
     stageFiles(files)
     const text = event.clipboardData.getData?.('text/plain') || ''

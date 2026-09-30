@@ -15,6 +15,8 @@
     #editor { display: block; box-sizing: border-box; width: 100%; min-height: 100px; border: 1px solid #888; border-radius: 16px; padding: 12px; margin: 16px 0; background: #18191a; color: #eee; font: 16px/1.5 system-ui, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
     input#editor { min-height: 48px; } #editor:focus { outline: 2px solid #aaa; outline-offset: 2px; }
     pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; color: #bbb; }
+    #dialog-test { border-top: 1px solid #666; margin-top: 24px; padding-top: 8px; }
+    #dialog-draft { min-height: 24px; padding: 12px; border: 1px solid #666; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
   </style>
   <script type="module" src="/keyboard-comparison.js"></script>
 </head>
@@ -29,7 +31,18 @@
   <div id="entry"></div>
   <button id="send" type="button">Clear and refocus test</button>
   <button id="dismiss" type="button">Close keyboard</button>
+  <section id="dialog-test" aria-labelledby="dialog-title">
+    <h2 id="dialog-title">System text dialog test</h2>
+    <p>This opens the browser's text dialog instead of the editor above. It is a separate, usually single-line window that blocks interaction with the page while open. Check whether the up/down/checkmark bar appears there. Removal on iPhone is not yet verified.</p>
+    <p>Use sample text. OK shows your draft below; Cancel keeps the previous draft. Nothing is sent or saved, and the draft disappears when you reload or change a comparison choice.</p>
+    <button id="open-dialog" type="button">Open system text dialog</button>
+    <p id="dialog-status" role="status">Not tested yet.</p>
+    <strong>Dialog draft</strong>
+    <div id="dialog-draft" aria-label="Dialog draft">No draft yet.</div>
+  </section>
   <pre id="context" aria-label="Browser context"></pre>
+  <p>Paste a copied video into the editor above to inspect what the browser supplies. The report below shows only formats and byte counts, never clipboard contents or filenames. It stays on this page and is cleared on reload.</p>
+  <pre id="paste-report" aria-label="Paste diagnostic">No paste event received yet.</pre>
   <pre id="events" aria-label="Input events"></pre>
 </body>
 </html>

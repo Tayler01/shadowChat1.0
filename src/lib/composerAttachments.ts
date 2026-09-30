@@ -36,5 +36,17 @@ export function extractComposerFiles(data: DataTransfer): File[] {
     .filter((file): file is File => file !== null)
 }
 
+/** A browser may advertise a clipboard file while withholding its File bytes. */
+export function hasClipboardFileIntent(data: DataTransfer): boolean {
+  const mediaType = (type: string) => /^(?:image|video|audio)\//i.test(type)
+  return Array.from(data.types ?? []).some(type => type.toLowerCase() === 'files' || mediaType(type)) ||
+    Array.from(data.items ?? []).some(item => item.kind === 'file' || mediaType(item.type))
+}
+
+export function clipboardHasNoReadableContent(data: DataTransfer): boolean {
+  if (Array.from(data.types ?? []).length || Array.from(data.items ?? []).length) return false
+  return !['text/plain', 'text/html', 'text/uri-list'].some(type => data.getData?.(type))
+}
+
 export const extractClipboardFiles = extractComposerFiles
 export const extractDroppedFiles = extractComposerFiles

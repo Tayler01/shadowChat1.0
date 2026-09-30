@@ -23,12 +23,13 @@ import { showActionErrorToast } from '../../lib/toastNotifications'
 import { isShadowPinImageShareUrl } from './shadowPinShareLinks'
 import {
   CHAT_FILE_UPLOAD_RULE,
+  CHAT_UPLOAD_MAX_BYTES,
   getUploadErrorMessage,
   MESSAGE_MEDIA_UPLOAD_MAX_BYTES,
   validateUpload,
   VOICE_RECORDING_MAX_SECONDS,
 } from '../../lib/uploadLimits'
-import { buildAttachmentMessageContent, classifyComposerFile, extractClipboardFiles, extractDroppedFiles } from '../../lib/composerAttachments'
+import { buildAttachmentMessageContent, classifyComposerFile, clipboardHasNoReadableContent, extractClipboardFiles, extractDroppedFiles, hasClipboardFileIntent } from '../../lib/composerAttachments'
 import { useStagedAttachments, type AttachmentStageView } from '../../hooks/useStagedAttachments'
 import { measureChatInputFrame } from '../../lib/chatPerformance'
 import { useComposerKeyboardDismiss } from '../../hooks/useComposerKeyboardDismiss'
@@ -186,7 +187,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     cleanupScopeKey: identityKey ?? undefined,
     cleanupNamespace: 'chat',
     cleanupPersisted: removeUnusedChatUploadAsset,
-    errorMessage: error => getUploadErrorMessage(error, 'Attachment failed. Try again.'),
+    errorMessage: (error, file) => getUploadErrorMessage(error, 'Attachment failed. Try again.', {
+      fileSizeBytes: file.size,
+      limitBytes: CHAT_UPLOAD_MAX_BYTES,
+    }),
   })
 
   useEffect(() => {
@@ -718,7 +722,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = extractClipboardFiles(event.clipboardData)
-    if (files.length === 0) return
+    if (files.length === 0) {
+      if (hasClipboardFileIntent(event.clipboardData)) {
+        toast.error('This clipboard did not provide a file to paste. Use Attach files to choose it instead.')
+      } else if (clipboardHasNoReadableContent(event.clipboardData)) {
+        toast.error('Nothing usable came through from the clipboard. For a video, use Attach files instead.')
+      }
+      return
+    }
     const accepted = stageFiles(files)
     if (accepted === 0) return
     const text = event.clipboardData.getData('text/plain')

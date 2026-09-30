@@ -70,4 +70,22 @@ describe('upload limits', () => {
     expect(getUploadErrorMessage(new Error('new row violates row-level security policy'), 'Upload failed'))
       .toBe('ShadowChat could not authorize this upload. Refresh the app and try again.')
   })
+
+  test('maps TUS 413 response shapes to a safe size explanation without exposing request URLs', () => {
+    const error = Object.assign(new Error('tus: request https://storage.example/upload?token=private-token, response code: 413, response text: Maximum size exceeded'), {
+      originalResponse: { getStatus: () => 413 },
+    })
+    const message = getUploadErrorMessage(error, 'Upload failed', {
+      fileSizeBytes: 35 * 1024 * 1024,
+      limitBytes: CHAT_UPLOAD_MAX_BYTES,
+    })
+    expect(message).toContain('35 MiB')
+    expect(message).toContain('64 MiB')
+    expect(message).toContain('Keep it staged')
+    expect(message).not.toContain('https://')
+    expect(message).not.toContain('private-token')
+    expect(getUploadErrorMessage({ status: 413 }, 'Upload failed')).toContain('rejected this file')
+    expect(getUploadErrorMessage(new Error('Maximum size exceeded at https://storage.example?secret=abc'), 'Upload failed'))
+      .not.toContain('secret=abc')
+  })
 })
