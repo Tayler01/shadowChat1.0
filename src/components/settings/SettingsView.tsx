@@ -1347,6 +1347,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </Button>
         </div>
       </div>
+      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border-subtle)] p-4">
+        <h3 className="font-medium text-[var(--text-primary)]">iPhone keyboard comparison</h3>
+        <p className="mt-1 text-sm text-[var(--text-muted)]">Compare entry styles if the iPhone keyboard shows extra controls. This check sends nothing.</p>
+        <Button variant="secondary" className="mt-3" onClick={() => window.location.assign('/keyboard-comparison.html')}>Open keyboard comparison</Button>
+      </div>
     </div>
   )
 

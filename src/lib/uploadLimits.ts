@@ -107,6 +107,13 @@ export const CHAT_FILE_UPLOAD_RULE: UploadRule = {
   supportedTypesDescription: 'supported image, video, audio, text, PDF, Office, JSON, or ZIP file',
 }
 
+export const CHAT_VIDEO_UPLOAD_RULE: UploadRule = {
+  maxBytes: CHAT_UPLOAD_MAX_BYTES,
+  mimeTypes: CHAT_UPLOAD_MIME_TYPES.filter(type => type.startsWith('video/')),
+  label: 'Video',
+  supportedTypesDescription: 'MP4, MPEG, OGG, QuickTime, or WebM video',
+}
+
 const EXTENSION_MIME_TYPES: Record<string, string> = {
   aac: 'audio/aac',
   avif: 'image/avif',
@@ -123,6 +130,7 @@ const EXTENSION_MIME_TYPES: Record<string, string> = {
   mp3: 'audio/mpeg',
   mp4: 'video/mp4',
   mpeg: 'video/mpeg',
+  mpg: 'video/mpeg',
   oga: 'audio/ogg',
   ogg: 'audio/ogg',
   ogv: 'video/ogg',
@@ -152,7 +160,7 @@ export const normalizeMimeType = (mimeType?: string | null) =>
 
 export const resolveUploadMimeType = (file: Pick<File, 'name' | 'type'>) => {
   const declaredType = normalizeMimeType(file.type)
-  if (declaredType) return declaredType
+  if (declaredType && declaredType !== 'application/octet-stream') return declaredType
 
   const extension = file.name.split('.').pop()?.toLowerCase() || ''
   return EXTENSION_MIME_TYPES[extension] || ''

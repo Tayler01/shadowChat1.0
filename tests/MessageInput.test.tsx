@@ -1,9 +1,12 @@
 import { act, render, screen } from '@testing-library/react'
 import { createEvent, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ComponentProps } from 'react'
 import { MessageInput } from '../src/components/chat/MessageInput'
 import { isShadowPinImageShareUrl } from '../src/components/chat/shadowPinShareLinks'
 import { enqueuePendingUploadCleanup, readPendingUploadCleanup } from '../src/lib/pendingUploadCleanup'
+
+type ComposerSendArguments = Parameters<ComponentProps<typeof MessageInput>['onSendMessage']>
 
 jest.mock('react-hot-toast', () => {
   const toastFn = jest.fn() as any
@@ -64,6 +67,24 @@ const { uploadChatFileAsset, uploadChatImageAsset } = jest.requireMock('../src/l
 
 const { searchKlipyGifs } = jest.requireMock('../src/lib/gifs') as {
   searchKlipyGifs: jest.Mock
+}
+
+// jsdom does not provide PointerEvent coordinates/types on every supported
+// version. Supply the real event fields instead of testing mouse fallbacks.
+const dispatchTouchPointer = (
+  target: HTMLElement,
+  kind: 'pointerDown' | 'pointerMove' | 'pointerUp' | 'pointerCancel',
+  x: number,
+  y: number,
+) => {
+  const event = createEvent[kind](target, { bubbles: true, cancelable: true })
+  Object.defineProperties(event, {
+    pointerType: { value: 'touch' },
+    pointerId: { value: 1 },
+    clientX: { value: x },
+    clientY: { value: y },
+  })
+  fireEvent(target, event)
 }
 
 beforeEach(() => {
@@ -274,12 +295,12 @@ test('long pressing the send button rings Hype without sending the draft', async
       fireEvent.change(textarea, { target: { value: 'ship it' } })
     })
 
-    fireEvent.pointerDown(sendButton, { pointerType: 'touch' })
+    dispatchTouchPointer(sendButton, 'pointerDown', 100, 100)
     await act(async () => {
       jest.advanceTimersByTime(650)
       await Promise.resolve()
     })
-    fireEvent.pointerUp(sendButton, { pointerType: 'touch' })
+    dispatchTouchPointer(sendButton, 'pointerUp', 100, 100)
     fireEvent.click(sendButton)
 
     expect(ringBell).toHaveBeenCalledTimes(1)
@@ -332,7 +353,8 @@ test('touch tapping the send button sends once and suppresses text selection', a
   fireEvent(sendButton, touchStart)
   expect(preventDefault).toHaveBeenCalled()
 
-  fireEvent.pointerUp(sendButton, { pointerType: 'touch' })
+  dispatchTouchPointer(sendButton, 'pointerDown', 100, 100)
+  dispatchTouchPointer(sendButton, 'pointerUp', 100, 100)
   fireEvent.click(sendButton)
 
   await waitFor(() => {
@@ -364,7 +386,7 @@ test('shows an error and keeps reply state when uploaded image send resolves to 
 
   fireEvent.change(imageInput, { target: { files: [file] } })
   expect(onSendMessage).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
 
   await waitFor(() => {
     expect(onSendMessage).toHaveBeenCalledWith(
@@ -373,12 +395,16 @@ test('shows an error and keeps reply state when uploaded image send resolves to 
       'https://example.com/file.png',
       'parent',
       'https://example.com/file-thumb.png',
-      expect.any(String)
+      expect.any(String),
+      expect.any(Function)
     )
   })
   expect(onCancelReply).not.toHaveBeenCalled()
-  expect(await screen.findByText('Message was not sent. Try again.')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Retry photo.png' })).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Retry photo.png' })).toBeInTheDocument()
+  expect(screen.getByRole('status')).toHaveTextContent('Message was not sent. Try again.')
+  expect(screen.getByRole('status')).toHaveClass('sr-only')
+  const toast = jest.requireMock('react-hot-toast').default as { error: jest.Mock }
+  expect(toast.error).toHaveBeenCalledWith('Message was not sent. Try again.')
 })
 
 test('composer reply preview expands long parent messages', async () => {
@@ -420,7 +446,7 @@ test('sends selected videos as video attachments', async () => {
   const file = new File(['video'], 'clip.mp4', { type: 'video/mp4' })
 
   fireEvent.change(videoInput, { target: { files: [file] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
 
   await waitFor(() => {
     expect(onSendMessage).toHaveBeenCalledWith(
@@ -429,7 +455,8 @@ test('sends selected videos as video attachments', async () => {
       'https://example.com/clip.mp4',
       'parent',
       undefined,
-      expect.any(String)
+      expect.any(String),
+      expect.any(Function)
     )
   })
 })
@@ -444,7 +471,7 @@ test('auto-detects videos from the generic file picker', async () => {
   const file = new File(['video'], 'movie.webm', { type: 'video/webm' })
 
   fireEvent.change(fileInput, { target: { files: [file] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
 
   await waitFor(() => {
     expect(onSendMessage).toHaveBeenCalledWith(
@@ -453,7 +480,8 @@ test('auto-detects videos from the generic file picker', async () => {
       'https://example.com/movie.webm',
       undefined,
       undefined,
-      expect.any(String)
+      expect.any(String),
+      expect.any(Function)
     )
   })
 })
@@ -471,7 +499,7 @@ test('stages a clipboard image while preserving mixed text at the caret', () => 
   fireEvent(textarea, paste)
   expect(paste.defaultPrevented).toBe(true)
   expect(textarea).toHaveValue('before pasted after')
-  expect(screen.getByText('screenshot.png')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Remove screenshot.png' })).toBeInTheDocument()
   expect(onSendMessage).not.toHaveBeenCalled()
 })
 
@@ -496,8 +524,9 @@ test('stages a dropped file without sending it and rejects a fourth file', () =>
   const drop = createEvent.drop(surface, { dataTransfer: { files, items: [], types: ['Files'] } })
   fireEvent(surface, drop)
   expect(drop.defaultPrevented).toBe(true)
-  expect(screen.getByRole('button', { name: 'Send 3 attachments' })).toBeInTheDocument()
-  expect(screen.queryByText('four.pdf')).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Send message' })).not.toBeDisabled()
+  expect(screen.getAllByRole('button', { name: /^Remove .*\.pdf$/ })).toHaveLength(3)
+  expect(screen.queryByRole('button', { name: 'Remove four.pdf' })).not.toBeInTheDocument()
   const rejectedDrop = createEvent.drop(surface, { dataTransfer: { files: [files[3]], items: [], types: ['Files'] } })
   fireEvent(surface, rejectedDrop)
   expect(rejectedDrop.defaultPrevented).toBe(true)
@@ -522,10 +551,10 @@ test('classifies an empty-MIME video by its extension', async () => {
   const fileInput = container.querySelector('input[data-upload-kind="file"]') as HTMLInputElement
   const file = new File(['video'], 'clip.mp4', { type: '' })
   fireEvent.change(fileInput, { target: { files: [file] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
   await waitFor(() => expect(onSendMessage).toHaveBeenCalledWith(
     JSON.stringify({ name: 'clip.mp4', size: file.size, type: 'video/mp4' }),
-    'video', 'https://example.com/clip.mp4', undefined, undefined, expect.any(String)
+    'video', 'https://example.com/clip.mp4', undefined, undefined, expect.any(String), expect.any(Function)
   ))
 })
 
@@ -535,13 +564,13 @@ test('retains an uploaded file for retry after a failed message send', async () 
   const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
   const fileInput = container.querySelector('input[data-upload-kind="file"]') as HTMLInputElement
   fireEvent.change(fileInput, { target: { files: [new File(['report'], 'report.pdf', { type: 'application/pdf' })] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Retry report.pdf' }))
   await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(2))
   expect(onSendMessage.mock.calls[0][5]).toEqual(expect.any(String))
   expect(onSendMessage.mock.calls[1][5]).toBe(onSendMessage.mock.calls[0][5])
   expect(uploadChatFileAsset).toHaveBeenCalledTimes(1)
-  await waitFor(() => expect(screen.queryByText('report.pdf')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument())
 })
 
 test('an ambiguous attachment send never enqueues its uploaded path for deletion', async () => {
@@ -550,7 +579,7 @@ test('an ambiguous attachment send never enqueues its uploaded path for deletion
   const { container } = render(<MessageInput identityKey="account-a" onSendMessage={jest.fn().mockResolvedValue(null)} />)
   const fileInput = container.querySelector('input[data-upload-kind="file"]') as HTMLInputElement
   fireEvent.change(fileInput, { target: { files: [new File(['pdf'], 'report.pdf', { type: 'application/pdf' })] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Remove report.pdf' }))
   expect(removeUnusedChatUploadAsset).not.toHaveBeenCalled()
   expect(readPendingUploadCleanup('account-a', 'chat')).toEqual([])
@@ -575,12 +604,12 @@ test('cancels an active upload without sending and clears stages on scope change
   const { container, rerender } = render(<MessageInput onSendMessage={onSendMessage} cacheKey="dm-one" />)
   const fileInput = container.querySelector('input[data-upload-kind="file"]') as HTMLInputElement
   fireEvent.change(fileInput, { target: { files: [new File(['report'], 'report.pdf', { type: 'application/pdf' })] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel upload of report.pdf' }))
   expect(await screen.findByRole('button', { name: 'Retry report.pdf' })).toBeInTheDocument()
   expect(onSendMessage).not.toHaveBeenCalled()
   rerender(<MessageInput onSendMessage={onSendMessage} cacheKey="dm-two" />)
-  await waitFor(() => expect(screen.queryByText('report.pdf')).not.toBeInTheDocument())
+  await waitFor(() => expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument())
 })
 
 test('late upload success after cancellation returns to retry without sending', async () => {
@@ -591,11 +620,11 @@ test('late upload success after cancellation returns to retry without sending', 
   const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
   const fileInput = container.querySelector('input[data-upload-kind="file"]') as HTMLInputElement
   fireEvent.change(fileInput, { target: { files: [new File(['report'], 'report.pdf', { type: 'application/pdf' })] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel upload of report.pdf' }))
   await act(async () => { resolveUpload({ path: 'late.pdf', publicUrl: 'https://example.com/late.pdf' }) })
   expect(await screen.findByRole('button', { name: 'Retry report.pdf' })).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Send 1 attachment' })).not.toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Send message' })).not.toBeDisabled()
   expect(onSendMessage).not.toHaveBeenCalled()
   expect(removeUnusedChatUploadAsset).toHaveBeenCalledWith('late.pdf')
 })
@@ -609,7 +638,7 @@ test('failed deletion after canceled upload is queued for its original account',
   const { container } = render(<MessageInput identityKey="account-a" onSendMessage={onSendMessage} />)
   const fileInput = container.querySelector('input[data-upload-kind="file"]') as HTMLInputElement
   fireEvent.change(fileInput, { target: { files: [new File(['pdf'], 'orphan.pdf', { type: 'application/pdf' })] } })
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
   fireEvent.click(await screen.findByRole('button', { name: 'Cancel upload of orphan.pdf' }))
   await act(async () => { resolveUpload({ path: 'account-a/orphan.pdf', publicUrl: 'https://example.com/orphan.pdf' }) })
   await waitFor(() => expect(readPendingUploadCleanup('account-a', 'chat')).toEqual(['account-a/orphan.pdf']))
@@ -628,12 +657,290 @@ test('reports attachment upload progress and keeps removal available before send
   const fileInput = container.querySelector('input[data-upload-kind="file"]') as HTMLInputElement
   fireEvent.change(fileInput, { target: { files: [new File(['pdf'], 'report.pdf', { type: 'application/pdf' })] } })
   expect(screen.getByRole('button', { name: 'Remove report.pdf' })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Send 1 attachment' }))
-  expect(screen.getByText(/Preparing upload/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  expect(screen.getByRole('progressbar', { name: 'Upload progress for report.pdf' })).toHaveValue(0)
   act(() => reportProgress(46))
   expect(screen.getByRole('progressbar', { name: 'Upload progress for report.pdf' })).toHaveValue(46)
   await act(async () => { resolveUpload({ path: 'report.pdf', publicUrl: 'https://example.com/report.pdf' }) })
   await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(1))
+})
+
+test('regular Send queues an image caption and preserves text typed during its acknowledgement', async () => {
+  let resolveSend!: () => void
+  const onSendMessage = jest.fn((...args: unknown[]) => {
+    ;(args[6] as () => void)()
+    return new Promise<void>(resolve => { resolveSend = resolve })
+  })
+  uploadChatImageAsset.mockResolvedValue({ path: 'photo.png', publicUrl: 'https://example.com/photo.png' })
+  const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
+  const textarea = screen.getByRole('textbox')
+  fireEvent.change(textarea, { target: { value: 'Photo caption' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="image"]')!, {
+    target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] },
+  })
+  expect(screen.queryByRole('button', { name: /^Send \d+ attachments?$/ })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(textarea).toHaveValue(''))
+  expect(onSendMessage).toHaveBeenCalledWith('Photo caption', 'image', 'https://example.com/photo.png', undefined, undefined, expect.any(String), expect.any(Function))
+  fireEvent.change(textarea, { target: { value: 'Next thought' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  expect(onSendMessage).toHaveBeenCalledTimes(1)
+  await act(async () => { resolveSend() })
+  expect(textarea).toHaveValue('Next thought')
+  expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument()
+})
+
+test('multiple attachments keep their captured reply and put the caption on the first file only', async () => {
+  let resolveFirst!: () => void
+  const onSendMessage = jest.fn()
+    .mockImplementationOnce((...args: unknown[]) => {
+      ;(args[6] as () => void)()
+      return new Promise<void>(resolve => { resolveFirst = resolve })
+    })
+    .mockResolvedValue({ id: 'sent' })
+  uploadChatFileAsset.mockImplementation(async (file: File) => ({ path: file.name, publicUrl: `https://example.com/${file.name}` }))
+  const { container, rerender } = render(<MessageInput onSendMessage={onSendMessage} replyingTo={{ id: 'original', content: 'Parent' }} />)
+  const textarea = screen.getByRole('textbox')
+  fireEvent.change(textarea, { target: { value: 'Batch caption' } })
+  const files = ['one.pdf', 'two.pdf'].map(name => new File(['pdf'], name, { type: 'application/pdf' }))
+  fireEvent.change(container.querySelector('input[data-upload-kind="file"]')!, { target: { files } })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(1))
+  rerender(<MessageInput onSendMessage={onSendMessage} replyingTo={{ id: 'new-reply', content: 'Another parent' }} />)
+  await act(async () => { resolveFirst() })
+  await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(2))
+  expect(JSON.parse(onSendMessage.mock.calls[0][0])).toEqual({ name: 'one.pdf', size: 3, type: 'application/pdf', caption: 'Batch caption' })
+  expect(JSON.parse(onSendMessage.mock.calls[1][0])).toEqual({ name: 'two.pdf', size: 3, type: 'application/pdf' })
+  expect(onSendMessage.mock.calls.map(args => args[3])).toEqual(['original', 'original'])
+  await waitFor(() => expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument())
+})
+
+test('a pasted video stays staged until regular Send includes its caption', async () => {
+  uploadChatFileAsset.mockResolvedValue({ path: 'clip.mp4', publicUrl: 'https://example.com/clip.mp4' })
+  const onSendMessage = jest.fn().mockResolvedValue({ id: 'sent' })
+  render(<MessageInput onSendMessage={onSendMessage} />)
+  const textarea = screen.getByRole('textbox')
+  fireEvent.change(textarea, { target: { value: 'Video caption' } })
+  const file = new File(['video'], 'clip.mp4', { type: 'video/mp4' })
+  const paste = createEvent.paste(textarea, { clipboardData: { files: [file], items: [], getData: () => '' } })
+  fireEvent(textarea, paste)
+  expect(paste.defaultPrevented).toBe(true)
+  expect(screen.getByRole('button', { name: 'Remove clip.mp4' })).toBeInTheDocument()
+  expect(uploadChatFileAsset).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(1))
+  expect(onSendMessage).toHaveBeenCalledWith(JSON.stringify({ name: 'clip.mp4', size: 5, type: 'video/mp4', caption: 'Video caption' }), 'video', 'https://example.com/clip.mp4', undefined, undefined, expect.any(String), expect.any(Function))
+})
+
+test('retry preserves attachment caption, reply and message ID while sending new text as a separate intent', async () => {
+  uploadChatImageAsset.mockResolvedValue({ path: 'photo.png', publicUrl: 'https://example.com/photo.png' })
+  const onSendMessage = jest.fn().mockResolvedValueOnce(null).mockResolvedValue({ id: 'sent' })
+  const { container, rerender } = render(<MessageInput onSendMessage={onSendMessage} replyingTo={{ id: 'original', content: 'Parent' }} />)
+  const textarea = screen.getByRole('textbox')
+  fireEvent.change(textarea, { target: { value: 'Original caption' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="image"]')!, {
+    target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  const retry = await screen.findByRole('button', { name: 'Retry photo.png' })
+  const originalId = onSendMessage.mock.calls[0][5]
+  rerender(<MessageInput onSendMessage={onSendMessage} replyingTo={{ id: 'new-parent', content: 'New parent' }} />)
+  fireEvent.change(textarea, { target: { value: 'New text' } })
+  fireEvent.click(retry)
+  await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(3))
+  expect(onSendMessage.mock.calls[1]).toEqual(['Original caption', 'image', 'https://example.com/photo.png', 'original', undefined, originalId, expect.any(Function)])
+  expect(onSendMessage.mock.calls[2]).toEqual(['New text', 'text', undefined, 'new-parent', undefined, undefined, expect.any(Function)])
+  expect(uploadChatImageAsset).toHaveBeenCalledTimes(1)
+  expect(textarea).toHaveValue('')
+})
+
+test('partial attachment failure retries only the retained file without repeating the accepted caption', async () => {
+  uploadChatFileAsset.mockImplementation(async (file: File) => ({ path: file.name, publicUrl: `https://example.com/${file.name}` }))
+  const onSendMessage = jest.fn().mockResolvedValueOnce({ id: 'first' }).mockResolvedValueOnce(null).mockResolvedValue({ id: 'retry' })
+  const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'One batch caption' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="file"]')!, {
+    target: { files: ['one.pdf', 'two.pdf'].map(name => new File(['pdf'], name, { type: 'application/pdf' })) },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  const retry = await screen.findByRole('button', { name: 'Retry two.pdf' })
+  expect(screen.queryByRole('button', { name: 'Remove one.pdf' })).not.toBeInTheDocument()
+  expect(screen.getByRole('textbox')).toHaveValue('')
+  fireEvent.click(retry)
+  await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(3))
+  expect(JSON.parse(onSendMessage.mock.calls[0][0]).caption).toBe('One batch caption')
+  expect(JSON.parse(onSendMessage.mock.calls[2][0]).caption).toBeUndefined()
+  expect(onSendMessage.mock.calls[2][5]).toBe(onSendMessage.mock.calls[1][5])
+  expect(uploadChatFileAsset).toHaveBeenCalledTimes(2)
+})
+
+test('attachment queue acceptance and success cancel the submitted reply only once', async () => {
+  uploadChatImageAsset.mockResolvedValue({ path: 'photo.png', publicUrl: 'https://example.com/photo.png' })
+  const onCancelReply = jest.fn()
+  const onSendMessage = jest.fn(async (...args: ComposerSendArguments) => {
+    args[6]?.()
+    args[6]?.()
+    return undefined
+  })
+  const { container } = render(<MessageInput onSendMessage={onSendMessage} onCancelReply={onCancelReply} replyingTo={{ id: 'parent', content: 'Parent message' }} />)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Caption' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="image"]')!, {
+    target: { files: [new File(['image'], 'photo.png', { type: 'image/png' })] },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument())
+  expect(onCancelReply).toHaveBeenCalledTimes(1)
+  expect(screen.getByRole('textbox')).toHaveValue('')
+})
+
+test('late attachment acknowledgement cannot clear a new conversation draft or continue its old batch', async () => {
+  let resolveSend!: () => void
+  const onSendMessage = jest.fn((..._args: ComposerSendArguments) => new Promise<void>(resolve => { resolveSend = resolve }))
+  const onCancelReply = jest.fn()
+  uploadChatFileAsset.mockImplementation(async (file: File) => ({ path: file.name, publicUrl: `https://example.com/${file.name}` }))
+  const { container, rerender } = render(<MessageInput cacheKey="dm-old" onSendMessage={onSendMessage} onCancelReply={onCancelReply} />)
+  const textarea = screen.getByRole('textbox')
+  fireEvent.change(textarea, { target: { value: 'Same caption' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="file"]')!, {
+    target: { files: ['one.pdf', 'two.pdf'].map(name => new File(['pdf'], name, { type: 'application/pdf' })) },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(1))
+  const oldQueued = onSendMessage.mock.calls[0][6] as () => void
+  rerender(<MessageInput cacheKey="dm-new" onSendMessage={onSendMessage} onCancelReply={onCancelReply} replyingTo={{ id: 'new-reply', content: 'New conversation' }} />)
+  fireEvent.change(textarea, { target: { value: 'Same caption' } })
+  await act(async () => { oldQueued(); resolveSend() })
+  expect(textarea).toHaveValue('Same caption')
+  expect(onCancelReply).not.toHaveBeenCalled()
+  expect(onSendMessage).toHaveBeenCalledTimes(1)
+  expect(uploadChatFileAsset).toHaveBeenCalledTimes(1)
+  expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument()
+})
+
+test('removing a caption owner whose upload failed transfers the caption to the next attachment', async () => {
+  uploadChatFileAsset.mockRejectedValueOnce(new Error('Upload failed before sending'))
+    .mockResolvedValue({ path: 'two.pdf', publicUrl: 'https://example.com/two.pdf' })
+  const onSendMessage = jest.fn().mockResolvedValue({ id: 'second' })
+  const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Keep this caption' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="file"]')!, {
+    target: { files: ['one.pdf', 'two.pdf'].map(name => new File(['pdf'], name, { type: 'application/pdf' })) },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await screen.findByRole('button', { name: 'Retry one.pdf' })
+  expect(onSendMessage).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Remove one.pdf' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument())
+  expect(onSendMessage).toHaveBeenCalledTimes(1)
+  expect(JSON.parse(onSendMessage.mock.calls[0][0])).toEqual({ name: 'two.pdf', size: 3, type: 'application/pdf', caption: 'Keep this caption' })
+  expect(onSendMessage.mock.calls[0][1]).toBe('file')
+  expect(screen.getByRole('textbox')).toHaveValue('')
+})
+
+test('removing an ambiguously sent caption owner does not replay its caption on another attachment or as text', async () => {
+  uploadChatFileAsset.mockImplementation(async (file: File) => ({ path: file.name, publicUrl: `https://example.com/${file.name}` }))
+  const onSendMessage = jest.fn().mockResolvedValueOnce(null).mockResolvedValue({ id: 'second' })
+  const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Uncertain caption' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="file"]')!, {
+    target: { files: ['one.pdf', 'two.pdf'].map(name => new File(['pdf'], name, { type: 'application/pdf' })) },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await screen.findByRole('button', { name: 'Retry one.pdf' })
+  fireEvent.click(screen.getByRole('button', { name: 'Remove one.pdf' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument())
+  expect(onSendMessage).toHaveBeenCalledTimes(2)
+  expect(JSON.parse(onSendMessage.mock.calls[0][0]).caption).toBe('Uncertain caption')
+  expect(JSON.parse(onSendMessage.mock.calls[1][0])).toEqual({ name: 'two.pdf', size: 3, type: 'application/pdf' })
+  expect(onSendMessage.mock.calls.every(args => args[1] === 'file')).toBe(true)
+  expect(screen.getByRole('textbox')).toHaveValue('Uncertain caption')
+  const toast = jest.requireMock('react-hot-toast').default as { error: jest.Mock }
+  expect(toast.error).toHaveBeenCalledWith(expect.stringMatching(/may have posted|check the conversation/i))
+})
+
+test('explicitly sending a removed attachment caption as text cannot retarget it to a later image', async () => {
+  uploadChatFileAsset.mockRejectedValueOnce(new Error('Upload failed before sending'))
+  uploadChatImageAsset.mockResolvedValue({ path: 'later.png', publicUrl: 'https://example.com/later.png' })
+  const onSendMessage = jest.fn(async (...args: ComposerSendArguments) => {
+    args[6]?.()
+    return undefined
+  })
+  const { container } = render(<MessageInput onSendMessage={onSendMessage} />)
+  const textarea = screen.getByRole('textbox')
+  fireEvent.change(textarea, { target: { value: 'Original caption' } })
+  fireEvent.change(container.querySelector('input[data-upload-kind="file"]')!, {
+    target: { files: [new File(['pdf'], 'failed.pdf', { type: 'application/pdf' })] },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await screen.findByRole('button', { name: 'Retry failed.pdf' })
+  fireEvent.click(screen.getByRole('button', { name: 'Remove failed.pdf' }))
+  expect(onSendMessage).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(textarea).toHaveValue(''))
+  expect(onSendMessage).toHaveBeenCalledWith('Original caption', 'text', undefined, undefined, undefined, undefined, expect.any(Function))
+  fireEvent.change(container.querySelector('input[data-upload-kind="image"]')!, {
+    target: { files: [new File(['image'], 'later.png', { type: 'image/png' })] },
+  })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument())
+  expect(onSendMessage).toHaveBeenCalledTimes(2)
+  expect(onSendMessage.mock.calls[1]).toEqual(['', 'image', 'https://example.com/later.png', undefined, undefined, expect.any(String), expect.any(Function)])
+})
+
+test('a downward Send swipe dismisses input and cancels Hype without sending or consuming the draft', async () => {
+  jest.useFakeTimers()
+  const ringBell = jest.fn().mockResolvedValue(null)
+  const onSendMessage = jest.fn()
+  mockUseOptionalHype.mockReturnValue({ status: { remaining: 2, limit_per_day: 2 }, loadingStatus: false, ringing: false, ringBell })
+  try {
+    render(<MessageInput onSendMessage={onSendMessage} />)
+    const textarea = screen.getByRole('textbox')
+    fireEvent.change(textarea, { target: { value: 'Keep the draft' } })
+    act(() => textarea.focus())
+    const sendButton = screen.getByRole('button', { name: /hold for hype/i })
+    dispatchTouchPointer(sendButton, 'pointerDown', 150, 100)
+    act(() => { jest.advanceTimersByTime(100) })
+    dispatchTouchPointer(sendButton, 'pointerMove', 151, 135)
+    expect(document.activeElement).not.toBe(textarea)
+    await act(async () => { jest.advanceTimersByTime(700) })
+    dispatchTouchPointer(sendButton, 'pointerUp', 151, 135)
+    fireEvent.click(sendButton)
+    expect(onSendMessage).not.toHaveBeenCalled()
+    expect(ringBell).not.toHaveBeenCalled()
+    expect(textarea).toHaveValue('Keep the draft')
+    expect(sendButton).toHaveClass('touch-none')
+    expect(textarea).not.toHaveClass('touch-none')
+  } finally {
+    jest.useRealTimers()
+  }
+})
+
+test('late send queue and acknowledgement cannot steal focus after explicit keyboard dismissal', async () => {
+  jest.useFakeTimers()
+  const originalInnerWidth = window.innerWidth
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  let resolveSend!: () => void
+  const onSendMessage = jest.fn((..._args: ComposerSendArguments) => new Promise<void>(resolve => { resolveSend = resolve }))
+  try {
+    render(<><MessageInput onSendMessage={onSendMessage} /><button type="button">Other control</button></>)
+    const textarea = screen.getByRole('textbox')
+    fireEvent.change(textarea, { target: { value: 'Pending text' } })
+    act(() => textarea.focus())
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Send message' })) })
+    const onQueued = onSendMessage.mock.calls[0][6] as () => void
+    fireEvent.click(screen.getByRole('button', { name: 'Hide keyboard' }))
+    const otherControl = screen.getByRole('button', { name: 'Other control' })
+    act(() => otherControl.focus())
+    await act(async () => { onQueued(); resolveSend() })
+    await act(async () => { jest.advanceTimersByTime(50) })
+    expect(document.activeElement).toBe(otherControl)
+    expect(textarea).toHaveValue('')
+  } finally {
+    jest.useRealTimers()
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth })
+  }
 })
 
 test('hides the GIF picker menu item by default', async () => {

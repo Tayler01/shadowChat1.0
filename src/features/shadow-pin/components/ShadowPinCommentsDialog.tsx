@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Copy, Edit3, Flag, Loader2, MessageSquare, Paperclip, Plus, Reply, Send, Trash2, X } from 'lucide-react'
+import { ChevronDown, Copy, Edit3, Flag, Loader2, MessageSquare, Paperclip, Plus, Reply, Send, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
 import type { EmojiClickData } from '../../../types'
 import { ChatMessageActionsMenu, type ChatMessageAction } from '../../../components/chat/ChatMessageActionsMenu'
@@ -36,6 +36,7 @@ import { MEMBER_REPORTING_FEATURE_ENABLED } from '../../../config/featureFlags'
 import { useUnreadScroll } from '../../../hooks/useUnreadScroll'
 import { beginChatTiming, measureChatInputFrame } from '../../../lib/chatPerformance'
 import { useStagedAttachments } from '../../../hooks/useStagedAttachments'
+import { useComposerKeyboardDismiss } from '../../../hooks/useComposerKeyboardDismiss'
 import { StagedAttachmentList } from '../../../components/chat/StagedAttachmentList'
 import { extractComposerFiles } from '../../../lib/composerAttachments'
 import { getWorkingClient } from '../../../lib/supabase'
@@ -364,6 +365,9 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
   const [hasOlder, setHasOlder] = useState(false)
   const closeRef = useRef<HTMLButtonElement>(null)
   const composerRef = useRef<HTMLTextAreaElement>(null)
+  const keyboard = useComposerKeyboardDismiss(composerRef)
+  const suppressSendClickRef = useRef(false)
+  const submittingRef = useRef(false)
   const viewportFrameRef = useRef<HTMLDivElement>(null)
   const commentsScrollRef = useRef<HTMLDivElement>(null)
   const canonicalCountRef = useRef(Math.max(0, image.comment_count ?? 0))
@@ -775,6 +779,16 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
       return true
     },
   })
+  const attachmentBatchRef = useRef<{
+    ids: Set<string>
+    firstId: string
+    caption: string
+    draftValue: string
+    captionCommitted: boolean
+    captionAttempted: boolean
+    replyId: string | null
+    imageId: string
+  } | null>(null)
   const stageFiles = (files: File[]) => {
     if (editing) { setError('Finish editing before attaching files.'); return }
     try {
@@ -822,10 +836,13 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
   }
 
   const submit = async () => {
-    if ((!body.trim() && attachments.items.length === 0) || saving || attachments.busy) return
+    if ((!body.trim() && attachments.items.length === 0) || saving || attachments.busy || submittingRef.current) return
+    submittingRef.current = true
     const finishTiming = beginChatTiming('send-ack', 'pins')
     const generation = generationRef.current
     const submittedBody = body
+    let finalBodyToClear = submittedBody
+    const focusIntent = keyboard.focusIntentRef.current
     setSaving(true)
     setError(null)
     try {
@@ -835,6 +852,51 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
         captureScrollAnchor()
         setComments(previous => previous.map(comment => comment.id === updated.id ? { ...comment, body: updated.body, updated_at: updated.updated_at } : comment))
         toast.success('Comment updated')
+      } else if (attachments.items.length) {
+        const stagedIds = attachments.items.map(item => item.clientMessageId)
+        let batch = attachmentBatchRef.current
+        if (!batch || batch.imageId !== image.id || !stagedIds.some(id => batch?.ids.has(id))) {
+          batch = {
+            ids: new Set(stagedIds),
+            firstId: stagedIds[0],
+            caption: submittedBody.trim(),
+            draftValue: submittedBody,
+            captionCommitted: false,
+            captionAttempted: false,
+            replyId: replyTo?.id ?? null,
+            imageId: image.id,
+          }
+          attachmentBatchRef.current = batch
+        }
+        const activeBatch = batch
+        if (!activeBatch.captionCommitted && !activeBatch.captionAttempted && !stagedIds.includes(activeBatch.firstId)) {
+          activeBatch.firstId = stagedIds[0]
+        }
+        finalBodyToClear = activeBatch.draftValue
+        const sentAll = await attachments.sendAll(async (attachment, _file, clientMessageId) => {
+          const caption = clientMessageId === activeBatch.firstId && !activeBatch.captionCommitted ? activeBatch.caption : ''
+          if (caption) activeBatch.captionAttempted = true
+          const created = await createShadowPinComment(image.id, caption, activeBatch.replyId, attachment)
+          if (caption) {
+            activeBatch.captionCommitted = true
+            if (aliveRef.current && generation === generationRef.current) {
+              setBody(current => current === activeBatch.draftValue ? '' : current)
+            }
+          }
+          if (!aliveRef.current || generation !== generationRef.current) return true
+          ownSendRef.current = true
+          setComments(previous => mergeComments(previous, [created]))
+          noteCommentCreated(created.id)
+          return true
+        })
+        if (!sentAll) return
+        attachmentBatchRef.current = null
+        if (activeBatch.caption && !activeBatch.captionCommitted) {
+          setError('Attachments posted, but the comment text was not confirmed. Check the discussion before posting it again.')
+          finishTiming()
+          return
+        }
+        toast.success(replyTo ? 'Reply posted' : 'Comment posted')
       } else if (body.trim()) {
         const created = await createShadowPinComment(image.id, body, replyTo?.id)
         if (!aliveRef.current || generation !== generationRef.current) return
@@ -844,18 +906,18 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
         setBody(current => current === submittedBody ? '' : current)
         toast.success(replyTo ? 'Reply posted' : 'Comment posted')
       }
-      if (attachments.items.length && !(await attachments.sendAll())) return
       if (!aliveRef.current || generation !== generationRef.current) return
       if (hasNewerRef.current) await jumpToLatest()
       finishTiming()
-      setBody(current => current === submittedBody ? '' : current)
+      setBody(current => current === finalBodyToClear ? '' : current)
       setReplyTo(null)
       setEditing(null)
-      composerRef.current?.focus({ preventScroll: true })
+      if (keyboard.focusIntentRef.current === focusIntent) composerRef.current?.focus({ preventScroll: true })
     } catch (saveError) {
       if (!aliveRef.current || generation !== generationRef.current) return
       setError(saveError instanceof Error ? saveError.message : 'Unable to save comment.')
     } finally {
+      submittingRef.current = false
       if (aliveRef.current) setSaving(false)
     }
   }
@@ -1005,12 +1067,16 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
             </div>
           )}
           {error && comments.length > 0 && <p className="mb-2 text-sm text-red-200" role="alert" aria-live="assertive">{error}</p>}
-          <StagedAttachmentList items={attachments.items} onRemove={attachments.remove} onRetry={id => { void attachments.retry(id) }} onCancel={attachments.cancel} />
           {pendingCleanup.map(attachment => <button key={attachment.path} type="button" onClick={() => void retryCleanup(attachment)} className="mb-2 min-h-11 text-sm text-[var(--theme-accent-readable)]">Retry file cleanup: {attachment.name || 'attachment'}</button>)}
           <div className="flex items-end gap-2" onDragOver={event => event.preventDefault()} onDrop={event => { const files = extractComposerFiles(event.dataTransfer); if (files.length) { event.preventDefault(); stageFiles(files) } }}>
             <input ref={fileRef} type="file" multiple className="hidden" aria-label="Attach files to comment" onChange={event => { stageFiles(Array.from(event.target.files ?? [])); event.target.value = '' }} />
-            <button type="button" disabled={Boolean(editing) || saving || attachments.busy} onClick={() => fileRef.current?.click()} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--theme-accent-readable)]" aria-label="Attach files"><Paperclip className="h-5 w-5" /></button>
-            <textarea
+            <div className="flex h-12 shrink-0 items-center">
+              <button type="button" disabled={Boolean(editing) || saving || attachments.busy} onClick={() => fileRef.current?.click()} className={`inline-flex h-12 ${keyboard.keyboardVisible ? 'w-8' : 'w-11'} items-center justify-center rounded-full text-[var(--theme-accent-readable)]`} aria-label="Attach files"><Paperclip className="h-5 w-5" /></button>
+              {keyboard.keyboardVisible && <button type="button" onMouseDown={event => event.preventDefault()} onClick={keyboard.dismissKeyboard} className="flex h-12 w-8 items-center justify-center text-[var(--text-muted)]" aria-label="Hide keyboard"><ChevronDown className="h-3.5 w-3.5" /></button>}
+            </div>
+            <div className="obsidian-input min-w-0 flex-1 rounded-[var(--radius-md)] px-2 py-1.5" data-composer-entry="true" data-testid="shadow-pin-comment-entry-box">
+              <StagedAttachmentList items={attachments.items} onRemove={attachments.remove} onRetry={() => { void submit() }} onCancel={attachments.cancel} />
+              <textarea
               ref={composerRef}
               value={body}
               onChange={event => { measureChatInputFrame('pins'); setBody(event.target.value) }}
@@ -1023,16 +1089,23 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
               }}
               maxLength={1000}
               rows={2}
-              className="obsidian-input min-h-11 flex-1 resize-none rounded-[var(--radius-md)] px-3 py-2.5 text-base"
+              className="min-h-11 w-full resize-none border-0 bg-transparent px-1 py-1.5 text-base text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
               placeholder={replyTo ? 'Write a reply…' : 'Add a comment…'}
               aria-label={replyTo ? `Reply to ${authorLabel(replyTo)}` : 'Add a ShadowPin comment'}
               aria-describedby="shadow-pin-comment-composer-help"
-            />
+              />
+            </div>
             <button
               type="button"
-              onClick={() => void submit()}
-              disabled={(!body.trim() && attachments.items.length === 0) || saving || attachments.busy}
-              className="theme-floating-action inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-45"
+              onClick={() => { if (suppressSendClickRef.current) { suppressSendClickRef.current = false; return }; void submit() }}
+              onMouseDown={event => event.preventDefault()}
+              onPointerDown={event => { suppressSendClickRef.current = false; keyboard.beginGesture(event) }}
+              onPointerMove={keyboard.moveGesture}
+              onPointerUp={event => { if (keyboard.endGesture(event)) { event.preventDefault(); suppressSendClickRef.current = true } }}
+              onPointerCancel={() => { keyboard.cancelGesture(); suppressSendClickRef.current = true }}
+              disabled={!keyboard.keyboardVisible && ((!body.trim() && attachments.items.length === 0) || saving || attachments.busy)}
+              aria-disabled={saving || attachments.busy || undefined}
+              className="theme-floating-action inline-flex h-12 w-12 shrink-0 touch-none items-center justify-center rounded-full disabled:cursor-not-allowed disabled:opacity-45"
               aria-label={editing ? 'Save edited comment' : replyTo ? 'Post reply' : 'Post comment'}
               aria-busy={saving}
             >

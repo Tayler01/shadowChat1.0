@@ -1,5 +1,16 @@
 # Mobile Viewport Audit
 
+## September 30 inline media composer
+
+Media thumbnails now live inside the neutral entry container. No visible image/video
+filename or size row appears underneath. Focus ownership belongs to the container,
+with shared Comfort widths and forced-color visibility retained; the former inner
+yellow rectangle is removed. The keyboard chevron is beside the attachment control
+in a compact 64px pair, with 32px-wide by 48px-high targets when focused. Final mobile
+Chromium/WebKit checks passed containment, placement and focus rules. Actual native
+keyboard height and toolbar removal remain physical iOS 27 checks; see the
+[follow-up report](../features/composer-media-followup-2026-09-30.md).
+
 ## September 30 chat smoothness checkpoint
 
 Initial message positioning now uses the actual readable area: DM targets clear

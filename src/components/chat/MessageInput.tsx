@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { motion } from 'framer-motion'
-import { BellRing, Film, Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
+import { BellRing, ChevronDown, Film, Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
 import { useTyping } from '../../hooks/useTyping'
 import { Button } from '../ui/Button'
 import { cn, processSlashCommand, slashCommands } from '../../lib/utils'
@@ -28,10 +28,11 @@ import {
   validateUpload,
   VOICE_RECORDING_MAX_SECONDS,
 } from '../../lib/uploadLimits'
-import { classifyComposerFile, extractClipboardFiles, extractDroppedFiles } from '../../lib/composerAttachments'
-import { useStagedAttachments } from '../../hooks/useStagedAttachments'
+import { buildAttachmentMessageContent, classifyComposerFile, extractClipboardFiles, extractDroppedFiles } from '../../lib/composerAttachments'
+import { useStagedAttachments, type AttachmentStageView } from '../../hooks/useStagedAttachments'
 import { StagedAttachmentList } from './StagedAttachmentList'
 import { measureChatInputFrame } from '../../lib/chatPerformance'
+import { useComposerKeyboardDismiss } from '../../hooks/useComposerKeyboardDismiss'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
 const GifPicker = React.lazy(() => import('./GifPicker').then(module => ({ default: module.GifPicker })))
@@ -44,6 +45,13 @@ type ChatStagedUpload = {
   path: string
   publicUrl: string
   thumbnailUrl?: string | null
+}
+
+type AttachmentMessageIntent = {
+  scopeGeneration: number
+  caption: string
+  replyId?: string
+  onQueued: () => void
 }
 
 interface MessageInputProps {
@@ -93,12 +101,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const submittingRef = useRef(false)
   const submissionIdRef = useRef(0)
   const scopeRef = useRef({ key: composerScopeKey, generation: 0 })
+  const attachmentBatchRef = useRef(false)
+  const attachmentIntentsRef = useRef(new Map<string, AttachmentMessageIntent>())
+  const previousStagesRef = useRef(new Map<string, AttachmentStageView>())
+  const removedUploadCaptionRef = useRef<AttachmentMessageIntent | null>(null)
+  const uncertainCaptionRef = useRef<{ scopeGeneration: number; caption: string } | null>(null)
   const composerEditVersionRef = useRef(0)
   const replyIdRef = useRef(replyingTo?.id)
   replyIdRef.current = replyingTo?.id
   if (scopeRef.current.key !== composerScopeKey) {
     scopeRef.current = { key: composerScopeKey, generation: scopeRef.current.generation + 1 }
     submittingRef.current = false
+    attachmentBatchRef.current = false
+    attachmentIntentsRef.current.clear()
+    previousStagesRef.current.clear()
+    removedUploadCaptionRef.current = null
+    uncertainCaptionRef.current = null
   }
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showGifPicker, setShowGifPicker] = useState(false)
@@ -115,6 +133,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const { startTyping, stopTyping } = useTyping(typingChannel)
   const hype = useOptionalHype()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const keyboard = useComposerKeyboardDismiss(textareaRef)
+  const { beginGesture, moveGesture, endGesture } = keyboard
   const attachmentMenuRef = useRef<HTMLDivElement>(null)
   const replyHypeCount = replyingTo?.hypeCount ?? 0
   const replyHypeTier = getHypeTier(replyHypeCount)
@@ -131,7 +151,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     setReplyPreviewExpanded(false)
   }, [replyingTo?.id])
   const audioChunksRef = useRef<Blob[]>([])
-  const attachmentReplyRef = useRef<{ id?: string } | null>(null)
   const uploadStatusRef = useRef(onUploadStatusChange)
   uploadStatusRef.current = onUploadStatusChange
   const staged = useStagedAttachments<ChatStagedUpload>({
@@ -144,16 +163,22 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         : uploadChatFileAsset(file, options)
     },
     send: async (uploaded, file, clientMessageId) => {
-      const { kind, mimeType } = classifyComposerFile(file)
-      const meta = JSON.stringify({ name: file.name, size: file.size, type: mimeType })
+      const intent = attachmentIntentsRef.current.get(clientMessageId)
+      if (!intent || intent.scopeGeneration !== scopeRef.current.generation) return false
+      const { kind } = classifyComposerFile(file)
       const sent = await onSendMessage(
-        kind === 'image' ? '' : meta,
+        buildAttachmentMessageContent(file, intent.caption),
         kind,
         uploaded.publicUrl,
-        attachmentReplyRef.current ? attachmentReplyRef.current.id : replyingTo?.id,
+        intent.replyId,
         uploaded.thumbnailUrl,
-        clientMessageId
+        clientMessageId,
+        intent.onQueued
       )
+      if (sent !== null) {
+        intent.onQueued()
+        if (attachmentIntentsRef.current.get(clientMessageId) === intent) attachmentIntentsRef.current.delete(clientMessageId)
+      }
       return sent !== null
     },
     cleanup: async uploaded => removeUnusedChatUploadAsset(uploaded.path),
@@ -168,24 +193,30 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     uploadStatusRef.current(staged.busy)
   }, [staged.busy])
 
-  const sendStagedAttachments = async (id?: string) => {
-    const scopeGeneration = scopeRef.current.generation
-    const replyId = replyingTo?.id
-    const attachmentReply = { id: replyId }
-    attachmentReplyRef.current = attachmentReply
-    try {
-      const sent = id ? await staged.retry(id) : await staged.sendAll()
-      if (sent && scopeRef.current.generation === scopeGeneration && replyIdRef.current === replyId && (id ? staged.items.length <= 1 : true)) onCancelReply?.()
-    } finally {
-      if (attachmentReplyRef.current === attachmentReply) attachmentReplyRef.current = null
+  useEffect(() => {
+    const activeIds = new Set(staged.items.map(item => item.clientMessageId))
+    for (const [id, intent] of attachmentIntentsRef.current) {
+      if (activeIds.has(id)) continue
+      if (intent.caption && intent.scopeGeneration === scopeRef.current.generation) {
+        const removedStage = previousStagesRef.current.get(id)
+        if (removedStage?.sendAttempted) {
+          uncertainCaptionRef.current = { scopeGeneration: intent.scopeGeneration, caption: intent.caption }
+        } else if (removedStage) {
+          removedUploadCaptionRef.current = intent
+        }
+      }
+      attachmentIntentsRef.current.delete(id)
     }
-  }
+    previousStagesRef.current = new Map(staged.items.map(item => [item.clientMessageId, item]))
+  }, [staged.items])
+
   const { enabled: suggestionsEnabled } = useSuggestionsEnabled()
   const { suggestions } = useSuggestedReplies(messages, suggestionsEnabled)
   const hypeRemaining = hype?.status?.remaining ?? 0
   const canLongPressHype = Boolean(
     hype &&
     !disabled &&
+    !staged.busy &&
     !hype.loadingStatus &&
     !hype.ringing &&
     hypeRemaining > 0
@@ -317,7 +348,92 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     }, 0)
   }, [])
 
+  const sendStagedAttachments = useCallback(async (id?: string) => {
+    if (disabled || staged.busy || attachmentBatchRef.current || submittingRef.current) return
+    const selected = id ? staged.items.filter(item => item.id === id) : staged.items
+    if (selected.length === 0) return
+    const scopeGeneration = scopeRef.current.generation
+    const focusIntent = keyboard.focusIntentRef.current
+    const editVersion = composerEditVersionRef.current
+    const currentMessage = messageRef.current.trim()
+    const replyId = replyingTo?.id
+    const stillInScope = () => scopeRef.current.generation === scopeGeneration
+    let queued = false
+    const completeQueued = () => {
+      if (queued || !stillInScope()) return
+      queued = true
+      if (removedUploadCaptionRef.current?.scopeGeneration === scopeGeneration && removedUploadCaptionRef.current.caption === currentMessage) {
+        removedUploadCaptionRef.current = null
+      }
+      if (uncertainCaptionRef.current?.scopeGeneration === scopeGeneration && uncertainCaptionRef.current.caption === currentMessage) {
+        uncertainCaptionRef.current = null
+      }
+      if (composerEditVersionRef.current === editVersion && messageRef.current.trim() === currentMessage) {
+        clear()
+        messageRef.current = ''
+        setMessage('')
+        stopTyping()
+        setShowSlashCommands(false)
+        if (textareaRef.current) textareaRef.current.style.height = 'auto'
+      }
+      if (replyIdRef.current === replyId) onCancelReply?.()
+    }
+    selected.forEach((item, index) => {
+      // A retry can have an uncertain server outcome: keep its original body,
+      // reply and stable ID rather than silently changing the accepted message.
+      if (!attachmentIntentsRef.current.has(item.clientMessageId)) {
+        attachmentIntentsRef.current.set(item.clientMessageId, {
+          scopeGeneration,
+          caption: index === 0 ? currentMessage : '',
+          replyId,
+          onQueued: index === 0 ? completeQueued : () => {},
+        })
+      }
+    })
+    const removedUploadCaption = removedUploadCaptionRef.current
+    if (removedUploadCaption?.scopeGeneration === scopeGeneration && selected.length > 0) {
+      const first = selected[0]
+      const currentIntent = attachmentIntentsRef.current.get(first.clientMessageId)
+      if (currentIntent && !selected.some(item => attachmentIntentsRef.current.get(item.clientMessageId)?.caption)) {
+        attachmentIntentsRef.current.set(first.clientMessageId, {
+          ...currentIntent,
+          caption: removedUploadCaption.caption,
+          replyId: removedUploadCaption.replyId,
+          onQueued: removedUploadCaption.onQueued,
+        })
+        removedUploadCaptionRef.current = null
+      }
+    }
+    const hasCurrentCaption = selected.some(item => attachmentIntentsRef.current.get(item.clientMessageId)?.caption === currentMessage)
+    const uncertainOriginalCaption = Boolean(currentMessage && uncertainCaptionRef.current?.scopeGeneration === scopeGeneration && uncertainCaptionRef.current.caption === currentMessage)
+    attachmentBatchRef.current = true
+    submittingRef.current = true
+    try {
+      const sent = id ? await staged.retry(id) : await staged.sendAll()
+      if (!sent || !stillInScope()) return
+      // Newly typed text beside a retry is a new intent; old retry payloads stay
+      // immutable. Send the new text once after the retained files succeed.
+      if (currentMessage && !hasCurrentCaption && !uncertainOriginalCaption) {
+        const textSent = await onSendMessage(currentMessage, 'text', undefined, replyId, undefined, undefined, completeQueued)
+        if (textSent !== null) completeQueued()
+      }
+      if (uncertainOriginalCaption) toast.error('The removed attachment may have posted. Check the conversation before sending its caption again.')
+    } catch (error) {
+      if (stillInScope()) toast.error(getUploadErrorMessage(error, 'Message was not sent. Try again.'))
+    } finally {
+      if (stillInScope()) {
+        attachmentBatchRef.current = false
+        submittingRef.current = false
+        restoreComposerFocus(() => stillInScope() && keyboard.focusIntentRef.current === focusIntent)
+      }
+    }
+  }, [clear, disabled, keyboard.focusIntentRef, onCancelReply, onSendMessage, replyingTo?.id, restoreComposerFocus, setMessage, staged, stopTyping])
+
   const sendCurrentMessage = useCallback(async () => {
+    if (staged.items.length > 0) {
+      await sendStagedAttachments()
+      return
+    }
     const currentMessage = message.trim()
 
     if (!currentMessage || disabled || submittingRef.current) {
@@ -327,6 +443,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     submittingRef.current = true
     const submissionId = ++submissionIdRef.current
     const scopeGeneration = scopeRef.current.generation
+    const focusIntent = keyboard.focusIntentRef.current
     const editVersion = composerEditVersionRef.current
     const replyId = replyingTo?.id
     const stillInScope = () => scopeRef.current.generation === scopeGeneration
@@ -334,6 +451,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     const completeQueued = () => {
       if (queued || !stillInScope()) return
       queued = true
+      if (removedUploadCaptionRef.current?.scopeGeneration === scopeGeneration && removedUploadCaptionRef.current.caption === currentMessage) {
+        removedUploadCaptionRef.current = null
+      }
+      if (uncertainCaptionRef.current?.scopeGeneration === scopeGeneration && uncertainCaptionRef.current.caption === currentMessage) {
+        uncertainCaptionRef.current = null
+      }
       if (composerEditVersionRef.current === editVersion && messageRef.current.trim() === currentMessage) {
         clear()
         messageRef.current = ''
@@ -390,7 +513,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     } finally {
       if (stillInScope() && submissionIdRef.current === submissionId) {
         submittingRef.current = false
-        restoreComposerFocus(() => scopeRef.current.generation === scopeGeneration && submissionIdRef.current === submissionId)
+        restoreComposerFocus(() => scopeRef.current.generation === scopeGeneration && submissionIdRef.current === submissionId && keyboard.focusIntentRef.current === focusIntent)
       }
     }
   }, [
@@ -404,6 +527,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     restoreComposerFocus,
     setMessage,
     stopTyping,
+    staged.items.length,
+    sendStagedAttachments,
+    keyboard.focusIntentRef,
   ])
 
   const ringHypeFromSendButton = useCallback(async () => {
@@ -421,6 +547,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   const handleSendPointerDown = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === 'mouse' && event.button !== 0) return
+    suppressNextSendClickRef.current = false
+    hypeLongPressTriggeredRef.current = false
+    beginGesture(event)
     if (!canLongPressHype) return
 
     hypeLongPressTriggeredRef.current = false
@@ -429,7 +558,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       hypeLongPressTimerRef.current = null
       void ringHypeFromSendButton()
     }, HYPE_SEND_LONG_PRESS_MS)
-  }, [canLongPressHype, ringHypeFromSendButton])
+  }, [canLongPressHype, beginGesture, ringHypeFromSendButton])
+
+  const handleSendPointerMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (moveGesture(event)) clearHypeLongPressTimer()
+  }, [clearHypeLongPressTimer, moveGesture])
 
   const handleSendPointerEnd = useCallback((event?: React.PointerEvent<HTMLButtonElement>) => {
     clearHypeLongPressTimer()
@@ -438,13 +571,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     event.preventDefault()
     suppressNextSendClickRef.current = true
 
+    if (event && endGesture(event)) return
+
     if (hypeLongPressTriggeredRef.current) {
       hypeLongPressTriggeredRef.current = false
       return
     }
 
     void sendCurrentMessage()
-  }, [clearHypeLongPressTimer, sendCurrentMessage])
+  }, [clearHypeLongPressTimer, endGesture, sendCurrentMessage])
 
   const handleSendClick = useCallback(() => {
     if (suppressNextSendClickRef.current) {
@@ -857,36 +992,33 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </Suspense>
       )}
 
-      <StagedAttachmentList
-        items={staged.items}
-        onRemove={staged.remove}
-        onCancel={staged.cancel}
-        onRetry={id => { void sendStagedAttachments(id) }}
-      />
-      {staged.items.length > 0 && (
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <span className="text-xs text-[var(--text-muted)]">Your message text stays in the composer.</span>
-          <Button type="button" size="sm" disabled={disabled || staged.busy} onClick={() => { void sendStagedAttachments() }}>
-            Send {staged.items.length} attachment{staged.items.length === 1 ? '' : 's'}
-          </Button>
-        </div>
-      )}
-
       {/* Input Form */}
       <form onSubmit={handleSubmit} className="flex items-end gap-2.5 md:gap-3">
         {/* Attachment Button */}
-        <div ref={attachmentMenuRef} className="relative">
+        <div ref={attachmentMenuRef} className="relative flex h-12 shrink-0 items-center">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => setShowAttachmentMenu(prev => !prev)}
             disabled={disabled || staged.busy}
-            className="h-12 w-12 rounded-xl p-0"
+            className={cn('h-12 rounded-xl p-0', keyboard.keyboardVisible ? 'w-8' : 'w-12')}
             aria-label="Add attachment"
           >
             <Plus className="w-4 h-4" />
           </Button>
+          {keyboard.keyboardVisible && (
+            <button
+              type="button"
+              aria-label="Hide keyboard"
+              title="Hide keyboard"
+              onMouseDown={event => event.preventDefault()}
+              onClick={() => { clearHypeLongPressTimer(); keyboard.dismissKeyboard() }}
+              className="flex h-12 w-8 items-center justify-center rounded text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+          )}
           {showAttachmentMenu && (
             <div className="glass-panel absolute bottom-full left-0 mb-2 min-w-32 rounded-[var(--radius-sm)]">
               <button
@@ -970,7 +1102,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           />
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="obsidian-input min-w-0 flex-1 overflow-hidden rounded-[var(--radius-md)]" data-composer-entry="true">
+          <StagedAttachmentList
+            items={staged.items}
+            onRemove={staged.remove}
+            onCancel={staged.cancel}
+            onRetry={id => { void sendStagedAttachments(id) }}
+          />
           <textarea
             ref={textareaRef}
             value={message}
@@ -984,7 +1122,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             autoCapitalize="sentences"
             name={`message-composer-${cacheKey}`}
             rows={1}
-            className="obsidian-input no-scrollbar block max-h-32 min-h-12 w-full resize-none rounded-[var(--radius-md)] px-3.5 py-3 text-base leading-6 text-[var(--text-primary)] md:px-3 md:py-2 md:text-sm"
+            className="no-scrollbar block max-h-32 min-h-12 w-full resize-none border-0 bg-transparent px-3.5 py-3 text-base leading-6 text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] focus:ring-0 md:px-3 md:py-2 md:text-sm"
           />
         </div>
 
@@ -1013,9 +1151,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
         <Button
           type="button"
-          disabled={disabled || (!message.trim() && !canLongPressHype)}
+          disabled={disabled || (!message.trim() && staged.items.length === 0 && !canLongPressHype && !keyboard.keyboardVisible)}
+          aria-disabled={staged.busy || undefined}
           className={cn(
-            'hype-send-button h-12 w-12 rounded-xl p-0',
+            'hype-send-button h-12 w-12 touch-none rounded-xl p-0',
             canLongPressHype && 'border-[rgba(var(--theme-accent-strong-rgb),0.28)]',
             (hypePressing || hype?.ringing) && 'border-[rgba(var(--theme-accent-strong-rgb),0.76)] bg-[rgba(var(--theme-accent-rgb),0.16)] text-[var(--theme-accent-readable)] shadow-[0_0_24px_rgba(var(--theme-accent-rgb),0.26)]'
           )}
@@ -1023,9 +1162,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           title={canLongPressHype ? `Tap to send. Hold for Hype ${hypeRemaining}/${hype?.status?.limit_per_day ?? 2}.` : 'Send message'}
           onMouseDown={e => e.preventDefault()}
           onPointerDown={handleSendPointerDown}
+          onPointerMove={handleSendPointerMove}
           onPointerUp={handleSendPointerEnd}
           onPointerLeave={clearHypeLongPressTimer}
-          onPointerCancel={clearHypeLongPressTimer}
+          onPointerCancel={() => { clearHypeLongPressTimer(); keyboard.cancelGesture(); suppressNextSendClickRef.current = true }}
           onTouchStart={event => event.preventDefault()}
           onContextMenu={event => event.preventDefault()}
           draggable={false}

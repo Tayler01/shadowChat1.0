@@ -66,6 +66,7 @@ import { ShareImageToShadowPinModal } from '../../features/shadow-pin/components
 import {
   getImageMessageDisplaySrc,
   getMessagePreviewText,
+  getMessageCaption,
   messageToReplyTarget,
   type ReplyTarget,
 } from '../chat/messageDisplay'
@@ -163,6 +164,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
   const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+  const mediaCaption = getMessageCaption(message)
   const isVideoMessage = message.message_type === 'video' && Boolean(message.file_url)
   const isFloatingMediaMessage = isImageMessage || isVideoMessage
   const videoMessageUrl = isVideoMessage ? message.file_url || '' : ''
@@ -529,6 +531,10 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
             <FileAttachment url={message.file_url} meta={message.content} />
           ) : (
             <MessageRichText content={message.content} className="text-sm" />
+          )}
+
+          {!editing && mediaCaption && message.file_url && (
+            <MessageRichText content={mediaCaption} className="mt-2 max-w-xs text-sm" />
           )}
 
           {!editing && (

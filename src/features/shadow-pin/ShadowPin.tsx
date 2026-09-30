@@ -1944,6 +1944,8 @@ function ImageCard({
   const imageSourcesKey = imageSources.join('\n')
   const [sourceIndex, setSourceIndex] = useState(0)
   const [imageLoadFailed, setImageLoadFailed] = useState(imageSources.length === 0)
+  const [imageLoading, setImageLoading] = useState(imageSources.length > 0)
+  const [videoLoading, setVideoLoading] = useState(true)
   const [radialState, setRadialState] = useState<PinRadialState>(EMPTY_PIN_RADIAL_STATE)
   const [feedback, setFeedback] = useState<PinActionFeedbackState | null>(null)
   const [shareSheet, setShareSheet] = useState<PinShareSheetState>({ open: false, url: '' })
@@ -1971,7 +1973,12 @@ function ImageCard({
   useEffect(() => {
     setSourceIndex(0)
     setImageLoadFailed(imageSources.length === 0)
+    setImageLoading(imageSources.length > 0)
   }, [image.id, imageSources.length, imageSourcesKey])
+
+  useEffect(() => {
+    if (shouldRenderNativeVideo || shouldRenderIframeVideo) setVideoLoading(true)
+  }, [iframeVideoSrc, nativeVideoSrc, shouldRenderIframeVideo, shouldRenderNativeVideo])
 
   useEffect(() => {
     if (!shareSheet.open) return
@@ -2640,6 +2647,7 @@ function ImageCard({
             allow="autoplay; encrypted-media; picture-in-picture; web-share"
             loading="eager"
             onLoad={() => {
+              setVideoLoading(false)
               handleVideoPlaybackStarted()
               syncIframeAudio(iframeRef.current, image.provider, !soundEnabled)
             }}
@@ -2657,7 +2665,8 @@ function ImageCard({
             preload="auto"
             draggable={false}
             onEnded={handleVideoPlaybackComplete}
-            onError={handleVideoPlaybackUnavailable}
+            onLoadedData={() => setVideoLoading(false)}
+            onError={() => { setVideoLoading(false); handleVideoPlaybackUnavailable() }}
             onContextMenu={event => event.preventDefault()}
             className="block h-full w-full object-cover"
           />
@@ -2677,16 +2686,22 @@ function ImageCard({
             draggable={false}
             onContextMenu={event => event.preventDefault()}
             onDragStart={event => event.preventDefault()}
+            onLoad={() => setImageLoading(false)}
             onError={() => {
-              setSourceIndex(index => {
-                const nextIndex = index + 1
-                if (nextIndex < imageSources.length) return nextIndex
+              const nextIndex = sourceIndex + 1
+              if (nextIndex < imageSources.length) {
+                setImageLoading(true)
+                setSourceIndex(nextIndex)
+              } else {
                 setImageLoadFailed(true)
-                return index
-              })
+                setImageLoading(false)
+              }
             }}
             className="block h-full w-full object-cover"
           />
+        )}
+        {!imageLoadFailed && ((shouldRenderNativeVideo || shouldRenderIframeVideo) ? videoLoading : imageLoading) && (
+          <progress className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-1 w-full accent-[var(--theme-accent)]" aria-label={`Loading ${image.title} media`} />
         )}
         {videoPin && overlayOpen && (
           <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full border border-[rgba(255,255,255,0.16)] bg-[rgba(4,5,6,0.68)] px-2 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[var(--text-primary)] backdrop-blur-md">
@@ -3086,6 +3101,7 @@ function ImageViewerMedia({
   const imageSourcesKey = imageSources.join('\n')
   const [imageSourceIndex, setImageSourceIndex] = useState(0)
   const [imageFailed, setImageFailed] = useState(imageSources.length === 0)
+  const [mediaLoading, setMediaLoading] = useState(true)
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const videoPin = isVideoPin(image)
@@ -3100,6 +3116,7 @@ function ImageViewerMedia({
     setNativeVideoFailed(false)
     setImageSourceIndex(0)
     setImageFailed(imageSources.length === 0)
+    setMediaLoading(true)
   }, [image.id, imageSources.length, imageSourcesKey, nativeVideoSrc])
 
   useEffect(() => {
@@ -3120,7 +3137,7 @@ function ImageViewerMedia({
   }, [image.id])
 
   return (
-    <div className="h-full w-full overflow-hidden bg-black/40" data-viewer-active-media="true">
+    <div className="relative h-full w-full overflow-hidden bg-black/40" data-viewer-active-media="true">
         {shouldRenderNativeVideo && nativeVideoSrc ? (
           <video
             ref={videoRef}
@@ -3131,12 +3148,16 @@ function ImageViewerMedia({
             autoPlay={autoplayMedia && !reducedMotion}
             loop={autoplayMedia && !reducedMotion}
             playsInline
+            preload="metadata"
             muted={muted}
             aria-label={`Video: ${image.title}`}
             data-viewer-no-swipe="true"
             onVolumeChange={event => onMutedChange(event.currentTarget.muted)}
+            onLoadedMetadata={() => { if (!autoplayMedia || reducedMotion) setMediaLoading(false) }}
+            onLoadedData={() => setMediaLoading(false)}
             onError={() => {
               setNativeVideoFailed(true)
+              setMediaLoading(true)
             }}
           />
         ) : videoPin && iframeSrc ? (
@@ -3148,6 +3169,7 @@ function ImageViewerMedia({
             allow="autoplay; encrypted-media; picture-in-picture; web-share"
             loading="eager"
             onLoad={() => {
+              setMediaLoading(false)
               if (autoplayMedia) syncIframeAudio(iframeRef.current, image.provider, muted)
             }}
             data-viewer-no-swipe="true"
@@ -3164,6 +3186,7 @@ function ImageViewerMedia({
             referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-presentation"
             data-viewer-no-swipe="true"
+            onLoad={() => setMediaLoading(false)}
             allowFullScreen
           />
         ) : richEmbedSrcDoc ? (
@@ -3177,6 +3200,7 @@ function ImageViewerMedia({
             referrerPolicy="strict-origin-when-cross-origin"
             sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox allow-presentation"
             data-viewer-no-swipe="true"
+            onLoad={() => setMediaLoading(false)}
             allowFullScreen
           />
         ) : videoPin ? (
@@ -3185,6 +3209,7 @@ function ImageViewerMedia({
               src={imageSources[imageSourceIndex] || getPinImageUrl(image, 'medium')}
               alt={image.title}
               className="max-h-[58vh] max-w-full rounded-[var(--radius-lg)] object-contain"
+              onLoad={() => setMediaLoading(false)}
               onError={() => setImageSourceIndex(index => {
                 const nextIndex = index + 1
                 if (nextIndex < imageSources.length) return nextIndex
@@ -3210,7 +3235,7 @@ function ImageViewerMedia({
             <div className="flex h-full w-full flex-col items-center justify-center gap-3 p-6 text-center text-white/65">
               <ImageIcon className="h-9 w-9 text-[var(--theme-accent-readable)]" />
               <p className="font-semibold text-white">Image unavailable</p>
-              <button type="button" onClick={() => { setImageSourceIndex(0); setImageFailed(false) }} className="min-h-11 rounded-full border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white">Retry</button>
+              <button type="button" onClick={() => { setImageSourceIndex(0); setImageFailed(false); setMediaLoading(true) }} className="min-h-11 rounded-full border border-white/15 bg-white/5 px-4 text-sm font-semibold text-white">Retry</button>
             </div>
           ) : (
             <ZoomableImageFrame resetKey={image.id} className="h-full w-full" controlsPosition="top" controlsVariant="minimal" onZoomChange={onZoomChange}>
@@ -3219,6 +3244,7 @@ function ImageViewerMedia({
                 alt={image.title}
                 draggable={false}
                 className="h-full w-full object-contain"
+                onLoad={() => setMediaLoading(false)}
                 onError={() => setImageSourceIndex(index => {
                   const nextIndex = index + 1
                   if (nextIndex < imageSources.length) return nextIndex
@@ -3228,6 +3254,9 @@ function ImageViewerMedia({
               />
             </ZoomableImageFrame>
           )
+        )}
+        {mediaLoading && !imageFailed && (
+          <progress className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1 w-full accent-[var(--theme-accent)]" aria-label={`Loading ${image.title} media`} />
         )}
     </div>
   )

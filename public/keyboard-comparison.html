@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <title>ShadowChat keyboard comparison</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #101112; color: #eee; }
+    body { margin: 0 auto; max-width: 40rem; padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 24px); }
+    h1 { font-size: 1.3rem; } p { line-height: 1.5; } nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 16px; }
+    a, button { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; border: 1px solid #666; border-radius: 12px; padding: 8px 12px; color: inherit; background: #202224; font: inherit; text-decoration: none; }
+    a[aria-current="true"] { border-color: #eee; background: #36383a; }
+    #editor { display: block; box-sizing: border-box; width: 100%; min-height: 100px; border: 1px solid #888; border-radius: 16px; padding: 12px; margin: 16px 0; background: #18191a; color: #eee; font: 16px/1.5 system-ui, sans-serif; white-space: pre-wrap; overflow-wrap: anywhere; }
+    input#editor { min-height: 48px; } #editor:focus { outline: 2px solid #aaa; outline-offset: 2px; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; color: #bbb; }
+  </style>
+  <script type="module" src="/keyboard-comparison.js"></script>
+</head>
+<body>
+  <a href="/?view=settings">Back to ShadowChat</a>
+  <h1>Keyboard comparison</h1>
+  <p>Open this from ShadowChat Settings to keep the home-screen app context. Each choice opens a fresh page with exactly one editor. Tap the entry, type a few words, and compare the whole up/down/checkmark bar. Disabled arrows still count as the bar being present.</p>
+  <p>This check sends and saves nothing. Use sample text.</p>
+  <strong>Editor</strong><nav id="editors" aria-label="Editor comparison"></nav>
+  <strong>File picker</strong><nav id="pickers" aria-label="File picker comparison"></nav>
+  <strong>Form</strong><nav id="forms" aria-label="Form comparison"></nav>
+  <div id="entry"></div>
+  <button id="send" type="button">Clear and refocus test</button>
+  <button id="dismiss" type="button">Close keyboard</button>
+  <pre id="context" aria-label="Browser context"></pre>
+  <pre id="events" aria-label="Input events"></pre>
+</body>
+</html>

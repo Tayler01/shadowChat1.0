@@ -1225,6 +1225,30 @@ describe('DirectMessagesView user search', () => {
     expect(screen.queryByText(/loading messages/i)).not.toBeInTheDocument();
   });
 
+  test.each(['image', 'video', 'file'] as const)('renders a %s caption alongside the DM attachment', async message_type => {
+    const caption = 'Caption sent with the DM attachment';
+    const content = message_type === 'image' ? caption : JSON.stringify({ name: 'clip.mp4', size: 12, type: 'video/mp4', caption });
+    dmSpy.mockReturnValue({
+      conversations: [{ id: 'c1', other_user: user, last_message: null, unread_count: 0 }],
+      currentConversation: 'c1',
+      messages: [{
+        id: 'caption-m1', conversation_id: 'c1', sender_id: 'u1', content,
+        message_type, file_url: 'https://example.com/clip.mp4', reactions: {}, read_by: ['u1'],
+        created_at: '2026-09-30T12:00:00Z', updated_at: '2026-09-30T12:00:00Z',
+        sender: { id: 'u1', username: 'me', display_name: 'Me' },
+      }],
+      messagesConversationId: 'c1', loading: false, messagesLoading: false, loadingMore: false,
+      hasMore: false, sending: false, uploading: false,
+      setCurrentConversation: setCurrentConversationMock, startConversation: startConversationMock,
+      sendMessage: jest.fn(), editMessage: jest.fn(), deleteMessage: jest.fn(), toggleReaction: jest.fn(),
+      markAsRead: jest.fn(), loadOlderMessages: jest.fn(),
+    } as any);
+    const { container } = render(<DirectMessagesView onToggleSidebar={() => {}} currentView="dms" onViewChange={() => {}} />);
+    await waitFor(() => expect(screen.getByText(caption)).toBeVisible());
+    if (message_type === 'video') expect(container.querySelector('video')).toHaveAttribute('src', 'https://example.com/clip.mp4');
+    if (message_type === 'file') expect(screen.getByRole('link', { name: 'clip.mp4' })).toHaveAttribute('href', 'https://example.com/clip.mp4');
+  });
+
   test('mobile thread keeps sparse messages bottom-aligned above the chat footer', () => {
     const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
       useIsDesktop: jest.Mock

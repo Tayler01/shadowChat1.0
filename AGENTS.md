@@ -2,6 +2,17 @@
 
 This file is the working handbook for agentic contributors operating inside this repository.
 
+## Solution-first problem solving
+
+- Avoid premature dead-end responses such as "I can't", "there is no fix", or
+  "no solution". Research, test and pursue practical workarounds before stopping.
+- When the direct path is constrained, lead with the best viable alternative,
+  concrete next steps and what is needed to make it work. Keep working within
+  the authorized scope; ask only for decisions or access that are truly needed.
+- Distinguish proposed approaches from verified results. Describe constraints
+  precisely without treating them as the end of the investigation or claiming
+  unverified success.
+
 ## Documentation Status - July 17, 2026
 
 This handbook is current through the July 10 production-alignment and Release A

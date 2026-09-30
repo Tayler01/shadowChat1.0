@@ -314,6 +314,7 @@ const getMessagePreview = (message: {
   const content = (message.content ?? '').trim()
 
   if (type === 'image') return 'Sent an image'
+  if (type === 'video') return 'Sent a video'
   if (type === 'file') return 'Sent a file'
   if (type === 'audio') return 'Sent a voice message'
   if (type === 'command') return truncate(content || 'Sent a message', 120)

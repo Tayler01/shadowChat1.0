@@ -92,6 +92,8 @@ After the verified release, Tayler will test installed iPhone/Android PWAs: keyb
 
 ### Deliberate follow-ups, not established defects
 
+- **Follow-up now in verification: video paste.** Tayler advanced the queued clipboard-video work into the [composer media follow-up](composer-media-followup-2026-09-30.md), together with inline previews, one Send for captions/media, picker staging, Pins loading bars and compact keyboard dismissal. This does not change the contents of the original `e079a569` release.
+
 The audit's PERF-3 broad-context split, PERF-9 additional weather/invitation startup deferral, and PERF-10 Motion extraction remain profiling candidates. Current evidence does not attribute a measured bottleneck to those components. Stable row callbacks, observer reuse, cache/coalescing changes, reduced background polling and genuinely optional lazy UI address the demonstrated work. A larger context or startup rewrite needs React commit counts and a cold-start network/main-thread trace first.
 
 The historical 19 production DM read-through HTTP 400 responses remain unclassified. Canonical cursor validation, safe deleted-anchor behavior and content-free error codes are implemented; those changes are not evidence of the historical cause. No blind index additions/removals or PostgreSQL upgrade were performed. Existing reviewed function privileges and paused product domains remain part of the release contract.

@@ -83,13 +83,25 @@ const parseAttachmentName = (content?: string | null) => {
   }
 }
 
+export const getMessageCaption = (message: Pick<MessagePreviewSource, 'content' | 'message_type'>): string => {
+  if (message.message_type === 'image') return message.content?.trim() || ''
+  if (message.message_type !== 'video' && message.message_type !== 'file') return ''
+  try {
+    const parsed = JSON.parse(message.content || '')
+    return typeof parsed?.caption === 'string' ? parsed.caption.trim() : ''
+  } catch {
+    return ''
+  }
+}
+
 export const getMessagePreviewText = (message: MessagePreviewSource) => {
   const text = message.content?.trim()
+  const caption = getMessageCaption(message)
 
   if (message.message_type === 'image') return text || 'Image'
-  if (message.message_type === 'video') return 'Video'
+  if (message.message_type === 'video') return caption || 'Video'
   if (message.message_type === 'audio') return 'Voice message'
-  if (message.message_type === 'file') return parseAttachmentName(text) || text || 'File attachment'
+  if (message.message_type === 'file') return caption || parseAttachmentName(text) || text || 'File attachment'
   if (message.message_type === 'hype') return 'Hype'
 
   return text || message.message_type

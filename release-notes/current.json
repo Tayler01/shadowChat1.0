@@ -1,31 +1,31 @@
 {
-  "title": "Smoother conversations and easier sharing",
-  "summary": "This update improves reading position, attachment sharing, and notification reliability across Shadow Chat.",
+  "title": "Preview your media, then send together",
+  "summary": "Images, videos and files now share the message entry box. Review them and send with your text using the regular Send button.",
   "restartPolicy": "required_restart",
   "severity": "feature",
   "sections": [
     {
-      "heading": "Keep your place",
+      "heading": "One composer, one Send",
       "items": [
-        "General Chat, DMs, reply threads, and Pins discussions restore unread conversations more reliably, including messages beyond the latest page.",
-        "Loading history and receiving new messages preserve your reading position. Jump to latest brings you back when you are ready.",
-        "Opening a pinned General message takes you to its conversation context."
+        "Attachment previews appear inside the entry box with a small X to remove them.",
+        "The regular Send button sends your text with the first attachment, across General Chat, DMs, reply threads and Pins discussions.",
+        "Image and video selections wait for you to review and send."
       ]
     },
     {
-      "heading": "Paste, preview, and send",
+      "heading": "Video and loading feedback",
       "items": [
-        "Paste images or files into the composer, or drag files in on desktop. Review your selections before sending.",
-        "Attachment progress, cancellation, and retry make interrupted uploads easier to handle.",
-        "Pins discussions support private file attachments alongside comments."
+        "Paste videos when your browser provides a video file, or use the video picker.",
+        "Upload progress, cancellation and retry remain available without a separate attachment Send button.",
+        "Pins media now show a small loading bar while opening."
       ]
     },
     {
-      "heading": "Quieter, more dependable updates",
+      "heading": "Compact keyboard controls",
       "items": [
-        "Push notifications respect preview privacy and conversation mute settings during retries.",
-        "A failed delivery on one device can retry without repeating successful deliveries on another.",
-        "Chat loading and background refreshes do less unnecessary work. Tap Restart Now to load this update."
+        "Use the small down chevron near attachments, or swipe down on Send, to close the phone keyboard.",
+        "A delayed send completion respects your decision to close the keyboard.",
+        "Apple's keyboard toolbar remains controlled by iOS. Tap Restart Now to load this update."
       ]
     }
   ]

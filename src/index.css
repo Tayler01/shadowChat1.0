@@ -3502,6 +3502,16 @@ html[data-comfort-contrast='high'] {
   outline-offset: var(--comfort-focus-offset) !important;
 }
 
+/* The entry box owns focus when text and attachments share one composer. */
+[data-composer-entry='true']:has(textarea:focus-visible) {
+  outline: var(--comfort-focus-width) solid var(--text-secondary) !important;
+  outline-offset: var(--comfort-focus-offset) !important;
+}
+
+[data-composer-entry='true'] textarea:focus-visible {
+  outline: none !important;
+}
+
 @media (forced-colors: active) {
   :root {
     --comfort-focus-width: 3px;
@@ -3520,6 +3530,10 @@ html[data-comfort-contrast='high'] {
     [role='option'],
     [tabindex]:not([tabindex='-1'])
   ):focus-visible {
+    outline-color: Highlight !important;
+  }
+
+  [data-composer-entry='true']:has(textarea:focus-visible) {
     outline-color: Highlight !important;
   }
 

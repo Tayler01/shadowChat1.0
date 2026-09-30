@@ -3400,6 +3400,17 @@ test('ShadowPin image card blocks native image callout and drag surfaces', () =>
   expect(dragEvent.defaultPrevented).toBe(true)
 })
 
+test('Pin media shows loading progress until the preview image finishes', () => {
+  render(<ShadowPin onBack={() => {}} />)
+  fireEvent.click(screen.getByText('Fam & Friends'))
+
+  const preview = screen.getByAltText('Pin one')
+  expect(screen.getByRole('progressbar', { name: 'Loading Pin one media' })).toBeInTheDocument()
+
+  fireEvent.load(preview)
+  expect(screen.queryByRole('progressbar', { name: 'Loading Pin one media' })).not.toBeInTheDocument()
+})
+
 test('ShadowPin edit category makes save and cancel primary while delete is deliberate', () => {
   jest.useFakeTimers()
   mockUseShadowPinCategories.mockReturnValue({

@@ -1,3 +1,8 @@
+## September 30 composer media follow-up in verification
+
+- Tayler advanced the queued video paste work into this follow-up, along with inline thumbnails, shared caption/attachment Send, picker review, Pins loading bars and small keyboard-dismiss controls. [Implementation and platform investigation](composer-media-followup-2026-09-30.md) tracks verification and release.
+- The iPhone up/down/checkmark strip is Apple's native form accessory view. Current WebKit offers no PWA suppression API; a small app chevron/swipe closes the keyboard but cannot remove the system strip while typing. User reports an iOS update on the same day; physical baseline/current comparison remains open.
+
 ## September 30 chat smoothness published
 
 - Tayler authorized the full performance/read-position/notifications/attachments audit fixes, goal execution, main push and manual Netlify deployment. [Implementation checkpoints](chat-smoothness-implementation-2026-09-30.md) track the shared General/DM/thread/Pins contract and backend-first release.

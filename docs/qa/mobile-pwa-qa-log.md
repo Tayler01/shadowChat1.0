@@ -1,3 +1,9 @@
+## September 30 composer follow-up
+
+- Inline previews, captioned media Send, video paste/picker staging, side-by-side chevrons, neutral focus styling and Pins loading bars passed 36 practical assertions across Android Chromium, iPhone WebKit and desktop. Exact test data/Storage cleanup and read-cursor restoration passed. [Follow-up report](../features/composer-media-followup-2026-09-30.md).
+- Tayler upgraded iOS 18 to 27. The native up/down/checkmark toolbar remains a physical-device investigation: Settings > Feedback > Open keyboard comparison tests individual editor/file-picker/form variants in the installed PWA. Browser DOM checks do not prove removal of this system UI.
+- Existing native wrapper suppression is prepared separately; signed-client delivery remains gated. WebKit uploaded HTTP video playback passed, while staged blob/synthetic video decoding remains a device-validation gap.
+
 ## September 30 chat smoothness release
 
 - Code `e079a569` is pushed to main and live through Netlify `6abd16af68215c0a06c1be8a`. Production two-account Chromium auth/resume-send/DM smoke and exact data cleanup passed; public health SHA/cache checks and Linux media guards passed. Backend migrations, function inventory, security contract and Auth checks passed. Physical installed-PWA checks remain pending, and the implementation report retains the WebKit frame-time limitation.

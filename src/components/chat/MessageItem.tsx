@@ -53,6 +53,7 @@ import {
   getChatMediaOrientation,
   getImageMessageDisplaySrc,
   getMessagePreviewText,
+  getMessageCaption,
   type ChatMediaOrientation,
 } from './messageDisplay'
 
@@ -237,6 +238,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
     const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+    const mediaCaption = getMessageCaption(message)
     const isVideoMessage = message.message_type === 'video' && Boolean(message.file_url)
     const isFloatingMediaMessage = isImageMessage || isVideoMessage
     const videoMessageUrl = isVideoMessage ? message.file_url || '' : ''
@@ -686,6 +688,12 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                         </span>
                       )}
                     </div>
+                  )}
+                  {mediaCaption && message.file_url && (
+                    <MessageRichText
+                      content={mediaCaption}
+                      className="mt-2 max-w-xs text-sm"
+                    />
                   )}
                 </div>
                 {/* Actions */}

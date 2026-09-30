@@ -132,6 +132,26 @@ test('renders image message', () => {
   expect(img).toHaveAttribute('height', '1920')
 })
 
+test.each(['image', 'video', 'file'] as const)('renders %s captions with the attachment', message_type => {
+  const caption = 'Text sent together with the attachment'
+  const content = message_type === 'image' ? caption : JSON.stringify({ name: 'shared.mp4', size: 12, type: 'video/mp4', caption })
+  const { container } = render(
+    <MessageItem
+      message={{ ...baseMessage, message_type, content }}
+      onEdit={async () => {}}
+      onDelete={async () => {}}
+      onTogglePin={async () => {}}
+      onToggleReaction={async () => {}}
+    />
+  )
+  expect(screen.getByText(caption)).toBeVisible()
+  if (message_type === 'video') {
+    expect(container.querySelector('video')).toHaveAttribute('src', baseMessage.file_url)
+    expect(container.querySelector('video')).toHaveAttribute('controls')
+  }
+  if (message_type === 'file') expect(screen.getByRole('link', { name: 'shared.mp4' })).toHaveAttribute('href', baseMessage.file_url)
+})
+
 test('adjusts image thumbnail orientation after the image dimensions load', () => {
   render(
     <MessageItem

@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { ShadowPinCommentsDialog } from '../src/features/shadow-pin/components/ShadowPinCommentsDialog'
 import {
   createShadowPinComment,
+  uploadShadowPinCommentAttachment,
   fetchShadowPinDiscussionWindow,
   fetchShadowPinNewerComments,
   fetchShadowPinCommentById,
@@ -329,10 +330,132 @@ test('pasted binary is staged with a removable preview and does not post immedia
   await screen.findByText('Root comment')
   const file = new File(['abc'], 'notes.txt', { type: 'text/plain' })
   fireEvent.paste(screen.getByLabelText('Add a ShadowPin comment'), { clipboardData: { files: [file], items: [] } })
-  expect(await screen.findByText('notes.txt')).toBeInTheDocument()
+  expect(await screen.findByRole('button', { name: 'Remove notes.txt' })).toBeInTheDocument()
+  expect(within(screen.getByTestId('shadow-pin-comment-entry-box')).getByLabelText('Staged attachments')).toContainElement(screen.getByRole('button', { name: 'Remove notes.txt' }))
   expect(createShadowPinComment).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Remove notes.txt' }))
-  expect(screen.queryByText('notes.txt')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Staged attachments')).not.toBeInTheDocument()
+})
+
+test('one Send posts a caption with the first staged media and sends the remaining media without repeating it', async () => {
+  ;(uploadShadowPinCommentAttachment as jest.Mock).mockImplementation(async (_imageId, file: File) => ({
+    path: `viewer-1/pin-1/${file.name}`,
+    name: file.name,
+    size: file.size,
+    contentType: file.type,
+    kind: file.type.startsWith('video/') ? 'video' : 'image',
+  }))
+  ;(createShadowPinComment as jest.Mock).mockImplementation(async (_imageId, body, parentId, attachment) => ({
+    ...rootComment,
+    id: attachment.path.split('/').pop(),
+    parent_comment_id: parentId ?? null,
+    body: body || attachment.name,
+    attachment,
+  }))
+  render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  const input = await screen.findByLabelText('Add a ShadowPin comment')
+  fireEvent.change(input, { target: { value: 'Night ride' } })
+  fireEvent.paste(input, { clipboardData: { files: [
+    new File(['video'], 'clip.mp4', { type: 'video/mp4' }),
+    new File(['image'], 'frame.png', { type: 'image/png' }),
+  ], items: [], getData: () => '' } })
+
+  expect(screen.getByTestId('shadow-pin-comment-entry-box')).toContainElement(screen.getByRole('button', { name: 'Remove clip.mp4' }))
+  expect(createShadowPinComment).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: 'Post comment' }))
+
+  await waitFor(() => expect(createShadowPinComment).toHaveBeenCalledTimes(2))
+  expect(createShadowPinComment).toHaveBeenNthCalledWith(1, image.id, 'Night ride', null, expect.objectContaining({ name: 'clip.mp4', kind: 'video' }))
+  expect(createShadowPinComment).toHaveBeenNthCalledWith(2, image.id, '', null, expect.objectContaining({ name: 'frame.png', kind: 'image' }))
+  expect(input).toHaveValue('')
+})
+
+test('retrying a later Pin attachment does not post the accepted caption again', async () => {
+  ;(uploadShadowPinCommentAttachment as jest.Mock).mockImplementation(async (_imageId, file: File) => ({
+    path: `viewer-1/pin-1/${file.name}`,
+    name: file.name,
+    size: file.size,
+    contentType: file.type,
+    kind: 'image',
+  }))
+  let secondAttempt = 0
+  ;(createShadowPinComment as jest.Mock).mockImplementation(async (_imageId, body, _parentId, attachment) => {
+    if (attachment.name === 'second.png' && secondAttempt++ === 0) throw new Error('Connection lost')
+    return { ...rootComment, id: attachment.name, body: body || attachment.name, attachment }
+  })
+  render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+  const input = await screen.findByLabelText('Add a ShadowPin comment')
+  fireEvent.change(input, { target: { value: 'One caption' } })
+  fireEvent.paste(input, { clipboardData: { files: [
+    new File(['first'], 'first.png', { type: 'image/png' }),
+    new File(['second'], 'second.png', { type: 'image/png' }),
+  ], items: [], getData: () => '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Post comment' }))
+
+  const retry = await screen.findByRole('button', { name: 'Retry second.png' })
+  expect(input).toHaveValue('')
+  fireEvent.click(retry)
+
+  await waitFor(() => expect(createShadowPinComment).toHaveBeenCalledTimes(3))
+  expect((createShadowPinComment as jest.Mock).mock.calls.map(call => call[1])).toEqual(['One caption', '', ''])
+})
+
+test('mobile Pin Send swipe hides the keyboard without posting the draft', async () => {
+  const originalWidth = window.innerWidth
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  try {
+    render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+    const input = await screen.findByLabelText('Add a ShadowPin comment')
+    fireEvent.change(input, { target: { value: 'Keep this draft' } })
+    act(() => { input.focus() })
+    expect(screen.getByRole('button', { name: 'Hide keyboard' })).toBeInTheDocument()
+
+    const send = screen.getByRole('button', { name: 'Post comment' })
+    fireEvent.pointerDown(send, { pointerType: 'touch', pointerId: 7, clientX: 120, clientY: 400 })
+    fireEvent.pointerMove(send, { pointerType: 'touch', pointerId: 7, clientX: 120, clientY: 440 })
+    fireEvent.pointerUp(send, { pointerType: 'touch', pointerId: 7, clientX: 120, clientY: 440 })
+    fireEvent.click(send)
+
+    expect(createShadowPinComment).not.toHaveBeenCalled()
+    expect(input).toHaveValue('Keep this draft')
+    expect(input).not.toHaveFocus()
+  } finally {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth })
+  }
+})
+
+test('Pin Send remains swipeable during upload and busy taps do not duplicate the comment', async () => {
+  const originalWidth = window.innerWidth
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: 390 })
+  let resolveUpload: ((attachment: { path: string; name: string; size: number; contentType: string; kind: 'image' }) => void) | undefined
+  ;(uploadShadowPinCommentAttachment as jest.Mock).mockImplementation(() => new Promise(resolve => { resolveUpload = resolve }))
+  ;(createShadowPinComment as jest.Mock).mockImplementation(async (_imageId, body, _parentId, attachment) => ({
+    ...rootComment, id: 'sent-photo', body, attachment,
+  }))
+  try {
+    render(<ShadowPinCommentsDialog image={image} open onClose={() => undefined} />)
+    const input = await screen.findByLabelText('Add a ShadowPin comment')
+    fireEvent.change(input, { target: { value: 'Waiting for upload' } })
+    fireEvent.paste(input, { clipboardData: { files: [new File(['photo'], 'photo.png', { type: 'image/png' })], items: [], getData: () => '' } })
+    act(() => { input.focus() })
+    const send = screen.getByRole('button', { name: 'Post comment' })
+    fireEvent.click(send)
+    expect(uploadShadowPinCommentAttachment).toHaveBeenCalledTimes(1)
+    expect(send).not.toBeDisabled()
+    expect(send).toHaveAttribute('aria-disabled', 'true')
+    fireEvent.click(send)
+    fireEvent.pointerDown(send, { pointerType: 'touch', pointerId: 11, clientX: 120, clientY: 400 })
+    fireEvent.pointerMove(send, { pointerType: 'touch', pointerId: 11, clientX: 120, clientY: 440 })
+    fireEvent.pointerUp(send, { pointerType: 'touch', pointerId: 11, clientX: 120, clientY: 440 })
+    fireEvent.click(send)
+    expect(input).not.toHaveFocus()
+
+    await act(async () => { resolveUpload?.({ path: 'viewer-1/pin-1/photo', name: 'photo.png', size: 5, contentType: 'image/png', kind: 'image' }) })
+    await waitFor(() => expect(createShadowPinComment).toHaveBeenCalledTimes(1))
+    expect(input).not.toHaveFocus()
+  } finally {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth })
+  }
 })
 
 test('unavailable exact targets report the state without clearing any unread event', async () => {
@@ -452,7 +575,7 @@ it('keeps mixed clipboard text with its staged file and reports invalid files', 
   input.setSelectionRange(7, 7)
   fireEvent.paste(input, { clipboardData: { files: [new File(['ok'], 'notes.txt', { type: 'text/plain' })], items: [], getData: () => 'caption ' } })
   expect(input).toHaveValue('Before caption after')
-  expect(screen.getByText('notes.txt')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Remove notes.txt' })).toBeInTheDocument()
   fireEvent.paste(input, { clipboardData: { files: [new File([], 'empty.txt', { type: 'text/plain' })], items: [], getData: () => '' } })
   expect(screen.getByRole('alert')).toHaveTextContent('Choose a file between 1 byte and 50 MB.')
 })

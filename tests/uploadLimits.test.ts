@@ -2,6 +2,7 @@ import {
   AVATAR_UPLOAD_MAX_BYTES,
   AVATAR_UPLOAD_RULE,
   CHAT_FILE_UPLOAD_RULE,
+  CHAT_VIDEO_UPLOAD_RULE,
   CHAT_UPLOAD_MAX_BYTES,
   getUploadErrorMessage,
   resolveUploadMimeType,
@@ -50,6 +51,17 @@ describe('upload limits', () => {
       type: 'application/zip',
       size: CHAT_UPLOAD_MAX_BYTES,
     }, CHAT_FILE_UPLOAD_RULE)).toBe('application/zip')
+  })
+
+  test('video uploads enforce the existing bucket MIME and size boundary', () => {
+    expect(validateUpload({ name: 'clip.mov', type: '', size: CHAT_UPLOAD_MAX_BYTES }, CHAT_VIDEO_UPLOAD_RULE))
+      .toBe('video/quicktime')
+    expect(() => validateUpload({ name: 'clip.mp4', type: 'video/mp4', size: CHAT_UPLOAD_MAX_BYTES + 1 }, CHAT_VIDEO_UPLOAD_RULE))
+      .toThrow('Video is too large. The maximum size is 64 MiB.')
+    expect(() => validateUpload(new File(['image'], 'photo.png', { type: 'image/png' }), CHAT_VIDEO_UPLOAD_RULE))
+      .toThrow('Video must be a MP4, MPEG, OGG, QuickTime, or WebM video.')
+    expect(() => validateUpload(new File(['video'], 'clip.avi', { type: 'video/x-msvideo' }), CHAT_VIDEO_UPLOAD_RULE))
+      .toThrow('Video must be a MP4, MPEG, OGG, QuickTime, or WebM video.')
   })
 
   test('turns upload transport and authorization failures into actionable messages', () => {

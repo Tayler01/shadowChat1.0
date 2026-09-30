@@ -7,6 +7,8 @@ export type AttachmentStageStatus = 'staged' | 'uploading' | 'sending' | 'failed
 
 export interface AttachmentStageView {
   id: string
+  clientMessageId: string
+  sendAttempted: boolean
   file: File
   kind: ComposerFileKind
   previewUrl: string | null
@@ -17,8 +19,6 @@ export interface AttachmentStageView {
 
 type AttachmentStage<TUploaded> = AttachmentStageView & {
   uploaded?: TUploaded
-  sendAttempted?: boolean
-  clientMessageId: string
   cleanupScopeKey?: string
   cleanupNamespace?: string
 }
@@ -89,7 +89,7 @@ export function useStagedAttachments<TUploaded>(options: StagedAttachmentOptions
       try {
         config.validate(file)
         const { kind } = classifyComposerFile(file)
-        accepted.push({ id: makeId(), clientMessageId: createClientMessageId(), cleanupScopeKey: config.cleanupScopeKey, cleanupNamespace: config.cleanupNamespace, file, kind, previewUrl: getPreviewUrl(file, kind), status: 'staged', progress: 0, error: null })
+        accepted.push({ id: makeId(), clientMessageId: createClientMessageId(), sendAttempted: false, cleanupScopeKey: config.cleanupScopeKey, cleanupNamespace: config.cleanupNamespace, file, kind, previewUrl: getPreviewUrl(file, kind), status: 'staged', progress: 0, error: null })
       } catch (error) {
         errors.push(config.errorMessage?.(error) || (error instanceof Error ? error.message : 'Unsupported attachment'))
       }
@@ -111,7 +111,7 @@ export function useStagedAttachments<TUploaded>(options: StagedAttachmentOptions
     controllersRef.current.get(id)?.abort()
   }, [])
 
-  const sendOne = useCallback(async (id: string): Promise<boolean> => {
+  const sendOne = useCallback(async (id: string, send?: StagedAttachmentOptions<TUploaded>['send']): Promise<boolean> => {
     if (sendingRef.current.has(id)) return false
     const initial = itemsRef.current.find(item => item.id === id)
     if (!initial) return false
@@ -144,7 +144,7 @@ export function useStagedAttachments<TUploaded>(options: StagedAttachmentOptions
       if (scope !== scopeRef.current || controller.signal.aborted) return false
       update(current => current.map(item => item.id === id ? { ...item, status: 'sending', progress: 100, error: null } : item))
       update(current => current.map(item => item.id === id ? { ...item, sendAttempted: true } : item))
-      const sent = await config.send(uploaded, initial.file, initial.clientMessageId)
+      const sent = await (send ?? config.send)(uploaded, initial.file, initial.clientMessageId)
       if (!sent) {
         update(current => current.map(item => item.id === id ? { ...item, status: 'failed', error: 'Message was not sent. Try again.' } : item))
         return false
@@ -164,9 +164,9 @@ export function useStagedAttachments<TUploaded>(options: StagedAttachmentOptions
     }
   }, [cleanupDefinite, update])
 
-  const sendAll = useCallback(async () => {
+  const sendAll = useCallback(async (send?: StagedAttachmentOptions<TUploaded>['send']) => {
     for (const item of [...itemsRef.current]) {
-      if (!(await sendOne(item.id))) return false
+      if (!(await sendOne(item.id, send))) return false
     }
     return true
   }, [sendOne])
@@ -214,12 +214,12 @@ export function useStagedAttachments<TUploaded>(options: StagedAttachmentOptions
   }, [release])
 
   return {
-    items: items as AttachmentStageView[],
+    items: (scopeRef.current === options.scopeKey ? items : []) as AttachmentStageView[],
     addFiles,
     remove,
     cancel,
     retry: sendOne,
     sendAll,
-    busy: items.some(item => item.status === 'uploading' || item.status === 'sending'),
+    busy: scopeRef.current === options.scopeKey && items.some(item => item.status === 'uploading' || item.status === 'sending'),
   }
 }

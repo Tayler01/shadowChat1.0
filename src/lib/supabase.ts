@@ -10,6 +10,7 @@ import { getResumableStorageEndpoint } from './resumableStorageEndpoint'
 import {
   CHAT_FILE_UPLOAD_RULE,
   CHAT_IMAGE_UPLOAD_RULE,
+  CHAT_VIDEO_UPLOAD_RULE,
   resolveUploadMimeType,
   sanitizeUploadFileName,
   validateUpload,
@@ -793,6 +794,11 @@ export const uploadChatFileAsset = async (file: File, options: ChatUploadProgres
 }
 
 export const uploadChatFile = async (file: File) => (await uploadChatFileAsset(file)).publicUrl
+
+export const uploadChatVideoAsset = async (file: File, options: ChatUploadProgressOptions = {}) => {
+  validateUpload(file, CHAT_VIDEO_UPLOAD_RULE)
+  return uploadChatFileAsset(file, options)
+}
 
 export const uploadChatImageAsset = async (
   file: File,

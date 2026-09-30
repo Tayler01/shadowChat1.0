@@ -1,5 +1,20 @@
 # Real-Device Mobile Validation
 
+## September 30 composer follow-up acceptance
+
+- RD-040: On Tayler's iOS 27 home-screen PWA, verify media tiles without detail rows,
+  video paste and picker review, X removal, regular caption/media Send, side-by-side
+  chevron, swipe dismissal, late-send focus behavior and neutral entry styling.
+- RD-041: Settings > Feedback > Open keyboard comparison. Confirm home-screen
+  context, compare textarea/input/contenteditable/plaintext-only with one editor
+  per fresh page, then hidden-file/form variants. Record whole toolbar visibility
+  separately from enabled arrows; verify typing/emoji/paste/composition/refocus.
+- RD-042: Signed native-client keyboard accessory suppression requires its own
+  installation and real iPhone acceptance; the web deployment is not that proof.
+- All three remain pending physical-device evidence. Thirty-six practical browser
+  checks passed, with exact temporary-data cleanup. WebKit blob video decoding
+  remains explicit; uploaded HTTP video playback passed in emulation.
+
 ## Documentation Status - July 14, 2026
 
 The checklist now includes the deployed July 10 Release A PWA update,
