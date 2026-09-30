@@ -246,6 +246,20 @@ backend-first checks. From the repo root:
 npx netlify deploy --prod
 ```
 
+For an authorized deploy of a freshly verified prebuilt bundle, explicitly
+include the reviewed prebuilt Functions directory:
+
+```powershell
+npx netlify deploy --prod --no-build --dir dist --functions .netlify/functions
+```
+
+First verify the two function ZIPs/manifest are current and include the Linux
+Sharp runtime. Omitting `--functions` with `--no-build` can publish only static
+files: the SPA fallback can return HTML for a missing function GET, while POST
+returns 404. Require the media endpoint's GET 405 and unauthenticated POST 401
+checks before broadcasting a release. September 30's initial prebuilt publish
+was corrected with explicit Functions and both live guards passed.
+
 This project already includes:
 
 - linked local Netlify metadata under `.netlify/state.json` (ignored from Git)

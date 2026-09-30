@@ -154,5 +154,35 @@ visibility remains unverified. The page also reports paste-event formats, item
 kinds, file byte counts and text-presence booleans locally, without contents or
 filenames, so a silent OS clipboard path can be distinguished from app handling.
 
-Source validation, practical large-video client QA and publication of this next
-client patch are pending. The server alignment above is already applied.
+Published client build `fb1d0b58a21f9636b559e4578c2413f148055b7c` is pushed to
+main and live through corrected Netlify deploy `6abd41540302b1466c64796c`.
+This merges the newly published Shadow Runner main commit instead of reverting
+that work. Full merged verification passed lint, app types, 318 Jest suites /
+2,862 tests (16 pre-existing TODOs), 402 Node contracts and unchanged production
+budgets (327.33 KiB initial gzip; 512 files / 94.21 MiB total). Docs passed.
+
+Four real 35/55 MiB video sends across General/DMs and Chromium/WebKit passed
+staging, progress, caption, one insert, live recipient update and advancing
+recipient playback; selected and stored bytes matched. Both browsers rejected
+55 MiB Pins discussion attachments with the correct 50 MiB limit and no upload.
+Merged-build chat smoke passed six checks; paste diagnostic privacy passed six
+cases. Cleanup verified six messages, four Storage objects and two synthetic
+Pins/categories removed, with read state restored. Evidence is in
+`output/playwright/video-size-followup/`.
+
+The first prebuilt Netlify publish omitted Functions and failed the live media
+guard. The corrected publish explicitly included `.netlify/functions` and
+passed app/health/SW checks, GET 405 and unauthenticated POST 401. Required
+restart policy matches this build, is active and was broadcast. A fresh linked
+migration dry run is current, and operations/production health passed with 13
+active Functions and push ready. No native build was shipped; its prepared
+change is parked as ignored `output/release-evidence/native-keyboard-suppression.patch`.
+
+Hosted production auth, resume-send and DM smoke passed on this final release.
+Cleanup verified one General message, two DMs and 25 notification events removed,
+two read cursors repaired and zero test Storage objects. Evidence:
+`output/playwright/video-size-production/summary.json`.
+
+Physical iPhone clipboard behavior, the user's original selected-video size
+and the system-dialog toolbar result remain open. The PWA editor variants were
+physically unsuccessful; this release does not claim toolbar removal.

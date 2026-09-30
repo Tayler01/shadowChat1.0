@@ -1,3 +1,9 @@
+## September 30 video-size and PWA paste follow-up published
+
+- Client build `fb1d0b58` merges current main and is live through corrected Netlify deploy `6abd41540302b1466c64796c`. Global Storage now matches chat's existing 64 MiB contract; all bucket constraints/visibility remain unchanged. Required restart is active and broadcast; live media guards and operations health passed.
+- Chromium/WebKit General/DM 35/55 MiB video sends, progress, captions and recipient playback passed; Pins rejected 55 MiB at its 50 MiB cap with no upload. Merged source gates passed 318 suites/2,862 Jest tests, 402 Node contracts, lint/types and unchanged build budgets. Exact cleanup passed.
+- Silent paste feedback covers empty events and missing media bytes, preserving ordinary text. Native app work is parked at Tayler's PWA-only request. Feedback's System text dialog and local clipboard-metadata diagnostic need his physical phone result. [Detailed follow-up](composer-media-followup-2026-09-30.md).
+
 ## September 30 Shadow Runner release candidate
 
 - Full campaign redesign retained: phone controls/HUD/map/journal, courier story,

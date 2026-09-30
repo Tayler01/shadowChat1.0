@@ -2,7 +2,7 @@
   "title": "Large video uploads and clearer paste feedback",
   "summary": "The chat upload limit is aligned with the server, and unavailable clipboard attachments now get clear feedback. A new PWA keyboard experiment is available in Feedback.",
   "restartPolicy": "required_restart",
-  "severity": "fix",
+  "severity": "maintenance",
   "sections": [
     {
       "heading": "Video upload reliability",

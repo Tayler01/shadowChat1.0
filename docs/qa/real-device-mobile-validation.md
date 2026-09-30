@@ -6,12 +6,14 @@
   video paste and picker review, X removal, regular caption/media Send, side-by-side
   chevron, swipe dismissal, late-send focus behavior and neutral entry styling.
 - RD-041: Settings > Feedback > Open keyboard comparison. Confirm home-screen
-  context, compare textarea/input/contenteditable/plaintext-only with one editor
-  per fresh page, then hidden-file/form variants. Record whole toolbar visibility
-  separately from enabled arrows; verify typing/emoji/paste/composition/refocus.
-- RD-042: Signed native-client keyboard accessory suppression requires its own
-  installation and real iPhone acceptance; the web deployment is not that proof.
-- All three remain pending physical-device evidence. Thirty-six practical browser
+  context. Tayler reported all DOM editor/file-picker/form variants retained the
+  whole toolbar; his September 30 photo confirms installed-PWA context. These
+  variants failed the removal goal on his phone. The new System text dialog is
+  unverified there; test typing/emoji/paste/cancel and whole toolbar visibility.
+  The local paste diagnostic reports formats and byte counts without contents.
+- RD-042: Native-client suppression is parked at Tayler's PWA-only request. Its
+  prepared patch/export are local and no signed build was released.
+- RD-040 and the new RD-041 experiment still need acceptance. Thirty-six practical browser
   checks passed, with exact temporary-data cleanup. WebKit blob video decoding
   remains explicit; uploaded HTTP video playback passed in emulation.
 

@@ -1,3 +1,9 @@
+## September 30 large-video and empty-paste follow-up
+
+- Published merged build `fb1d0b58` / Netlify `6abd41540302b1466c64796c`; public identity/cache/media guards, migration dry-run and operations health passed, with required restart broadcast. The initial static-only deployment's missing Functions was corrected before release broadcast.
+- Real 35/55 MiB General/DM video sends passed in Chromium/WebKit with progress, captions, live receipt and actual playback. Pins 55 MiB selections show the 50 MiB rejection and no upload. Six merged chat smoke and six clipboard-metadata privacy cases passed. Six messages, four files and two Pins/categories were cleaned; read state restored.
+- Tayler requires a PWA fix. All tested DOM editor variants retained the toolbar on his phone. The new system text dialog is a distinct proposed experiment, not a verified removal; clipboard data missing from iOS is now explained when a paste event reaches the app. Actual device video paste and the original selected byte count remain pending.
+
 ## September 30 composer follow-up
 
 - Build `abb22931` is pushed to main and live through Netlify `6abd3281fceefa3eb468e003`; required-restart policy/broadcast and public health/media guards passed. Hosted two-account auth/resume-send/DM smoke and exact cleanup passed. Hosted diagnostic DOM checks passed 16 Chromium/WebKit cases.
