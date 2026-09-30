@@ -1,7 +1,9 @@
-## September 30 chat smoothness implementation started
+## September 30 chat smoothness published
 
 - Tayler authorized the full performance/read-position/notifications/attachments audit fixes, goal execution, main push and manual Netlify deployment. [Implementation checkpoints](chat-smoothness-implementation-2026-09-30.md) track the shared General/DM/thread/Pins contract and backend-first release.
-- Work is isolated from existing Unity and agent-guide changes. Six agents own distinct implementation areas; integrated validation and release remain pending. Physical installed-PWA testing is reserved for Tayler after the release, with practical mobile browser checks required before it.
+- Pushed code `e079a56973341df3c7b3c2928e0c0ff7a1333d1f` to main and manually deployed Netlify `6abd16af68215c0a06c1be8a`. Three migrations, exact function inventory, linked security/Auth checks, public health/media guards, release broadcast and production auth/resume-send/DM smoke passed. Test cleanup was verified.
+- Follow-up: required-restart policy is active and broadcast for older builds; Shado's General update `76d7806f-5c36-4559-bb08-0b0651ea0cf3` is posted with maximum visual Hype tier 5 (five system entries, no invented user attribution).
+- Full local validation passed 268 Jest suites/1,591 tests, 63 Node tests and 40 integrated Chromium/WebKit assertions; final packaging added 29 passing focused tests. Production build budgets remain unchanged. Work stayed isolated from existing Unity and guide edits; task preview/containers are stopped. Tayler's physical installed-PWA acceptance and the documented WebKit rendering-performance follow-up remain open.
 
 ## September 29 Shadow Checkers move sync and camera published
 

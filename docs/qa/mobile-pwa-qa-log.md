@@ -1,4 +1,6 @@
-## September 30 chat smoothness candidate
+## September 30 chat smoothness release
+
+- Code `e079a569` is pushed to main and live through Netlify `6abd16af68215c0a06c1be8a`. Production two-account Chromium auth/resume-send/DM smoke and exact data cleanup passed; public health SHA/cache checks and Linux media guards passed. Backend migrations, function inventory, security contract and Auth checks passed. Physical installed-PWA checks remain pending, and the implementation report retains the WebKit frame-time limitation.
 
 - The shared read/scroll controller waits for committed target rows, restores stable row/offset anchors, respects user movement and excludes rows covered by the fixed mobile composer. DM targets also clear the floating controls. General, DMs, reply threads and Pins retain bounded history.
 - Pins discussion checks passed Android Chromium, iPhone WebKit and desktop: initial unread, visible-only cursor, history prepend, realtime while reading, send/edit, private file upload, exact target and header counts. Temporary comments/files were removed and absence verified.

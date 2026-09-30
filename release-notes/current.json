@@ -1,7 +1,7 @@
 {
   "title": "Smoother conversations and easier sharing",
   "summary": "This update improves reading position, attachment sharing, and notification reliability across Shadow Chat.",
-  "restartPolicy": "optional_restart",
+  "restartPolicy": "required_restart",
   "severity": "feature",
   "sections": [
     {
@@ -25,7 +25,7 @@
       "items": [
         "Push notifications respect preview privacy and conversation mute settings during retries.",
         "A failed delivery on one device can retry without repeating successful deliveries on another.",
-        "Chat loading and background refreshes do less unnecessary work. Restart when convenient to load the update."
+        "Chat loading and background refreshes do less unnecessary work. Tap Restart Now to load this update."
       ]
     }
   ]

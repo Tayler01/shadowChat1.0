@@ -14,8 +14,23 @@ Tayler approved implementing the [audit](../PERFORMANCE_AND_QOL_AUDIT_2026-09-30
 - [x] Bounded server queries, canonical cursor validation, scoped SQL security/ordering checks and sanitized RPC diagnostics.
 - [x] Unchanged presence suppression, hidden release-poll gating, activation refresh reduction and honest performance probes.
 - [x] Integrated review, regression suites, lint/types/build, Node contracts, docs, audit and mobile-browser acceptance.
-- [ ] Backend-first migrations/functions and parity verification; reviewed main push; manual Netlify deployment and production health/smoke.
-- [ ] Final report, release notes, QA logs, task helper cleanup and Notion work note.
+- [x] Backend-first migrations/functions and parity verification; reviewed main push; manual Netlify deployment and production health/smoke.
+- [x] Final report, release notes, QA logs, task helper cleanup and Notion work note.
+
+## Published release
+
+Code `e079a56973341df3c7b3c2928e0c0ff7a1333d1f` is pushed to `main` and published at [shadochat.online](https://shadochat.online). Final manual Netlify deploy: `6abd16af68215c0a06c1be8a`. A subsequent documentation-only closeout commit records this evidence without requiring a different app build.
+
+- All three September 30 migrations applied; the linked dry run reports current across 241 migration versions. Function inventory matches 13 active, 15 deny-paused and one removed entry. Dedicated Bridge sessions remain revoked. Linked security-contract checks passed; password protection, email confirmation and the invite hook read back enabled.
+- Production build passed unchanged budgets: initial gzip 330.18 KiB, largest eager JavaScript 482.07 KiB raw / 146.98 KiB gzip, total deploy 95.34 MiB. Production Live and Catch-Up flags remain enabled. Phone-install guidance and Hype presentation now load when needed; a lossless badge PNG optimization saves 75,421 bytes with identical decoded 584-by-584 RGBA pixels. Packaging changes passed lint/types and 29 focused tests across six suites.
+- Public app/health/service-worker returned 200 with the expected code SHA and cache policies. Media method/auth guards returned 405/401. Operations release evidence and health were recorded. At Tayler's follow-up request, the release policy was changed to `required_restart`, republished and broadcast: older builds show Restart Now automatically; current builds do not need another restart. Existing restart receipts retain reload-loop protection. `release-notes/current.json` preserves this required policy for future publication.
+- The post-shado-updates workflow posted the verified General announcement as `Shado` / `shado_ai`: message `76d7806f-5c36-4559-bb08-0b0651ea0cf3`, 1,558 characters, UTF-8 readback exact. It has maximum visual Hype tier 5 through five anonymous/system entries and zero falsely attributed user Hypes. No duplicate Shado announcement existed that day.
+- Live two-account Chromium smoke passed auth, resume-send and DM. Cleanup verified removal of one General message, two DMs and 29 test notification events, restored two test read cursors, and found no test Storage objects requiring removal. Evidence: `output/playwright/chat-smoothness-production/summary.json` and `output/release-evidence/`.
+- The first upload briefly failed media-function startup because Netlify CLI 26 rebuilt the Windows function bundle during deploy. The final deploy restored and verified Linux Sharp/libvips and used `deploy --no-build` with the prepared functions. Both live guards then passed. Future Windows manual releases must preserve the verified package this way; an authenticated image transform was not part of the public guard check.
+- The code push succeeded; two checks for this SHA returned no GitHub production workflow runs. Manual publication is confirmed independently. Native Netlify Git builds are intentionally paused by the backend-first release policy; the separate GitHub trigger issue is not diagnosed by an empty run list.
+- Cleanup stopped the task preview and reduced task-owned local containers from six to zero, preserving all eleven existing user containers. Original-checkout Unity/guide edits remain untouched. The release note was prepended to Codex Work Notes at 10:05 ET.
+
+Physical installed-PWA acceptance remains with Tayler. The WebKit frame-time and ResizeObserver findings below remain explicit follow-ups, not resolved by a successful deployment.
 
 ## Scope controls
 
