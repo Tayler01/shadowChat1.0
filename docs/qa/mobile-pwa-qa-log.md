@@ -1,8 +1,14 @@
+## September 29 Shadow Checkers hosted move and camera QA
+
+- Published build `fef865dee100b6c6ef92926c62faaab0a2ea1f04`, Netlify deploy `6abc7522c70385a4236e9f57`, passed hosted two-player Android/Chromium browser emulation. Legal-move animation began 12 ms after input before held RPC completion; the server persisted it without acknowledgement replay. Own-side orientation, opponent realtime turn/reply from the flipped seat, camera controls and exact test-created data cleanup passed. Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790735775133/summary.json`.
+- Hosted iPhone/WebKit browser emulation passed the same checks at 138 ms optimistic start with exact cleanup. Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790735841210/summary.json`. Public health checked app 200, media endpoint 405 and 11 game assets; production health checked app 200 with News paused. Restart release `fef865de` was published and broadcast.
+- Physical iPhone and Android installed-PWA interaction, camera gestures and sustained performance still require confirmation. Browser emulation is not physical-device proof.
+
 ## September 29 Shadow Checkers optimistic move and camera browser QA
 
 - Two-player Android/Chromium browser emulation passed: a legal move began local animation 10 ms after input while its RPC was held, the server persisted it without animation replay on acknowledgement, and the opponent saw the realtime turn and replied from the correctly flipped seat. Portrait/landscape gate and camera controls passed. Exact test-created data cleanup passed. Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790734760532/summary.json`.
 - The corresponding iPhone/WebKit browser-emulated run passed the same move, realtime reply, seat and camera checks with 146 ms local animation start and exact cleanup. Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790734821801/summary.json`.
-- These are browser-emulated contexts. Physical iPhone and Android installed-PWA responsiveness, real touch gestures and sustained performance remain pending; this entry does not establish a production deployment.
+- These were local browser-emulated checks before the hosted release recorded above. Physical iPhone and Android installed-PWA responsiveness, real touch gestures and sustained performance remain pending.
 
 ## September 27 Shadow Checkers opponent orientation follow-up
 

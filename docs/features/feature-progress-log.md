@@ -1,7 +1,13 @@
+## September 29 Shadow Checkers move sync and camera published
+
+- Published commit/build `fef865dee100b6c6ef92926c62faaab0a2ea1f04` to `https://shadochat.online` via Netlify deploy `6abc7522c70385a4236e9f57`. Public health checked app 200, media endpoint 405 and 11 game assets; production health checked app 200 with News paused. Required restart release `fef865de` was published and broadcast.
+- Hosted Android/Chromium and iPhone/WebKit two-player browser-emulated reports passed with 12 ms and 138 ms optimistic animation starts, respectively. Both verified own-side orientation, server persistence without animation replay, opponent realtime reply from the flipped seat, camera controls and exact test-created data cleanup. Evidence: `output/playwright/shadow-checkers-unity/multiplayer-1790735775133/summary.json` and `multiplayer-1790735841210/summary.json`.
+- Physical iPhone and Android installed-PWA confirmation remains pending; hosted browser emulation does not complete phone acceptance.
+
 ## September 29 Shadow Checkers move sync and camera candidate
 
 - Legal moves begin local animation before RPC completion and reconcile the server acknowledgement without replay. Two-player Android/Chromium and iPhone/WebKit browser-emulated runs passed at 10 ms and 146 ms local animation start respectively; both persisted the move, showed the opponent's realtime turn/reply from the correctly flipped seat, and passed camera controls.
-- Reports: `output/playwright/shadow-checkers-unity/multiplayer-1790734760532/summary.json` and `multiplayer-1790734821801/summary.json`. Both report exact test-created data cleanup. Physical iPhone/Android installed-PWA confirmation and production release verification are still pending; these runs are browser evidence only.
+- Reports: `output/playwright/shadow-checkers-unity/multiplayer-1790734760532/summary.json` and `multiplayer-1790734821801/summary.json`. Both report exact test-created data cleanup. These were local browser runs before the published release recorded above; physical iPhone/Android installed-PWA confirmation remains pending.
 
 ## September 27 Shadow Checkers paused for the night
 

@@ -1,16 +1,22 @@
 # Shadow Checkers finish checklist
 
-September 29, 2026. Working checklist from the user's physical-phone walkthrough. The user resumed the goal on September 29. The move-sync and camera release candidate is locally verified and awaiting publication for physical-phone testing; acceptance requirements below remain open where hosted or physical-device evidence is still needed.
+September 29, 2026. Working checklist from the user's physical-phone walkthrough. The user resumed the goal on September 29. The move-sync and camera update is published for physical-phone testing; remaining acceptance requirements stay open where physical-device evidence is needed.
 
-## Move sync and camera release candidate — September 29
+## Move sync and camera release — September 29
+
+- Published commit/build `fef865dee100b6c6ef92926c62faaab0a2ea1f04` to `https://shadochat.online` in Netlify deploy `6abc7522c70385a4236e9f57`. Public health verified app 200, media endpoint 405 and 11 game assets; production health reported app 200 with News paused. Required restart release `fef865de` was published and broadcast.
+- Hosted two-player Android/Chromium and iPhone/WebKit browser-emulated runs passed on this release. Local optimistic animation began in 12 ms and 138 ms respectively before the held RPC returned; the server persisted the move, and acknowledgement did not replay its animation. Both runs passed own-side orientation, opponent realtime turn/reply from the flipped seat, camera controls and exact test-created data cleanup. Reports: `output/playwright/shadow-checkers-unity/multiplayer-1790735775133/summary.json` and `multiplayer-1790735841210/summary.json`.
+- Hosted browser emulation does not establish physical iPhone or Android installed-PWA behavior. Physical move responsiveness, camera gestures, sustained play and final phone acceptance remain pending.
+
+### Local candidate evidence
 
 - A legal move now begins its local animation before the move RPC returns, then reconciles with the authoritative server board. Two-player Android/Chromium browser emulation recorded a 10 ms local animation start; iPhone/WebKit browser emulation recorded 146 ms. Server acknowledgement persisted the move without replaying its animation in either run.
 - Both runs passed the opponent's realtime turn update and reply move from the correctly flipped seat, portrait/landscape gate and camera controls. Reports: `output/playwright/shadow-checkers-unity/multiplayer-1790734760532/summary.json` (Chromium) and `multiplayer-1790734821801/summary.json` (WebKit). Both report exact test-created data cleanup.
-- These are browser-emulated mobile contexts, not physical iPhone or Android results. Physical installed-PWA move responsiveness, camera gestures, sustained play and release verification remain open. This release candidate is not recorded here as deployed.
+- These earlier local runs were browser-emulated mobile contexts, not physical iPhone or Android results. The hosted release checks above supersede their publication status.
 
 ## Pause checkpoint — September 27, 10:49 PM ET
 
-- User requested stopping for the night and saving the latest changes to pursue next time. Goal is paused; the three active implementation agents were interrupted. No further deployment was performed.
+- User requested stopping for the night and saving the latest changes to pursue next time. At this September 27 checkpoint, the goal was paused; the three active implementation agents were interrupted. No deployment was performed at that checkpoint. Work resumed and was published on September 29 as recorded above.
 - **Next: reduce move sync delay.** Inspect the current move path's extra authentication round trip and broad refresh (sessions, matches, leaderboard, then queue/moves/chat). Keep server rules, permissions, turn notifications and account/match response fencing intact. Publish the authoritative current board promptly rather than waiting for unrelated lobby data.
 - **Next: animate the moving player's legal move immediately while syncing.** Use local validated prediction with an explicit pending state, prevent duplicate submissions, reconcile server acknowledgement without replaying the animation, and recover from rejection/connection loss without leaving a false board or applying an old response to another match. Verify captures, kinging and terminal outcomes. This request is saved, not implemented or verified.
 - **Next: smooth camera rotation.** Preserve the user's inverted pan directions and pinch zoom, add responsive frame-rate-independent smoothing, and respect reduced motion, camera limits, reset/overhead, room reveal and seat orientation. This request is saved, not implemented or verified.
