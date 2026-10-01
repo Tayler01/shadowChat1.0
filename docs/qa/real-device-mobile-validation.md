@@ -1,5 +1,16 @@
 # Real-Device Mobile Validation
 
+## October 1 acceptance correction
+
+- RD-044 is not accepted yet: native Send swipe improved, but physical bottom
+  rebound and PWA Send swipe still quiver. Follow-up fixes the real CSS override
+  and elastic-position correction loop; recheck the new hosted release in both
+  hosts, retaining normal boundary pull. Browser probes are not device acceptance.
+- RD-043 requires installed Build 17, not the signed artifact alone. Native movie
+  module registration/rotation are verified in the IPA; Apple account access
+  recovered and the uploaded build is processing. Verify Photos video copy/paste and Allow/Deny
+  Paste after the installed build number changes to 17.
+
 ## September 30 TestFlight build 17 follow-up
 
 - Tayler physically installed build 16 and confirmed accessory toolbar absence;

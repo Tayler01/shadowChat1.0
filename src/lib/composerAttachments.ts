@@ -44,7 +44,9 @@ export function hasClipboardFileIntent(data: DataTransfer): boolean {
 }
 
 export function clipboardHasNoReadableContent(data: DataTransfer): boolean {
-  if (Array.from(data.types ?? []).length || Array.from(data.items ?? []).length) return false
+  // WKWebView can declare text formats/items while withholding every value
+  // for a Photos movie. Format declarations are not readable clipboard bytes.
+  // Preserve real plain text, rich text and URLs, including whitespace.
   return !['text/plain', 'text/html', 'text/uri-list'].some(type => data.getData?.(type))
 }
 

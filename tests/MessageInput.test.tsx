@@ -782,7 +782,11 @@ test('a pasted video stays staged until regular Send includes its caption', asyn
   expect(onSendMessage).toHaveBeenCalledWith(JSON.stringify({ name: 'clip.mp4', size: 5, type: 'video/mp4', caption: 'Video caption' }), 'video', 'https://example.com/clip.mp4', undefined, undefined, expect.any(String), expect.any(Function))
 })
 
-test.each(['general', 'dm:recipient'])('empty native video paste stages and regular Send retains the caption in %s', async cacheKey => {
+test.each([
+  { cacheKey: 'general', formats: [] as string[], clipboardText: '' },
+  { cacheKey: 'dm:recipient', formats: ['text/plain'], clipboardText: '' },
+  { cacheKey: 'general', formats: ['video/mp4', 'text/plain'], clipboardText: ' with pasted text' },
+])('native video paste with formats $formats stages and retains the caption in $cacheKey', async ({ cacheKey, formats, clipboardText }) => {
   window.__SHADOWCHAT_NATIVE_APP__ = true
   window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = true
   window.ReactNativeWebView = { postMessage: jest.fn() }
@@ -792,7 +796,7 @@ test.each(['general', 'dm:recipient'])('empty native video paste stages and regu
     render(<MessageInput onSendMessage={onSendMessage} cacheKey={cacheKey} identityKey="native-account" />)
     const textarea = screen.getByRole('textbox')
     fireEvent.change(textarea, { target: { value: 'Native video caption' } })
-    fireEvent.paste(textarea, { clipboardData: { files: [], items: [], types: [], getData: () => '' } })
+    fireEvent.paste(textarea, { clipboardData: { files: [], items: formats.map(type => ({ kind: 'string', type })), types: formats, getData: (type: string) => type === 'text/plain' ? clipboardText : '' } })
     expect(screen.getByRole('status')).toHaveTextContent('Pasting video')
     const request = JSON.parse((window.ReactNativeWebView.postMessage as jest.Mock).mock.calls[0][0])
     await act(async () => {
@@ -801,11 +805,30 @@ test.each(['general', 'dm:recipient'])('empty native video paste stages and regu
       emit({ type: 'clipboard_chunk', index: 0, offset: 0, data: btoa('video') })
     })
     expect(screen.getByRole('button', { name: 'Remove clip.mov' })).toBeInTheDocument()
-    expect(textarea).toHaveValue('Native video caption')
+    expect(textarea).toHaveValue('Native video caption' + clipboardText)
     expect(uploadChatFileAsset).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
     await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(1))
-    expect(onSendMessage).toHaveBeenCalledWith(JSON.stringify({ name: 'clip.mov', size: 5, type: 'video/quicktime', caption: 'Native video caption' }), 'video', 'https://example.com/clip.mov', undefined, undefined, expect.any(String), expect.any(Function))
+    expect(onSendMessage).toHaveBeenCalledWith(JSON.stringify({ name: 'clip.mov', size: 5, type: 'video/quicktime', caption: 'Native video caption' + clipboardText }), 'video', 'https://example.com/clip.mov', undefined, undefined, expect.any(String), expect.any(Function))
+  } finally {
+    delete window.__SHADOWCHAT_NATIVE_APP__
+    delete window.__SHADOWCHAT_NATIVE_CLIPBOARD__
+    delete window.ReactNativeWebView
+  }
+})
+
+test.each(['text/plain', 'text/html', 'text/uri-list', 'image/png'])('native recovery leaves ordinary %s paste on the browser path', format => {
+  window.__SHADOWCHAT_NATIVE_APP__ = true
+  window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = true
+  window.ReactNativeWebView = { postMessage: jest.fn() }
+  try {
+    render(<MessageInput onSendMessage={jest.fn()} />)
+    const files = format === 'image/png' ? [new File(['photo'], 'photo.png', { type: format })] : []
+    const event = createEvent.paste(screen.getByRole('textbox'), { clipboardData: { files, items: [{ kind: 'string', type: format }], types: [format], getData: (type: string) => type === format && files.length === 0 ? 'ordinary content' : '' } })
+    fireEvent(screen.getByRole('textbox'), event)
+    expect(window.ReactNativeWebView.postMessage).not.toHaveBeenCalled()
+    if (files.length === 0) expect(event.defaultPrevented).toBe(false)
+    else expect(screen.getByRole('button', { name: 'Remove photo.png' })).toBeInTheDocument()
   } finally {
     delete window.__SHADOWCHAT_NATIVE_APP__
     delete window.__SHADOWCHAT_NATIVE_CLIPBOARD__

@@ -618,7 +618,10 @@ it('retains a failed Pins upload and shows a safe size message after TUS 413', a
   expect(createShadowPinComment).not.toHaveBeenCalled()
 })
 
-it('recovers an empty native movie paste into the Pin inline attachment with its caption', async () => {
+it.each([
+  { formats: ['text/plain'], clipboardText: '' },
+  { formats: ['video/mp4', 'text/plain'], clipboardText: ' with pasted text' },
+])('recovers a native movie paste with $formats into the Pin attachment with its caption', async ({ formats, clipboardText }) => {
   window.__SHADOWCHAT_NATIVE_APP__ = true
   window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = true
   window.ReactNativeWebView = { postMessage: jest.fn() }
@@ -627,7 +630,7 @@ it('recovers an empty native movie paste into the Pin inline attachment with its
     await screen.findByText('Root comment')
     const input = screen.getByLabelText('Add a ShadowPin comment')
     fireEvent.change(input, { target: { value: 'Native Pin caption' } })
-    fireEvent.paste(input, { clipboardData: { files: [], items: [], types: [], getData: () => '' } })
+    fireEvent.paste(input, { clipboardData: { files: [], items: formats.map(type => ({ kind: 'string', type })), types: formats, getData: (type: string) => type === 'text/plain' ? clipboardText : '' } })
     const request = JSON.parse((window.ReactNativeWebView.postMessage as jest.Mock).mock.calls[0][0])
     await act(async () => {
       const emit = (record: Record<string, unknown>) => window.dispatchEvent(new CustomEvent('shadowchat:native-message', { detail: { ...request, ...record } }))
@@ -635,11 +638,11 @@ it('recovers an empty native movie paste into the Pin inline attachment with its
       emit({ type: 'clipboard_chunk', index: 0, offset: 0, data: btoa('video') })
     })
     expect(screen.getByRole('button', { name: 'Remove clip.mov' })).toBeInTheDocument()
-    expect(input).toHaveValue('Native Pin caption')
+    expect(input).toHaveValue('Native Pin caption' + clipboardText)
     expect(uploadShadowPinCommentAttachment).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Remove clip.mov' }))
     expect(screen.queryByRole('button', { name: 'Remove clip.mov' })).not.toBeInTheDocument()
-    expect(input).toHaveValue('Native Pin caption')
+    expect(input).toHaveValue('Native Pin caption' + clipboardText)
   } finally {
     delete window.__SHADOWCHAT_NATIVE_APP__
     delete window.__SHADOWCHAT_NATIVE_CLIPBOARD__

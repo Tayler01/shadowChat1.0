@@ -806,11 +806,22 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
     } catch (stageError) { setError(stageError instanceof Error ? stageError.message : 'Unable to attach files.'); return 0 }
   }
   const { recoverVideoPaste, pastingVideo } = useNativeVideoPaste(`pin:${user?.id}:${image.id}:${open}`, stageFiles)
+  const insertPastedText = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const text = event.clipboardData.getData?.('text/plain') || ''
+    if (!text) return
+    const start = event.currentTarget.selectionStart
+    const end = event.currentTarget.selectionEnd
+    setBody(current => `${current.slice(0, start)}${text}${current.slice(end)}`.slice(0, 1000))
+    requestAnimationFrame(() => {
+      if (aliveRef.current) composerRef.current?.setSelectionRange(start + text.length, start + text.length)
+    })
+  }
   const handlePaste = (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const files = extractComposerFiles(event.clipboardData)
     if (!files.length) {
       if ((hasClipboardFileIntent(event.clipboardData) || clipboardHasNoReadableContent(event.clipboardData)) && recoverVideoPaste()) {
         event.preventDefault()
+        insertPastedText(event)
         return
       }
       if (hasClipboardFileIntent(event.clipboardData)) setError('This clipboard did not provide a file to paste. Use Attach files to choose it instead.')
@@ -819,15 +830,7 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
     }
     event.preventDefault()
     stageFiles(files)
-    const text = event.clipboardData.getData?.('text/plain') || ''
-    if (text) {
-      const start = event.currentTarget.selectionStart
-      const end = event.currentTarget.selectionEnd
-      setBody(current => `${current.slice(0, start)}${text}${current.slice(end)}`.slice(0, 1000))
-      requestAnimationFrame(() => {
-        if (aliveRef.current) composerRef.current?.setSelectionRange(start + text.length, start + text.length)
-      })
-    }
+    insertPastedText(event)
   }
   const retryCleanup = async (attachment: ShadowPinCommentAttachment) => {
     try {

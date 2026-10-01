@@ -1,4 +1,4 @@
-import { buildAttachmentMessageContent, classifyComposerFile, extractClipboardFiles } from '../src/lib/composerAttachments'
+import { buildAttachmentMessageContent, classifyComposerFile, clipboardHasNoReadableContent, extractClipboardFiles } from '../src/lib/composerAttachments'
 import { getMessageCaption, getMessagePreviewText } from '../src/components/chat/messageDisplay'
 
 test.each([
@@ -16,6 +16,18 @@ test('clipboard files are taken only once when browsers expose both collections'
   expect(extractClipboardFiles({ files: [file], items: [{ kind: 'file', getAsFile }] } as unknown as DataTransfer)).toEqual([file])
   expect(getAsFile).not.toHaveBeenCalled()
   expect(extractClipboardFiles({ files: [], items: [{ kind: 'file', getAsFile }] } as unknown as DataTransfer)).toEqual([file])
+})
+
+test('empty declared text formats do not hide a native clipboard movie', () => {
+  expect(clipboardHasNoReadableContent({ types: ['text/plain', 'text/html'], items: [{ kind: 'string', type: 'text/plain' }], getData: () => '' } as unknown as DataTransfer)).toBe(true)
+})
+
+test.each(['text/plain', 'text/html', 'text/uri-list'])('actual %s clipboard content keeps ordinary paste', format => {
+  expect(clipboardHasNoReadableContent({ types: [format], items: [{ kind: 'string', type: format }], getData: (type: string) => type === format ? 'ordinary text or rich content' : '' } as unknown as DataTransfer)).toBe(false)
+})
+
+test('whitespace-only text is still ordinary clipboard content', () => {
+  expect(clipboardHasNoReadableContent({ getData: () => ' ' } as unknown as DataTransfer)).toBe(false)
 })
 
 test.each([

@@ -479,6 +479,65 @@ describe('useUnreadScroll', () => {
     container.remove()
   })
 
+  it.each(['general_chat:main', 'dm:conversation', 'pin:image', 'general_chat_thread:root'])('leaves %s elastic bottom rebound to the browser without follow writes', (surfaceKey) => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+    setRect(container, 0, 400)
+    const scrollTo = jest.fn((options: ScrollToOptions) => { container.scrollTop = options.top ?? 0 })
+    container.scrollTo = scrollTo as typeof container.scrollTo
+    const containerRef = { current: container }
+    const { result, rerender, unmount } = renderHook(({messages}) => useUnreadScroll<TestMessage>({
+      containerRef, messages, cursor: null, surfaceKey,
+      getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at,
+      getElementId: id => `message-${id}`, onMarkReadToLatest: jest.fn(),
+    }), {initialProps: {messages: [makeMessage('m1', 1)]}})
+    scrollTo.mockClear()
+    // Safari can report an elastic position even when no touch events reached
+    // the inner scrollport (for example an ancestor WebView rebound).
+    act(() => {
+      container.scrollTop = 640
+      window.dispatchEvent(new Event(MOBILE_VIEWPORT_UPDATED_EVENT))
+      jest.advanceTimersByTime(800)
+    })
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(container.scrollTop).toBe(640)
+    container.scrollTop = 600
+    const touch = (type: string, y: number) => {
+      const event = new Event(type)
+      Object.defineProperty(event, 'touches', {value: type === 'touchend' ? [] : [{clientX: 120, clientY: y}]})
+      container.dispatchEvent(event)
+    }
+    act(() => {
+      touch('touchstart', 160)
+      touch('touchmove', 144) // Pull toward the end while already at latest.
+      container.scrollTop = 640
+      result.current.handleUnreadScroll()
+      window.dispatchEvent(new Event('resize'))
+      window.dispatchEvent(new Event(MOBILE_VIEWPORT_UPDATED_EVENT))
+      jest.advanceTimersByTime(800)
+      touch('touchend', 144)
+      jest.advanceTimersByTime(800) // Rebound can outlive the ordinary idle timer.
+    })
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(container.scrollTop).toBe(640)
+    expect(result.current.autoScroll).toBe(false)
+    act(() => {
+      container.scrollTop = 600 // The browser finishes its own rebound.
+      result.current.handleUnreadScroll()
+      jest.advanceTimersByTime(180)
+    })
+    expect(result.current.autoScroll).toBe(true)
+    act(() => {
+      setScrollMetrics(container, 1100)
+      rerender({messages: [makeMessage('m1', 1), makeMessage('m2', 2)]})
+    })
+    expect(container.scrollTop).toBe(700)
+    unmount()
+    container.remove()
+  })
+
   it('persists the visible anchor after upstream media changes during a swipe and restores it on return', () => {
     useFakeTimersWithImmediateRaf()
     let resizeCallback: ResizeObserverCallback | undefined
@@ -614,6 +673,50 @@ describe('useUnreadScroll', () => {
     })
     expect(result.current.autoScroll).toBe(false)
     expect(container.scrollTop).toBe(596)
+    unmount()
+    container.remove()
+  })
+
+  it('presents a resolved empty conversation without acknowledging a nonexistent message', () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    const containerRef = {current: container}
+    const markRead = jest.fn()
+    const {result, rerender, unmount} = renderHook(({loading}) => useUnreadScroll<TestMessage>({
+      containerRef, messages: [], loading, cursor: null, surfaceKey: 'dm:empty-ready',
+      getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at,
+      getElementId: id => `message-${id}`, onMarkReadToLatest: markRead,
+    }), {initialProps: {loading: true}})
+    expect(result.current.initialPositionReady).toBe(false)
+    rerender({loading: false})
+    expect(result.current.initialPositionReady).toBe(true)
+    expect(result.current.feedState).toBe('bottomPinned')
+    act(() => jest.advanceTimersByTime(800))
+    expect(markRead).not.toHaveBeenCalled()
+    unmount()
+  })
+
+  it('resumes following the next append after a tap with no native scroll event', () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+    container.scrollTo = jest.fn((options: ScrollToOptions) => { container.scrollTop = options.top ?? 0 }) as typeof container.scrollTo
+    const containerRef = {current: container}
+    const {result, rerender, unmount} = renderHook(({messages}) => useUnreadScroll<TestMessage>({
+      containerRef, messages, cursor: null, surfaceKey: 'dm:tap-append',
+      getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at,
+      getElementId: id => `message-${id}`, onMarkReadToLatest: jest.fn(),
+    }), {initialProps: {messages: [makeMessage('m1', 1)]}})
+    act(() => container.dispatchEvent(new TouchEvent('touchstart')))
+    expect(result.current.autoScroll).toBe(false)
+    act(() => container.dispatchEvent(new TouchEvent('touchend')))
+    expect(result.current.autoScroll).toBe(true)
+    act(() => {
+      setScrollMetrics(container, 1100)
+      rerender({messages: [makeMessage('m1', 1), makeMessage('m2', 2)]})
+    })
+    expect(container.scrollTop).toBe(700)
     unmount()
     container.remove()
   })

@@ -2,6 +2,8 @@ import { act, renderHook } from '@testing-library/react'
 import { recoverNativeClipboardVideos } from '../src/lib/nativeClipboard'
 import { NATIVE_APP_MESSAGE_EVENT } from '../src/lib/nativeAppBridge'
 import { useNativeVideoPaste } from '../src/hooks/useNativeVideoPaste'
+import { useStagedAttachments } from '../src/hooks/useStagedAttachments'
+import { CHAT_VIDEO_UPLOAD_RULE, validateUpload } from '../src/lib/uploadLimits'
 import { createNativeClipboardController, CLIPBOARD_CHUNK_BYTES } from '../apps/mobile/src/lib/nativeClipboardController'
 
 const requestId = '11111111-1111-4111-8111-111111111111'
@@ -33,6 +35,54 @@ test('movie bytes use pull chunks and become a regular File; release follows com
   const calls = (window.ReactNativeWebView!.postMessage as jest.Mock).mock.calls
   expect(JSON.parse(calls[calls.length - 1][0]).type).toBe('clipboard_cancel')
 })
+
+test('a real 35 MiB transfer survives every chunk byte-for-byte and stages without uploading', async () => {
+  const source = Buffer.alloc(35 * 1024 * 1024)
+  for (let i = 0; i < source.length; i++) source[i] = i % 251
+  let chunkCount = 0
+  let largestEncodedChunk = 0
+  const release = jest.fn().mockResolvedValue(undefined)
+  const controller = createNativeClipboardController({
+    origin: 'https://shadochat.online',
+    clipboard: {
+      begin: async () => [{ name: '35-mib.mov', type: 'video/quicktime', size: source.length }],
+      readChunk: async (_requestId, _index, offset) => source.subarray(offset, offset + CLIPBOARD_CHUNK_BYTES).toString('base64'),
+      release,
+    },
+    publish: record => {
+      if (record.type === 'clipboard_chunk') {
+        chunkCount++
+        largestEncodedChunk = Math.max(largestEncodedChunk, (record.data as string).length)
+      }
+      dispatch(record)
+    },
+  })
+  window.ReactNativeWebView = { postMessage: raw => { controller.handle(raw, 'https://shadochat.online/?nativeApp=1') } }
+  const upload = jest.fn()
+  const staged = renderHook(() => useStagedAttachments({ scopeKey: 'large-movie', validate: file => { validateUpload(file, CHAT_VIDEO_UPLOAD_RULE) }, upload, send: jest.fn() }))
+  try {
+    const files = await recoverNativeClipboardVideos('large-movie', new AbortController().signal)
+    expect(files[0].size).toBe(source.length)
+    const bytes = await new Promise<ArrayBuffer>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result as ArrayBuffer)
+      reader.onerror = () => reject(reader.error)
+      reader.readAsArrayBuffer(files[0])
+    })
+    expect(Buffer.from(bytes).equals(source)).toBe(true)
+    expect(chunkCount).toBe(Math.ceil(source.length / CLIPBOARD_CHUNK_BYTES))
+    expect(largestEncodedChunk).toBe(256 * 1024)
+    act(() => { expect(staged.result.current.addFiles(files)).toEqual({ accepted: 1, errors: [] }) })
+    expect(staged.result.current.items[0]).toMatchObject({ kind: 'video', status: 'staged', file: { size: source.length } })
+    expect(upload).not.toHaveBeenCalled()
+    act(() => { staged.result.current.remove(staged.result.current.items[0].id) })
+    expect(staged.result.current.items).toHaveLength(0)
+    expect(release).toHaveBeenCalled()
+  } finally {
+    controller.reset()
+    staged.unmount()
+  }
+}, 30_000)
 
 test('scope mismatch is ignored and cancellation releases bytes/listeners before late completion', async () => {
   const controller = new AbortController()

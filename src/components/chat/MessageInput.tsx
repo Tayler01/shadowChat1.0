@@ -727,6 +727,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (files.length === 0) {
       if ((hasClipboardFileIntent(event.clipboardData) || clipboardHasNoReadableContent(event.clipboardData)) && recoverVideoPaste()) {
         event.preventDefault()
+        insertPastedText(event.clipboardData.getData('text/plain'))
         return
       }
       if (hasClipboardFileIntent(event.clipboardData)) {

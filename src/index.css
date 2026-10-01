@@ -1078,7 +1078,9 @@ html, body, #root {
   -webkit-tap-highlight-color: transparent;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
-  touch-action: manipulation;
+  /* This rule follows Tailwind utilities: preserve the Send handle's touch-none
+     contract before Safari starts a pan or keyboard-dismiss gesture. */
+  touch-action: none;
   user-select: none;
 }
 

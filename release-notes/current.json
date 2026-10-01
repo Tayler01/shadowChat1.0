@@ -1,22 +1,23 @@
 {
-  "title": "Smoother chat scrolling and keyboard gestures",
-  "summary": "Chat gives your scroll gesture priority, keeps incoming messages from shifting your reading position, and makes keyboard dismissal steadier.",
+  "title": "Phone scrolling and paste follow-up",
+  "summary": "Bottom-edge scrolling and Send-side keyboard swipes now respect your touch, with fixes for empty DMs and native video paste recovery.",
   "restartPolicy": "required_restart",
   "severity": "maintenance",
   "sections": [
     {
-      "heading": "Scroll and reading position",
+      "heading": "Scrolling and DMs",
       "items": [
-        "Scrolling upward releases bottom-follow immediately, including the first few pixels of a drag.",
-        "Incoming messages wait behind the newer-messages control while you are reading, keeping the displayed chat window stable.",
-        "Delayed media, typing and keyboard layout updates respect your scroll gesture. General, DMs, threads and Pins share the fix."
+        "Automatic scroll corrections wait for the phone's bottom-edge bounce to settle. General, DMs, threads and Pins share the fix.",
+        "DMs retrieve messages that arrived during a bottom-edge gesture when following resumes.",
+        "New empty DM conversations now show their greeting instead of remaining hidden."
       ]
     },
     {
-      "heading": "Keyboard and phone push setup",
+      "heading": "Keyboard and paste",
       "items": [
-        "The compact down chevron still dismisses the keyboard. A downward swipe near Send now owns its gesture without dragging the page.",
-        "Phone push enrollment is repaired on the server; native delivery is being validated separately with a limited tester canary.",
+        "The Send swipe handle no longer allows page panning; the compact down chevron remains available.",
+        "Native video paste recovers from empty clipboard formats and preserves accompanying text. This requires TestFlight Build 17; Home Screen video paste still depends on what iOS supplies.",
+        "Attachments remain in the composer for review and removal, then send with your text using the regular Send button.",
         "Tap Restart Now to load this update."
       ]
     }

@@ -11,6 +11,11 @@ const FOLLOW_LATEST_MAX_WAIT_MS = 800
 const INITIAL_TARGET_MAX_RAF_ATTEMPTS = 5
 const USER_SCROLL_SETTLE_MS = 180
 
+const isElasticScroll = (container: HTMLElement) => {
+  const max = Math.max(0, container.scrollHeight - container.clientHeight)
+  return container.scrollTop < 0 || container.scrollTop > max + 1
+}
+
 export type UnreadScrollFeedState =
   | 'resolvingInitial'
   | 'targetingFirstUnread'
@@ -388,7 +393,7 @@ export function useUnreadScroll<TMessage>({
 
   const scrollContainerToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const container = containerRef.current
-    if (!container || !enabledRef.current || document.querySelector('[aria-modal="true"]') && !container.closest('[aria-modal="true"]')) return
+    if (!container || !enabledRef.current || isElasticScroll(container) || document.querySelector('[aria-modal="true"]') && !container.closest('[aria-modal="true"]')) return
 
     const top = Math.max(container.scrollHeight - container.clientHeight, 0)
     if (Math.abs(container.scrollTop - top) > 1) {
@@ -418,13 +423,15 @@ export function useUnreadScroll<TMessage>({
 
   const flushFollowLatest = useCallback(() => {
     cancelFollowLatest()
-    if (autoScrollRef.current) {
+    const container = containerRef.current
+    if (container && autoScrollRef.current && !userScrollRef.current.active && !userScrollRef.current.touching && !isElasticScroll(container)) {
       scrollToBottom('auto')
     }
-  }, [cancelFollowLatest, scrollToBottom])
+  }, [cancelFollowLatest, containerRef, scrollToBottom])
 
   const followLatest = useCallback(() => {
-    if (!enabledRef.current || document.querySelector('[aria-modal="true"]') && !containerRef.current?.closest('[aria-modal="true"]') || !autoScrollRef.current) return
+    const container = containerRef.current
+    if (!container || !enabledRef.current || userScrollRef.current.active || userScrollRef.current.touching || isElasticScroll(container) || document.querySelector('[aria-modal="true"]') && !container.closest('[aria-modal="true"]') || !autoScrollRef.current) return
     if (!initialUnreadJumpDoneRef.current) return
     if (initialUnreadReadHoldRef.current) return
 
@@ -444,17 +451,29 @@ export function useUnreadScroll<TMessage>({
 
   const settleUserScroll = useCallback(() => {
     if (userScrollSettleTimerRef.current !== null) window.clearTimeout(userScrollSettleTimerRef.current)
-    userScrollSettleTimerRef.current = window.setTimeout(() => {
+    const settle = () => {
       userScrollSettleTimerRef.current = null
       if (userScrollRef.current.touching) return
-      userScrollRef.current.active = false
       const container = containerRef.current
+      // WebKit exposes elastic positions outside the scrollable range. Leave
+      // rebound to the browser; correcting that range fights its animation.
+      if (container && isElasticScroll(container)) {
+        userScrollSettleTimerRef.current = window.setTimeout(settle, USER_SCROLL_SETTLE_MS)
+        return
+      }
+      userScrollRef.current.active = false
       if (container) {
+        if (container.scrollHeight - container.scrollTop - container.clientHeight <= 1 && (userScrollRef.current.wasFollowing || userScrollRef.current.direction > 0)) {
+          setAutoScroll(true)
+          setFeedState('bottomPinned')
+          scheduleMarkObservedRead(true)
+        }
         anchoredPositionRef.current = captureMessageScrollAnchor(container)
         if (!autoScrollRef.current) saveMessageScrollAnchor(readerId, surfaceKey, anchoredPositionRef.current)
       }
-    }, USER_SCROLL_SETTLE_MS)
-  }, [containerRef, readerId, surfaceKey])
+    }
+    userScrollSettleTimerRef.current = window.setTimeout(settle, USER_SCROLL_SETTLE_MS)
+  }, [containerRef, readerId, scheduleMarkObservedRead, setAutoScroll, setFeedState, surfaceKey])
 
   const scrollToBottomIfFollowing = useCallback(() => {
     if (autoScrollRef.current && !userScrollRef.current.active) followLatest()
@@ -475,7 +494,7 @@ export function useUnreadScroll<TMessage>({
     }
     // Keep the generous tolerance while following, but require an actual return
     // to the bottom after the user takes over. The first few swipe pixels count.
-    const atBottom = autoScrollRef.current ? bottomGap <= 28 : bottomGap <= 1 && (!userScroll.active || scrollDelta > 0)
+    const atBottom = !isElasticScroll(container) && !userScroll.touching && (autoScrollRef.current ? bottomGap <= 28 : bottomGap <= 1 && (!userScroll.active || scrollDelta > 0))
     anchoredPositionRef.current = captureMessageScrollAnchor(container)
     if (initialUnreadJumpDoneRef.current) saveMessageScrollAnchor(readerId, surfaceKey, atBottom || bottomGap <= 1 ? null : anchoredPositionRef.current)
     updateLastObservedMessage()
@@ -527,7 +546,7 @@ export function useUnreadScroll<TMessage>({
   }, [containerRef, readerId, surfaceKey])
   const restoreScrollAnchor = useCallback(() => {
     const container = containerRef.current
-    if (container && !autoScrollRef.current && !userScrollRef.current.active && initialUnreadJumpDoneRef.current) {
+    if (container && !isElasticScroll(container) && !autoScrollRef.current && !userScrollRef.current.active && initialUnreadJumpDoneRef.current) {
       restoreMessageScrollAnchor(container, anchoredPositionRef.current)
     }
   }, [containerRef])
@@ -655,7 +674,7 @@ export function useUnreadScroll<TMessage>({
       const gesture = userScrollRef.current
       gesture.touching = false
       const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight <= 1
-      if (!gesture.moved && gesture.wasFollowing || gesture.direction > 0 && atBottom) {
+      if (!isElasticScroll(container) && (!gesture.moved && gesture.wasFollowing || gesture.direction > 0 && atBottom)) {
         setAutoScroll(true)
         followLatest()
       } else settleUserScroll()
@@ -853,7 +872,8 @@ export function useUnreadScroll<TMessage>({
     }
 
     if (messages.length === 0) {
-      setFeedState('resolvingInitial')
+      scrollToBottom('auto')
+      setFeedState('bottomPinned')
       return
     }
 

@@ -1104,6 +1104,49 @@ describe('DirectMessagesView user search', () => {
     }
   })
 
+  test('a restored empty DM presents its greeting instead of remaining hidden while resolving', async () => {
+    const loadReadWindow = jest.fn().mockResolvedValue(true)
+    dmSpy.mockReturnValue({
+      conversations: [{id: 'empty-ready-test', other_user: user, last_message: null, unread_count: 0}],
+      currentConversation: 'empty-ready-test', messages: [], messagesConversationId: 'empty-ready-test',
+      loading: false, messagesLoading: false, loadingMore: false, hasMore: false, hasNewer: false, sending: false,
+      setCurrentConversation: setCurrentConversationMock, startConversation: startConversationMock,
+      sendMessage: jest.fn(), editMessage: jest.fn(), deleteMessage: jest.fn(), toggleReaction: jest.fn(),
+      markAsRead: jest.fn(), loadOlderMessages: jest.fn(), loadLatestMessages: jest.fn(), loadReadWindow,
+    } as any)
+    render(<DirectMessagesView onToggleSidebar={() => {}} currentView="dms" onViewChange={() => {}} initialConversation="empty-ready-test" />)
+    await waitFor(() => expect(screen.getByTestId('dm-message-scroll')).toHaveAttribute('data-scroll-state', 'bottomPinned'))
+    expect(screen.getByTestId('dm-message-stack')).toHaveStyle({visibility: 'visible'})
+    expect(screen.getByText('Say hello to Bob')).toBeVisible()
+    expect(loadReadWindow).toHaveBeenCalledTimes(1)
+  })
+
+  test('resumed bottom following retrieves an arrival deferred during contact without another scroll event', async () => {
+    const row = { id: 'resume-row', conversation_id: 'follow-resume-test', sender_id: 'u1', content: 'Mounted row', attachments: [], reactions: [], read_by: ['u1'], created_at: '2026-10-01T12:00:00Z' }
+    const model = {
+      conversations: [{id: 'follow-resume-test', other_user: user, last_message: null, unread_count: 0}],
+      currentConversation: 'follow-resume-test', messages: [row], messagesConversationId: 'follow-resume-test',
+      loading: false, messagesLoading: false, loadingMore: false, hasMore: false, hasNewer: false, sending: false,
+      setCurrentConversation: setCurrentConversationMock, startConversation: startConversationMock,
+      sendMessage: jest.fn(), editMessage: jest.fn(), deleteMessage: jest.fn(), toggleReaction: jest.fn(),
+      markAsRead: jest.fn(), loadOlderMessages: jest.fn(), loadLatestMessages: jest.fn().mockResolvedValue(undefined),
+    }
+    dmSpy.mockImplementation(() => model as any)
+    const view = () => <DirectMessagesView onToggleSidebar={() => {}} currentView="dms" onViewChange={() => {}} initialConversation="follow-resume-test" />
+    const {rerender} = render(view())
+    await waitFor(() => expect(screen.getByTestId('dm-message-scroll')).toHaveAttribute('data-following-latest', 'true'))
+    await waitFor(() => expect(screen.getByTestId('dm-message-stack')).toHaveStyle({visibility: 'visible'}))
+    const container = screen.getByTestId('dm-message-scroll')
+    fireEvent.touchStart(container, {touches: [{clientX: 120, clientY: 160}]})
+    expect(container).toHaveAttribute('data-following-latest', 'false')
+    model.hasNewer = true
+    rerender(view())
+    expect(model.loadLatestMessages).not.toHaveBeenCalled()
+    fireEvent.touchEnd(container, {touches: []})
+    await waitFor(() => expect(model.loadLatestMessages).toHaveBeenCalledTimes(1))
+    expect(container).toHaveAttribute('data-following-latest', 'true')
+  })
+
   test('failed exact-message targets focus the thread header and can retry after reopening', async () => {
     const { useIsDesktop } = jest.requireMock('../src/hooks/useIsDesktop') as {
       useIsDesktop: jest.Mock

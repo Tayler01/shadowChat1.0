@@ -4,6 +4,12 @@ This document turns the June 1, 2026 read-only audit into an implementation back
 
 ## September 30 mobile/native checkpoint
 
+October 1 follow-up repairs the actual Send CSS cascade, Safari elastic-scroll
+corrections, deferred DM arrival retrieval and empty-DM presentation. Native
+empty-format movie paste now preserves captions; the signed Build 17 registers
+the clipboard module. Current checks, distribution and device acceptance are
+tracked in [the follow-up](features/mobile-quiver-paste-followup-2026-10-01.md).
+
 Native TestFlight build 16's accessory-toolbar removal is physically confirmed.
 The current follow-up implements shared keyboard-swipe and bottom-scroll fixes,
 native movie clipboard transfer and device rotation. Production enrollment

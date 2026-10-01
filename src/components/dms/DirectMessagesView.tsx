@@ -1209,6 +1209,19 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
 
   useEffect(() => { if (initialPositionReady) setPositionPresented(true) }, [initialPositionReady])
 
+  const previousFollowingRef = useRef(autoScroll)
+  const followResumePendingRef = useRef(false)
+  useEffect(() => {
+    if (!autoScroll) followResumePendingRef.current = false
+    else if (!previousFollowingRef.current) followResumePendingRef.current = true
+    previousFollowingRef.current = autoScroll
+    if (!followResumePendingRef.current || !autoScroll || !initialPositionReady || loadingMore) return
+    followResumePendingRef.current = false
+    // Rebound can finish without another native scroll event. Reconcile arrivals
+    // deferred during contact when the controller resumes following at latest.
+    if (hasNewer) void Promise.resolve(loadLatestMessages()).catch(() => undefined)
+  }, [autoScroll, hasNewer, initialPositionReady, loadLatestMessages, loadingMore])
+
   const handleJumpToLatest = useCallback(async () => {
     if (!currentConversation) return
     const generation = ++targetRequestScopeRef.current.generation

@@ -1,3 +1,16 @@
+## October 1 bottom-edge and PWA swipe follow-up
+
+- Physical feedback exposed a real Send CSS cascade override and automatic
+  corrections fighting Safari's elastic rebound. Both are repaired in the shared
+  paths, preserving natural containment. Empty-format native paste and mixed
+  captions are repaired; 35 MiB bounded transfer passed. [Current follow-up](mobile-quiver-paste-followup-2026-10-01.md).
+- Empty DM presentation and retrieval of deferred arrivals after rebound are
+  repaired. Final lint/types/build and 320 suites/2,918 tests pass; 16 affected
+  Chromium/WebKit UI checks pass.
+- Build 17 is signed with native module registration and rotation verified.
+  Apple account access recovered and the upload is processing. Hosted release,
+  TestFlight distribution and physical acceptance are separate gates in the follow-up.
+
 ## September 30 shared mobile stability and native build 17
 
 - Physical build 16 toolbar removal is accepted. PWA toolbar remains and modal
