@@ -122,6 +122,20 @@ const readyAsset: ShadowPinCreatorAsset = {
   errorMessage: null,
 }
 
+const legacyVideoAsset: ShadowPinCreatorAsset = {
+  ...readyAsset,
+  assetKind: 'video',
+  provider: 'bunny_stream',
+  state: 'ready',
+  storagePath: null,
+  posterPath: null,
+  previewUrl: 'https://shadowchat.example/entertainment/shado-tv/placeholders/video-vertical.webp',
+  playbackUrl: null,
+  mimeType: 'video/mp4',
+  sourceUrl: null,
+  providerAssetId: 'bunny-video-1',
+}
+
 const publishedImage = {
   id: 'pin-1',
   category_id: 'category-1',
@@ -370,6 +384,57 @@ test('explains normal video encoding on the Publish screen while automatic check
   expect(await screen.findByRole('status')).toHaveTextContent('Finishing your video')
   expect(screen.getByRole('status')).toHaveTextContent('checks automatically')
   expect(screen.queryByText(/Media is still processing/i)).not.toBeInTheDocument()
+})
+
+test('refreshes a restored ready Bunny video poster once and keeps its repaired preview', async () => {
+  const currentDraft = draft(3, 'ready', { title: 'Legacy video', sourceKind: 'video_upload' })
+  const repairedAsset = { ...legacyVideoAsset, previewUrl: 'https://video-cdn.example/video-id/thumbnail.jpg' }
+  mockListCreatorDrafts.mockResolvedValue([{ draft: currentDraft, asset: legacyVideoAsset }])
+  mockSyncCreatorDraftStatus.mockResolvedValue({ draft: currentDraft, asset: repairedAsset })
+
+  const view = render(<ShadowPinCreatorStudio open onClose={jest.fn()} onPublished={jest.fn()} />)
+
+  await waitFor(() => expect(mockSyncCreatorDraftStatus).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(screen.getByAltText('Legacy video')).toHaveAttribute('src', repairedAsset.previewUrl))
+  view.rerender(<ShadowPinCreatorStudio open onClose={jest.fn()} onPublished={jest.fn()} />)
+  expect(mockSyncCreatorDraftStatus).toHaveBeenCalledTimes(1)
+})
+
+test('does not poll or surface repeated errors when ready-poster refresh fails', async () => {
+  const currentDraft = draft(3, 'ready', { title: 'Legacy video', sourceKind: 'video_upload' })
+  mockListCreatorDrafts.mockResolvedValue([{ draft: currentDraft, asset: legacyVideoAsset }])
+  mockSyncCreatorDraftStatus.mockRejectedValue(new Error('Provider temporarily unavailable'))
+
+  const view = render(<ShadowPinCreatorStudio open onClose={jest.fn()} onPublished={jest.fn()} />)
+
+  await waitFor(() => expect(mockSyncCreatorDraftStatus).toHaveBeenCalledTimes(1))
+  expect(await screen.findByAltText('Legacy video')).toHaveAttribute('src', legacyVideoAsset.previewUrl)
+  view.rerender(<ShadowPinCreatorStudio open onClose={jest.fn()} onPublished={jest.fn()} />)
+  expect(mockSyncCreatorDraftStatus).toHaveBeenCalledTimes(1)
+  expect(screen.queryByText('Provider temporarily unavailable')).not.toBeInTheDocument()
+})
+
+test('does not apply a late ready-poster response to another draft', async () => {
+  const first = draft(3, 'ready', { id: 'draft-1', title: 'Legacy video', sourceKind: 'video_upload' })
+  const second = draft(4, 'ready', { id: 'draft-2', activeAssetId: 'asset-2', title: 'New cover' })
+  const secondAsset = { ...readyAsset, id: 'asset-2', draftId: second.id }
+  mockListCreatorDrafts.mockResolvedValue([
+    { draft: first, asset: legacyVideoAsset },
+    { draft: second, asset: secondAsset },
+  ])
+  let resolveSync!: (bundle: ShadowPinCreatorDraftBundle) => void
+  mockSyncCreatorDraftStatus.mockReturnValue(new Promise(resolve => { resolveSync = resolve }))
+
+  render(<ShadowPinCreatorStudio open onClose={jest.fn()} onPublished={jest.fn()} />)
+  await waitFor(() => expect(mockSyncCreatorDraftStatus).toHaveBeenCalledTimes(1))
+  fireEvent.click(screen.getByRole('button', { name: /new cover/i }))
+  await waitFor(() => expect(screen.getByRole('button', { name: /new cover/i })).toHaveAttribute('aria-pressed', 'true'))
+
+  await act(async () => {
+    resolveSync({ draft: { ...first, title: 'Late old video' }, asset: { ...legacyVideoAsset, previewUrl: 'https://video-cdn.example/late.jpg' } })
+  })
+  expect(screen.getByAltText('New cover')).toHaveAttribute('src', secondAsset.previewUrl)
+  expect(mockSyncCreatorDraftStatus).toHaveBeenCalledTimes(1)
 })
 
 test('reopens a mounted Studio without leaking the previous create session', async () => {

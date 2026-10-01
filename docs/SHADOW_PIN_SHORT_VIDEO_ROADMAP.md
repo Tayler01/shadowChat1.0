@@ -34,9 +34,22 @@ stores image, native video, and external video pins via media metadata columns.
 This avoids a second activity, hearts, score, category, and moderation surface.
 
 Native video uploads use Bunny Stream because ShadowChat already has a Bunny
-TUS upload path for Shado TV. The browser captures a poster image, stores that
-poster in Supabase Storage, asks the `shadow-pin-video` Edge Function for a
-Bunny upload session, then uploads the video directly to Bunny with TUS.
+TUS upload path for Shado TV. Legacy uploads may supply a captured poster in
+Supabase Storage. Creator uploads can omit that poster: `shadow-pin-video`
+repairs missing or generic image/thumbnail/medium metadata when Bunny reports
+the video ready, using its `thumbnailFileName` and the configured HTTPS pull
+zone. Custom posters remain unchanged. The browser obtains an upload session
+from the Edge Function and uploads video directly to Bunny with TUS.
+
+The October 1 poster repair also runs during Creator publication preflight,
+before the existing transactional finalizer copies the asset metadata into
+the canonical pin. Ready draft assets with generic posters remain eligible
+for status repair. Older published pins can be repaired through the existing
+creator/operator-authorized `sync-status` action. No schema or ACL changes
+are required. URLs come from server configuration, a validated video UUID,
+and a provider-confirmed image basename; the repair does not fetch arbitrary
+URLs or infer provider filenames. Deployment and scoped live repair still
+need separate verification.
 
 External video pins use embeds or direct playback URLs where rehosting is not a
 good first version fit. YouTube Shorts get iframe playback. Pinterest video

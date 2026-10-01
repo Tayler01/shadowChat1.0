@@ -1,6 +1,7 @@
 import { ensureSession, getSessionWithTimeout, getWorkingClient } from '../../../lib/supabase'
 import type { ShadowPinCreatorValues } from './creatorModel'
 import { inferCreatorSourceKind } from './creatorModel'
+import { isShadowPinFallbackVideoPosterUrl } from '../videoPoster'
 import type {
   ShadowPinCreatorAsset,
   ShadowPinCreatorDraft,
@@ -58,6 +59,16 @@ export const normalizeCreatorDraft = (value: unknown): ShadowPinCreatorDraft => 
 export const normalizeCreatorAsset = (value: unknown): ShadowPinCreatorAsset | null => {
   const row = asRecord(value)
   if (!asString(row.id)) return null
+  const genericPreview = asOptionalString(pick(row, 'preview_url', 'previewUrl'))
+  const finalPoster = [
+    pick(row, 'final_medium_url', 'finalMediumUrl'),
+    pick(row, 'final_thumbnail_url', 'finalThumbnailUrl'),
+    pick(row, 'final_image_url', 'finalImageUrl'),
+  ].map(asOptionalString).find(url => url && !isShadowPinFallbackVideoPosterUrl(url)) ?? null
+  const previewUrl = asString(pick(row, 'asset_kind', 'assetKind')) === 'video' && row.provider === 'bunny_stream'
+    && (!genericPreview || isShadowPinFallbackVideoPosterUrl(genericPreview))
+    ? finalPoster || genericPreview
+    : genericPreview
   return {
     id: asString(row.id),
     draftId: asString(pick(row, 'draft_id', 'draftId')),
@@ -72,7 +83,7 @@ export const normalizeCreatorAsset = (value: unknown): ShadowPinCreatorAsset | n
       pick(row, 'medium_path', 'mediumPath') ??
       pick(row, 'thumbnail_path', 'thumbnailPath')
     ),
-    previewUrl: asOptionalString(pick(row, 'preview_url', 'previewUrl') ?? pick(row, 'final_medium_url', 'finalMediumUrl') ?? pick(row, 'final_thumbnail_url', 'finalThumbnailUrl') ?? pick(row, 'final_image_url', 'finalImageUrl') ?? pick(row, 'medium_url', 'mediumUrl') ?? pick(row, 'image_url', 'imageUrl')),
+    previewUrl: previewUrl || asOptionalString(pick(row, 'final_medium_url', 'finalMediumUrl') ?? pick(row, 'final_thumbnail_url', 'finalThumbnailUrl') ?? pick(row, 'final_image_url', 'finalImageUrl') ?? pick(row, 'medium_url', 'mediumUrl') ?? pick(row, 'image_url', 'imageUrl')),
     playbackUrl: asOptionalString(pick(row, 'playback_url', 'playbackUrl') ?? pick(row, 'video_playback_url', 'videoPlaybackUrl')),
     hlsUrl: asOptionalString(pick(row, 'hls_url', 'hlsUrl') ?? pick(row, 'video_hls_url', 'videoHlsUrl')),
     embedUrl: asOptionalString(pick(row, 'embed_url', 'embedUrl') ?? pick(row, 'video_embed_url', 'videoEmbedUrl')),

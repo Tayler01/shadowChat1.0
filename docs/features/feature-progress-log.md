@@ -1,4 +1,24 @@
+## October 1 Pins video thumbnails
+
+- Generated Bunny frames replace generic posters during ready polling and
+  publication; custom covers are preserved. Cached rows get an image-only
+  fallback and a usable Open video state. Four existing ready Pins were repaired
+  against verified CDN JPEGs. [Implementation and verification](pins-video-thumbnails-2026-10-01.md).
+- Native paste and quiver are accepted in Tayler's reported tests. Direct Home
+  Screen movie paste remains unresolved; native push delivery still lacks fresh
+  phone enrollment proof. These are separate from the thumbnail fix.
+
 ## October 1 bottom-edge and PWA swipe follow-up
+
+- Tayler reports the quiver fixed in both TestFlight and the Home Screen app.
+  This accepts his tested interaction; broader rotation, push and multi-device
+  acceptance remains separate. Video paste works in TestFlight but remains open
+  in the Home Screen app.
+- Physical follow-up: Tayler confirms video paste now works in TestFlight,
+  but still fails in the Home Screen PWA. Native basic paste is accepted;
+  PWA movie paste remains open. [Clipboard source investigation](pwa-video-clipboard-2026-10-01.md)
+  rules out a speculative async-Clipboard retry and distinguishes working picker
+  import from unverified drag/drop alternatives.
 
 - Physical feedback exposed a real Send CSS cascade override and automatic
   corrections fighting Safari's elastic rebound. Both are repaired in the shared

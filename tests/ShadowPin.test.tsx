@@ -731,6 +731,59 @@ test('hides the video label in the feed until pin details are active', () => {
   }
 })
 
+test('shows a real Bunny thumbnail for older video pins and an actionable fallback if it fails', () => {
+  mockShouldAutoplayMedia = false
+  const videoId = 'b28d2b26-f6e2-4adc-85fd-3360c92aed4b'
+  const placeholder = 'https://shadowchat.online/entertainment/shado-tv/placeholders/video-vertical.webp'
+  mockUseShadowPinImages.mockReturnValue({
+    category,
+    images: [
+      {
+        ...image('old-video', 1080, 1920),
+        image_url: placeholder,
+        thumbnail_url: placeholder,
+        medium_url: placeholder,
+        media_type: 'video',
+        provider: 'bunny_stream',
+        provider_asset_id: videoId,
+        video_preview_url: `https://vz-c7e4be31-00e.b-cdn.net/${videoId}/play_480p.mp4`,
+        processing_status: 'ready',
+      },
+      {
+        ...image('custom-video', 1080, 1920),
+        media_type: 'video',
+        provider: 'bunny_stream',
+        provider_asset_id: videoId,
+        video_preview_url: `https://vz-c7e4be31-00e.b-cdn.net/${videoId}/play_480p.mp4`,
+        processing_status: 'ready',
+      },
+    ],
+    loading: false,
+    saving: false,
+    error: null,
+    hasMore: false,
+    refresh: jest.fn(),
+    loadMore: jest.fn(),
+    createImage: jest.fn(),
+    updateImage: jest.fn(),
+    removeImage: jest.fn(),
+    toggleHeart: mockToggleImageHeart,
+  })
+
+  const { container } = render(<ShadowPin onBack={() => {}} />)
+  fireEvent.click(screen.getByText('Fam & Friends'))
+  const oldCard = screen.getByAltText('Pin old-video').closest('article')!
+  const oldPoster = within(oldCard).getByAltText('Pin old-video')
+  expect(oldPoster).toHaveAttribute('src', `https://vz-c7e4be31-00e.b-cdn.net/${videoId}/thumbnail.jpg`)
+  expect(within(screen.getByAltText('Pin custom-video').closest('article')!).getByAltText('Pin custom-video'))
+    .toHaveAttribute('src', 'https://images.example/custom-video-thumb.jpg')
+  expect(container.querySelector('video')).toBeNull()
+
+  fireEvent.error(oldPoster)
+  expect(within(oldCard).getByText('Open video')).toBeInTheDocument()
+  expect(within(oldCard).getByRole('button', { name: /^Open “Pin old-video”/ })).toBeInTheDocument()
+})
+
 test('autoplays focused native video when allowed and stops when comfort disables autoplay', async () => {
   const originalIntersectionObserver = global.IntersectionObserver
   const originalPlay = HTMLMediaElement.prototype.play

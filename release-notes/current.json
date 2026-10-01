@@ -1,24 +1,17 @@
 {
-  "title": "Phone scrolling and paste follow-up",
-  "summary": "Bottom-edge scrolling and Send-side keyboard swipes now respect your touch, with fixes for empty DMs and native video paste recovery.",
+  "title": "Real video thumbnails in Pins",
+  "summary": "Video Pins now use real video frames instead of the generic gold placeholder.",
   "restartPolicy": "required_restart",
   "severity": "maintenance",
   "sections": [
     {
-      "heading": "Scrolling and DMs",
+      "heading": "Pins previews",
       "items": [
-        "Automatic scroll corrections wait for the phone's bottom-edge bounce to settle. General, DMs, threads and Pins share the fix.",
-        "DMs retrieve messages that arrived during a bottom-edge gesture when following resumes.",
-        "New empty DM conversations now show their greeting instead of remaining hidden."
-      ]
-    },
-    {
-      "heading": "Keyboard and paste",
-      "items": [
-        "The Send swipe handle no longer allows page panning; the compact down chevron remains available.",
-        "Native video paste recovers from empty clipboard formats and preserves accompanying text. This requires TestFlight Build 17; Home Screen video paste still depends on what iOS supplies.",
-        "Attachments remain in the composer for review and removal, then send with your text using the regular Send button.",
-        "Tap Restart Now to load this update."
+        "Existing affected video Pins have been repaired with their generated thumbnails.",
+        "New native video Pins save generated thumbnails when processing finishes. Custom covers remain first.",
+        "Pins Studio also refreshes older ready drafts and shows the real frame before publishing.",
+        "Loading media keeps its progress bar. If a thumbnail fails, the card offers Open video.",
+        "Restart to load the latest Pins interface."
       ]
     }
   ]

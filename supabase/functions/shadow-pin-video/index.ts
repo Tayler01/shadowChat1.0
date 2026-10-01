@@ -13,6 +13,7 @@ import {
   safeFetch,
 } from '../_shared/safe-fetch.ts'
 import { getBunnyStreamReadyState } from '../_shared/bunny-stream-status.ts'
+import { buildBunnyPosterPatch, FALLBACK_VIDEO_POSTER_URL, needsBunnyPosterRepair } from '../_shared/bunny-stream-poster.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,7 +27,6 @@ const DEFAULT_SHADOW_PIN_MUTATIONS_PER_MINUTE = 12
 const SHADOW_PIN_BUCKET = 'shadow-pin'
 const MAX_PREVIEW_IMAGE_BYTES = 15 * 1024 * 1024
 const DAILY_NATIVE_UPLOAD_LIMIT = 5
-const FALLBACK_VIDEO_POSTER_URL = '/entertainment/shado-tv/placeholders/video-vertical.webp'
 const ALLOWED_NATIVE_VIDEO_TYPES = new Set([
   'video/mp4',
   'video/quicktime',
@@ -112,6 +112,12 @@ type ShadowPinDraftAssetRow = {
   provider_asset_id: string | null
   provider_payload: Record<string, unknown> | null
   source_url: string | null
+  final_image_url?: string | null
+  final_image_path?: string | null
+  final_thumbnail_url?: string | null
+  final_thumbnail_path?: string | null
+  final_medium_url?: string | null
+  final_medium_path?: string | null
   size_bytes?: number | null
   duration_seconds?: number | null
   deleted_at: string | null
@@ -129,6 +135,12 @@ type ShadowPinRow = {
   provider_payload: Record<string, unknown> | null
   provider_asset_id: string | null
   processing_status: string | null
+  image_url?: string | null
+  image_path?: string | null
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  medium_url?: string | null
+  medium_path?: string | null
   deleted_at: string | null
 }
 
@@ -1131,7 +1143,7 @@ const ensureCategory = async (supabase: SupabaseAdmin, categoryId: string) => {
 const getEditablePin = async (supabase: SupabaseAdmin, userId: string, imageId: string) => {
   const { data, error } = await supabase
     .from('shadow_pin_images')
-    .select('id, category_id, creator_id, title, description, provider, provider_payload, provider_asset_id, processing_status, deleted_at')
+    .select('id, category_id, creator_id, title, description, provider, provider_payload, provider_asset_id, processing_status, deleted_at, image_url, image_path, thumbnail_url, thumbnail_path, medium_url, medium_path')
     .eq('id', imageId)
     .maybeSingle()
 
@@ -1149,7 +1161,7 @@ const getEditablePin = async (supabase: SupabaseAdmin, userId: string, imageId: 
 const getAssetCleanupPin = async (supabase: SupabaseAdmin, userId: string, imageId: string) => {
   const { data, error } = await supabase
     .from('shadow_pin_images')
-    .select('id, category_id, creator_id, title, description, provider, provider_payload, provider_asset_id, processing_status, deleted_at')
+    .select('id, category_id, creator_id, title, description, provider, provider_payload, provider_asset_id, processing_status, deleted_at, image_url, image_path, thumbnail_url, thumbnail_path, medium_url, medium_path')
     .eq('id', imageId)
     .maybeSingle()
 
@@ -1445,7 +1457,9 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
 
   const pin = await getVisiblePin(auth.supabase, auth.userId, imageId)
   if (!pin) return notFound('Pin not found.')
-  if (!pin.provider_asset_id) return badRequest('Pin does not have a Bunny Stream video id.')
+  if (pin.provider !== 'bunny_stream' || !pin.provider_asset_id) {
+    return badRequest('Pin does not have a Bunny Stream video id.')
+  }
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'sync-status')
 
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
@@ -1491,6 +1505,7 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
   }
 
   if (processingStatus === 'ready') {
+    Object.assign(update, buildBunnyPosterPatch(pin, pullZoneUrl, pin.provider_asset_id, bunnyStatus))
     update.video_preview_url = playback.previewUrl
     update.video_playback_url = playback.playbackUrl
     update.video_hls_url = playback.hlsUrl
@@ -1501,6 +1516,7 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
     .from('shadow_pin_images')
     .update(update)
     .eq('id', imageId)
+    .eq('provider_asset_id', pin.provider_asset_id)
     .select('*')
     .single()
 
@@ -2047,14 +2063,15 @@ const handleSyncDraftStatus = async (req: Request, body: VideoPayload) => {
   if (!assetId) return badRequest('Draft does not have an active upload.')
   const asset = await getDraftAsset(auth.supabase, auth.userId, draftId, assetId)
   if (!asset) return notFound('Draft asset not found.')
-  if (asset.state === 'ready' || asset.state === 'publish_ready' || asset.state === 'failed') {
+  if (asset.state === 'failed' || ((asset.state === 'ready' || asset.state === 'publish_ready') &&
+      !needsBunnyPosterRepair(asset, 'final_'))) {
     return json({ ok: true, draft, asset })
   }
   if (asset.provider !== 'bunny_stream' || !asset.provider_asset_id) {
     return badRequest('Draft asset does not have a Bunny Stream video id.')
   }
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'sync-draft-status')
-  const { libraryId, apiKey } = getBunnyEnv()
+  const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
   const bunnyStatus = await getBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
   const providerState = getBunnyStreamReadyState(bunnyStatus)
   const duration = normalizeNonNegativeInteger(bunnyStatus.length ?? bunnyStatus.duration ?? bunnyStatus.durationSeconds)
@@ -2075,6 +2092,7 @@ const handleSyncDraftStatus = async (req: Request, body: VideoPayload) => {
     .from('shadow_pin_draft_assets')
     .update({
       state, provider_payload: providerPayload,
+      ...(state === 'ready' ? buildBunnyPosterPatch(asset, pullZoneUrl, asset.provider_asset_id, bunnyStatus, 'final_') : {}),
       duration_seconds: duration !== null && duration <= MAX_VIDEO_SECONDS ? duration : undefined,
       video_preview_url: null,
       video_playback_url: null,
@@ -2138,6 +2156,20 @@ const handlePublishDraftVideo = async (req: Request, body: VideoPayload) => {
     playback = buildBunnyPlaybackUrls(
       libraryId, asset.provider_asset_id, pullZoneUrl, bunnyStatus.availableResolutions,
     )
+    // The finalizer copies these persisted fields into the canonical pin atomically.
+    // Repair older ready drafts too, even when their polling phase has already ended.
+    const posterPatch = buildBunnyPosterPatch(
+      asset, pullZoneUrl, asset.provider_asset_id, bunnyStatus, 'final_',
+    )
+    if (Object.keys(posterPatch).length) {
+      const { error: posterError } = await auth.supabase
+        .from('shadow_pin_draft_assets')
+        .update(posterPatch)
+        .eq('id', assetId)
+        .eq('creator_id', auth.userId)
+        .eq('provider_asset_id', asset.provider_asset_id)
+      if (posterError) throw posterError
+    }
   }
 
   const userClient = getUserScopedSupabase(req)

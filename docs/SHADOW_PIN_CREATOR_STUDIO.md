@@ -44,6 +44,13 @@ required and is not claimed by automated WebKit.
 
 ## Product Contract
 
+October 1 thumbnail follow-up: server ready polling and publication preflight
+persist generated Bunny frames when a custom cover is absent. Restored ready
+drafts with generic posters receive one authenticated status refresh per Studio
+open. Real final posters replace generic preview URLs; custom and private image
+previews remain unchanged. Late results are fenced to their original draft and
+asset. See [thumbnail verification](features/pins-video-thumbnails-2026-10-01.md).
+
 Creator Studio replaces ShadowPin's direct-publish form with one deliberate,
 recoverable workflow. It does not add another primary navigation tab.
 

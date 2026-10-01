@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import './shadow-pin-actions.css'
 import type {
   CSSProperties,
@@ -84,6 +84,7 @@ import { useInnerCircleFeed } from '../inner-circles/useInnerCircleFeed'
 import { useInnerCircles } from '../inner-circles/useInnerCircles'
 import { hasCreatorStudioQuery } from './creator/creatorHistory'
 import { hasCreatorDraftsNeedingAttention } from './creator/creatorAttention'
+import { getBunnyStreamThumbnailUrl, isShadowPinFallbackVideoPosterUrl, SHADOW_PIN_VIDEO_FALLBACK_POSTER_URL } from './videoPoster'
 import {
   useShadowPinActivityTracker,
   useShadowPinCategoryDwell,
@@ -226,6 +227,9 @@ const getProviderPreviewImageUrl = (image: ShadowPinImage) => {
 }
 
 const getPinImageUrl = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
+  if (image.media_type === 'video' && image.provider === 'bunny_stream') {
+    return getPinImageSources(image, size)[0] || SHADOW_PIN_VIDEO_FALLBACK_POSTER_URL
+  }
   const providerPreviewImageUrl = getProviderPreviewImageUrl(image)
   if (size === 'thumb') return image.thumbnail_url || image.medium_url || providerPreviewImageUrl || image.image_url
   if (size === 'medium') {
@@ -238,6 +242,16 @@ const getPinImageUrl = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'full'
 
 const getPinImageSources = (image: ShadowPinImage, size: 'thumb' | 'medium' | 'full' = 'thumb') => {
   const providerPreviewImageUrl = getProviderPreviewImageUrl(image)
+  if (image.media_type === 'video' && image.provider === 'bunny_stream') {
+    const stored = size === 'full'
+      ? uniqueImageSources(image.image_url, image.medium_url, image.thumbnail_url, providerPreviewImageUrl)
+      : size === 'medium'
+        ? uniqueImageSources(image.medium_url, image.thumbnail_url, image.image_url, providerPreviewImageUrl)
+        : uniqueImageSources(image.thumbnail_url, image.medium_url, image.image_url, providerPreviewImageUrl)
+    const posters = stored.filter(source => !/\.(?:mp4|m4v|mov|webm|m3u8)(?:[?#]|$)/i.test(source))
+    const realPosters = posters.filter(source => !isShadowPinFallbackVideoPosterUrl(source))
+    return uniqueImageSources(...realPosters, getBunnyStreamThumbnailUrl(image), ...posters, SHADOW_PIN_VIDEO_FALLBACK_POSTER_URL)
+  }
   if (size === 'thumb') return uniqueImageSources(image.thumbnail_url, image.medium_url, providerPreviewImageUrl, image.image_url)
   if (size === 'medium') {
     return image.image_content_type === 'image/gif'
@@ -1942,6 +1956,8 @@ function ImageCard({
   const radialDismissTimerRef = useRef<number | null>(null)
   const imageSources = useMemo(() => getPinImageSources(image, 'thumb'), [image])
   const imageSourcesKey = imageSources.join('\n')
+  const imageSourceIdentity = `${image.id}\n${imageSourcesKey}`
+  const imageSourceIdentityRef = useRef(imageSourceIdentity)
   const [sourceIndex, setSourceIndex] = useState(0)
   const [imageLoadFailed, setImageLoadFailed] = useState(imageSources.length === 0)
   const [imageLoading, setImageLoading] = useState(imageSources.length > 0)
@@ -1955,6 +1971,7 @@ function ImageCard({
   const controlSide = getPinControlSide(columnSide)
   const canReportImage = MEMBER_REPORTING_FEATURE_ENABLED && Boolean(user && image.creator_id && image.creator_id !== user.id)
   const videoPin = isVideoPin(image)
+  const hasVideoPoster = videoPin && !imageLoadFailed && Boolean(imageSrc) && !isShadowPinFallbackVideoPosterUrl(imageSrc)
   const activeVideo = activeVideoId === image.id && image.processing_status !== 'failed'
   const nativeVideoSrc = getVideoPreviewUrl(image)
   const feedIframeVideoSrc = videoPin ? getVideoIframeUrl(image) : ''
@@ -1970,11 +1987,13 @@ function ImageCard({
     [image.id, onVideoPlaybackUnavailable]
   )
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (imageSourceIdentityRef.current === imageSourceIdentity) return
+    imageSourceIdentityRef.current = imageSourceIdentity
     setSourceIndex(0)
     setImageLoadFailed(imageSources.length === 0)
     setImageLoading(imageSources.length > 0)
-  }, [image.id, imageSources.length, imageSourcesKey])
+  }, [imageSourceIdentity, imageSources.length])
 
   useEffect(() => {
     if (shouldRenderNativeVideo || shouldRenderIframeVideo) setVideoLoading(true)
@@ -2670,6 +2689,14 @@ function ImageCard({
             onContextMenu={event => event.preventDefault()}
             className="block h-full w-full object-cover"
           />
+        ) : videoPin && !hasVideoPoster ? (
+          <div
+            className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[linear-gradient(145deg,#1b1a19,#08090c)] px-4 text-center text-[var(--theme-accent-readable)]"
+            aria-label={`${image.title} video preview unavailable. Open video.`}
+          >
+            <Play className="h-9 w-9" aria-hidden="true" />
+            <span className="text-xs font-semibold">Open video</span>
+          </div>
         ) : imageLoadFailed ? (
           <div
             className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,rgba(215,170,70,0.12),rgba(5,6,8,0.9))] text-[rgba(255,240,184,0.72)]"
@@ -2700,7 +2727,7 @@ function ImageCard({
             className="block h-full w-full object-cover"
           />
         )}
-        {!imageLoadFailed && ((shouldRenderNativeVideo || shouldRenderIframeVideo) ? videoLoading : imageLoading) && (
+        {!imageLoadFailed && ((shouldRenderNativeVideo || shouldRenderIframeVideo) ? videoLoading : imageLoading && (!videoPin || hasVideoPoster)) && (
           <progress className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-1 w-full accent-[var(--theme-accent)]" aria-label={`Loading ${image.title} media`} />
         )}
         {videoPin && overlayOpen && (

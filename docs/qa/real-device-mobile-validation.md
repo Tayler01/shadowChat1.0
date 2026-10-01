@@ -1,5 +1,17 @@
 # Real-Device Mobile Validation
 
+## October 1 physical video-paste result
+
+- Tayler reports video paste working in TestFlight after the Build 17 release,
+  while the same operation still fails in the Home Screen app. Basic native
+  movie paste is physically accepted; the exact file size, cloud-backed media,
+  permission-denial path, rotation and notification delivery are not confirmed
+  by this report. RD-043 is partially accepted, not fully closed.
+- PWA movie paste remains open. Current upstream and a pinned WebKit release
+  filter native movie representations before the async Clipboard API exposes
+  data. The existing video picker remains physically confirmed. See the
+  [source-backed investigation](../features/pwa-video-clipboard-2026-10-01.md).
+
 ## October 1 acceptance correction
 
 - RD-044 is not accepted yet: native Send swipe improved, but physical bottom
@@ -185,6 +197,13 @@ Chromium evidence is tracked in the [implementation record](../features/chat-smo
 | RD-037 | iPhone and Android installed PWA | Open General, DM, reply thread and Pins with unread history; page older, receive a message, jump latest, close/reopen and reconnect | Correct first unread or saved row; no loading jump or pull away from history; reads advance only for visible content | Pending Tayler's physical-device test |
 | RD-038 | iPhone and Android installed PWA, desktop clipboard | Paste text/image/file, review/remove attachments, send twice rapidly, switch conversation before acknowledgement, open/close keyboard | Staged media, preserved new draft/reply, correct recipient, stable viewport and usable caret | Pending Tayler's physical-device test |
 | RD-039 | Two physical devices/accounts | Disable notifications on one device, mute a conversation, hide previews, foreground/background/lock, reconnect | Device choice persists; privacy and mute choices honored; no duplicate recovery; accurate supported OS badges | Pending Tayler's physical-device test |
+
+### October 1 physical follow-up
+
+Tayler reports quiver resolved in both TestFlight and the Home Screen app, and
+video paste working in TestFlight. Home Screen video paste still fails. This
+accepts the reported interactions on his phone, rather than all rows above.
+Pins video thumbnails were separately reported missing and remain under repair.
 
 ## Known Emulator Gaps
 

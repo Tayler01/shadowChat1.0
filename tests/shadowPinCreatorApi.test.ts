@@ -85,6 +85,24 @@ describe('ShadowPin Creator Studio API', () => {
     expect(normalizeCreatorAsset({})).toBeNull()
   })
 
+  test('prefers a repaired Bunny poster over a generic preview but preserves custom and private previews', () => {
+    const video = {
+      ...rawAsset,
+      asset_kind: 'video',
+      provider: 'bunny_stream',
+      preview_url: 'https://shadowchat.example/entertainment/shado-tv/placeholders/video-vertical.webp',
+      final_medium_url: 'https://video-cdn.example/video-id/thumbnail.jpg',
+      final_thumbnail_url: 'https://video-cdn.example/video-id/thumbnail-small.jpg',
+    }
+    expect(normalizeCreatorAsset(video)?.previewUrl).toBe(video.final_medium_url)
+    expect(normalizeCreatorAsset({ ...video, preview_url: 'https://custom.example/cover.jpg' })?.previewUrl)
+      .toBe('https://custom.example/cover.jpg')
+    expect(normalizeCreatorAsset({ ...video, provider: 'shadow_pin_storage', preview_url: 'https://signed.example/private' })?.previewUrl)
+      .toBe('https://signed.example/private')
+    expect(normalizeCreatorAsset({ ...video, final_medium_url: video.preview_url })?.previewUrl)
+      .toBe(video.final_thumbnail_url)
+  })
+
   test('creates drafts with the exact bounded RPC payload', async () => {
     rpc.mockResolvedValue({ data: { draft: rawDraft, asset: null }, error: null })
 

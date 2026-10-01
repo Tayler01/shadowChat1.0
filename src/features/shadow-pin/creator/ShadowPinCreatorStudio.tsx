@@ -28,6 +28,7 @@ import { MOBILE_VIEWPORT_UPDATED_EVENT } from '../../../lib/mobileViewport'
 import { fetchLinkPreview } from '../../../lib/linkPreview'
 import { cn } from '../../../lib/utils'
 import { useShadowPinCategories } from '../hooks/useShadowPinCategories'
+import { isShadowPinFallbackVideoPosterUrl } from '../videoPoster'
 import type { ShadowPinImage } from '../types'
 import {
   createCreatorDraft,
@@ -211,8 +212,10 @@ export function ShadowPinCreatorStudio({
   const closeRequestTokenRef = useRef(0)
   const processingSyncRef = useRef<{
     draftId: string
+    assetId: string | null
     request: Promise<ShadowPinCreatorDraftBundle>
   } | null>(null)
+  const readyPosterRefreshRef = useRef(new Set<string>())
   const popstateCloseRef = useRef<() => void>(() => undefined)
   const focusedEditorRef = useRef<HTMLElement | null>(null)
   const scrollRegionRef = useRef<HTMLElement | null>(null)
@@ -277,12 +280,15 @@ export function ShadowPinCreatorStudio({
 
   const refreshProcessingDraft = useCallback((draft: ShadowPinCreatorDraftBundle['draft']) => {
     const inFlight = processingSyncRef.current
-    if (inFlight?.draftId === draft.id) return inFlight.request
+    if (inFlight?.draftId === draft.id && inFlight.assetId === draft.activeAssetId) return inFlight.request
 
+    const contextToken = saveContextTokenRef.current
+    const assetId = draft.activeAssetId
     const request = syncCreatorDraftStatus(draft)
       .then(bundle => {
         const current = stateRef.current
-        if (current.draft?.id !== draft.id) return bundle
+        if (contextToken !== saveContextTokenRef.current || current.draft?.id !== draft.id ||
+          current.draft.activeAssetId !== assetId || (bundle.asset && bundle.asset.id !== assetId)) return bundle
         setAsset(previous => bundle.asset ?? previous)
         applyAsyncAction({
           type: 'draft-status-synced',
@@ -296,7 +302,7 @@ export function ShadowPinCreatorStudio({
         }
       })
 
-    processingSyncRef.current = { draftId: draft.id, request }
+    processingSyncRef.current = { draftId: draft.id, assetId, request }
     return request
   }, [applyAsyncAction])
 
@@ -311,6 +317,7 @@ export function ShadowPinCreatorStudio({
     uploadAbortRef.current?.abort()
     uploadAbortRef.current = null
     processingSyncRef.current = null
+    readyPosterRefreshRef.current.clear()
     if (saveTimerRef.current !== null) window.clearTimeout(saveTimerRef.current)
     saveTimerRef.current = null
     savePromiseRef.current = null
@@ -640,6 +647,22 @@ export function ShadowPinCreatorStudio({
       window.clearInterval(interval)
     }
   }, [asset?.state, open, refreshProcessingDraft, state.draft?.id])
+
+  useEffect(() => {
+    const draft = state.draft
+    if (!open || !draft || !asset || asset.draftId !== draft.id ||
+      asset.id !== draft.activeAssetId || asset.assetKind !== 'video' ||
+      asset.provider !== 'bunny_stream' || !['ready', 'publish_ready'].includes(asset.state) ||
+      (asset.previewUrl && !isShadowPinFallbackVideoPosterUrl(asset.previewUrl))) return
+
+    const key = `${draft.id}:${asset.id}:${asset.generation}`
+    if (readyPosterRefreshRef.current.has(key)) return
+    readyPosterRefreshRef.current.add(key)
+    void refreshProcessingDraft(draft).catch(() => {
+      // A ready draft gets one quiet poster repair attempt per open. A failed
+      // request must not turn into a polling loop.
+    })
+  }, [asset, open, refreshProcessingDraft, state.draft])
 
   const stageMedia = useCallback(async () => {
     // Staging is revision guarded on the server. Drain any in-flight or
