@@ -1,15 +1,15 @@
 {
-  "title": "Smoother first-message scrolling",
-  "summary": "Sending your first text keeps the chat following latest, and messages stay above the entry field.",
+  "title": "Shadow Checkers computer opponent",
+  "summary": "Choose a human match or play a private game against four levels of computer opponent.",
   "restartPolicy": "required_restart",
   "severity": "maintenance",
   "sections": [
     {
-      "heading": "Chat scrolling",
+      "heading": "Shadow Checkers",
       "items": [
-        "Layout changes after Send keep following the newest message instead of leaving you partway up the conversation.",
-        "Message rows stop at the mobile composer instead of showing through below it.",
-        "Shared scroll handling covers chat, DMs, reply threads and Pins comments while preserving your own reading gestures.",
+        "Choose Play Computer for an instant solo game or Play a Person for invitations and live tables.",
+        "Rookie, Casual, Challenger and Master levels all follow the same mandatory-jump, multi-jump and kinging rules as multiplayer.",
+        "Computer thinking runs on your device so it does not block the 3D room or create a ranked multiplayer match.",
         "Restart to load this update in the Home Screen app or TestFlight."
       ]
     }

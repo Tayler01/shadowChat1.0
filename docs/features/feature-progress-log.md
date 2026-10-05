@@ -1,3 +1,18 @@
+## October 5 Shadow Checkers solo opponent
+
+- Added a fully local computer opponent beside the existing human multiplayer
+  mode. The four levels use the existing American-checkers rules and bounded,
+  deterministic alpha-beta search in a lazy Web Worker; solo play makes no
+  match, chat, ranking or Supabase writes.
+- Added a branded one-screen mode/difficulty entrance, immediate local human
+  moves, presentation-gated computer replies, result/restart/leave controls and
+  keyboard-safe menus/dialogs. Invitation and turn-notification deep links still
+  bypass the chooser and open multiplayer directly.
+- Focused engine/UI tests and isolated 667x320 at 130% text Chromium/WebKit
+  checks pass, including a full human-plus-computer turn, restart and zero
+  backend requests. Physical installed-PWA difficulty/performance remains for
+  release testing.
+
 ## October 5 first-send chat scrolling
 
 - Fixed a shared layout/scroll event race that disabled following before resize

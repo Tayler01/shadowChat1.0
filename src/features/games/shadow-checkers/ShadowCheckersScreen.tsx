@@ -19,7 +19,7 @@ import { applyMove, deserializeBoard, getLegalMoves, hasMandatoryCapture } from 
 import type { CheckersBoardState, CheckersMove, CheckersPiece, CheckersPlayer } from './engine/types'
 import { useShadowCheckers } from './hooks/useShadowCheckers'
 
-interface ShadowCheckersScreenProps {
+export interface ShadowCheckersScreenProps {
   onExit?: () => void
   initialMatchId?: string
   onMatchRoute?: (action: 'push-item' | 'replace-item' | 'close-item', matchId?: string) => void
@@ -528,7 +528,7 @@ export function ShadowCheckersScreen({
             <p>Shadow Checkers uses standard American checkers rules on an 8x8 board. Only dark squares are playable.</p>
             <p>Regular pieces move and capture diagonally forward. Crowned pieces move and capture diagonally forward or backward.</p>
             <p>Captures are mandatory. If a jump creates another jump for the same piece, the multi-jump must continue. Promotion ends that move.</p>
-            <p>You win when your opponent has no pieces, no legal moves, or resigns. There is no timer, undo, or AI opponent. Music is optional.</p>
+            <p>You win when your opponent has no pieces, no legal moves, or resigns. There is no timer or undo. Solo play against the computer is available from the mode selection screen. Music is optional.</p>
             <p>Active players can toggle legal hints. Spectators can watch and use temporary match chat, but cannot move pieces.</p>
           </div>
         </section>

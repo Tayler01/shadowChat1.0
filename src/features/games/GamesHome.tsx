@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { createGameSoundtrackController, type GameSoundtrackController } from './gameSoundtrack'
 import { ShadowWarScreen } from './shadow-war/ShadowWarScreen'
 import { SHADOW_WAR_ASSETS } from './shadow-war/assets/manifest'
-import { ShadowCheckersScreen } from './shadow-checkers/ShadowCheckersScreen'
+import { ShadowCheckersExperience } from './shadow-checkers/ShadowCheckersExperience'
 import { SHADOW_CHECKERS_ASSETS } from './shadow-checkers/assets/manifest'
 import { ShadowRunnerScreen } from './shadow-runner/ShadowRunnerScreen'
 import { SHADOW_RUNNER_ASSETS } from './shadow-runner/assets/manifest'
@@ -421,7 +421,7 @@ export function GamesHome({
         </div>
       ) : selectedEntertainment === 'shadow-checkers' ? (
         <div className="h-full min-h-0 overflow-hidden bg-black">
-          <ShadowCheckersScreen
+          <ShadowCheckersExperience
             onExit={exitShadowCheckers}
             initialMatchId={initialItem}
             onMatchRoute={(action, matchId) => onPlayRoute?.(action, 'shadow-checkers', matchId)}

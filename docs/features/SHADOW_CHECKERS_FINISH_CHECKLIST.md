@@ -2,6 +2,29 @@
 
 September 29, 2026. Working checklist from the user's physical-phone walkthrough. The user resumed the goal on September 29. The move-sync and camera update is published for physical-phone testing; remaining acceptance requirements stay open where physical-device evidence is needed.
 
+## Solo opponent candidate — October 5
+
+- Added an explicit **Play Computer** or **Play a Person** entrance. Existing
+  invitation and turn-notification links continue directly into their human
+  match.
+- Solo mode has Rookie, Casual, Challenger and Master levels. A bounded
+  alpha-beta engine runs in a lazy Web Worker and reuses the authoritative local
+  move generator for mandatory captures, complete multi-jumps, crowning and win
+  detection. It has no paid API, server game state, leaderboard or multiplayer
+  side effects.
+- Human moves remain immediate. The computer starts only after that exact board
+  presentation completes; stale searches are cancelled on restart, rotation,
+  mode changes and unmount. Its reply is revalidated against the current legal
+  moves before it can be applied.
+- Focused tests pass for all four levels, legal/repeatable choices, multi-jumps,
+  crowning, cancellation, mode/deep-link routing, presentation order, restart,
+  result focus and keyboard menu behavior. Chromium and WebKit pass a 667x320,
+  130% text solo turn with the actual worker and zero backend requests:
+  `output/playwright/shadow-checkers-solo/chromium-1791224526619/report.json`
+  and `webkit-1791224526628/report.json`.
+- These are browser-emulated phone checks. Physical installed-PWA responsiveness,
+  sustained Master-level performance and final phone acceptance remain open.
+
 ## Move sync and camera release — September 29
 
 - Published commit/build `fef865dee100b6c6ef92926c62faaab0a2ea1f04` to `https://shadochat.online` in Netlify deploy `6abc7522c70385a4236e9f57`. Public health verified app 200, media endpoint 405 and 11 game assets; production health reported app 200 with News paused. Required restart release `fef865de` was published and broadcast.
