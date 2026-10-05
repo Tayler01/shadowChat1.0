@@ -1,8 +1,29 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { RunnerFinale } from '../src/features/games/shadow-runner/components/RunnerFinale'
+import { RunnerDialogSuspensionContext } from '../src/features/games/shadow-runner/components/runnerDialogSuspension'
 import { SHADOW_RUNNER_LEVEL_TEN } from '../src/features/games/shadow-runner/game/levelTen'
 
 const finale = SHADOW_RUNNER_LEVEL_TEN.finale!
+
+test('rotation suspends the finale without advancing it or resetting artwork recovery', () => {
+  const advance = jest.fn()
+  const complete = jest.fn()
+  const content = (suspended: boolean) => (
+    <RunnerDialogSuspensionContext.Provider value={suspended}>
+      <RunnerFinale finale={finale} beatIndex={1} reducedMotion={true} onAdvance={advance} onComplete={complete} />
+    </RunnerDialogSuspensionContext.Provider>
+  )
+  const view = render(content(false))
+  fireEvent.error(view.container.querySelector('img')!)
+  expect(screen.getByRole('button', { name: 'Reload scene artwork' })).toBeInTheDocument()
+  view.rerender(content(true))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  view.rerender(content(false))
+  expect(screen.getByRole('button', { name: 'Reload scene artwork' })).toBeInTheDocument()
+  expect(advance).not.toHaveBeenCalled()
+  expect(complete).not.toHaveBeenCalled()
+})
 
 test('the ending follows world ignition and waits for deliberate cinematic advancement', () => {
   jest.useFakeTimers()

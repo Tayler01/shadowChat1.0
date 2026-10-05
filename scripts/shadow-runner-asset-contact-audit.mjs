@@ -156,8 +156,8 @@ async function main() {
   // Fail rather than silently publishing measurements for a changed rendering contract.
   for (const expected of ['const visualY = centerY + (artLayout?.offsetY ?? options.visualOffsetY ?? 0)', 'visual.setDisplaySize(displayWidth, displayHeight)',
     'contact && options.displayHeight === undefined',
-    'displayWidth: platform.width + 24', 'displayHeight: platform.visualHeight ?? 66', 'visualOffsetY: platform.visualOffsetY ?? -12',
-    'displayHeight: Math.max(62, platform.height + 30)', 'displayHeight: Math.max(56, platform.height + 28)']) {
+    'displayWidth: platform.width + 22',
+    'displayHeight: Math.max(62, platform.height + 30)', 'displayHeight: contact ? undefined : Math.max(56, platform.height + 28)']) {
     assert(runtime.text.includes(expected), `Rendering contract changed; inspect audit model: ${expected}`)
   }
   const tableSets = [
@@ -230,23 +230,19 @@ async function main() {
         const usage = {
           levelId: level.id, collection, id: rect.id, terrainSet, frameId, configurationSources: configLocations.get(rect.id) ?? [],
           rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-          status: rect.hidden ? 'hidden' : opening ? 'opening-raster-composite-not-atlas' : relayMasonry || captainMasonry ? 'district-masonry-composite-not-atlas' : frame ? 'measured' : 'non-atlas-fallback',
+          status: rect.hidden ? 'hidden' : collection === 'tiltPlatforms' ? 'rotated-deck-contact-not-modeled' : opening ? 'opening-raster-composite-not-atlas' : relayMasonry || captainMasonry ? 'district-masonry-composite-not-atlas' : frame ? 'measured' : 'non-atlas-fallback',
         }
         usages.push(usage)
         if (usage.status !== 'measured') continue
         let displayWidth = rect.width
         let displayHeight = rect.height
         let visualOffsetY = 0
-        if (collection === 'tiltPlatforms') {
-          displayWidth += 24
-          displayHeight = rect.visualHeight ?? 66
-          visualOffsetY = rect.visualOffsetY ?? -12
-        } else if (collection === 'phasePlatforms' || collection === 'movingPlatforms') {
+        if (collection === 'phasePlatforms' || collection === 'movingPlatforms') {
           displayWidth += 22
           displayHeight = Math.max(collection === 'phasePlatforms' ? 62 : 56, rect.height + (collection === 'phasePlatforms' ? 30 : 28))
           visualOffsetY = -10
         }
-        if (collection === 'platforms' || collection === 'spectralPlatforms') {
+        if (collection === 'platforms' || collection === 'spectralPlatforms' || collection === 'movingPlatforms') {
           const contact = platformArt.SHADOW_RUNNER_PLATFORM_CONTACTS[frame.textureKey]?.[`terrain-${frame.id}`]
           const layout = platformArt.getShadowRunnerPlatformArtLayout(rect, frame.crop.height, contact)
           if (layout) {

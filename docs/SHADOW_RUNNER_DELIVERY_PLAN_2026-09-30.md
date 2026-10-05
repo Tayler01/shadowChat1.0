@@ -1,5 +1,45 @@
 # Shadow Runner Delivery Reset
 
+## October 5 Resume
+
+Tayler requested continuation of the full goal after phone-feedback intake.
+The September 30 rebuild was deployed at main commit `39bd199c`; this was a
+phone-test release, not physical-device certification or proof of every mastery
+route. The old unchecked snapshot must not be mistaken for a new feature backlog.
+
+- Current confirmed patch: SR-PHONE-001. Existing landscape fallback was only
+  rendered during gameplay. Extend it to title/map as well; retain best-effort
+  automatic rotation and preserve the current screen after manual rotation.
+- Reuse September 30 campaign art, story, finale, progression, geometry and
+  regression evidence where source is unchanged. Do not repeat the 44-run matrix.
+- Keep the user feedback list as the consolidated-patch authority; retain device
+  reports and targeted reproductions rather than inventing new product scope.
+- Remaining full-finish limits: physical installed-PWA rotation/lifecycle,
+  sustained device performance and iPhone audio/media-card behavior; confirm the
+  hosted WebKit reload warnings on a real device. Unproven mastery-route coverage
+  remains an evidence gap, not a claim that all routes are perfect.
+- Preparing a patch does not publish it. Record deployment separately and do not
+  mark the full goal complete solely because the orientation fix passes.
+
+### Current Exit Criteria
+
+- Confirmed local defect: SR-PHONE-001 is implemented and checked on integrated
+  main. Its phone acceptance remains open; it is not an unfinished art task.
+- Release decision: Tayler explicitly authorized "push for testing" on October 5.
+  Publish the prepared consolidated patch and verify the served build identity.
+- Security gate: full dependency audit reports five development-only high
+  findings; production-only audit is clean. Record a security disposition before
+  release, rather than silently forcing Tailwind 4 or waiving the gate.
+- Full-game acceptance: physical orientation/audio/performance and unproven
+  optional-route/mastery coverage stay explicit. They are not proof of a game
+  defect, nor permission to restart the superseded exhaustive replay matrix.
+- No additional missing production feature or replacement-art requirement was
+  established by the current reconciliation. Add work only from a concrete
+  requirement mismatch or reproduced defect, not from old unchecked snapshots.
+
+See the [patch approval packet](SHADOW_RUNNER_PATCH_APPROVAL_2026-10-05.md) for
+the exact diff, successful checks, failed security gate and remaining decisions.
+
 ## Authority
 
 September 30: Tayler identified excessive elapsed time and explicitly requested
@@ -82,8 +122,9 @@ all105 tests in those two suites; no production behavior or assertion is removed
 CI will rerun the complete suite.399 Node checks, lint/typecheck,188-doc integrity
 and the500-file/93.55MiB production build pass. Known product work is retained;
 remaining live tuning belongs to the requested phone-feedback pass.
-- [ ] Review release diff, current main alignment and final backend-first gates;
-  push main, verify hosted SHA/assets/game/save, and hand over the phone URL.
+- [x] September 30 phone-test release: pushed `39bd199c`, deployed and handed
+  over for phone testing. This historical release item is not October 5 patch
+  authorization or physical-device acceptance. See the current criteria above.
 
 ## Full Finish
 

@@ -1,3 +1,17 @@
+## October 5 Shadow Runner rotation and modal recovery
+
+- Local integrated main `a40565f5` plus unshipped Runner patch: portrait prompt
+  now covers title/map as well as play; hidden dialogs and finale release focus
+  traps and resume their state in landscape. No physical-device certification.
+- WebKit portrait 19 surfaces and Android Chromium 21 pass in the existing
+  Runner UI harness, including options/journal rotation, keyboard focus,
+  crouch/jump, pause and artwork. 25 focused regressions and required app gates
+  pass. [Full evidence and limits](../SHADOW_RUNNER_FULL_FINISH_EVIDENCE_2026-10-05.md).
+- Full Jest: 322 suites, 2,944 passing tests and 16 existing auth TODOs.
+  Local Relay retry/frame sample passed, but is not physical performance proof.
+  Ivy contact settled at two reviewed positions; an enemy hit invalidated the
+  third contact sample. No speculative art or physics replacement.
+
 ## September 30 current mobile stability checkpoint
 
 Tayler physically confirmed build 16 removes the accessory toolbar; its older

@@ -42,6 +42,40 @@ describe('Shadow Runner progress and loader screen integration', () => {
     Object.defineProperty(window, 'matchMedia', { configurable: true, value: jest.fn().mockImplementation(() => ({ matches: true, addEventListener: jest.fn(), removeEventListener: jest.fn() })) })
   })
 
+  it('prompts on the portrait title and map, then restores the current screen after rotation', async () => {
+    const width = window.innerWidth
+    const height = window.innerHeight
+    const resize = (w: number, h: number) => {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w })
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: h })
+      fireEvent(window, new Event('resize'))
+    }
+    try {
+      resize(390, 844)
+      render(<ShadowRunnerScreen />)
+      expect(screen.getByRole('dialog', { name: 'Rotate Phone' })).toBeInTheDocument()
+      expect(screen.getByText('Turn your phone sideways to continue.')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Start Tutorial' })).not.toBeInTheDocument()
+      resize(844, 390)
+      fireEvent.click(await screen.findByRole('button', { name: 'Select Level' }))
+      resize(390, 844)
+      expect(screen.getByRole('dialog', { name: 'Rotate Phone' })).toBeInTheDocument()
+      resize(844, 390)
+      await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Rotate Phone' })).not.toBeInTheDocument())
+      expect(screen.getByRole('button', { name: 'Back to Shadow Runner menu' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Courier journal' }))
+      expect(screen.getByRole('dialog', { name: 'Courier journal' })).toBeInTheDocument()
+      resize(390, 844)
+      expect(screen.getAllByRole('dialog')).toHaveLength(1)
+      expect(screen.queryByRole('dialog', { name: 'Courier journal' })).not.toBeInTheDocument()
+      fireEvent.keyDown(document, { key: 'Escape' })
+      resize(844, 390)
+      expect(await screen.findByRole('dialog', { name: 'Courier journal' })).toBeInTheDocument()
+    } finally {
+      resize(width, height)
+    }
+  })
+
   it('starts a route with sound disabled without constructing or waiting for SFX', async () => {
     localStorage.setItem(SHADOW_RUNNER_SFX_ENABLED_STORAGE_KEY, 'false')
     render(<ShadowRunnerScreen />)

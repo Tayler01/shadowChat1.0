@@ -2,15 +2,21 @@ import React from 'react'
 import { X } from 'lucide-react'
 import { useDialogAccessibility } from '../../../../hooks/useDialogAccessibility'
 
-export function RunnerDialog({ title, eyebrow, onClose, children, image }: {
+import { RunnerDialogSuspensionContext } from './runnerDialogSuspension'
+
+export function RunnerDialog({ title, eyebrow, onClose, children, image, suspended }: {
   title: string
   eyebrow?: string
   onClose?: () => void
   children: React.ReactNode
   image?: string
+  suspended?: boolean
 }) {
-  const ref = useDialogAccessibility({ open: true, onClose: onClose ?? (() => {}), dismissible: Boolean(onClose) })
+  const inheritedSuspension = React.useContext(RunnerDialogSuspensionContext)
+  const inactive = suspended ?? inheritedSuspension
+  const ref = useDialogAccessibility({ open: !inactive, onClose: onClose ?? (() => {}), dismissible: Boolean(onClose), restoreFocus: !inactive })
   const titleId = React.useId()
+  if (inactive) return null
   return (
     <div className={`runner-dialog-backdrop${image ? ' runner-dialog-cinematic' : ''}`}>
       {image && <img className="runner-dialog-scene" src={image} alt="" draggable={false} />}

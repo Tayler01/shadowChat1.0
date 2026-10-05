@@ -67,10 +67,26 @@ for (const profile of profiles) {
       result.checks.push(stage)
     }
     await page.goto(`${baseUrl}/?view=games&localPreview=shadow-runner`, { waitUntil: 'domcontentloaded' })
+    if (profile.name === 'portrait') {
+      await page.getByRole('dialog', { name: 'Rotate Phone' }).waitFor()
+      await capture('title-rotate')
+      await page.setViewportSize({ width: 740, height: 390 })
+    }
     await page.getByRole('button', { name: 'Select Level', exact: true }).waitFor()
     await capture('title')
     await page.getByRole('button', { name: 'Options', exact: true }).click()
     await page.getByRole('dialog', { name: 'Options' }).waitFor()
+    if (profile.name === 'portrait') {
+      await page.setViewportSize(profile.viewport)
+      const rotate = page.getByRole('dialog', { name: 'Rotate Phone' })
+      await rotate.waitFor()
+      await page.keyboard.press('Tab')
+      assert.ok(await rotate.evaluate(element => element.contains(document.activeElement)), 'Rotation prompt owns keyboard focus')
+      await page.keyboard.press('Escape')
+      await capture('options-rotate')
+      await page.setViewportSize({ width: 740, height: 390 })
+      await page.getByRole('dialog', { name: 'Options' }).waitFor()
+    }
     if (profile.comfort) assert.equal(await page.getByRole('checkbox', { name: /Sound effects/ }).isDisabled(), true)
     await capture('options')
     await page.keyboard.press('Escape')
@@ -104,6 +120,14 @@ for (const profile of profiles) {
     await page.getByRole('tab', { name: 'Map', exact: true }).click()
     await capture('atlas')
     await page.getByRole('button', { name: 'Courier journal' }).click()
+    if (profile.name === 'portrait') {
+      await page.setViewportSize(profile.viewport)
+      await page.getByRole('dialog', { name: 'Rotate Phone' }).waitFor()
+      await page.keyboard.press('Escape')
+      await capture('journal-rotate')
+      await page.setViewportSize({ width: 740, height: 390 })
+      await page.getByRole('dialog', { name: 'Courier journal' }).waitFor()
+    }
     await capture('journal')
     await page.getByRole('button', { name: 'Close dialog' }).click()
     await page.getByRole('button', { name: 'Back to Shadow Runner menu' }).click()
@@ -112,6 +136,7 @@ for (const profile of profiles) {
     await page.getByRole('button', { name: 'Close dialog' }).click()
     await page.getByRole('button', { name: 'Start Tutorial', exact: true }).click()
     if (profile.name === 'portrait') {
+      await page.setViewportSize(profile.viewport)
       await page.getByRole('dialog', { name: 'Rotate Phone' }).waitFor()
       await capture('rotate')
       await page.setViewportSize({ width: 740, height: 390 })

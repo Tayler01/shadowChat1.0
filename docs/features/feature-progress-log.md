@@ -1,3 +1,17 @@
+## October 5 Shadow Runner full-finish continuation
+
+- Integrated current main `a40565f5` without losing the Runner patch or unrelated
+  chat/upload/native work. No new Runner release.
+- Extended the rotation fallback to title/map and suspended hidden dialog/finale
+  focus traps without resetting their state. Targeted regressions pass.
+- Full Jest passed 322 suites / 2,944 tests, plus 402 Node tests. A bounded
+  15-second Relay sample and three retries retained identical entity counts.
+  Production dependency audit is clean; the full audit has five development-only
+  high findings awaiting security review. No dependency migration or push.
+- [Current evidence and remaining gates](../SHADOW_RUNNER_FULL_FINISH_EVIDENCE_2026-10-05.md)
+  distinguish shipped features, local fixes, finite-life Relay traversal, older
+  save-observer failure, representative browser measurements and device limits.
+
 ## October 1 Pins video thumbnails
 
 - Generated Bunny frames replace generic posters during ready polling and

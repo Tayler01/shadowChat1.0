@@ -2,6 +2,7 @@ import React from 'react'
 import { ChevronRight, RotateCcw, SkipForward } from 'lucide-react'
 import { useDialogAccessibility } from '../../../../hooks/useDialogAccessibility'
 import type { ShadowRunnerFinaleConfig } from '../game/levels'
+import { RunnerDialogSuspensionContext } from './runnerDialogSuspension'
 
 export function RunnerFinale({ finale, beatIndex, reducedMotion, onAdvance, onComplete }: {
   finale: ShadowRunnerFinaleConfig
@@ -10,7 +11,8 @@ export function RunnerFinale({ finale, beatIndex, reducedMotion, onAdvance, onCo
   onAdvance: () => void
   onComplete: () => void
 }) {
-  const ref = useDialogAccessibility({ open: true, onClose: onComplete, dismissible: false })
+  const suspended = React.useContext(RunnerDialogSuspensionContext)
+  const ref = useDialogAccessibility({ open: !suspended, onClose: onComplete, dismissible: false, restoreFocus: !suspended })
   const headingId = React.useId()
   const bodyId = React.useId()
   const beat = finale.beats[beatIndex]
@@ -19,7 +21,7 @@ export function RunnerFinale({ finale, beatIndex, reducedMotion, onAdvance, onCo
   const [imageAttempt, setImageAttempt] = React.useState(0)
   const last = beatIndex >= finale.beats.length - 1
 
-  if (!beat) return null
+  if (!beat || suspended) return null
 
   return (
     <section ref={ref} role="dialog" aria-modal="true" aria-label="Dawn Relay Spire finale"

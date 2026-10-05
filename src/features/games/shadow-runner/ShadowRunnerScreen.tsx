@@ -14,6 +14,7 @@ import { loadShadowRunnerImages } from './loading'
 import { useShadowRunnerProgress } from './useShadowRunnerProgress'
 import { ShadowRunnerGame } from './ShadowRunnerGame'
 import { RunnerDialog } from './components/RunnerDialog'
+import { RunnerDialogSuspensionContext } from './components/runnerDialogSuspension'
 import { RunnerCampaign } from './components/RunnerCampaign'
 import { RunnerTitle } from './components/RunnerTitle'
 import { RunnerSaveStatus } from './components/RunnerSaveStatus'
@@ -133,7 +134,7 @@ function ShadowRunnerAccountSession({ ownerId, onExit, musicPlaying = false, onP
   const effectiveSoundEffectsEnabled = soundEffectsEnabled && effectivePreferences.gameSfx
   const sfxControllerRef = React.useRef<ShadowRunnerSfxController | null>(null)
   const titleAssets = useImagePreload(screen === 'title' ? TITLE_IMAGE_SOURCES : EMPTY_IMAGE_SOURCES)
-  const showRotateGate = orientationGateActive && screen === 'play'
+  const showRotateGate = orientationGateActive
 
   React.useEffect(() => {
     if (!effectiveSoundEffectsEnabled) return
@@ -169,12 +170,13 @@ function ShadowRunnerAccountSession({ ownerId, onExit, musicPlaying = false, onP
   const showSaveStatus = saveDetailsOpen || screen !== 'play' || Boolean(campaignProgress.syncError || campaignProgress.storageError || campaignProgress.pendingCount)
 
   return (
+    <RunnerDialogSuspensionContext.Provider value={showRotateGate}>
     <section className="runner-session" data-runner-reduced-motion={isReducedMotion}>
       <div className="runner-session-stage">
-        {showRotateGate && <RunnerDialog title="Rotate Phone" eyebrow="Shadow Runner">
-          <p>The courier road awaits.</p>
+        {showRotateGate && <RunnerDialog title="Rotate Phone" eyebrow="Shadow Runner" suspended={false}>
+          <p>Turn your phone sideways to continue.</p>
           <div className="runner-dialog-actions">
-            <button type="button" className="runner-command" onClick={() => setScreen('levels')}><ArrowLeft size={18} />Return to Map</button>
+            {screen === 'play' && <button type="button" className="runner-command" onClick={() => setScreen('levels')}><ArrowLeft size={18} />Return to Map</button>}
             <button type="button" className="runner-command secondary" onClick={onExit}><LogOut size={18} />Exit game</button>
           </div>
         </RunnerDialog>}
@@ -208,5 +210,6 @@ function ShadowRunnerAccountSession({ ownerId, onExit, musicPlaying = false, onP
       </div>
       {showSaveStatus && <RunnerSaveStatus progress={campaignProgress} onDetailsChange={setSaveDetailsOpen} onRetry={() => { void campaignProgress.retry() }} />}
     </section>
+    </RunnerDialogSuspensionContext.Provider>
   )
 }

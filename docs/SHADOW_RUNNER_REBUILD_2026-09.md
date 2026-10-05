@@ -2,6 +2,11 @@
 
 ## Status And Authority
 
+October 5: [Current full-finish reconciliation](SHADOW_RUNNER_FULL_FINISH_EVIDENCE_2026-10-05.md)
+records the shipped rebuild, current-main integration, queued rotation patch and
+remaining evidence/device limits. Historical incomplete snapshots below do not
+override that reconciliation or certify untested routes.
+
 September30: [Delivery reset](SHADOW_RUNNER_DELIVERY_PLAN_2026-09-30.md) is the
 current execution and risk-based verification contract following Tayler's
 efficiency correction. It supersedes blanket replay requirements, not the game
@@ -20,7 +25,8 @@ earned player progression or historical release evidence.
 - September 8 live `/.well-known/shadowchat-health.json` reported that same production SHA; this is historical, not current deployment authority.
 - Linked Supabase catalog confirms tutorial and levels 1-10 are available.
 - Original `C:/repos/chat2.0` checkout remains untouched.
-- No rebuild code, assets, migration or announcement has been released.
+- September 8 baseline: no rebuild code or assets had been released. The rebuild
+  subsequently shipped on September 30 at `39bd199c`; October 5 fixes are local.
 
 ## September 30: Main Integration And Sovereign Victory
 

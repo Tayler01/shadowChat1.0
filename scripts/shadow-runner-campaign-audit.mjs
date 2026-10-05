@@ -6,6 +6,10 @@ import sharp from 'sharp'
 import { chromium, webkit } from 'playwright'
 
 const args = Object.fromEntries(process.argv.slice(2).map(arg => arg.replace(/^--/, '').split('=')))
+const sampleMs = Number(args['sample-ms'] ?? 3000)
+const retryCount = Number(args.retries ?? 0)
+assert.ok(Number.isInteger(sampleMs) && sampleMs >= 1000 && sampleMs <= 60000, 'Sample duration must be 1000-60000 ms')
+assert.ok(Number.isInteger(retryCount) && retryCount >= 0 && retryCount <= 5, 'Retry count must be 0-5')
 const depthInput = args['depth-input'] === 'true'
 const depthCases = {
   'level-8': { count: 11, nearIndex: 5, farRate: 0.16, nearRate: 0.28, files: ['courier-catacombs-background.webp', 'catacomb-hanging-lantern.webp'] },
@@ -87,20 +91,21 @@ for (const profile of profiles) {
         const begin = page.getByRole('button', { name: 'Begin delivery', exact: true })
         await begin.waitFor()
         await page.screenshot({ path: path.join(output, `${profile.name}-${levelId}-delivery.png`) })
+        result.freshSceneCounts = [await page.evaluate(() => window.__shadowRunnerDebug?.().entityCounts)]
         await begin.click()
-        result.frames = await page.evaluate(() => new Promise(resolve => {
+        result.frames = await page.evaluate(duration => new Promise(resolve => {
           const deltas = []
           let last = performance.now()
           const start = last
           const sample = now => {
             deltas.push(now - last)
             last = now
-            if (now - start < 3000) return requestAnimationFrame(sample)
+            if (now - start < duration) return requestAnimationFrame(sample)
             deltas.sort((a, b) => a - b)
-            resolve({ count: deltas.length, p50: deltas[Math.floor(deltas.length * 0.5)], p95: deltas[Math.floor(deltas.length * 0.95)], max: deltas.at(-1), over50ms: deltas.filter(n => n > 50).length })
+            resolve({ durationMs: now - start, scope: 'Starting-scene frame scheduling, not a combat-route or physical-device benchmark', count: deltas.length, p50: deltas[Math.floor(deltas.length * 0.5)], p95: deltas[Math.floor(deltas.length * 0.95)], max: deltas.at(-1), over50ms: deltas.filter(n => n > 50).length })
           }
           requestAnimationFrame(sample)
-        }))
+        }), sampleMs)
         result.start = await page.evaluate(() => window.__shadowRunnerDebug?.())
         result.surface = await page.evaluate(() => {
           const canvas = document.querySelector('canvas')
@@ -178,6 +183,30 @@ for (const profile of profiles) {
         const afterPause = await page.evaluate(() => window.__shadowRunnerDebug?.())
         result.pauseStable = JSON.stringify(beforePause) === JSON.stringify(afterPause)
         await page.screenshot({ path: path.join(output, `${profile.name}-${levelId}-pause.png`) })
+        if (retryCount) {
+          result.retryMethod = 'Local QA damage injection to exhaust lives; genuine Retry/Pause/Resume UI, observing a replaced runtime getter. Not route-completion evidence or total process-memory measurement.'
+          await page.getByRole('button', { name: 'Resume', exact: true }).click()
+          for (let retry = 0; retry < retryCount; retry += 1) {
+            for (let life = 0; life < 3; life += 1) {
+              const remaining = await page.evaluate(() => window.__shadowRunnerDebug?.().player.lives)
+              await page.evaluate(() => window.__shadowRunnerQa.damage(999))
+              await page.waitForFunction(previous => {
+                const state = window.__shadowRunnerDebug?.()
+                return state && state.player.lives < previous && (state.player.lives === 0 || !state.respawnPending)
+              }, remaining, { timeout: 5000 })
+            }
+            await page.evaluate(() => { window.__runnerAuditPreviousDebug = window.__shadowRunnerDebug })
+            await page.getByRole('dialog', { name: 'Route Failed', exact: true }).getByRole('button', { name: 'Retry', exact: true }).click()
+            await page.waitForFunction(() => window.__shadowRunnerDebug !== window.__runnerAuditPreviousDebug && window.__shadowRunnerDebug?.().player.lives === 3)
+            await page.evaluate(() => { delete window.__runnerAuditPreviousDebug })
+            await page.getByRole('button', { name: 'Open pause menu', exact: true }).click()
+            await page.getByRole('button', { name: 'Resume', exact: true }).waitFor()
+            const counts = await page.evaluate(() => window.__shadowRunnerDebug?.().entityCounts)
+            result.freshSceneCounts.push(counts)
+            assert.deepEqual(counts, result.freshSceneCounts[0], 'Fresh scene entity/tween counts must not grow after retry')
+            await page.getByRole('button', { name: 'Resume', exact: true }).click()
+          }
+        }
         for (const job of bundleJobs) await job
         result.buildIdentityPassed = expectedBundles.every(expected => result.loadedBundles.some(actual => actual.path === expected.path && actual.sha256 === expected.sha256))
         if (!result.buildIdentityPassed) result.errors.push('Served runtime does not match the frozen dist bundles')
