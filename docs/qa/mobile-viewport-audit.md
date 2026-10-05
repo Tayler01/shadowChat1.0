@@ -1,5 +1,13 @@
 # Mobile Viewport Audit
 
+## October 5 Checkers fullscreen and camera follow-up
+
+The fullscreen element now remains mounted across mode selection, solo and
+multiplayer, with scoped exit/orientation cleanup. Chromium and WebKit verify
+the landscape solo layout at 667x320 and 130% text without page overflow.
+Camera drag keeps its inverted direction with quicker response. Physical
+Android fullscreen and iPhone camera feel remain acceptance checks.
+
 ## September 30 keyboard gesture and bottom-scroll follow-up
 
 Repeated identical viewport snapshots no longer rewrite CSS or dispatch layout

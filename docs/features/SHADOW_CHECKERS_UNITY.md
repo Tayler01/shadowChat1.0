@@ -398,7 +398,7 @@ The first iPhone/WebKit run passed authoritative touch moves and chat, but its W
 
 ## Architecture
 
-`native/shadow-checkers-unity` contains original editable Blender assets and Unity 6000.3.24f1 source. Unity owns the scene, camera, rendering and raycast input. ShadowChat owns authenticated data access, realtime subscriptions, legal moves and the existing social screens. A same-origin iframe isolates the Web runtime and releases it when leaving a match. The versioned bridge accepts only its own frame, origin, revision and current legal choices. No credentials are sent to Unity.
+`native/shadow-checkers-unity` contains original editable Blender assets and Unity 6000.6.3f1 source (updated to the installed editor for the October 5 performance rebuild). Batch builds must select `-buildTarget WebGL` at startup before `-executeMethod ShadowCheckersBuild.BuildWeb`, so the WebGL input assembly is available while compiling. Unity owns the scene, camera, rendering and raycast input. ShadowChat owns authenticated data access, realtime subscriptions, legal moves and the existing social screens. A same-origin iframe isolates the Web runtime and releases it when leaving a match. The versioned bridge accepts only its own frame, origin, revision and current legal choices. No credentials are sent to Unity.
 
 The original board remains available as explicit accessible controls and as a recovery option if WebGL cannot load. Runtime files load only upon entering a match. Migration `20260925053123_shadow_checkers_continuation_integrity.sql` addresses continuation retry/cosmetic/queue integrity and was applied September 27. Hosted concurrent continuation acceptance remains open.
 

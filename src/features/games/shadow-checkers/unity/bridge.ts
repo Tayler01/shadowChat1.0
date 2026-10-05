@@ -33,7 +33,7 @@ export function chooseSquare(props: ShadowCheckersBoardProps, position: Checkers
     const end = candidate.path[candidate.path.length - 1]
     return end.row === position.row && end.col === position.col
   })
-  if (move) { props.onSelectMove?.(move); return 'move' }
+  if (move) return props.onSelectMove?.(move) === false ? 'ignored' : 'move'
   const piece = props.state.pieces.find(candidate => candidate.row === position.row && candidate.col === position.col)
   if (piece) { props.onSelectPiece?.(piece); return 'piece' }
   if (props.selectedPieceId && (position.row + position.col) % 2 === 1) {

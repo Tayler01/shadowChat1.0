@@ -1,5 +1,15 @@
 # Real-Device Mobile Validation
 
+## October 5 Checkers selection, music and frame pacing
+
+- User reports AI works in light iPhone testing, but reselection sometimes locks,
+  music blips, and room/camera motion is sluggish on iPhone 16 Pro Max.
+- Candidate repairs have browser/runtime evidence in `mobile-pwa-qa-log.md`.
+  This is not physical-device acceptance. After the restart prompt, verify:
+  tap another own piece and deselect, mandatory jumps, a complete AI/human match,
+  camera drag/pinch, music on/off and background/return, then sustained play for
+  at least ten minutes for heat, stable audio and responsiveness.
+
 ## October 5 first-send and composer-boundary follow-up
 
 - New screenshots report a first outgoing text leaving latest and message rows

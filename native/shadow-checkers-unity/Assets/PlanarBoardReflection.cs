@@ -7,6 +7,8 @@ public class PlanarBoardReflection : MonoBehaviour
     Camera source, mirror;
     RenderTexture texture;
     bool rendering;
+    float nextRefresh;
+    Matrix4x4 reflectedView, reflectedProjection;
     readonly Plane[] viewPlanes=new Plane[6];
     // Only the two tile meshes sample this texture. Include their bevels and
     // a small margin so reflection rendering resumes before an edge is visible.
@@ -22,13 +24,22 @@ public class PlanarBoardReflection : MonoBehaviour
         if(rendering || source==null) return;
         if(!BoardInView()) {
             Shader.SetGlobalFloat("_HasBoardReflection",0);
+            nextRefresh=0;
+            return;
+        }
+        // Camera motion needs a fresh reflection immediately. At rest, flames
+        // and moving pieces still refresh at 30 Hz while the main view runs 60 Hz.
+        if(texture!=null && Time.unscaledTime<nextRefresh &&
+           source.worldToCameraMatrix==reflectedView && source.projectionMatrix==reflectedProjection) {
+            Shader.SetGlobalTexture("_BoardReflection",texture);
+            Shader.SetGlobalFloat("_HasBoardReflection",1);
             return;
         }
         if(mirror==null)
         {
             var o=new GameObject("Board reflection camera"); o.hideFlags=HideFlags.HideAndDontSave;
             mirror=o.AddComponent<Camera>(); mirror.enabled=false;
-            int size=Screen.width>1000?1024:512;
+            const int size=512;
             texture=new RenderTexture(size,size,16,RenderTextureFormat.ARGB32); texture.name="Actual board reflection";
         }
         rendering=true;
@@ -49,11 +60,14 @@ public class PlanarBoardReflection : MonoBehaviour
         finally { GL.invertCulling=previous; rendering=false; }
         Shader.SetGlobalTexture("_BoardReflection",texture);
         Shader.SetGlobalFloat("_HasBoardReflection",1);
+        reflectedView=source.worldToCameraMatrix;reflectedProjection=source.projectionMatrix;
+        nextRefresh=Time.unscaledTime+1f/30;
     }
     void OnDisable()
     {
         if(mirror!=null) Destroy(mirror.gameObject);
         if(texture!=null) { texture.Release(); Destroy(texture); }
+        nextRefresh=0;
         Shader.SetGlobalFloat("_HasBoardReflection",0);
     }
 }

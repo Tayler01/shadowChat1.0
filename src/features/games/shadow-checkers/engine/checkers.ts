@@ -94,11 +94,13 @@ export function deserializeBoard(input: SerializedCheckersBoard): CheckersBoardS
 export function getLegalMoves(state: CheckersBoardState, player: CheckersPlayer = state.turn, pieceId?: string): CheckersMove[] {
   if (state.winner) return []
 
-  const pieces = state.pieces.filter(piece => piece.owner === player && (!pieceId || piece.id === pieceId))
+  // Captures are mandatory across the whole side, even when the caller asks
+  // for one piece's destinations. Filter only after establishing that rule.
+  const pieces = state.pieces.filter(piece => piece.owner === player)
   const captures = pieces.flatMap(piece => getLegalCaptures(state, piece))
-  if (captures.length > 0) return captures
+  if (captures.length > 0) return pieceId ? captures.filter(move => move.pieceId === pieceId) : captures
 
-  return pieces.flatMap(piece => getSimpleMoves(state, piece))
+  return pieces.filter(piece => !pieceId || piece.id === pieceId).flatMap(piece => getSimpleMoves(state, piece))
 }
 
 export function getLegalCaptures(state: CheckersBoardState, pieceOrId: CheckersPiece | string): CheckersMove[] {

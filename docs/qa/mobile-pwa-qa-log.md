@@ -1,3 +1,30 @@
+## October 5 Checkers phone-feedback repair
+
+- Chromium and WebKit pass the real solo worker/React flow at 667x320 and 130%
+  text: mode chooser, human/computer turn, restart and zero backend requests.
+  Reports: `output/playwright/shadow-checkers-solo/chromium-1791236835636`
+  and `webkit-1791236845769`.
+- Actual Unity before/after Chromium sample improved from 32.25 to 61.43
+  submissions/sec; median draws fell from 598 to 345 and median main-loop work
+  from 7.3ms to 5.4ms. Windows software-composited WebKit improved from 10.56
+  to 14.83 submissions/sec; these figures are desktop diagnostics, not phone FPS.
+- Both actual runtimes animate four-capture king loops with four timed landings
+  and no replay on confirmation. Room/24-piece screenshot inspection passed.
+- Final export preserves the Quad's required MeshCollider through stripping;
+  both runtimes now report zero console errors. Final Chromium stationary/pan
+  samples: 62.67/61.30 submissions/sec, moving p95 interval 22.3ms and no sampled
+  intervals over 50ms. Artifact: `render-chromium-1.5-camera-1791237009553` under
+  `output/playwright/shadow-checkers-unity/`.
+- Real original soundtrack passes 15-second Chromium playback, one source/fetch,
+  host/iframe gesture recovery and mute. Windows WebKit has no AudioContext API
+  in either headed or headless mode; iPhone audio is not certified by that check.
+  Evidence: `output/playwright/checkers-music-runtime/report.json`.
+- Full Jest: 326 suites, 2,981 passed, 16 existing TODOs. Node suites: 402 plus
+  14 focused lifecycle/audio tests pass. SQL/local rules parity: 24 games,
+  1,913 moves, 460 captures, 52 multi-jumps, 86 promotions and 765 rejections.
+- Physical iPhone 16 Pro Max sustained play, music recovery after interruption,
+  heat and camera feel remain for user acceptance after publishing.
+
 ## October 5 Shadow Runner rotation and modal recovery
 
 - Local integrated main `a40565f5` plus unshipped Runner patch: portrait prompt

@@ -8,6 +8,7 @@ interface StopOptions {
 
 export interface GameSoundtrackController {
   setVolume: (value: number) => void
+  isPlaying: () => boolean
   play: (source: string) => Promise<boolean>
   stop: (options?: StopOptions) => void
   dispose: () => void
@@ -111,6 +112,11 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
     }
 
     if (pending?.source === source && !pending.controller.signal.aborted) {
+      // A previous autoplay resume can remain pending until a real gesture.
+      // Retry synchronously in that gesture without duplicating the load.
+      if (context && context.state !== 'running' && context.state !== 'closed') {
+        void context.resume().catch(() => undefined)
+      }
       return pending.promise
     }
 
@@ -139,10 +145,11 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
       const audioContext = getContext()
       if (!audioContext || !gain) return false
 
-      if (audioContext.state === 'suspended') {
+      // Safari also exposes `interrupted` after device audio interruptions.
+      if (audioContext.state !== 'running') {
         await audioContext.resume()
       }
-      if (!isCurrent()) return false
+      if (!isCurrent() || audioContext.state !== 'running') return false
       if (reuseActiveSource) return true
 
       const response = await fetch(source, { signal: controller.signal })
@@ -160,10 +167,10 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
       })
       if (!isCurrent() || !buffer) return false
 
-      if (audioContext.state === 'suspended') {
+      if (audioContext.state !== 'running') {
         await audioContext.resume()
       }
-      if (!isCurrent()) return false
+      if (!isCurrent() || audioContext.state !== 'running') return false
 
       const nextSource = audioContext.createBufferSource()
       activeSource = nextSource
@@ -214,6 +221,7 @@ export function createGameSoundtrackController(volume = 0.42): GameSoundtrackCon
   if (typeof window !== 'undefined') window.addEventListener('pagehide', handlePageHide)
 
   return {
+    isPlaying: () => !disposed && !isHidden() && activeSource !== null && context?.state === 'running',
     setVolume: (value: number) => {
       volume = Math.max(0, Math.min(1, value))
       if (gain && context) gain.gain.setTargetAtTime(volume, context.currentTime, 0.15)

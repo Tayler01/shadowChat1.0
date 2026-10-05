@@ -2,6 +2,7 @@ import React from 'react'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ComfortProvider } from '../src/hooks/useComfortPreferences'
 import { getLegalMoves } from '../src/features/games/shadow-checkers/engine/checkers'
+import * as checkers from '../src/features/games/shadow-checkers/engine/checkers'
 import type { ShadowCheckersAiChoice } from '../src/features/games/shadow-checkers/engine/checkersAi'
 import type { CheckersBoardState } from '../src/features/games/shadow-checkers/engine/types'
 import { ShadowCheckersSoloScreen } from '../src/features/games/shadow-checkers/ShadowCheckersSoloScreen'
@@ -18,7 +19,8 @@ jest.mock('../src/features/games/shadow-checkers/components/ShadowCheckersUnityB
   ShadowCheckersUnityBoard: React.forwardRef(function MockBoard(props: any, ref) {
     React.useImperativeHandle(ref, () => ({ openCameraHelp: jest.fn(), toggleAccessibleBoard: jest.fn(), resetCamera: jest.fn() }))
     const firstHumanPiece = props.state.pieces.find((piece: { owner: string }) => piece.owner === 'player_one')
-    return <div data-testid="solo-board" data-move-number={props.state.moveNumber} data-turn={props.state.turn}>
+    return <div data-testid="solo-board" data-move-number={props.state.moveNumber} data-turn={props.state.turn} data-selected={props.selectedPieceId ?? ''} data-helpers={props.helperMoves.length}>
+      {props.state.pieces.filter((piece: { owner: string }) => piece.owner === 'player_one').map((piece: { id: string }) => <button key={piece.id} onClick={() => props.onSelectPiece(piece)}>Select {piece.id}</button>)}
       <button type="button" onClick={() => props.onSelectPiece(firstHumanPiece)}>Select first piece</button>
       <button type="button" disabled={!props.legalMoves.length} onClick={() => props.onSelectMove(props.legalMoves[0])}>Make first move</button>
       <button type="button" onClick={() => props.onPresentationComplete(props.state)}>Present board</button>
@@ -34,6 +36,37 @@ describe('Shadow Checkers solo game', () => {
   beforeEach(() => {
     mockChooseMove.mockReset()
     mockDispose.mockReset()
+  })
+
+  test('can deselect, switch pieces, and recover from choosing a piece barred by a mandatory jump', () => {
+    const state = {
+      ...checkers.createInitialBoard(),
+      pieces: [
+        { id: 'jump', owner: 'player_one' as const, row: 5, col: 0, king: false },
+        { id: 'other-jump', owner: 'player_one' as const, row: 5, col: 4, king: false },
+        { id: 'blocked', owner: 'player_one' as const, row: 7, col: 6, king: false },
+        { id: 'victim', owner: 'player_two' as const, row: 4, col: 1, king: false },
+        { id: 'other-victim', owner: 'player_two' as const, row: 4, col: 5, king: false },
+      ],
+    }
+    const initial = jest.spyOn(checkers, 'createInitialBoard').mockReturnValue(state)
+    try {
+      renderSolo()
+      const select = (id: string) => fireEvent.click(screen.getByRole('button', { name: `Select ${id}` }))
+      const board = screen.getByTestId('solo-board')
+      select('jump')
+      select('other-jump')
+      expect(board).toHaveAttribute('data-selected', 'other-jump')
+      select('other-jump')
+      expect(board).toHaveAttribute('data-selected', '')
+      select('jump')
+      select('blocked')
+      expect(board).toHaveAttribute('data-selected', '')
+      expect(board).toHaveAttribute('data-helpers', '2')
+      select('other-jump')
+      fireEvent.click(screen.getByRole('button', { name: /make first move/i }))
+      expect(board).toHaveAttribute('data-move-number', '1')
+    } finally { initial.mockRestore() }
   })
 
   test('waits for the human animation, then applies a legal computer reply', async () => {

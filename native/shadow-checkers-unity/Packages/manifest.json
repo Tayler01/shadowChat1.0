@@ -1,8 +1,11 @@
 {
   "dependencies": {
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#v10.0.0",
+    "com.unity.modules.imgui": "1.0.0",
     "com.unity.modules.jsonserialize": "1.0.0",
     "com.unity.modules.physics": "1.0.0",
-    "com.unity.modules.imgui": "1.0.0"
+    "com.unity.modules.physicscore2d": "1.0.0",
+    "com.unity.modules.tetgen": "1.0.0",
+    "com.unity.modules.timelinefoundation": "1.0.0"
   }
 }

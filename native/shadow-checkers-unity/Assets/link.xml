@@ -3,5 +3,7 @@
     <type fullname="UnityEngine.BoxCollider" preserve="all" />
     <type fullname="UnityEngine.SphereCollider" preserve="all" />
     <type fullname="UnityEngine.CapsuleCollider" preserve="all" />
+    <!-- CreatePrimitive(Quad) creates this before StudyWindow removes it. -->
+    <type fullname="UnityEngine.MeshCollider" preserve="all" />
   </assembly>
 </linker>

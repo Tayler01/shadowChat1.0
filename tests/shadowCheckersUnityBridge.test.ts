@@ -25,6 +25,21 @@ test('forwards only a host-generated legal move', () => {
   expect(p.onSelectMove).toHaveBeenCalledTimes(1)
 })
 
+test('a king capture returning to its starting square takes precedence over deselection', () => {
+  const state = {
+    ...createInitialBoard(),
+    pieces: [
+      { id: 'king', owner: 'player_one' as const, row: 5, col: 2, king: true },
+      ...[[4, 3], [2, 3], [2, 1], [4, 1]].map(([row, col], index) => ({ id: `enemy-${index}`, owner: 'player_two' as const, row, col, king: false })),
+    ],
+  }
+  const p = { ...props(), state, selectedPieceId: 'king', legalMoves: getLegalMoves(state, 'player_one', 'king') }
+  expect(p.legalMoves[0].captures).toHaveLength(4)
+  expect(chooseSquare(p, { row: 5, col: 2 })).toBe('move')
+  expect(p.onSelectMove).toHaveBeenCalledWith(p.legalMoves[0])
+  expect(p.onSelectPiece).not.toHaveBeenCalled()
+})
+
 test.each([{ disabled: true }, { viewerSlot: 'spectator' as const }, { state: { ...createInitialBoard(), winner: 'player_two' as const } }])('blocks input when game interaction is unavailable: %j', patch => {
   const p = { ...props(), ...patch }
   expect(chooseSquare(p, { row: 4, col: 1 })).toBe('ignored')

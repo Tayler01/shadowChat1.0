@@ -51,7 +51,7 @@ public partial class ShadowBoard : MonoBehaviour
 
     void Start()
     {
-        Application.targetFrameRate = 30;
+        Application.targetFrameRate = 60;
 #if UNITY_WEBGL && !UNITY_EDITOR
         WebGLInput.captureAllKeyboardInput = false;
 #endif
@@ -60,7 +60,7 @@ public partial class ShadowBoard : MonoBehaviour
         QualitySettings.shadows = ShadowQuality.All;
         QualitySettings.shadowDistance = 25;
         QualitySettings.shadowResolution = ShadowResolution.High;
-        QualitySettings.antiAliasing = 4;
+        QualitySettings.antiAliasing = 2;
         BuildScene();
         ready = true;
         Emit(new BoardEvent { type = "ready" });
@@ -240,6 +240,15 @@ public partial class ShadowBoard : MonoBehaviour
         if(next==null || next.version!=1 || next.pieces==null || next.pieces.Length>24) return;
         view.GetComponent<StudyColorGrade>().SetHighContrast(next.highContrast);
         bool flip=current==null || current.viewerSlot!=next.viewerSlot;
+        // A multi-jump king can finish on its starting square. Detect a new
+        // capture through removed victims, not just final coordinates or the
+        // revision (selection/preferences also create revisions).
+        bool newCapture=false;
+        if(next.lastMove!=null && next.lastMove.captures!=null)
+            foreach(var victim in tokens.Values) {
+                bool retained=Array.Exists(next.pieces,p=>p.id==victim.piece.id);
+                if(!retained) {newCapture=true;break;}
+            }
         bool newRevision=current==null || current.revision!=next.revision;
         current=next;
         GetComponent<MedievalStudyEffects>()?.Configure(next.reducedMotion,presentationPaused);
@@ -258,7 +267,8 @@ public partial class ShadowBoard : MonoBehaviour
             }
             else
             {
-                bool changed=token.piece.row!=piece.row || token.piece.col!=piece.col;
+                bool changed=token.piece.row!=piece.row || token.piece.col!=piece.col ||
+                    (newCapture && next.lastMove!=null && next.lastMove.pieceId==piece.id);
                 bool crowned=piece.king && !token.piece.king;
                 // A reused board can acquire a new seat without any logical move.
                 // Reorient its existing meshes together with picking/highlights.
@@ -416,7 +426,7 @@ public partial class ShadowBoard : MonoBehaviour
         cameraZoom=Mathf.Clamp(cameraZoom*Mathf.Clamp(delta.zoomRatio,.75f,1.25f),.75f,1.18f);
         tactical=false;BeginCameraGestureMotion();
     }
-    public void SetPaused(string value) { presentationPaused=value=="true";if(presentationPaused) pressed=false;Application.targetFrameRate=presentationPaused?5:30;GetComponent<MedievalStudyEffects>()?.Configure(current?.reducedMotion??false,presentationPaused); }
+    public void SetPaused(string value) { presentationPaused=value=="true";if(presentationPaused) pressed=false;Application.targetFrameRate=presentationPaused?5:60;GetComponent<MedievalStudyEffects>()?.Configure(current?.reducedMotion??false,presentationPaused); }
     void CameraPose(out Vector3 position,out Quaternion rotation)
     {
         float a=cameraAngle*Mathf.Deg2Rad;

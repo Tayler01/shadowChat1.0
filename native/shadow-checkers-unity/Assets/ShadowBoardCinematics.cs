@@ -24,7 +24,7 @@ public partial class ShadowBoard
     [Serializable] class SoundEvent {public int version=1;public string type="sound";public string cue;}
     void Sound(string cue) {if(!presentationPaused) Emit(new SoundEvent {cue=cue});}
     void CinematicState(bool busy,string stage) {Emit(new CinematicEvent {busy=busy,stage=stage});}
-    const float CameraGestureSmoothingSeconds=.035f;
+    const float CameraGestureSmoothingSeconds=.022f;
     static float CameraGestureBlend(float deltaTime) {return 1-Mathf.Exp(-Mathf.Min(Mathf.Max(0,deltaTime),.05f)/CameraGestureSmoothingSeconds);}
     void BeginCameraGestureMotion()
     {
@@ -57,7 +57,8 @@ public partial class ShadowBoard
             view.transform.rotation=Quaternion.Slerp(view.transform.rotation,targetRotation,blend);
             view.fieldOfView=Mathf.Lerp(view.fieldOfView,43*cameraZoom,blend);
             view.orthographicSize=Mathf.Max(5.35f,5.5f/Mathf.Max(.65f,view.aspect));
-            SendProjection();
+            // The host does not position overlays from intermediate projections.
+            // Avoid serializing 64 squares across the WASM/iframe bridge each frame.
             if(Vector3.Distance(view.transform.position,targetPosition)<.001f &&
                Quaternion.Angle(view.transform.rotation,targetRotation)<.02f &&
                Mathf.Abs(view.fieldOfView-43*cameraZoom)<.005f) {

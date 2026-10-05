@@ -171,6 +171,41 @@ function openMoveFrame() {
   return { view, iframe, post, emit, snapshots, latest, move }
 }
 
+test('changes or clears a selection and keeps mandatory-capture guidance from trapping input', () => {
+  const fixture = mockUseShadowCheckers()
+  const state = {
+    ...createInitialBoard(),
+    pieces: [
+      { id: 'jump', owner: 'player_one' as const, row: 5, col: 0, king: false },
+      { id: 'other-jump', owner: 'player_one' as const, row: 5, col: 4, king: false },
+      { id: 'blocked-by-rule', owner: 'player_one' as const, row: 7, col: 6, king: false },
+      { id: 'victim', owner: 'player_two' as const, row: 4, col: 1, king: false },
+      { id: 'other-victim', owner: 'player_two' as const, row: 4, col: 5, king: false },
+    ],
+  }
+  mockUseShadowCheckers.mockReturnValue({ ...fixture, activeMatch: { ...activeMatch, board_state: serializeBoard(state) } })
+  fixture.actions.submitMove.mockImplementation(() => new Promise(() => {}))
+  const board = openMoveFrame()
+  const tap = (row: number, col: number) => board.emit({ type: 'square', revision: board.latest().revision, row, col })
+  tap(5, 0)
+  expect(board.latest().selectedPieceId).toBe('jump')
+  tap(5, 4)
+  expect(board.latest().selectedPieceId).toBe('other-jump')
+  tap(5, 4)
+  expect(board.latest().selectedPieceId).toBe('')
+  tap(5, 0)
+  tap(7, 6)
+  expect(board.latest().selectedPieceId).toBe('')
+  expect(board.latest().destinations).toEqual([])
+  expect(board.latest().helpers).toEqual(expect.arrayContaining([{ row: 5, col: 0 }, { row: 5, col: 4 }]))
+  tap(6, 5)
+  expect(fixture.actions.submitMove).not.toHaveBeenCalled()
+  tap(5, 4)
+  tap(3, 6)
+  expect(fixture.actions.submitMove).toHaveBeenCalledWith('match-1', 'other-jump', [{ row: 5, col: 4 }, { row: 3, col: 6 }])
+  board.post.mockRestore()
+})
+
 test('shows a legal move while its RPC is pending, survives stale refresh, and reconciles without replay', async () => {
   const fixture = mockUseShadowCheckers()
   let resolveMove!: (value: unknown) => void

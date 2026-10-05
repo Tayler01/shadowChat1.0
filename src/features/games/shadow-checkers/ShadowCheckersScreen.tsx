@@ -391,6 +391,7 @@ export function ShadowCheckersScreen({
 
     const pieceMoves = getLegalMoves(state, viewerSlot, piece.id)
     if (pieceMoves.length === 0) {
+      setSelectedPieceId(null)
       if (hasMandatoryCapture(state, viewerSlot)) {
         const captureMoves = getLegalMoves(state, viewerSlot).filter(move => move.captures.length > 0)
         setHelperMoves(captureMoves)
@@ -401,7 +402,7 @@ export function ShadowCheckersScreen({
       return
     }
 
-    setSelectedPieceId(piece.id)
+    setSelectedPieceId(current => current === piece.id ? null : piece.id)
     setHelperMoves(mandatoryMoves)
   }
 
@@ -417,13 +418,13 @@ export function ShadowCheckersScreen({
   }
 
   const handleSelectMove = (move: CheckersMove) => {
-    if (!activeMatch || selectedMatchId !== activeMatch.id || !state || !user?.id || !myTurn || viewerSlot === 'spectator' || moveInFlight.current) return
+    if (!activeMatch || selectedMatchId !== activeMatch.id || !state || !user?.id || !myTurn || viewerSlot === 'spectator' || moveInFlight.current) return false
     let predicted: CheckersBoardState
     try {
       predicted = applyMove(state, viewerSlot, move.pieceId, move.path).state
     } catch (err) {
       notify('error', formatCheckersActionError(err, 'That move is not legal.'))
-      return
+      return false
     }
     const id = ++moveSequence.current
     const matchId = activeMatch.id

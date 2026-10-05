@@ -35,7 +35,7 @@ export function ShadowCheckersCameraSurface({ disabled, onChange, onReset }: {
       if (disabled) return
       const rect = event.currentTarget.getBoundingClientRect()
       const delta = gesture.current.move(event.pointerId, { x: event.clientX, y: event.clientY }, rect.width, rect.height)
-      if (delta) { onChange({ ...delta, turn: (delta.turn ?? 0) * -.35, tilt: (delta.tilt ?? 0) * -.55 }); event.preventDefault() }
+      if (delta) { onChange({ ...delta, turn: (delta.turn ?? 0) * -.45, tilt: (delta.tilt ?? 0) * -.65 }); event.preventDefault() }
     }}
     onPointerUp={event => gesture.current.end(event.pointerId)}
     onPointerCancel={event => gesture.current.end(event.pointerId)}

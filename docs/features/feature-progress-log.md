@@ -1,3 +1,16 @@
+## October 5 Shadow Checkers selection, audio and rendering follow-up
+
+- Fixed board-wide mandatory-capture filtering, same-piece deselection and
+  rejected Unity move locks in solo and multiplayer. Added selection regressions.
+- Preserved the soundtrack across callback rerenders and recover Safari audio
+  interruptions from in-room gestures. Fullscreen now survives mode changes.
+- Rebuilt Unity with the installed 6000.6.3f1 editor: 60 FPS target, 1.5 DPR cap,
+  2x antialiasing, bounded 512px reflections and fewer camera bridge messages.
+  Inverted camera controls remain and respond more quickly. King capture loops
+  now animate even when their destination equals their starting square.
+- Required lint and TypeScript pass; phone-emulated/runtime verification and
+  physical iPhone acceptance are tracked in the finish checklist.
+
 ## October 5 Shadow Checkers solo opponent
 
 - Added a fully local computer opponent beside the existing human multiplayer

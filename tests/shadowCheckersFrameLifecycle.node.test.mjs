@@ -66,10 +66,10 @@ function target() {
 
 async function player({ pending = false } = {}) {
   const window = target(), canvas = target(), document = target()
-  const calls = [], sent = [], audio = []
+  const calls = [], sent = [], audio = [], gestures = []
   let quits = 0, disposals = 0, resolvePlayer
   const unity = { SendMessage: (...args) => calls.push(args), Quit: async () => { quits++ } }
-  const parent = { postMessage: message => sent.push(message) }
+  const parent = { postMessage: message => sent.push(message), Event, dispatchEvent: event => gestures.push(event.type) }
   const origin = 'https://shadow.test'
   Object.assign(canvas, { setPointerCapture() {}, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 400 }) })
   Object.assign(document, {
@@ -85,13 +85,24 @@ async function player({ pending = false } = {}) {
   const emitReady = () => window.emit('shadow-unity-event', { detail: { type: 'ready' } })
   if (!pending) emitReady()
   return {
-    window, canvas, document, calls, sent, audio,
+    window, canvas, document, calls, sent, audio, gestures,
     stats: () => ({ quits, disposals }),
     host: (type, value) => window.emit('message', { source: parent, origin, data: { version: 1, type, value } }),
     finish: async () => { emitReady(); resolvePlayer(unity); await flush() },
     pointer: type => canvas.emit(type, { pointerId: 1, isPrimary: true, button: 0, clientX: 120, clientY: 100 }),
   }
 }
+
+test('board touches synchronously unlock the host soundtrack and respect pause', async () => {
+  const p = await player()
+  p.pointer('pointerdown')
+  assert.deepEqual(p.gestures, ['shadow-checkers-audio-gesture'])
+  p.pointer('pointerup')
+  assert.equal(p.gestures.length, 2)
+  p.host('paused', true)
+  p.pointer('pointerdown'); p.pointer('pointerup'); p.canvas.emit('keydown')
+  assert.equal(p.gestures.length, 2)
+})
 
 test('a cached page suspends and resumes the same player, then requests fresh host state', async () => {
   const p = await player()

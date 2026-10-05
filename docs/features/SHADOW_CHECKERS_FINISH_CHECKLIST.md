@@ -2,6 +2,21 @@
 
 September 29, 2026. Working checklist from the user's physical-phone walkthrough. The user resumed the goal on September 29. The move-sync and camera update is published for physical-phone testing; remaining acceptance requirements stay open where physical-device evidence is needed.
 
+## October 5 phone feedback follow-up
+
+- Fixed selection switching/deselection and rejected-move input locks. Mandatory
+  jumps now filter against all pieces before a selected piece's moves are shown.
+- Fixed soundtrack disposal on parent callback changes and retry playback after
+  Safari audio interruption from a real in-room gesture. Browser policy still
+  requires user interaction when initial playback is blocked.
+- The 6000.6.3f1 Unity export targets 60 FPS with lower pixel/MSAA/reflection work,
+  more responsive camera smoothing, and no per-frame projection JSON during pan.
+  Geometry, room textures, direct lighting and live board reflections remain.
+- Fixed stationary-looking king capture loops and fullscreen loss on mode switch.
+- [ ] Confirm selection, continuous music, camera response and sustained rendering
+  on the user's iPhone 16 Pro Max after the restart prompt. Desktop browser
+  measurements are not physical-phone acceptance or a sustained 60 FPS promise.
+
 ## Solo opponent candidate — October 5
 
 - Added an explicit **Play Computer** or **Play a Person** entrance. Existing
@@ -161,11 +176,10 @@ Checkboxes distinguish verified implementation from remaining acceptance. Checke
 - Keep architecture, tricky debugging, security-sensitive notification/invitation behavior and final integration/review at the capability level the work needs. Review delegated changes and run appropriate checks before accepting them.
 - Batch independent reads, bound output, reuse verified evidence and avoid unnecessary rebuilds or repeated tests. Cost efficiency must not weaken the acceptance criteria.
 
-## Future addition — computer opponent (outside current finish scope)
+## Computer opponent — delivered October 5
 
-- [ ] Add a quick game against a computer when another member is unavailable, alongside human multiplayer.
-- [ ] Evaluate a publicly available checkers game engine, rather than a language model, compatible with the game's American checkers rules.
-- [ ] Research license, cost, mobile performance and integration before choosing an engine. A free hosted API is not yet established; compare it with an engine that can run locally.
-- [ ] Define difficulty, local/offline behavior and separation from human multiplayer statistics before implementation.
-
-No engine or API has been selected, installed, purchased or integrated. This future feature is not a condition for completing the current multiplayer goal.
+- [x] Added four local search difficulties alongside human multiplayer, without
+  a paid API or new engine dependency. Solo state does not affect human rankings.
+- [x] Verified legal complete turns, restart and cancellation with the real worker
+  in Chromium and WebKit. The user reports the AI works in initial phone testing.
+- [ ] Complete sustained physical-phone performance and difficulty acceptance.

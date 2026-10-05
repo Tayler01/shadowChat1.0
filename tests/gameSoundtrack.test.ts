@@ -527,20 +527,48 @@ describe('game soundtrack bounded lifecycle', () => {
     expect(decode).toHaveBeenCalledTimes(phase === 'initial' ? 1 : 2)
   })
 
-  it('resumes a suspended active source without recreating or decoding it', async () => {
+  it.each(['suspended', 'interrupted'])('resumes a %s active source without recreating or decoding it', async state => {
     await controller.play('a.mp3')
-    contexts[0].state = 'suspended'
+    expect(controller.isPlaying()).toBe(true)
+    contexts[0].state = state as AudioContextState
+    expect(controller.isPlaying()).toBe(false)
     const resuming = deferred<void>()
     resumeWork = () => resuming.promise
     const first = controller.play('a.mp3')
     expect(controller.play('a.mp3')).toBe(first)
     resuming.resolve(undefined)
     await expect(first).resolves.toBe(true)
+    expect(controller.isPlaying()).toBe(true)
     expect(contexts[0].sources).toHaveLength(1)
     expect(contexts[0].sources[0].start).toHaveBeenCalledTimes(1)
     expect(contexts[0].sources[0].stop).not.toHaveBeenCalled()
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(decode).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not report success when resume leaves the context interrupted', async () => {
+    await controller.play('a.mp3')
+    contexts[0].state = 'interrupted' as AudioContextState
+    contexts[0].resume.mockImplementationOnce(async () => undefined)
+    await expect(controller.play('a.mp3')).resolves.toBe(false)
+    expect(controller.isPlaying()).toBe(false)
+    expect(retainedBuffers()).toHaveLength(0)
+  })
+
+  it('a same-source gesture retries a pending autoplay resume without another fetch', async () => {
+    initialState = 'suspended'
+    const resuming = deferred<void>()
+    resumeWork = jest.fn().mockReturnValueOnce(resuming.promise).mockImplementationOnce(async () => {
+      resuming.resolve(undefined)
+    })
+    const first = controller.play('a.mp3')
+    await drain()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(controller.play('a.mp3')).toBe(first)
+    await expect(first).resolves.toBe(true)
+    expect(contexts[0].resume).toHaveBeenCalledTimes(2)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(contexts[0].sources).toHaveLength(1)
   })
 
   it('stops on pagehide and unregisters both lifecycle listeners on dispose', async () => {

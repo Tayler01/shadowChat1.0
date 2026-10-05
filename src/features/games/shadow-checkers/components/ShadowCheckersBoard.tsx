@@ -15,7 +15,8 @@ export interface ShadowCheckersBoardProps {
     captures: CheckersPosition[]
   } | null
   onSelectPiece?: (piece: CheckersPiece) => void
-  onSelectMove?: (move: CheckersMove) => void
+  // Returning false rejects stale/invalid input without holding the Unity lock.
+  onSelectMove?: (move: CheckersMove) => void | boolean
   onInvalidDestination?: (position: CheckersPosition) => void
   disabled?: boolean
   showHints?: boolean

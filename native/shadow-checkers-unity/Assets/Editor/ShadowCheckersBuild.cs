@@ -73,7 +73,7 @@ public static class ShadowCheckersBuild
         PlayerSettings.WebGL.nameFilesAsHashes=true;
         PlayerSettings.WebGL.initialMemorySize=64;
         PlayerSettings.WebGL.maximumMemorySize=256;
-        PlayerSettings.WebGL.powerPreference=WebGLPowerPreference.LowPower;
+        PlayerSettings.WebGL.powerPreference=WebGLPowerPreference.HighPerformance;
         PlayerSettings.runInBackground=false;
         QualitySettings.shadows=ShadowQuality.All;
         QualitySettings.shadowResolution=ShadowResolution.Medium;

@@ -1,15 +1,16 @@
 {
-  "title": "Shadow Checkers computer opponent",
-  "summary": "Choose a human match or play a private game against four levels of computer opponent.",
+  "title": "Smoother Shadow Checkers",
+  "summary": "More responsive piece selection and camera movement, lighter rendering, and improved music recovery.",
   "restartPolicy": "required_restart",
   "severity": "maintenance",
   "sections": [
     {
       "heading": "Shadow Checkers",
       "items": [
-        "Choose Play Computer for an instant solo game or Play a Person for invitations and live tables.",
-        "Rookie, Casual, Challenger and Master levels all follow the same mandatory-jump, multi-jump and kinging rules as multiplayer.",
-        "Computer thinking runs on your device so it does not block the 3D room or create a ranked multiplayer match.",
+        "Switch or deselect pieces reliably, including when another piece must capture.",
+        "The 3D room targets smoother motion with lower rendering overhead and more responsive camera controls.",
+        "Music recovers after browser audio interruptions; changing game modes keeps the fullscreen view.",
+        "Kings now animate a complete capture loop even when they finish on their starting square.",
         "Restart to load this update in the Home Screen app or TestFlight."
       ]
     }

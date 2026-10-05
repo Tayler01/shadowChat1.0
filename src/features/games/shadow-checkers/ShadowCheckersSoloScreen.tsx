@@ -143,17 +143,18 @@ export function ShadowCheckersSoloScreen({
     if (!humanTurn || aiThinking || piece.owner !== 'player_one') return
     const moves = getLegalMoves(state, 'player_one', piece.id)
     if (!moves.length) {
+      setSelectedPieceId(null)
       setHelperMoves(hasMandatoryCapture(state, 'player_one') ? getLegalMoves(state, 'player_one').filter(move => move.captures.length > 0) : [])
       return
     }
-    setSelectedPieceId(piece.id)
+    setSelectedPieceId(current => current === piece.id ? null : piece.id)
     setHelperMoves([])
   }
 
   const selectMove = (move: CheckersMove) => {
-    if (!humanTurn || aiThinking) return
+    if (!humanTurn || aiThinking) return false
     const legal = getLegalMoves(state, 'player_one', move.pieceId).find(candidate => sameMove(candidate, move))
-    if (!legal) return
+    if (!legal) return false
     cancelSearch()
     const next = applyMove(state, 'player_one', legal.pieceId, legal.path).state
     setSelectedPieceId(null)

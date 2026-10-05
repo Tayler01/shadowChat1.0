@@ -75,7 +75,12 @@ export const ShadowCheckersUnityBoard = forwardRef<ShadowCheckersBoardControls, 
           return end.row === position.row && end.col === position.col
         })
         if (legal && !latest.current.disabled) submitted.current = latestSnapshot.current.revision
-        chooseSquare(latest.current, position)
+        try {
+          if (chooseSquare(latest.current, position) !== 'move') submitted.current = null
+        } catch (error) {
+          submitted.current = null
+          throw error
+        }
       }
     }
     const visibility = () => post('paused', document.hidden || Boolean(latest.current.paused))

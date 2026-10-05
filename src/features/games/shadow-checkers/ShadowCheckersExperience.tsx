@@ -26,35 +26,48 @@ export function ShadowCheckersExperience(props: ShadowCheckersExperienceProps) {
   const rotateGate = useLandscapeGate()
   const rootRef = React.useRef<HTMLDivElement>(null)
   const orientationLocked = React.useRef(false)
+  const landscapeRequest = React.useRef(0)
 
   React.useEffect(() => {
     if (props.initialMatchId) setMode('multiplayer')
   }, [props.initialMatchId])
 
   const requestLandscape = React.useCallback(async () => {
+    const root = rootRef.current
+    if (!root || (document.fullscreenElement && document.fullscreenElement !== root)) return
+    const request = ++landscapeRequest.current
     const orientation = window.screen.orientation as ScreenOrientation & { lock?: (orientation: 'landscape') => Promise<void> }
-    if (!document.fullscreenElement && rootRef.current?.requestFullscreen) {
-      await rootRef.current.requestFullscreen().catch(() => {})
+    if (!document.fullscreenElement && root.requestFullscreen) {
+      await root.requestFullscreen().catch(() => {})
+    }
+    if (request !== landscapeRequest.current || rootRef.current !== root) {
+      if (!root.isConnected && document.fullscreenElement === root) void document.exitFullscreen?.().catch(() => {})
+      return
     }
     if (orientation?.lock) {
-      await orientation.lock('landscape').then(() => { orientationLocked.current = true }).catch(() => {})
+      await orientation.lock('landscape').then(() => {
+        if (request === landscapeRequest.current && rootRef.current === root) orientationLocked.current = true
+        else if (!root.isConnected && (!document.fullscreenElement || document.fullscreenElement === root)) orientation.unlock?.()
+      }).catch(() => {})
     }
   }, [])
 
   React.useEffect(() => {
+    const root = rootRef.current
     void requestLandscape()
     return () => {
-      if (orientationLocked.current) window.screen.orientation?.unlock?.()
+      landscapeRequest.current += 1
+      if (orientationLocked.current && (!document.fullscreenElement || document.fullscreenElement === root)) window.screen.orientation?.unlock?.()
       orientationLocked.current = false
+      if (root && document.fullscreenElement === root) void document.exitFullscreen?.().catch(() => {})
     }
   }, [requestLandscape])
 
+  let content: React.ReactNode
   if (mode === 'multiplayer') {
-    return <React.Suspense fallback={<div role="status" className="flex h-full items-center justify-center bg-black text-sm text-[#d9c79f]">Opening multiplayer tables…</div>}><LazyShadowCheckersScreen {...props} onExit={() => props.initialMatchId ? props.onExit?.() : setMode('choose')} /></React.Suspense>
-  }
-
-  if (mode === 'solo') {
-    return (
+    content = <React.Suspense fallback={<div role="status" className="flex h-full items-center justify-center bg-black text-sm text-[#d9c79f]">Opening multiplayer tables…</div>}><LazyShadowCheckersScreen {...props} onExit={() => props.initialMatchId ? props.onExit?.() : setMode('choose')} /></React.Suspense>
+  } else if (mode === 'solo') {
+    content = (
       <ShadowCheckersSoloScreen
         difficulty={difficulty}
         onLeaveMode={() => setMode('choose')}
@@ -66,10 +79,8 @@ export function ShadowCheckersExperience(props: ShadowCheckersExperienceProps) {
         onToggleMusic={props.onToggleMusic}
       />
     )
-  }
-
-  return (
-    <div ref={rootRef} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-black text-[#f6e0a2]">
+  } else content = (
+    <>
       {rotateGate && (
         <div className="absolute inset-0 z-[150] flex flex-col items-center justify-center gap-3 bg-black px-8 text-center" role="dialog" aria-modal="true" aria-label="Rotate phone to play">
           <img src={SHADOW_CHECKERS_ASSETS.logo} alt="Shadow Checkers" className="h-16 max-w-[min(60vw,22rem)] object-contain" />
@@ -121,6 +132,8 @@ export function ShadowCheckersExperience(props: ShadowCheckersExperienceProps) {
           )}
         </section>
       </main>
-    </div>
+    </>
   )
+
+  return <div ref={rootRef} className="relative flex h-full min-h-0 flex-col overflow-hidden bg-black text-[#f6e0a2]">{content}</div>
 }

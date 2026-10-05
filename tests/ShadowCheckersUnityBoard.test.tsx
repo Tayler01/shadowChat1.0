@@ -17,6 +17,27 @@ test('rejects messages from another frame and releases Unity for accessible cont
   expect(screen.getAllByRole('button', { name: /player_one piece/ })).toHaveLength(12)
 })
 
+test('the accessible board submits a king loop capture when its selected starting square is tapped', () => {
+  const controls = createRef<ShadowCheckersBoardControls>()
+  const state = {
+    ...createInitialBoard(),
+    pieces: [
+      { id: 'king', owner: 'player_one' as const, row: 5, col: 2, king: true },
+      ...[[4, 3], [2, 3], [2, 1], [4, 1]].map(([row, col], index) => ({ id: `enemy-${index}`, owner: 'player_two' as const, row, col, king: false })),
+    ],
+  }
+  const legalMoves = getLegalMoves(state, 'player_one', 'king')
+  const onSelectMove = jest.fn()
+  const onSelectPiece = jest.fn()
+  render(<ComfortProvider><ShadowCheckersUnityBoard ref={controls} state={state} viewerSlot="player_one" selectedPieceId="king" legalMoves={legalMoves} onSelectMove={onSelectMove} onSelectPiece={onSelectPiece} /></ComfortProvider>)
+  act(() => controls.current?.toggleAccessibleBoard())
+  fireEvent.click(screen.getByRole('button', { name: 'player_one piece' }))
+  expect(onSelectMove).toHaveBeenCalledTimes(1)
+  expect(onSelectMove.mock.calls[0][0]).toMatchObject({ pieceId: 'king', captures: expect.any(Array) })
+  expect(onSelectMove.mock.calls[0][0].captures).toHaveLength(4)
+  expect(onSelectPiece).not.toHaveBeenCalled()
+})
+
 test('locks duplicate move input before React or server state changes', () => {
   const state = createInitialBoard()
   const onSelectMove = jest.fn()
@@ -28,6 +49,23 @@ test('locks duplicate move input before React or server state changes', () => {
   const move = () => window.dispatchEvent(new MessageEvent('message', { origin: location.origin, source: iframe.contentWindow, data: { version: 1, type: 'square', revision: snapshot.revision, row: 4, col: 1 } }))
   act(() => { move(); move() })
   expect(onSelectMove).toHaveBeenCalledTimes(1)
+})
+
+test('a synchronously rejected move releases input so another piece can be selected', () => {
+  const state = createInitialBoard()
+  const onSelectMove = jest.fn(() => false)
+  const onSelectPiece = jest.fn()
+  render(<ComfortProvider><ShadowCheckersUnityBoard state={state} viewerSlot="player_one" selectedPieceId="p1-5-0" legalMoves={getLegalMoves(state, 'player_one', 'p1-5-0')} onSelectMove={onSelectMove} onSelectPiece={onSelectPiece} /></ComfortProvider>)
+  const iframe = screen.getByTitle('Shadow Checkers 3D board') as HTMLIFrameElement
+  const post = jest.spyOn(iframe.contentWindow!, 'postMessage')
+  const emit = (data: object) => act(() => window.dispatchEvent(new MessageEvent('message', { origin: location.origin, source: iframe.contentWindow, data: { version: 1, ...data } })))
+  emit({ type: 'ready' })
+  const snapshot = post.mock.calls.find(call => call[0].type === 'snapshot')![0].value
+  emit({ type: 'square', revision: snapshot.revision, row: 4, col: 1 })
+  emit({ type: 'square', revision: snapshot.revision, row: 5, col: 2 })
+  expect(onSelectMove).toHaveBeenCalledTimes(1)
+  expect(onSelectPiece).toHaveBeenCalledWith(state.pieces.find(piece => piece.id === 'p1-5-2'))
+  post.mockRestore()
 })
 
 test('presentation completion requires the current snapshot from its own frame and falls back without Unity', () => {

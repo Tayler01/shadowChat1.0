@@ -92,6 +92,8 @@ describe('Shadow Checkers engine', () => {
     ])
 
     expect(hasMandatoryCapture(state, 'player_one')).toBe(true)
+    expect(getLegalMoves(state, 'player_one', 'p1b')).toEqual([])
+    expect(getLegalMoves(state, 'player_one', 'p1')).toEqual(getLegalMoves(state, 'player_one'))
     expect(() => validateMove(state, 'player_one', 'p1b', [{ row: 5, col: 4 }, { row: 4, col: 3 }])).toThrow('Capture required')
   })
 

@@ -15,10 +15,18 @@
     if (isPaused()) press = null
   }
   const canvas = document.getElementById('board')
+  const unlockAudio = () => {
+    if (isPaused()) return
+    void window.ShadowStudyAudio.unlock()
+    // Keep the host soundtrack resume in this same-origin user gesture.
+    // postMessage would defer it until after the touch activation expires.
+    try { parent.dispatchEvent(new parent.Event('shadow-checkers-audio-gesture')) } catch { /* Standalone frame. */ }
+  }
+  canvas.addEventListener('keydown', unlockAudio)
   let press
   canvas.addEventListener('pointerdown', event => {
     if (isPaused()) { press = null; return }
-    void window.ShadowStudyAudio.unlock()
+    unlockAudio()
     if (!event.isPrimary || event.button !== 0) return
     press = { x: event.clientX, y: event.clientY, id: event.pointerId }
     canvas.setPointerCapture(event.pointerId)
@@ -27,7 +35,7 @@
   canvas.addEventListener('pointerup', event => {
     if (isPaused()) { press = null; return }
     // Touch browsers grant activation at release, so resume directly in that gesture.
-    void window.ShadowStudyAudio.unlock()
+    unlockAudio()
     const down = press; press = null
     if (!down || down.id !== event.pointerId || !instance || !started) return
     if (Math.hypot(event.clientX - down.x, event.clientY - down.y) > 14) return
@@ -106,7 +114,8 @@
     if (disposed) return
     instance = await window.createUnityInstance(document.getElementById('board'), {
       ...config,
-      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+      // Preserve scene detail while bounding fill cost on high-DPI phone screens.
+      devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.5),
       companyName: 'ShadowChat', productName: 'Shadow Checkers', productVersion: '1.0',
       showBanner: (_message, type) => { if (type === 'error') fail() },
     }, value => send('progress', value))

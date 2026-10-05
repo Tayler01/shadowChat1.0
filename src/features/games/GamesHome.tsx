@@ -161,6 +161,8 @@ export function GamesHome({
   const currentMusicSourceRef = useRef<string | null>(null)
   const musicRequestedRef = useRef(false)
   const musicRequestIdRef = useRef(0)
+  const immersiveChangeRef = useRef(onImmersiveChange)
+  immersiveChangeRef.current = onImmersiveChange
 
   const getSoundtrack = useCallback(() => {
     soundtrackRef.current ??= createGameSoundtrackController(0.42)
@@ -360,13 +362,19 @@ export function GamesHome({
     return () => {
       soundtrackRef.current?.dispose()
       soundtrackRef.current = null
-      onImmersiveChange?.(false)
+      immersiveChangeRef.current?.(false)
     }
-  }, [onImmersiveChange])
+  }, [])
 
   useEffect(() => {
     const resumeRequestedMusic = () => {
       if (!document.hidden && musicRequestedRef.current && currentMusicSourceRef.current) {
+        void playMusic(currentMusicSourceRef.current)
+      }
+    }
+    const recoverMusicFromGesture = () => {
+      if (!document.hidden && musicRequestedRef.current && currentMusicSourceRef.current
+        && !soundtrackRef.current?.isPlaying()) {
         void playMusic(currentMusicSourceRef.current)
       }
     }
@@ -379,11 +387,17 @@ export function GamesHome({
     document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener('pagehide', stopMusicForBackground)
     window.addEventListener('pageshow', resumeRequestedMusic)
+    window.addEventListener('pointerup', recoverMusicFromGesture)
+    window.addEventListener('keydown', recoverMusicFromGesture)
+    window.addEventListener('shadow-checkers-audio-gesture', recoverMusicFromGesture)
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener('pagehide', stopMusicForBackground)
       window.removeEventListener('pageshow', resumeRequestedMusic)
+      window.removeEventListener('pointerup', recoverMusicFromGesture)
+      window.removeEventListener('keydown', recoverMusicFromGesture)
+      window.removeEventListener('shadow-checkers-audio-gesture', recoverMusicFromGesture)
     }
   }, [stopMusicForBackground, playMusic])
 
