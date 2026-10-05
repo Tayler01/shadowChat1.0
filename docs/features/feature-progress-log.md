@@ -1,3 +1,12 @@
+## October 5 first-send chat scrolling
+
+- Fixed a shared layout/scroll event race that disabled following before resize
+  observation after the first outgoing text. Gesture and elastic ownership stay
+  intact. Fixed-footer chat surfaces now clip rows below the composer without
+  resizing the scrollport. Pins comments inherit the controller fix.
+- Regression and browser evidence plus physical acceptance steps:
+  [first-send scrolling](first-send-scroll-2026-10-05.md).
+
 ## October 5 Shadow Runner full-finish continuation
 
 - Integrated current main `a40565f5` without losing the Runner patch or unrelated

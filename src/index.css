@@ -1254,6 +1254,12 @@ html, body, #root {
     height: var(--shadowchat-app-height, var(--shadowchat-visual-viewport-height, 100dvh));
   }
 
+  /* Keep the stable scroll geometry for WebKit's keyboard and rubber-band
+     motion, but stop message paint/hit targets at the fixed composer. */
+  .mobile-chat-message-viewport {
+    clip-path: inset(0 0 calc(var(--shadowchat-mobile-chat-footer-height, 9.5rem) + var(--shadowchat-mobile-scroll-keyboard-inset, 0px)) 0);
+  }
+
   .shadowchat-mobile-nav {
     overflow: hidden;
   }

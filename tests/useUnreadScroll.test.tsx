@@ -235,6 +235,62 @@ describe('useUnreadScroll', () => {
     document.body.removeChild(container)
   })
 
+  it.each(['general_chat:main', 'dm:conversation', 'general_chat_thread:root', 'pin:image'])('keeps %s following when first-send layout scrolls arrive before resize observation', (surfaceKey) => {
+    useFakeTimersWithImmediateRaf()
+    let resizeCallback: ResizeObserverCallback | undefined
+    global.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) { resizeCallback = callback }
+      observe = jest.fn()
+      disconnect = jest.fn()
+    } as unknown as typeof ResizeObserver
+    const container = document.createElement('div')
+    container.appendChild(document.createElement('div'))
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1000)
+    container.scrollTo = jest.fn((options: ScrollToOptions) => { container.scrollTop = options.top ?? 0 }) as typeof container.scrollTo
+    const { result, unmount } = renderHook(() => useUnreadScroll<TestMessage>({
+      containerRef: { current: container }, messages: [makeMessage('m1', 1)], cursor: null, surfaceKey,
+      getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at,
+      getElementId: id => `message-${id}`, onMarkReadToLatest: jest.fn(),
+    }))
+    act(() => jest.advanceTimersByTime(900))
+    expect(container.scrollTop).toBe(600)
+    // Optimistic insertion changes the DOM before the read-cursor rows change.
+    // A native scroll can precede ResizeObserver and the queue acknowledgement.
+    act(() => {
+      setScrollMetrics(container, 1090)
+      result.current.handleUnreadScroll()
+    })
+    expect(result.current.autoScroll).toBe(true)
+    act(() => resizeCallback?.([], {} as ResizeObserver))
+    expect(container.scrollTop).toBe(690)
+    // Clearing/refocusing the composer and reconciling the server row settle
+    // in separate phases. Neither is a gesture away from latest.
+    act(() => {
+      setScrollMetrics(container, 1110, 350)
+      result.current.handleUnreadScroll()
+      window.dispatchEvent(new Event(MOBILE_VIEWPORT_UPDATED_EVENT))
+      container.scrollTop = 660
+      result.current.handleUnreadScroll()
+      jest.advanceTimersByTime(900)
+    })
+    expect(result.current.autoScroll).toBe(true)
+    expect(container.scrollTop).toBe(760)
+    // Real user intent still cancels the pending correction immediately.
+    act(() => {
+      container.dispatchEvent(new WheelEvent('wheel', { deltaY: -10 }))
+      container.scrollTop = 650
+      result.current.handleUnreadScroll()
+      setScrollMetrics(container, 1150, 350)
+      resizeCallback?.([], {} as ResizeObserver)
+      jest.advanceTimersByTime(900)
+    })
+    expect(result.current.autoScroll).toBe(false)
+    expect(container.scrollTop).toBe(650)
+    unmount()
+    container.remove()
+  })
+
   it('coalesces late content height changes while auto-scroll is active', async () => {
     let resizeCallback: ResizeObserverCallback | null = null
     global.ResizeObserver = class {

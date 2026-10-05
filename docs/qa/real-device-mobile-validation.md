@@ -1,5 +1,16 @@
 # Real-Device Mobile Validation
 
+## October 5 first-send and composer-boundary follow-up
+
+- New screenshots report a first outgoing text leaving latest and message rows
+  painting behind the composer/keyboard accessory gap. The shared controller
+  race is reproduced by event-order regression tests; the patch and mobile
+  clipping pass Chromium/WebKit fixtures. Physical PWA/TestFlight acceptance is
+  pending. [Validation steps](../features/first-send-scroll-2026-10-05.md).
+- Tayler separately reports the earlier quiver fixed in both hosts. Preserve
+  that accepted behavior while checking the new Send scenario. This does not
+  close the remaining Home Screen video-paste or toolbar investigations.
+
 ## October 1 physical video-paste result
 
 - Tayler reports video paste working in TestFlight after the Build 17 release,

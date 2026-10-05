@@ -125,6 +125,7 @@ export function useUnreadScroll<TMessage>({
   // event inside the bottom tolerance must not give ownership back mid-swipe.
   const userScrollRef = useRef({ active: false, touching: false, moved: false, wasFollowing: false, top: 0, x: 0, y: 0, direction: 0 })
   const userScrollSettleTimerRef = useRef<number | null>(null)
+  const scrollGeometryRef = useRef({ height: 0, viewport: 0 })
   messagesRef.current = messages
   cursorRef.current = cursor
   loadingRef.current = loading
@@ -396,6 +397,7 @@ export function useUnreadScroll<TMessage>({
     if (!container || !enabledRef.current || isElasticScroll(container) || document.querySelector('[aria-modal="true"]') && !container.closest('[aria-modal="true"]')) return
 
     const top = Math.max(container.scrollHeight - container.clientHeight, 0)
+    scrollGeometryRef.current = { height: container.scrollHeight, viewport: container.clientHeight }
     if (Math.abs(container.scrollTop - top) > 1) {
       if (typeof container.scrollTo === 'function') {
         container.scrollTo({ top, behavior })
@@ -485,6 +487,9 @@ export function useUnreadScroll<TMessage>({
 
     const bottomGap = container.scrollHeight - container.scrollTop - container.clientHeight
     const userScroll = userScrollRef.current
+    const previousGeometry = scrollGeometryRef.current
+    const layoutChanged = previousGeometry.height !== container.scrollHeight || previousGeometry.viewport !== container.clientHeight
+    scrollGeometryRef.current = { height: container.scrollHeight, viewport: container.clientHeight }
     const scrollTop = Math.max(0, Math.min(container.scrollTop, container.scrollHeight - container.clientHeight))
     const scrollDelta = scrollTop - userScroll.top
     userScroll.top = scrollTop
@@ -495,6 +500,15 @@ export function useUnreadScroll<TMessage>({
     // Keep the generous tolerance while following, but require an actual return
     // to the bottom after the user takes over. The first few swipe pixels count.
     const atBottom = !isElasticScroll(container) && !userScroll.touching && (autoScrollRef.current ? bottomGap <= 28 : bottomGap <= 1 && (!userScroll.active || scrollDelta > 0))
+    // Sending, clearing the composer and keyboard layout can emit a native
+    // scroll before ResizeObserver. A temporary gap is not a gesture away from
+    // latest. Keep follow intent until layout settles; actual contact/wheel/key
+    // ownership still cancels it before this path, including elastic rebound.
+    if (!atBottom && previousGeometry.viewport > 0 && autoScrollRef.current && !userScroll.active && !userScroll.touching &&
+      (layoutChanged || followSettleTimerRef.current !== null || followMaxTimerRef.current !== null)) {
+      followLatest()
+      return false
+    }
     anchoredPositionRef.current = captureMessageScrollAnchor(container)
     if (initialUnreadJumpDoneRef.current) saveMessageScrollAnchor(readerId, surfaceKey, atBottom || bottomGap <= 1 ? null : anchoredPositionRef.current)
     updateLastObservedMessage()
@@ -536,6 +550,7 @@ export function useUnreadScroll<TMessage>({
     readerId,
     surfaceKey,
     settleUserScroll,
+    followLatest,
   ])
 
   const captureScrollAnchor = useCallback(() => {
@@ -622,6 +637,7 @@ export function useUnreadScroll<TMessage>({
     setFeedState('resolvingInitial')
     clearTargetSettleTimer()
     anchoredPositionRef.current = null
+    scrollGeometryRef.current = { height: 0, viewport: 0 }
   }, [clearTargetSettleTimer, setAutoScroll, setFeedState, setTargetMessageId, scopeKey, initialMessageId])
 
   useEffect(() => {

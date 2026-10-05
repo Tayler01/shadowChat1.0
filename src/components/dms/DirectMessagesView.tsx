@@ -1623,7 +1623,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
               data-loaded-count={messages.length}
               data-rendered-count={messages.length}
               data-has-newer={String(hasNewer)}
-              className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)+4rem)] scroll-pt-[calc(env(safe-area-inset-top)_+_4rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)] md:pt-4 md:scroll-pt-4"
+              className="mobile-chat-message-viewport relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-[calc(env(safe-area-inset-top)+4rem)] scroll-pt-[calc(env(safe-area-inset-top)_+_4rem)] md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)] md:pt-4 md:scroll-pt-4"
             >
               <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
                 {targetAnnouncement || (uploading

@@ -959,7 +959,7 @@ export const MessageList: React.FC<MessageListProps> = ({
       data-scroll-target-id={targetMessageId ?? ''}
       data-first-unread-id={firstUnreadMessageId ?? ''}
       data-read-cursor-id={cursor?.last_read_message_id ?? ''}
-      className="relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
+      className="mobile-chat-message-viewport relative flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden overscroll-y-contain px-4 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-4 md:px-3 md:pb-[calc(env(safe-area-inset-bottom)_+_6rem)]"
     >
       {deepLinkStatus === 'targetUnavailable' && <div role="status" className="glass-panel p-4 text-center">
         <p>That message is no longer available.</p>

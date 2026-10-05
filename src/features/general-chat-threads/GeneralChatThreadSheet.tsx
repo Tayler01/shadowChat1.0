@@ -282,7 +282,7 @@ export function GeneralChatThreadSheet({
           <div
             ref={scrollRef}
             onScroll={handleScroll}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-3 [overflow-anchor:auto] md:px-4 md:pb-3"
+            className="mobile-chat-message-viewport min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[calc(env(safe-area-inset-bottom)_+_var(--shadowchat-mobile-chat-footer-height,9.5rem)_+_var(--shadowchat-mobile-scroll-keyboard-inset,0px)_+_0.75rem)] pt-3 [overflow-anchor:auto] md:px-4 md:pb-3"
             data-testid="general-chat-thread-scroll"
           >
             {thread.targetUnavailable && <div role="status" className="glass-panel p-4 text-center">
