@@ -1,4 +1,4 @@
-/* ShadowPin interaction styles load with the lazy ShadowPin route. */
+/* Shared ShadowPin and chat-image radial interaction styles. */
 .shadow-pin-action-card {
   position: relative;
   isolation: isolate;
