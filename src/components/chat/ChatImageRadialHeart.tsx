@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom'
 import type { LucideIcon } from 'lucide-react'
 import { Heart, Maximize2, Share2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
-import '../../features/shadow-pin/shadow-pin-actions.css'
+import './chat-image-radial-heart.css'
 
 type ChatImageQuickAction = 'share' | 'heart' | 'open'
 type ChatImageActionSide = 'left' | 'right'

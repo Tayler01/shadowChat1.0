@@ -1,4 +1,4 @@
-/* Shared ShadowPin and chat-image radial interaction styles. */
+/* ShadowPin interaction styles. Chat images carry a scoped radial subset. */
 .shadow-pin-action-card {
   position: relative;
   isolation: isolate;
