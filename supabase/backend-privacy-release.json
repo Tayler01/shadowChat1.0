@@ -85,7 +85,7 @@
     },
     {
       "path": "supabase/migrations/20261023224356_legacy_account_deletion_reconciliation.sql",
-      "sha256": "32b3b365b33a5517ddeaef97e60f3977e0f94ff2d08f5213fed34c045e8c5249"
+      "sha256": "07877d10f86bec57824ef20d064a11f6831f3d5b8fce481be488f1c4c88e64cb"
     }
   ],
   "activation": [

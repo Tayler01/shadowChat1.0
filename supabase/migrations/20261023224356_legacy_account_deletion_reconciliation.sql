@@ -2,6 +2,12 @@
 -- verified-bearer adapter. This additive foundation installs no scheduler.
 begin;
 
+-- Account removal cascades through messages into notification events. Keep the
+-- group-message lookup indexed just like dm_message_id so each deleted message
+-- does not scan the entire notification history. This foundation is unapplied.
+create index idx_notification_events_message_id
+  on public.notification_events(message_id);
+
 create table private.account_deletion_legacy_reconciliation (
   user_id uuid primary key references private.account_deletion_jobs(user_id) on delete cascade,
   worker_id uuid,

@@ -37,6 +37,13 @@ branch has been removed. The latest release status follows.
   URL. Actual group and DM hook fault/retry regressions pass. Private-media and
   private-Realtime production switches remain off pending coordinated consumer
   compatibility and backend acceptance.
+- Exact test-message cleanup exposed a missing production index on
+  `notification_events.message_id`. Read-only EXPLAIN selected a sequential scan
+  over approximately 40,854 rows. The still-unapplied foundation now adds that
+  narrow index; its plan hash was revised explicitly. Actual-migration SQL tests
+  select the index and delete 23 related synthetic notifications while preserving
+  19,977 unrelated rows. All 83 focused phase/release/SQL checks pass. Production
+  latency and account-deletion acceptance remain unverified until rollout.
 - No TestFlight upload or production App Store submission has occurred for these
   streamlined builds. Hosted membership/reporting/deletion acceptance, final
   privacy disclosures, review access, moderation operations and physical-iPhone
@@ -565,7 +572,7 @@ receipt-based deletion is activated.
 The historical split proposal and subsequent implementation/proof appendix are
 in `output/security/security-foundation-activation-review-20261023.md`. The
 current reviewed plan is `supabase/backend-privacy-release.json`, SHA-256
-`05ec4bb9a28255454f67f5761d9644ae4063fc14735ff5fb50c85c09ad63f095`.
+`c1f6d2b22759ffa3dc52830e40469bcbe304059e8e49ecbf567532ed1917a94b`.
 The final activation is `20261023224455_security_privacy_activation.sql`, SHA-256
 `9729cad612270addd30b64de79ce61139bf240d42550982bdfa7cf964ff99280`.
 The plan preserves the five September 30 migrations through baseline version

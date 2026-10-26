@@ -19,6 +19,11 @@ async function fixture() {
   const db = await PGlite.create()
   try {
     await db.exec('create role anon; create role authenticated; create role service_role bypassrls; create schema private;')
+    await db.exec(`
+      create table public.messages(id uuid primary key);
+      create table public.notification_events(id bigint primary key,
+        message_id uuid references public.messages(id) on delete cascade);
+    `)
     const access = await readMigration('20261023001140_active_member_access_boundary.sql')
     const start = access.indexOf('create table private.account_deletion_jobs')
     const end = access.indexOf('create function private.is_active_member')
@@ -73,6 +78,25 @@ async function dispatcherFixture() {
   const dispatch = () => fx.scalar('select private.request_legacy_account_deletion_reconciliation()')
   return { ...fx, bind, credential, vault, dispatch }
 }
+
+test('foundation indexes group notification cascades and preserves unrelated events', async () => {
+  const { db, scalar } = await fixture()
+  try {
+    await db.exec('reset role')
+    await db.query('insert into public.messages values($1),($2)', [member, other])
+    await db.query(`insert into public.notification_events
+      select i,case when i<=23 then $1::uuid else $2::uuid end
+      from generate_series(1,20000) i`, [member, other])
+    await db.exec('analyze public.notification_events')
+    const plan = await db.query('explain (format json) delete from public.notification_events where message_id=$1', [member])
+    assert.match(JSON.stringify(plan.rows), /idx_notification_events_message_id/,
+      'The cascade predicate must use the index installed by the actual foundation migration')
+    await db.query('delete from public.messages where id=$1', [member])
+    assert.equal(await scalar('select count(*)::integer from public.notification_events where message_id=$1', [member]), 0)
+    assert.equal(await scalar('select count(*)::integer from public.notification_events where message_id=$1', [other]), 19977)
+    assert.equal(await scalar('select count(*)::integer from public.messages where id=$1', [other]), 1)
+  } finally { await db.close() }
+})
 
 test('claims only a stale, already-authorized legacy job and never creates deletion authority', async () => {
   const fx = await fixture()
