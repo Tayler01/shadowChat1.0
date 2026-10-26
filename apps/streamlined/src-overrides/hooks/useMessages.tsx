@@ -1465,6 +1465,7 @@ function useProvideMessages(): MessagesContextValue {
     const intentKey = `${user.id}:${clientMessageId}`;
     if (pendingIntentsRef.current.has(intentKey)) return null;
     const createdAt = options.createdAt || new Date().toISOString();
+    let preparedMedia = { content: content.trim(), fileUrl, thumbnailUrl };
     const optimisticPayload = prepareMessageData(
       user.id,
       content,
@@ -1528,6 +1529,7 @@ function useProvideMessages(): MessagesContextValue {
         ? await prepareMessageMedia({ senderId: user.id, clientMessageId, messageType, content, fileUrl, thumbnailUrl })
         : { content, fileUrl, thumbnailUrl };
       if (activeUserIdRef.current !== user.id) throw new Error('The account changed while preparing this attachment.');
+      preparedMedia = { content: media.content, fileUrl: media.fileUrl, thumbnailUrl: media.thumbnailUrl };
       upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
         id: clientMessageId, clientMessageId, senderId: user.id, messageType, replyTo,
         ...media, createdAt, failedAt: createdAt,
@@ -1576,10 +1578,8 @@ function useProvideMessages(): MessagesContextValue {
         id: clientMessageId,
         clientMessageId,
         senderId: user.id,
-        content: content.trim(),
+        ...preparedMedia,
         messageType,
-        fileUrl,
-        thumbnailUrl,
         replyTo,
         createdAt,
         failedAt: new Date().toISOString(),
@@ -1620,14 +1620,14 @@ function useProvideMessages(): MessagesContextValue {
       message.delivery_status === 'failed'
     );
     const outboxEntry = loadLocalOutboxEntries(GROUP_OUTBOX_SCOPE).find(entry => (
-      entry.id === messageId || entry.clientMessageId === messageId
+      entry.senderId === activeUserIdRef.current && (entry.id === messageId || entry.clientMessageId === messageId)
     ))
 
     if (!failedMessage && !outboxEntry) return null;
 
     const clientMessageId = failedMessage?.client_message_id || failedMessage?.id || outboxEntry!.clientMessageId;
     const messageType = failedMessage?.message_type ?? outboxEntry!.messageType
-    const retryContent = failedMessage
+    const retryContent = PRIVATE_MEDIA_ENABLED && outboxEntry ? outboxEntry.content : failedMessage
       ? failedMessage.message_type === 'audio'
         ? failedMessage.audio_url || failedMessage.content
         : failedMessage.content
@@ -1636,9 +1636,9 @@ function useProvideMessages(): MessagesContextValue {
     return sendMessage(
       retryContent,
       messageType,
-      failedMessage?.file_url ?? outboxEntry?.fileUrl,
+      PRIVATE_MEDIA_ENABLED && outboxEntry ? outboxEntry.fileUrl : failedMessage?.file_url ?? outboxEntry?.fileUrl,
       failedMessage?.reply_to ?? outboxEntry?.replyTo ?? undefined,
-      failedMessage?.thumbnail_url ?? outboxEntry?.thumbnailUrl,
+      PRIVATE_MEDIA_ENABLED && outboxEntry ? outboxEntry.thumbnailUrl : failedMessage?.thumbnail_url ?? outboxEntry?.thumbnailUrl,
       {
         clientMessageId,
         createdAt: new Date().toISOString(),

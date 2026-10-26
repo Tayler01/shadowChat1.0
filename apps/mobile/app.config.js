@@ -13,11 +13,12 @@ module.exports = ({ config }) => {
       origin.hostname === 'localhost' || /^\d+(?:\.\d+){3}$/.test(origin.hostname)) {
     throw new Error('The streamlined build requires its own HTTPS origin, without paths or credentials.');
   }
-  const buildNumber = process.env.SHADOWCHAT_IOS_BUILD_NUMBER || '18';
-  if (!/^\d+$/.test(buildNumber) || Number(buildNumber) < 18) throw new Error('Streamlined iOS build number must be at least 18.');
+  const buildNumber = process.env.SHADOWCHAT_IOS_BUILD_NUMBER || '19';
+  if (!/^\d+$/.test(buildNumber) || Number(buildNumber) < 19) throw new Error('Streamlined iOS build number must be at least 19.');
   return {
     ...config, ...expo,
     ios: { ...expo.ios, buildNumber },
     extra: { ...expo.extra, appEdition: 'streamlined', webAppUrl: origin.origin },
+    plugins: [...expo.plugins, './plugins/with-streamlined-store-permissions'],
   };
 };

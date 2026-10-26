@@ -9,9 +9,38 @@ Verified against the official sources below on **October 22, 2026**. This is a
 release preparation plan, not evidence of store approval. Policies and SDK
 requirements must be rechecked when each native build is submitted.
 
-Implementation and isolated acceptance evidence below is current through
+The historical isolated acceptance evidence below is current through
 **October 23, 2026 local time / October 24, 2026 00:19 UTC**. The disposable test
-branch has been removed; production has not received these changes.
+branch has been removed. The latest release status follows.
+
+## October 26 release status
+
+- Source preparation was committed and pushed as `76b5ce71`. The dedicated
+  streamlined site package was prepared from that clean commit but not published.
+  Android/Chromium and iPhone/WebKit passed four core chat scenarios plus focused
+  DM reload checks; every diagnostic and final fixture cleanup is verified in
+  the ignored browser evidence. See the [mobile QA log](qa/mobile-pwa-qa-log.md).
+- The foundation workflow dispatch failed with HTTP 422, **Actions has been
+  disabled for this user**, despite repository Actions permissions being enabled.
+  No workflow run or backend phase started. The full-app deployment hold remains
+  enabled; live health still identifies production `a4437b1d`. Account recovery
+  requires GitHub Support; existing ticket `4819567` needs a signed-in browser
+  before its current response can be inspected.
+- EAS produced signed streamlined iOS build **18**, build ID
+  `43c06ae4-24e4-48f5-a745-c64d1d9aafd7`. Inspection found inherited Face ID and
+  development-only local-network declarations. The streamlined-only correction
+  and build **19** configuration pass native tests, Expo introspection, doctor,
+  lint, typecheck and the release security audit. Full native defaults are
+  unchanged. Build 19 still requires its own signed artifact inspection.
+- The private-media send retry now preserves a prepared sender-owned copy when
+  message insertion fails, rather than replacing it with the original source
+  URL. Actual group and DM hook fault/retry regressions pass. Private-media and
+  private-Realtime production switches remain off pending coordinated consumer
+  compatibility and backend acceptance.
+- No TestFlight upload or production App Store submission has occurred for these
+  streamlined builds. Hosted membership/reporting/deletion acceptance, final
+  privacy disclosures, review access, moderation operations and physical-iPhone
+  testing remain submission requirements.
 
 ## October 23 production-source reconciliation
 

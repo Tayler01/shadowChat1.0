@@ -35,9 +35,10 @@ test('streamlined build uses an isolated HTTPS origin and advances only its buil
     const config = configure({ config: {} });
     assert.equal(config.extra.webAppUrl, origin);
     assert.equal(config.extra.appEdition, 'streamlined');
-    assert.equal(config.ios.buildNumber, '18');
+    assert.equal(config.ios.buildNumber, '19');
     assert.equal(config.ios.bundleIdentifier, expo.ios.bundleIdentifier);
-    assert.deepEqual(config.plugins, expo.plugins);
+    assert.deepEqual(config.plugins.slice(0, -1), expo.plugins);
+    assert.equal(config.plugins.at(-1), './plugins/with-streamlined-store-permissions');
     assert.deepEqual(config.android, expo.android);
     assert.equal(config.orientation, expo.orientation);
     assert.equal(config.extra.eas.projectId, expo.extra.eas.projectId);
@@ -49,6 +50,46 @@ test('streamlined build fails closed for missing or unsafe origin and reused bui
     withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: value }, () => assert.throws(() => configure({ config: {} })));
   }
   withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '17' }, () => assert.throws(() => configure({ config: {} })));
+  withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '18' }, () => assert.throws(() => configure({ config: {} })));
+});
+
+test('store permission cleanup removes only unused declarations and leaves full config untouched', () => {
+  const plugin = require('../plugins/with-streamlined-store-permissions');
+  assert.equal(plugin(expo), expo);
+  const original = {
+    NSFaceIDUsageDescription: 'Expo default',
+    NSLocalNetworkUsageDescription: 'Expo Dev Launcher',
+    NSBonjourServices: ['_expo._tcp'],
+    NSCameraUsageDescription: 'Capture a message photo',
+    NSMicrophoneUsageDescription: 'Record a voice message',
+    NSPhotoLibraryUsageDescription: 'Attach a message photo',
+    NSAppTransportSecurity: { NSAllowsArbitraryLoads: false, NSAllowsLocalNetworking: true },
+    UIBackgroundModes: ['fetch'],
+  };
+  const cleaned = plugin.stripUnusedStorePermissions(original);
+  for (const key of ['NSFaceIDUsageDescription', 'NSLocalNetworkUsageDescription', 'NSBonjourServices']) assert.ok(!Object.hasOwn(cleaned, key));
+  assert.deepEqual(cleaned.NSAppTransportSecurity, { NSAllowsArbitraryLoads: false });
+  for (const key of ['NSCameraUsageDescription', 'NSMicrophoneUsageDescription', 'NSPhotoLibraryUsageDescription', 'UIBackgroundModes']) assert.deepEqual(cleaned[key], original[key]);
+  assert.equal(original.NSAppTransportSecurity.NSAllowsLocalNetworking, true);
+});
+
+test('store permissions are pruned after earlier Expo mods can insert defaults', async () => {
+  const plugin = require('../plugins/with-streamlined-store-permissions');
+  const config = plugin({
+    extra: { appEdition: 'streamlined' },
+    mods: { ios: { infoPlist: async mod => ({ ...mod, modResults: {
+      NSFaceIDUsageDescription: 'Injected by SecureStore',
+      NSLocalNetworkUsageDescription: 'Injected by Dev Launcher',
+      NSBonjourServices: ['_expo._tcp'],
+      NSAppTransportSecurity: { NSAllowsArbitraryLoads: true, NSExceptionDomains: { localhost: { NSExceptionAllowsInsecureHTTPLoads: true } } },
+      NSCameraUsageDescription: 'Capture a message photo',
+    } }) } },
+  });
+  const completed = await config.mods.ios.infoPlist({ ...config, modResults: {}, modRequest: {} });
+  assert.deepEqual(completed.modResults, {
+    NSAppTransportSecurity: { NSAllowsArbitraryLoads: false },
+    NSCameraUsageDescription: 'Capture a message photo',
+  });
 });
 
 test('native routes preserve exact chat/DM/Pin destinations and reject cross-origin navigation', () => {

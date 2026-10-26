@@ -15,7 +15,7 @@ token registration, foreground arbitration, rich presentation, actions,
 badges, custom sounds, and exact notification routing.
 
 The separate `streamlined` EAS build profile uses the same signed application
-identity with build number `18` and the dedicated
+identity with build number `19` and the dedicated
 `https://shadowchat-streamlined.netlify.app` origin. The default production
 profile still selects the full app and its existing build number `17`.
 Both editions use the configured origin consistently for navigation, clipboard
@@ -23,6 +23,11 @@ and notification/session bridges. The streamlined profile falls back to Chat
 for notifications from features it omits. Only that profile substitutes the
 notification service that avoids downloading member images in the background.
 Full-app rich notifications keep their existing implementation.
+
+The streamlined profile also removes unused Face ID, local-network discovery,
+Bonjour and local-network ATS declarations after Expo's plugins run. Camera,
+photo and microphone descriptions remain for chat attachments. This does not
+change the full app's native configuration.
 
 The dedicated web app must be deployed and its backend gates verified before
 this native build is distributed. A local export is not a signed archive or

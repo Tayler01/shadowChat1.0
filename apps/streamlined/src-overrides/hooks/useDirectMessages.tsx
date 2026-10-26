@@ -1144,6 +1144,7 @@ export function useConversationMessages(conversationId: string | null) {
       const sendScopeEpoch = sendScopeEpochRef.current.version;
       if (pendingIntentsRef.current.has(intentKey)) return null;
       const createdAt = options.createdAt || new Date().toISOString();
+      let preparedMedia = { content: trimmedContent, fileUrl, thumbnailUrl };
       const optimisticMessage = {
         id: clientMessageId,
         client_message_id: clientMessageId,
@@ -1194,6 +1195,7 @@ export function useConversationMessages(conversationId: string | null) {
               ? await prepareMessageMedia({ senderId: user.id, clientMessageId, messageType, content: trimmedContent, fileUrl, thumbnailUrl })
               : { content: trimmedContent, fileUrl, thumbnailUrl };
             if (activeUserIdRef.current !== user.id) throw new Error('The account changed while preparing this attachment.');
+            preparedMedia = { content: media.content, fileUrl: media.fileUrl, thumbnailUrl: media.thumbnailUrl };
             upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
               id: clientMessageId, clientMessageId, senderId: user.id, messageType, replyTo,
               ...media, createdAt, failedAt: createdAt,
@@ -1262,10 +1264,8 @@ export function useConversationMessages(conversationId: string | null) {
           id: clientMessageId,
           clientMessageId,
           senderId: user.id,
-          content: trimmedContent,
+          ...preparedMedia,
           messageType,
-          fileUrl,
-          thumbnailUrl,
           replyTo,
           createdAt,
           failedAt: new Date().toISOString(),
@@ -1294,22 +1294,25 @@ export function useConversationMessages(conversationId: string | null) {
     if (!failedMessage) return null;
 
     const clientMessageId = failedMessage.client_message_id || failedMessage.id;
-    const retryContent = failedMessage.message_type === 'audio'
+    const preparedEntry = PRIVATE_MEDIA_ENABLED && conversationId
+      ? loadLocalOutboxEntries(getDMOutboxScope(conversationId)).find(entry => entry.senderId === activeUserIdRef.current && entry.clientMessageId === clientMessageId)
+      : undefined;
+    const retryContent = preparedEntry ? preparedEntry.content : failedMessage.message_type === 'audio'
       ? failedMessage.audio_url || failedMessage.content
       : failedMessage.content;
 
     return sendMessage(
       retryContent,
       failedMessage.message_type,
-      failedMessage.file_url,
+      preparedEntry ? preparedEntry.fileUrl : failedMessage.file_url,
       failedMessage.reply_to ?? undefined,
-      failedMessage.thumbnail_url,
+      preparedEntry ? preparedEntry.thumbnailUrl : failedMessage.thumbnail_url,
       {
         clientMessageId,
         createdAt: new Date().toISOString(),
       }
     );
-  }, [sendMessage]);
+  }, [sendMessage, conversationId]);
 
   const discardFailedMessage = useCallback((messageId: string) => {
     if (!conversationId) return;
