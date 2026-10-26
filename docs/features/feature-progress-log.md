@@ -12,8 +12,11 @@
   default. Local-only preview output is excluded from Git.
 - Fresh read-only production checks confirm the expected 243-migration baseline
   and unchanged deletion restrictions. No October backend phase or streamlined
-  hosting release has been applied. Apple/EAS access works; the configured
-  streamlined build is 18, while the latest uploaded build remains 17.
+  hosting release has been applied. GitHub rejected the foundation dispatch
+  because Actions is disabled for the account, despite repository Actions being
+  enabled. Signed streamlined iPhone build 19 is downloaded and inspected;
+  App Store Connect has not received it. See store readiness for the exact build,
+  source, permission and artifact evidence.
 - The [App Review packet](../STREAMLINED_APP_REVIEW_PACKET.md) records listing
   copy, reviewer access, privacy disclosures and signed-artifact checks still
   needed before submission. No App Store submission has occurred.

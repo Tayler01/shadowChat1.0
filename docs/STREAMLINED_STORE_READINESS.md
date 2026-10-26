@@ -31,7 +31,16 @@ branch has been removed. The latest release status follows.
   development-only local-network declarations. The streamlined-only correction
   and build **19** configuration pass native tests, Expo introspection, doctor,
   lint, typecheck and the release security audit. Full native defaults are
-  unchanged. Build 19 still requires its own signed artifact inspection.
+  unchanged. Build **19** then finished successfully as EAS build
+  `7f3acd13-a249-4c66-b7a7-896582c3062a`, from clean source `f5e2e03b`.
+  Actual IPA inspection confirms the permission cleanup, dedicated streamlined
+  origin, correct app/extension identities, production APNs and Store profiles
+  expiring July 19, 2027. The 13 bundled privacy manifests declare no tracking;
+  this does not mean the hosted product collects no data. Windows inspection
+  checks signing structures, not Apple trust-chain verification or device behavior.
+  Binary: `output/ShadowChat-streamlined-build19.ipa`; SHA-256
+  `1f038048d1465d8a9e3c968d76518fd4efe003964f9b4b002aa3003afaf1e502`.
+  Receipt: `output/native-build19-ipa-inspection-20261026.json`.
 - The private-media send retry now preserves a prepared sender-owned copy when
   message insertion fails, rather than replacing it with the original source
   URL. Actual group and DM hook fault/retry regressions pass. Private-media and
@@ -48,6 +57,17 @@ branch has been removed. The latest release status follows.
   streamlined builds. Hosted membership/reporting/deletion acceptance, final
   privacy disclosures, review access, moderation operations and physical-iPhone
   testing remain submission requirements.
+
+Two compatibility patches remain deliberately unapplied in local release evidence:
+`output/release-evidence/full-client-privacy-transport.patch` (33 files; virtual
+lint/typecheck and 132 tests pass) and `rich-push-private-media.patch` (four files;
+nine authorization/expiry tests and two Edge Function Deno checks pass). They
+preserve the full client UI and rich notification fields while preparing signed
+media and authorized transports. Recheck, integrate and run both-edition runtime
+acceptance after the foundation is available; these draft checks do not authorize
+global private-media/private-Realtime switches. Signed Storage links last 600
+seconds and Bunny links 300 seconds; already-issued links and cached notification
+images have those explicit revocation limits. No opaque grant service was added.
 
 ## October 23 production-source reconciliation
 
