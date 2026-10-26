@@ -29,6 +29,12 @@ const withShadowChatNotificationServiceExtension = config => {
       );
       fs.rmSync(destination, { recursive: true, force: true });
       fs.cpSync(source, destination, { recursive: true });
+      if (dangerousConfig.extra?.appEdition === 'streamlined') {
+        fs.copyFileSync(
+          path.resolve(dangerousConfig.modRequest.projectRoot, 'plugins', 'NotificationService.streamlined.swift'),
+          path.join(destination, 'NotificationService.swift')
+        );
+      }
       return dangerousConfig;
     },
   ]);

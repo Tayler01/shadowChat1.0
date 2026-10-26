@@ -2,8 +2,12 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { verifyAccountDeletionReleaseReadiness } from './verify-account-deletion-release.mjs'
+import { verifySecurityActivationReady } from './backend-privacy-release.mjs'
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const root = process.env.SHADOWCHAT_BACKEND_RELEASE_WORKDIR
+  ? path.resolve(process.env.SHADOWCHAT_BACKEND_RELEASE_WORKDIR)
+  : path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const manifestPath = path.join(root, 'supabase', 'function-manifest.json')
 const functionsRoot = path.join(root, 'supabase', 'functions')
 
@@ -130,6 +134,13 @@ const deploy = manifest => {
   if (!projectRef) throw new Error('SUPABASE_PROJECT_ID is required')
   if (!process.env.SUPABASE_ACCESS_TOKEN?.trim()) throw new Error('SUPABASE_ACCESS_TOKEN is required')
 
+  // Manual use of this canonical deploy command must honor the same guard as
+  // CI. Readiness is checked before any secret, function or inventory mutation.
+  verifySecurityActivationReady({ root })
+  if (manifest.active.some(entry => entry.name === 'delete-account')) {
+    verifyAccountDeletionReleaseReadiness({ workspaceRoot: root })
+  }
+
   const secretEntries = parseJsonCommand([
     'secrets', 'list', '--project-ref', projectRef, '--output', 'json',
   ])
@@ -148,7 +159,9 @@ const deploy = manifest => {
     ])
   }
 
-  deployGroup(manifest.active)
+  // Producers acquire durable upload reservations before the destructive
+  // endpoint is replaced. Recheck current data after that deployment too.
+  deployGroup(manifest.active.filter(entry => entry.name !== 'delete-account'))
   deployGroup(manifest.pausedDeny)
 
   const beforeDelete = parseJsonCommand([
@@ -159,6 +172,13 @@ const deploy = manifest => {
     if (deployedNames.has(entry.name)) {
       run(['functions', 'delete', entry.name, '--project-ref', projectRef])
     }
+  }
+
+  // The destructive endpoint is the last publication, after every producer,
+  // deny-paused endpoint and retired endpoint has reached its intended state.
+  if (manifest.active.some(entry => entry.name === 'delete-account')) {
+    verifyAccountDeletionReleaseReadiness({ workspaceRoot: root })
+    deployGroup(manifest.active.filter(entry => entry.name === 'delete-account'))
   }
 
   const remoteFunctions = parseJsonCommand([

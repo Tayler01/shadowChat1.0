@@ -1,3 +1,23 @@
+## October 26 streamlined pre-rollout phone checks
+
+- Separate loopback feature-preview build at port 4186 passed auth, two-account
+  DMs, background/resume sending and mobile DM back navigation on Android-style
+  Chromium and iPhone-style WebKit. Evidence:
+  `output/playwright/streamlined-android-acceptance3-20261026/summary.json` and
+  `output/playwright/streamlined-iphone-acceptance2-20261026/summary.json`.
+- Both runs verified cleanup of one General Chat message and three DMs, linked
+  notification events and read-cursor references; no uploads were created.
+  A failed diagnostic's exact leftover row was recovered and verified separately
+  in `streamlined-android-diagnose3-20261026/cleanup-recovery.json`.
+- Focused follow-ups on both engines also verified that a reloaded DM restores
+  its committed message and composer. Screenshots were reviewed for phone layout.
+  Test harness waits now distinguish an optimistic row from a committed insert
+  and an initial inbox toolbar from the loaded conversation list.
+- These are browser checks against the local feature-preview artifact, not
+  production membership acceptance, signed-iPhone testing, notification delivery,
+  or App Store approval. Repeat the relevant checks after each backend phase;
+  real-device permission, keyboard, audio and push checks remain required.
+
 ## October 5 Checkers phone-feedback repair
 
 - Chromium and WebKit pass the real solo worker/React flow at 667x320 and 130%

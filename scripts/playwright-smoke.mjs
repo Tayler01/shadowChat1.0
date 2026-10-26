@@ -1,4 +1,4 @@
-import { chromium, devices } from 'playwright'
+import { chromium, webkit, devices } from 'playwright'
 import { createClient } from '@supabase/supabase-js'
 import { execFileSync, spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -6,6 +6,7 @@ import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
+import { createSmokeArtifactLedger, recordSmokeArtifactRequest, ownedSmokeStoragePaths } from './smoke-artifact-ledger.mjs'
 
 const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 4174
@@ -32,6 +33,7 @@ const envFileValues = await loadDotEnvFiles([
   path.join(repoRoot, '.env.testing.local'),
 ])
 const config = buildConfig(args, envFileValues)
+const browserType = config.browser === 'webkit' ? webkit : chromium
 const artifactDir = path.join(repoRoot, config.artifactDir)
 const logsDir = path.join(artifactDir, 'logs')
 const fixturesDir = path.join(artifactDir, 'fixtures')
@@ -42,6 +44,7 @@ await mkdir(logsDir, { recursive: true })
 const fixtures = await createFixtures(fixturesDir)
 
 const runState = {
+  artifacts: createSmokeArtifactLedger(getEnvValue(config.envValues, ['SUPABASE_URL', 'VITE_SUPABASE_URL'])),
   config,
   repoRoot,
   artifactDir,
@@ -53,6 +56,9 @@ const runState = {
     startedAt: new Date().toISOString(),
     baseUrl: config.baseUrl,
     accountMode: config.accountMode,
+    edition: config.edition,
+    browser: config.browser,
+    phone: config.phone,
     fixtures,
     scenarios: [],
     cleanups: [],
@@ -70,13 +76,13 @@ try {
   logLine(`Scenarios: ${config.scenarios.join(', ')}`)
 
   previewServer = await ensurePreviewServer(runState)
-  browser = await chromium.launch({
+  browser = await browserType.launch({
     headless: config.headless,
     slowMo: config.slowMo,
-    args: [
+    args: config.browser === 'chromium' ? [
       '--disable-dev-shm-usage',
       '--disable-gpu',
-    ],
+    ] : [],
   })
 
   const accounts = buildAccounts(config)
@@ -161,6 +167,12 @@ try {
   console.error(error instanceof Error ? error.stack || error.message : String(error))
   process.exitCode = 1
 } finally {
+  await writeJson(path.join(artifactDir, 'owned-artifacts.json'), {
+    messages: [...runState.artifacts.messages],
+    dm_messages: [...runState.artifacts.dm_messages],
+    storage: Object.fromEntries([...runState.artifacts.storage].map(([bucket, paths]) => [bucket, [...paths]])),
+    untrackedInserts: runState.artifacts.untrackedInserts,
+  })
   await closeSession(mobileA)
   await closeSession(desktopB)
   await closeSession(desktopA)
@@ -215,37 +227,31 @@ async function cleanupSmokeRunData(state, accounts) {
   }
 
   const startedAt = state.summary.startedAt
-  const storagePaths = new Map([
-    ['chat-uploads', new Set()],
-    ['message-media', new Set()],
-  ])
-
-  const { data: deletedEvents, error: eventError } = await admin
-    .from('notification_events')
-    .delete()
-    .in('actor_id', accountIds)
-    .gte('created_at', startedAt)
-    .select('id')
-  if (eventError) throw eventError
+  const storagePaths = ownedSmokeStoragePaths(state.artifacts, accountIds)
 
   const deletedMessages = {}
   const deletedDmMessages = []
+  const deletedGroupMessageIds = []
   for (const [table, senderColumn, selectColumns] of [
     ['dm_messages', 'sender_id', 'id,conversation_id,file_url,thumbnail_url,audio_url'],
     ['messages', 'user_id', 'id,file_url,thumbnail_url,audio_url'],
   ]) {
-    const { data, error } = await admin
-      .from(table)
-      .delete()
-      .in(senderColumn, accountIds)
-      .gte('created_at', startedAt)
-      .select(selectColumns)
+    const clientMessageIds = [...state.artifacts[table]]
+    if (!clientMessageIds.length) continue
+    let data, error
+    // A canceled PostgreSQL statement rolls back. Retry only its exact owned IDs.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      ;({ data, error } = await admin.from(table).delete()
+        .in(senderColumn, accountIds).in('client_message_id', clientMessageIds).select(selectColumns))
+      if (error?.code !== '57014') break
+      logLine(`Exact ${table} cleanup hit statement timeout; attempt ${attempt + 1}/3`)
+    }
     if (error) throw error
 
     deletedMessages[table] = data.length
     if (table === 'dm_messages') {
       deletedDmMessages.push(...data)
-    }
+    } else deletedGroupMessageIds.push(...data.map(row => row.id))
     for (const row of data) {
       for (const url of [row.file_url, row.thumbnail_url, row.audio_url]) {
         const parsed = parseSupabaseStorageUrl(url)
@@ -256,22 +262,12 @@ async function cleanupSmokeRunData(state, accounts) {
     }
   }
 
-  const recentThresholdMs = new Date(startedAt).getTime() - 60_000
-  for (const bucket of storagePaths.keys()) {
-    for (const accountId of accountIds) {
-      const entries = await listSmokeStorageFiles(admin, bucket, accountId)
-      for (const entry of entries) {
-        const createdAtMs = new Date(entry.createdAt || 0).getTime()
-        if (createdAtMs >= recentThresholdMs) {
-          storagePaths.get(bucket).add(entry.path)
-        }
-      }
-    }
-  }
-
   const removedStorage = {}
   for (const [bucket, paths] of storagePaths) {
     const values = [...paths]
+    if (values.some(storagePath => !accountIds.includes(storagePath.split('/')[0]) || storagePath.split('/').includes('..'))) {
+      throw new Error('A smoke media reference is outside the controlled account folders')
+    }
     for (let index = 0; index < values.length; index += 100) {
       const { error } = await admin.storage
         .from(bucket)
@@ -285,27 +281,48 @@ async function cleanupSmokeRunData(state, accounts) {
     admin,
     accountIds,
     deletedDmMessages.map(message => message.conversation_id).filter(Boolean),
+    deletedGroupMessageIds,
+    deletedDmMessages.map(message => message.id),
   )
 
   for (const [table, senderColumn] of [
     ['messages', 'user_id'],
     ['dm_messages', 'sender_id'],
   ]) {
+    const clientMessageIds = [...state.artifacts[table]]
+    if (!clientMessageIds.length) continue
     const { count, error } = await admin
       .from(table)
       .select('id', { count: 'exact', head: true })
       .in(senderColumn, accountIds)
-      .gte('created_at', startedAt)
+      .in('client_message_id', clientMessageIds)
     if (error) throw error
     if (count !== 0) {
       throw new Error(`${count} ${table} smoke rows remain after cleanup.`)
     }
   }
 
+  for (const [bucket, paths] of storagePaths) {
+    for (const storagePath of paths) {
+      const folder = storagePath.slice(0, storagePath.lastIndexOf('/'))
+      const filename = storagePath.slice(storagePath.lastIndexOf('/') + 1)
+      const { data, error } = await admin.storage.from(bucket).list(folder, { search: filename, limit: 100 })
+      if (error) throw error
+      if (data.some(entry => entry.name === filename)) throw new Error('An exact smoke upload remains after cleanup')
+    }
+  }
+  for (const [column, ids] of [['message_id', deletedGroupMessageIds], ['dm_message_id', deletedDmMessages.map(message => message.id)]]) {
+    if (!ids.length) continue
+    const { count, error } = await admin.from('notification_events').select('id', { count: 'exact', head: true }).in(column, ids)
+    if (error) throw error
+    if (count) throw new Error('Message-linked smoke notification events remain after cleanup')
+  }
+  if (state.artifacts.untrackedInserts) throw new Error('Smoke observed message inserts without client IDs; inspect their exact responses before cleanup. No time-window deletion was attempted.')
+
   const cleanup = {
     startedAt,
     accounts: accountIds.length,
-    notificationEvents: deletedEvents.length,
+    notificationEvents: 'message-linked events cascade with the exact deleted messages',
     messages: deletedMessages.messages || 0,
     directMessages: deletedMessages.dm_messages || 0,
     storageObjects: removedStorage,
@@ -317,7 +334,7 @@ async function cleanupSmokeRunData(state, accounts) {
   logLine(`Smoke data cleanup verified: ${JSON.stringify(cleanup)}`)
 }
 
-async function repairSmokeReadCursors(admin, accountIds, affectedConversationIds) {
+async function repairSmokeReadCursors(admin, accountIds, affectedConversationIds, deletedGroupIds, deletedDmIds) {
   let repaired = 0
   const { data: latestGroupMessage, error: groupError } = await admin
     .from('messages')
@@ -329,17 +346,18 @@ async function repairSmokeReadCursors(admin, accountIds, affectedConversationIds
     .maybeSingle()
   if (groupError) throw groupError
 
-  if (latestGroupMessage) {
+  if (latestGroupMessage && deletedGroupIds.length) {
     const { error } = await admin
       .from('user_read_cursors')
-      .upsert(accountIds.map(userId => ({
-        user_id: userId,
-        surface: 'general_chat',
-        scope_id: 'main',
+      .update({
         last_read_message_id: latestGroupMessage.id,
         last_read_at: latestGroupMessage.created_at,
         updated_at: new Date().toISOString(),
-      })))
+      })
+      .in('user_id', accountIds)
+      .eq('surface', 'general_chat')
+      .eq('scope_id', 'main')
+      .in('last_read_message_id', deletedGroupIds)
     if (error) throw error
     repaired += accountIds.length
   }
@@ -362,20 +380,22 @@ async function repairSmokeReadCursors(admin, accountIds, affectedConversationIds
         .in('user_id', accountIds)
         .eq('surface', 'dm')
         .eq('scope_id', conversationId)
+        .in('last_read_message_id', deletedDmIds)
       if (error) throw error
       continue
     }
 
     const { error } = await admin
       .from('user_read_cursors')
-      .upsert(accountIds.map(userId => ({
-        user_id: userId,
-        surface: 'dm',
-        scope_id: conversationId,
+      .update({
         last_read_message_id: latestDmMessage.id,
         last_read_at: latestDmMessage.created_at,
         updated_at: new Date().toISOString(),
-      })))
+      })
+      .in('user_id', accountIds)
+      .eq('surface', 'dm')
+      .eq('scope_id', conversationId)
+      .in('last_read_message_id', deletedDmIds)
     if (error) throw error
     repaired += accountIds.length
   }
@@ -438,28 +458,14 @@ function parseSupabaseStorageUrl(value) {
   }
 }
 
-async function listSmokeStorageFiles(admin, bucket, prefix) {
-  const { data, error } = await admin.storage
-    .from(bucket)
-    .list(prefix, {
-      limit: 1000,
-      sortBy: { column: 'name', order: 'asc' },
+function trackSmokeArtifacts(context, state) {
+  context.on('request', request => {
+    recordSmokeArtifactRequest(state.artifacts, {
+      url: request.url(), method: request.method(),
+      body: /\/rest\/v1\/(messages|dm_messages)(?:\?|$)/.test(request.url()) ? request.postData() : null,
+      headers: request.headers(),
     })
-  if (error) throw error
-
-  const entries = []
-  for (const item of data) {
-    const itemPath = `${prefix}/${item.name}`
-    if (item.id) {
-      entries.push({
-        path: itemPath,
-        createdAt: item.created_at || item.updated_at,
-      })
-    } else {
-      entries.push(...await listSmokeStorageFiles(admin, bucket, itemPath))
-    }
-  }
-  return entries
+  })
 }
 
 function parseArgs(argv) {
@@ -472,10 +478,28 @@ function parseArgs(argv) {
     skipBuild: false,
     runName: null,
     accountMode: null,
+    browser: 'chromium',
+    phone: 'iphone',
+    edition: 'full',
   }
 
   for (let index = 0; index < argv.length; index += 1) {
     const current = argv[index]
+    if (current.startsWith('--edition=')) {
+      parsed.edition = current.slice('--edition='.length)
+      if (!['full', 'streamlined'].includes(parsed.edition)) throw new Error('Choose full or streamlined')
+      continue
+    }
+    if (current.startsWith('--browser=')) {
+      parsed.browser = current.slice('--browser='.length)
+      if (!['chromium', 'webkit'].includes(parsed.browser)) throw new Error('Choose chromium or webkit')
+      continue
+    }
+    if (current.startsWith('--phone=')) {
+      parsed.phone = current.slice('--phone='.length)
+      if (!['iphone', 'android'].includes(parsed.phone)) throw new Error('Choose iphone or android')
+      continue
+    }
 
     if (current === '--headed') {
       parsed.headed = true
@@ -573,6 +597,9 @@ function buildConfig(parsedArgs, envValues) {
     skipBuild: parsedArgs.skipBuild,
     scenarios,
     accountMode,
+    browser: parsedArgs.browser,
+    phone: parsedArgs.phone,
+    edition: parsedArgs.edition,
     artifactDir: path.join('output', 'playwright', runName),
     envValues,
   }
@@ -784,29 +811,41 @@ async function ensurePreviewServer(state) {
 
 async function createDesktopSession(browserInstance, state, account, folderName, options = {}) {
   let context
+  const device = primarySessionDevice(state.config)
 
   if (options.persistent) {
     const profileDir = path.join(state.artifactDir, 'profiles', folderName)
     await mkdir(profileDir, { recursive: true })
-    context = await chromium.launchPersistentContext(profileDir, {
+    context = await browserType.launchPersistentContext(profileDir, {
       headless: state.config.headless,
       slowMo: state.config.slowMo,
-      viewport: { width: 1440, height: 960 },
+      ...device,
       serviceWorkers: 'block',
       ignoreHTTPSErrors: true,
     })
   } else {
     context = await browserInstance.newContext({
-      viewport: { width: 1440, height: 960 },
+      ...device,
       serviceWorkers: 'block',
       ignoreHTTPSErrors: true,
     })
   }
 
+  trackSmokeArtifacts(context, state)
   await installBrowserMocks(context)
   const page = context.pages()[0] || await context.newPage()
   attachDiagnostics(page, path.join(state.logsDir, `${folderName}.log`), folderName)
-  const hydratedAccount = await authenticateAccount(page, state, account, folderName)
+  let hydratedAccount
+  try {
+    hydratedAccount = await authenticateAccount(page, state, account, folderName)
+  } catch (error) {
+    await capture(page, state.artifactDir, `${folderName}-auth-failure`)
+    await writeJson(path.join(state.artifactDir, `${folderName}-auth-failure.json`), {
+      url: page.url(), text: (await page.locator('body').innerText()).slice(0, 2000),
+    })
+    await context.close()
+    throw error
+  }
 
   return {
     account: hydratedAccount,
@@ -826,16 +865,26 @@ async function refreshMobileSession(browserInstance, state, account, existingSes
   await writeStorageState(browserInstance, state, account, storageStatePath)
 
   const context = await browserInstance.newContext({
-    ...devices['iPhone 13'],
+    ...devices[state.config.phone === 'android' ? 'Pixel 7' : 'iPhone 13'],
     storageState: storageStatePath,
     serviceWorkers: 'block',
     ignoreHTTPSErrors: true,
   })
+  trackSmokeArtifacts(context, state)
   await installBrowserMocks(context)
   const page = await context.newPage()
   attachDiagnostics(page, path.join(state.logsDir, 'mobile-account-1.log'), 'mobile-account-1')
   await page.goto(state.config.baseUrl, { waitUntil: 'domcontentloaded' })
-  await waitForChatView(page)
+  try {
+    await waitForChatView(page)
+  } catch (error) {
+    await capture(page, state.artifactDir, 'mobile-storage-restore-failure')
+    await writeJson(path.join(state.artifactDir, 'mobile-storage-restore-failure.json'), {
+      url: page.url(), text: (await page.locator('body').innerText()).slice(0, 4000),
+    })
+    await context.close()
+    throw error
+  }
 
   return {
     account,
@@ -847,7 +896,7 @@ async function refreshMobileSession(browserInstance, state, account, existingSes
 
 async function writeStorageState(browserInstance, state, account, storageStatePath) {
   const scratchContext = await browserInstance.newContext({
-    viewport: { width: 1440, height: 960 },
+    ...primarySessionDevice(state.config),
     serviceWorkers: 'block',
     ignoreHTTPSErrors: true,
   })
@@ -872,7 +921,9 @@ async function authenticateAccount(page, state, account, label) {
 
   if (await isChatVisible(page)) {
     await dismissAppReleaseDialog(page)
-    const profile = await readVisibleProfile(page).catch(() => null)
+    const profile = state.config.edition === 'streamlined'
+      ? await readVisibleProfile(page, account)
+      : await readVisibleProfile(page, account).catch(() => null)
     return {
       ...account,
       ...profile,
@@ -916,7 +967,7 @@ async function authenticateAccount(page, state, account, label) {
   }
 
   await dismissAppReleaseDialog(page)
-  const profile = await readVisibleProfile(page)
+  const profile = await readVisibleProfile(page, account)
   await capture(page, state.artifactDir, `${label}-ready`)
 
   return {
@@ -1046,7 +1097,7 @@ async function scenarioDM(state, sessionA, sessionB) {
   await sessionB.page.reload({ waitUntil: 'domcontentloaded' })
   const dmRestored = await waitForEither(
     [
-      async () => sessionB.page.getByText(messageText, { exact: false }).first().isVisible().catch(() => false),
+      async () => sessionB.page.getByText(messageText, { exact: false }).filter({ visible: true }).first().isVisible().catch(() => false),
       async () => sessionB.page.getByRole('button', { name: 'Start new conversation' }).isVisible().catch(() => false),
     ],
     DEFAULT_TIMEOUT_MS
@@ -1054,7 +1105,17 @@ async function scenarioDM(state, sessionA, sessionB) {
   if (!dmRestored) {
     throw new Error('DM view did not restore after reload')
   }
+  // Do not count the transient inbox/recovery shell as a restored conversation.
+  if (config.edition === 'streamlined') {
+    await waitForRestoredDmMessage(sessionB.page, messageText)
+  }
   await capture(sessionB.page, state.artifactDir, 'dm-recipient-after-reload')
+}
+
+async function waitForRestoredDmMessage(page, text) {
+  await page.getByTestId('dm-message-scroll').waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+  await page.getByTestId('dm-message-scroll').getByText(text, { exact: true }).waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+  await page.locator('textarea:visible').last().waitFor({ timeout: DEFAULT_TIMEOUT_MS })
 }
 
 async function scenarioResumeSend(state, sessionA, sessionB) {
@@ -1184,12 +1245,22 @@ async function goToDirectMessages(page) {
   } else {
     await page.getByRole('button', { name: /^Direct Messages(?:,?\s+\d+(?: unread)?)?$/ }).first().click()
   }
+  if (config.edition === 'streamlined') {
+    await waitForEither([
+      async () => page.getByRole('button', { name: 'Start new conversation' }).isVisible().catch(() => false),
+      async () => threadBack.isVisible().catch(() => false),
+    ], DEFAULT_TIMEOUT_MS)
+    if (await threadBack.isVisible().catch(() => false)) await threadBack.click()
+  }
   await waitForDmView(page)
 }
 
 async function goToChat(page) {
   await dismissAppReleaseDialog(page)
-  await page.getByRole('button', { name: /^Chat$/ }).click()
+  const chatButton = config.edition === 'streamlined'
+    ? mobileNavButton(page, '^Chat(?:,|$)')
+    : page.getByRole('button', { name: /^Chat$/ })
+  await chatButton.click()
   await waitForChatView(page)
 }
 
@@ -1272,6 +1343,7 @@ async function waitForBootSurface(page) {
       text.includes('Invite code required') ||
       text.includes('General Chat') ||
       text.includes('Direct Messages')
+      || Boolean(document.querySelector('[data-testid="message-scroll"]'))
     )
   }, null, { timeout: DEFAULT_TIMEOUT_MS })
 }
@@ -1336,6 +1408,7 @@ async function waitForProfileView(page) {
 }
 
 async function isChatVisible(page) {
+  if (config.edition === 'streamlined') return page.getByTestId('message-scroll').isVisible().catch(() => false)
   return page.getByText(/Lounge/i).first().isVisible().catch(() => false)
 }
 
@@ -1378,7 +1451,26 @@ async function fillInput(page, label, value) {
   await input.fill(value)
 }
 
-async function readVisibleProfile(page) {
+function primarySessionDevice(runConfig) {
+  return runConfig.edition === 'streamlined'
+    ? devices[runConfig.phone === 'android' ? 'Pixel 7' : 'iPhone 13']
+    : { viewport: { width: 1440, height: 960 } }
+}
+
+async function readVisibleProfile(page, account) {
+  if (config.edition === 'streamlined') {
+    await mobileNavButton(page, '^Settings$').click()
+    const signIn = page.getByRole('region', { name: 'Sign-in', exact: true })
+    if (!(await signIn.isVisible().catch(() => false))) {
+      await page.getByRole('button', { name: /^Account\s/ }).click()
+    }
+    await signIn.getByText(account.email, { exact: true }).waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+    const usernameText = await page.getByText(/^@[A-Za-z0-9_]+$/).first().innerText()
+    const username = usernameText.trim().replace(/^@/u, '')
+    if (account.username && username !== account.username) throw new Error('Authenticated profile does not match the configured QA account')
+    await goToChat(page)
+    return { username }
+  }
   const usernameText = await page.getByText(/^@/).first().innerText()
 
   return {
@@ -1387,6 +1479,12 @@ async function readVisibleProfile(page) {
 }
 
 async function openConversationWithUser(page, account, state) {
+  // A phone inbox renders its toolbar before the asynchronous conversation list.
+  // Opening the new-person picker during that gap excludes an existing peer.
+  await waitForEither([
+    async () => page.getByRole('button', { name: /@/ }).filter({ visible: true }).first().isVisible().catch(() => false),
+    async () => page.getByText('No conversations yet', { exact: true }).isVisible().catch(() => false),
+  ], DEFAULT_TIMEOUT_MS)
   const row = page.getByRole('button', { name: new RegExp(`@${escapeRegExp(account.username)}`, 'i') }).first()
   if (await row.isVisible().catch(() => false)) {
     await row.click()
@@ -1519,7 +1617,14 @@ async function sendThreadMessage(page, messageText) {
   await composer.fill(messageText)
   const sendButton = page.getByRole('button', { name: /^Send message(?:\. Hold for Hype .*)?$/ }).last()
   await sendButton.waitFor({ timeout: DEFAULT_TIMEOUT_MS })
+  const committed = page.waitForResponse(response => {
+    const request = response.request()
+    return request.method() === 'POST' && new URL(request.url()).pathname === '/rest/v1/dm_messages'
+      && request.postData()?.includes(messageText)
+  }, { timeout: DEFAULT_TIMEOUT_MS })
   await sendButton.click()
+  const response = await committed
+  if (!response.ok()) throw new Error(`DM insert failed (${response.status()})`)
 }
 
 async function sendVisibleMessage(page, messageText) {
@@ -1586,6 +1691,7 @@ async function waitForAudioCount(page, expectedCount) {
 }
 
 async function readSidebarDmLabel(page) {
+  if (config.edition === 'streamlined') return mobileNavButton(page, '^DMs(?:,|$)').getAttribute('aria-label')
   const label = await page.getByRole('button', { name: /Direct Messages/i }).first().innerText()
   return normalizeWhitespace(label)
 }
@@ -1627,6 +1733,14 @@ async function assertSwitchGeometry(page, primaryLabel, referenceLabel) {
 }
 
 async function waitForSidebarUnreadChange(page, previousLabel) {
+  if (config.edition === 'streamlined') {
+    await page.waitForFunction(previous => {
+      const button = document.querySelector('nav.shadowchat-mobile-nav button[aria-label^="DMs"]')
+      const current = button?.getAttribute('aria-label') || ''
+      return current !== previous && /\d+ unread/.test(current)
+    }, previousLabel, { timeout: DEFAULT_TIMEOUT_MS })
+    return
+  }
   await page.waitForFunction(expectedPrevious => {
     const buttons = Array.from(document.querySelectorAll('button'))
     const match = buttons.find(button => button.innerText.includes('Direct Messages'))
@@ -1640,7 +1754,7 @@ async function waitForSidebarUnreadChange(page, previousLabel) {
 }
 
 async function expectVisibleText(page, text, timeoutMs) {
-  await page.getByText(text, { exact: false }).first().waitFor({ timeout: timeoutMs })
+  await page.getByText(text, { exact: false }).filter({ visible: true }).first().waitFor({ timeout: timeoutMs })
 }
 
 async function waitForEither(checks, timeoutMs) {
@@ -1868,6 +1982,10 @@ function serializeError(error) {
       message: error.message,
       stack: error.stack,
     }
+  }
+
+  if (error && typeof error === 'object') {
+    return Object.fromEntries(['name', 'message', 'code', 'details', 'hint'].filter(key => typeof error[key] === 'string').map(key => [key, error[key]]))
   }
 
   return {

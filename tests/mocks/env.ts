@@ -9,3 +9,7 @@ export const VITE_APP_IS_PROD = true
 export const VITE_APP_MODE = 'test'
 export const VITE_SENTRY_DSN = ''
 export const VITE_SUPABASE_IMAGE_TRANSFORMS_ENABLED = 'true'
+
+export const VITE_PRIVATE_MEDIA_ENABLED = 'false'
+export const VITE_BUNNY_STREAM_CDN_ORIGIN = ''
+export const VITE_PRIVATE_REALTIME_ENABLED = 'false'

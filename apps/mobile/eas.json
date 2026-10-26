@@ -4,6 +4,17 @@
     "appVersionSource": "local"
   },
   "build": {
+    "streamlined": {
+      "extends": "production",
+      "distribution": "store",
+      "environment": "production",
+      "channel": "streamlined",
+      "env": {
+        "SHADOWCHAT_APP_EDITION": "streamlined",
+        "SHADOWCHAT_STREAMLINED_WEB_ORIGIN": "https://shadowchat-streamlined.netlify.app",
+        "SHADOWCHAT_IOS_BUILD_NUMBER": "18"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",

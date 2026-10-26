@@ -2,6 +2,24 @@
 
 This document turns the June 1, 2026 read-only audit into an implementation backlog and records status updates as fixes land.
 
+## October 23 streamlined release preparation
+
+The separate streamlined edition and its staged privacy/account-deletion work
+are being reconciled onto the current production source. Preserve the newer
+September 30 migrations, native clipboard integration, notification delivery
+bounds and chat fixes. Isolated acceptance is recorded in
+[the streamlined security audit](STREAMLINED_SECURITY_AUDIT.md); production
+activation, signed-build verification and the remaining store gates are tracked
+in [store readiness](STREAMLINED_STORE_READINESS.md). Importing those reviewed
+changes does not establish production deployment or App Store approval.
+
+October 26 handover verification preserves the old deletion FKs and Live
+append-only guard until the durable handler has been deployed and old requests
+have drained. New deletion starts fail closed before capture activation; an
+atomic activation check refuses uncatalogued historical report media. The
+four-phase local release plan and focused runtime/SQL checks pass. Production
+rollout, provider cleanup and recovery scheduling remain unverified.
+
 ## September 30 mobile/native checkpoint
 
 October 1 follow-up repairs the actual Send CSS cascade, Safari elastic-scroll

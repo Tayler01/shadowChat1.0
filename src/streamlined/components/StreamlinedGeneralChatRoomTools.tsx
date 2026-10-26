@@ -1,0 +1,90 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ActiveUsersButton } from '../../../apps/streamlined/src-overrides/components/chat/ActiveUsersButton'
+import { PinnedMessagesButton } from '../../components/chat/PinnedMessagesButton'
+import { GlobalSearchButton } from '../../components/search/GlobalSearchButton'
+import { useOptionalClientReset } from '../../hooks/ClientResetContext'
+import { useOptionalMessages } from '../../../apps/streamlined/src-overrides/hooks/MessagesContext'
+import type { AppView } from '../../types/navigation'
+
+const ROOM_TOOLS_ID = 'general-chat-room-tools'
+
+interface GeneralChatRoomToolsProps {
+  onViewChange: (view: AppView) => void
+}
+
+export function GeneralChatRoomTools({ onViewChange }: GeneralChatRoomToolsProps) {
+  const messagesContext = useOptionalMessages()
+  const { status: resetStatus } = useOptionalClientReset()
+  const [expanded, setExpanded] = useState(false)
+  const toggleRef = useRef<HTMLButtonElement>(null)
+  const pinnedMessages = useMemo(
+    () => (messagesContext?.messages || []).filter(message => message.pinned),
+    [messagesContext?.messages]
+  )
+
+  useEffect(() => {
+    if (!expanded) return
+
+    const collapseForKeyboard = () => {
+      if (document.documentElement.dataset.shadowchatKeyboard === 'open') {
+        setExpanded(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setExpanded(false)
+      window.requestAnimationFrame(() => toggleRef.current?.focus())
+    }
+    const keyboardObserver = new MutationObserver(collapseForKeyboard)
+
+    document.addEventListener('keydown', handleKeyDown)
+    keyboardObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-shadowchat-keyboard'],
+    })
+    collapseForKeyboard()
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      keyboardObserver.disconnect()
+    }
+  }, [expanded])
+
+  return (
+    <div className="relative isolate flex h-11 shrink-0 items-center">
+      {expanded && (
+        <div
+          id={ROOM_TOOLS_ID}
+          role="group"
+          aria-label="General Chat tools"
+          className="room-tools-inline-rail absolute right-[calc(100%+0.2rem)] top-1/2 z-20 flex h-11 w-max max-w-[calc(100vw-8rem)] -translate-y-1/2 items-center gap-1 overflow-hidden rounded-l-full bg-[var(--bg-panel-strong)] pl-2 pr-1 shadow-[-12px_0_18px_rgba(0,0,0,0.18)] backdrop-blur-xl [&>button]:min-h-11 [&>button]:min-w-11"
+        >
+          <GlobalSearchButton onOpen={() => onViewChange('discover')} />
+          <ActiveUsersButton
+            resetStatus={resetStatus}
+            showPresenceDot={false}
+            onOpen={() => onViewChange('active-users')}
+          />
+          <PinnedMessagesButton
+            messages={pinnedMessages}
+            onUnpin={messagesContext?.togglePin ?? (async () => {})}
+            onToggleReaction={messagesContext?.toggleReaction ?? (async () => {})}
+          />
+        </div>
+      )}
+
+      <button
+        ref={toggleRef}
+        type="button"
+        onClick={() => setExpanded(value => !value)}
+        className="room-tools-control inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] transition-[background-color,color,transform] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--theme-accent-readable)] active:scale-95"
+        aria-label={expanded ? 'Collapse General Chat tools' : 'Expand General Chat tools'}
+        aria-controls={ROOM_TOOLS_ID}
+        aria-expanded={expanded}
+      >
+        {expanded ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+      </button>
+    </div>
+  )
+}

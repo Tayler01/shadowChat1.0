@@ -1,0 +1,147 @@
+import { PrivateMediaAudio } from '../../../../../src/components/ui/PrivateMediaPlayer'
+import { PrivateMediaImage } from '../../../../../src/components/ui/PrivateMediaImage'
+import React, { useState } from 'react'
+import { PinOff, Plus } from 'lucide-react'
+import { Button } from '../../../../../src/components/ui/Button'
+import type { Message } from '../../lib/supabase'
+import type { EmojiClickData } from '../../../../../src/types'
+import { MessageReactions } from '../../../../../src/components/chat/MessageReactions'
+import { MessageHypeBadge } from '../../../../../src/components/chat/MessageHypeBadge'
+import { VideoAttachment } from './VideoAttachment'
+import { FileAttachment } from './FileAttachment'
+import { cn } from '../../../../../src/lib/utils'
+import { UserRoleBadge } from '../../../../../src/components/ui/UserRoleBadge'
+import { UserPresenceBadge } from '../../../../../src/components/ui/UserPresenceBadge'
+import { UserAchievementBadges } from '../../../../../src/components/ui/UserAchievementBadges'
+import { getBlockedActionMessage } from '../../../../../src/lib/moderation'
+import { showActionErrorToast } from '../../../../../src/lib/toastNotifications'
+import { MessageRichText } from './MessageRichText'
+import { EmojiPickerOverlay } from '../../../../../src/components/chat/EmojiPickerOverlay'
+import { getImageMessageDisplaySrc } from '../../../../../src/components/chat/messageDisplay'
+import { getHypeTier } from '../../../../../src/lib/hypePresentation'
+import { useAuth } from '../../hooks/useAuth'
+
+const QUICK_REACTIONS = ['\u{1F44D}', '\u2764\uFE0F', '\u{1F602}', '\u{1F389}', '\u{1F64F}']
+
+interface PinnedMessageItemProps {
+  message: Message
+  onUnpin: (messageId: string) => Promise<void>
+  onToggleReaction: (messageId: string, emoji: string) => Promise<void>
+  onViewInChat?: (messageId: string) => void
+}
+
+export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
+  message,
+  onUnpin,
+  onToggleReaction,
+  onViewInChat,
+}) => {
+  const { profile, user } = useAuth()
+  const [showPicker, setShowPicker] = useState(false)
+  const hypeCount = message.hype_count ?? 0
+  const hypeTier = getHypeTier(hypeCount)
+  const imageMessageSrc = message.message_type === 'image'
+    ? getImageMessageDisplaySrc(message.file_url, message.thumbnail_url)
+    : ''
+
+  const handleReaction = async (emoji: string) => {
+    try {
+      await onToggleReaction(message.id, emoji)
+    } catch (error) {
+      const notice = await getBlockedActionMessage('general_chat', error, 'Failed to update reaction')
+      showActionErrorToast(notice)
+    }
+  }
+
+  const handleSelect = (emojiData: EmojiClickData) => {
+    handleReaction(emojiData.emoji)
+    setShowPicker(false)
+  }
+
+  return (
+    <div
+      className={cn(
+        'glass-panel relative flex items-start rounded-[var(--radius-md)] p-3 group',
+        hypeTier > 0 && 'hype-message-shell hype-message-bubble'
+      )}
+      data-hype-tier={hypeTier || undefined}
+    >
+      <div className="flex-1 min-w-0 space-y-1">
+        <MessageHypeBadge count={hypeCount} users={message.hype_users ?? []} className="float-right ml-2" />
+        <MessageReactions
+          message={message}
+          currentUserId={profile?.id ?? user?.id}
+          onReact={handleReaction}
+          className="text-[0.65rem]"
+        />
+        <div className="break-words text-sm text-[var(--text-primary)]">
+          <strong className="inline-flex items-center gap-1">
+            {message.user?.display_name}
+            <UserRoleBadge role={message.user?.admin_role} />
+            <UserAchievementBadges user={message.user} />
+            <UserPresenceBadge userId={message.user?.id} presenceVisibility={message.user?.presence_visibility} />
+          </strong>
+          :{' '}
+          {message.message_type === 'audio' ? (
+            <PrivateMediaAudio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
+          ) : imageMessageSrc ? (
+            <PrivateMediaImage
+              src={imageMessageSrc}
+              alt="pinned uploaded image"
+              loading="lazy"
+              decoding="async"
+              draggable={false}
+              className="mt-2 max-h-40 max-w-full rounded-[var(--radius-md)] object-cover"
+            />
+          ) : message.message_type === 'video' && message.file_url ? (
+            <VideoAttachment url={message.file_url} meta={message.content} />
+          ) : message.message_type === 'file' && message.file_url ? (
+            <FileAttachment url={message.file_url} meta={message.content} />
+          ) : (
+            <MessageRichText content={message.content} className="inline whitespace-pre-wrap" />
+          )}
+        </div>
+        {onViewInChat && (
+          <button type="button" onClick={() => onViewInChat(message.id)} className="min-h-11 text-sm font-semibold text-[var(--theme-accent-readable)]">
+            View in chat
+          </button>
+        )}
+        <div className={cn('hidden group-hover:flex items-center space-x-2 mt-1', showPicker && 'flex')}>
+          {QUICK_REACTIONS.map(e => (
+            <button
+              key={e}
+              onClick={() => handleReaction(e)}
+              className="text-base transition-transform hover:scale-110"
+            >
+              {e}
+            </button>
+          ))}
+          <button
+            onClick={() => setShowPicker(!showPicker)}
+            className="text-base text-[var(--text-secondary)] transition-transform hover:scale-110 hover:text-[var(--text-gold)]"
+            aria-label="Add reaction"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+        <EmojiPickerOverlay
+          open={showPicker}
+          title="Add reaction"
+          ariaLabel="Pinned message reaction emoji picker"
+          onClose={() => setShowPicker(false)}
+          onEmojiClick={handleSelect}
+          desktopClassName="fixed left-1/2 top-16 z-[90] max-w-[calc(100vw-1rem)] -translate-x-1/2 overflow-hidden rounded-[var(--radius-md)] sm:absolute sm:left-0 sm:top-full sm:mt-2 sm:translate-x-0"
+        />
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => onUnpin(message.id)}
+        aria-label="Unpin message"
+        className="ml-2 text-[var(--text-muted)] hover:text-[var(--text-gold)]"
+      >
+        <PinOff className="w-4 h-4" />
+      </Button>
+    </div>
+  )
+}

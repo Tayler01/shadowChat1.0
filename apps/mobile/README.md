@@ -1,9 +1,9 @@
 # ShadowChat Mobile
 
-## Documentation Status - September 30, 2026
+## Documentation Status - October 23, 2026
 
 The native workspace is the signed iPhone/Android notification companion for
-the production ShadoChat web client. It is aligned to Expo `~57.0.26`, React
+the production ShadoChat web client. It is aligned to Expo `~57.0.31`, React
 Native `0.86.3`, React `19.2.3`, and TypeScript `~6.0.3`.
 
 Expo iOS-first native client for ShadoChat. The complete product UI continues
@@ -13,6 +13,20 @@ The persistent authenticated session remains owned by the hosted WebView.
 Native code owns push permissions, the scoped device installation credential,
 token registration, foreground arbitration, rich presentation, actions,
 badges, custom sounds, and exact notification routing.
+
+The separate `streamlined` EAS build profile uses the same signed application
+identity with build number `18` and the dedicated
+`https://shadowchat-streamlined.netlify.app` origin. The default production
+profile still selects the full app and its existing build number `17`.
+Both editions use the configured origin consistently for navigation, clipboard
+and notification/session bridges. The streamlined profile falls back to Chat
+for notifications from features it omits. Only that profile substitutes the
+notification service that avoids downloading member images in the background.
+Full-app rich notifications keep their existing implementation.
+
+The dedicated web app must be deployed and its backend gates verified before
+this native build is distributed. A local export is not a signed archive or
+physical-device acceptance.
 
 ## Native Client Contract
 
@@ -76,8 +90,11 @@ production routing.
 
 ```powershell
 npm ci
-npm audit --audit-level=low
 npm run test:dependencies
+npm run test:clipboard
+npm run test:dependency-security
+npm run test:streamlined
+npm run audit:release
 npm run lint
 npx tsc --noEmit
 npm run doctor
@@ -140,11 +157,21 @@ descriptions. The hosted inline composer remains unchanged. Physical iPhone
 toolbar removal, media capture and notification acceptance still need device
 verification. This build does not claim to fix Photos video clipboard delivery.
 
-Use Node `24.15.0`, including on EAS. Patched `decode-uri-component` and
-`image-size` versions remove dependency audit findings. `patch-package` applies
-the one-line CommonJS/default-export adaptation needed by `query-string` 7;
-installation fails if the patch cannot apply. Dependency contract tests and the
-iOS Metro/Hermes export verify the actual router and image-decoding paths.
+Use Node `24.15.0`, including on EAS. The vendored CommonJS decoder preserves
+the upstream fixed algorithm for Expo Router 57; Metro `0.84.5` removes the
+vulnerable image-size dependency, and shell-quote is locked to a fixed version.
+The install hook also applies a hash-checked node-forge structural validation
+backport. A scoped Expo CLI Zod override uses its patched release. See
+[tooling security evidence](vendor/TOOLING-SECURITY.md) for exact advisories,
+patch hashes and why `npm run audit:release` reports the remaining raw advisory
+while failing unless the installed mitigation and regression tests pass.
+
+Build the streamlined edition with `eas build --platform ios --profile
+streamlined`. Its profile supplies the edition, dedicated HTTPS origin and
+build number. `app.config.js` fails closed for a missing origin, the full-app
+origin, paths/credentials in the URL, or a reused build number below `18`.
+The EAS production environment must supply the public Supabase URL and anon key.
+Do not put service-role keys or signing secrets in Expo public configuration.
 
 Run signed builds from the clean `main` checkout after confirming it matches
 `origin/main`. On Windows, starting EAS from a linked Git worktree can cause the

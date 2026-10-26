@@ -55,6 +55,8 @@ export async function authenticateAuthorization(authorization, admin) {
 
   const { data, error } = await admin.auth.getUser(token)
   if (error || !data?.user?.id) return null
+  const active = await admin.rpc('is_active_member_for_service', { target_user_id: data.user.id })
+  if (active.error || active.data !== true) return null
   return { id: data.user.id }
 }
 
@@ -212,8 +214,25 @@ async function resolveImageResponseFromPage(response, sourceUrl) {
   )
 }
 
-export async function fetchRemoteImage(urlValue) {
+export async function fetchRemoteImage(urlValue, userClient) {
   const sourceUrl = normalizeImageUrl(urlValue)
+  const projectUrl = getRuntimeEnv('SUPABASE_URL') || getRuntimeEnv('VITE_SUPABASE_URL')
+  const protectedPath = sourceUrl.pathname.match(/^\/storage\/v1\/(?:object|render\/image)\/(?:public|authenticated|sign)\/(chat-uploads|message-media|shadow-pin)\/(.+)$/)
+  if (projectUrl && sourceUrl.origin === new URL(projectUrl).origin && protectedPath) {
+    if (!userClient) throw new Error('Authenticated media access is required.')
+    const parts = protectedPath[2].split('/').map(part => decodeURIComponent(part))
+    if (parts.some(part => !part || part === '.' || part === '..' || /[\\/\u0000-\u001f\u007f]/.test(part))) {
+      throw new Error('Media object path is invalid.')
+    }
+    // The actor's Storage policy is the source authority. Never fetch a legacy
+    // public URL or use the service role to copy another member's private media.
+    const { data: blob, error } = await userClient.storage.from(protectedPath[1]).download(parts.join('/'))
+    if (error || !blob) throw new Error('This attachment is unavailable or you no longer have access.')
+    if (blob.size > MAX_IMAGE_BYTES) throw new Error('Image is larger than 15MB.')
+    const { contentType, extension } = resolveImageType(blob.type)
+    return { buffer: Buffer.from(await blob.arrayBuffer()), contentType, extension,
+      sizeBytes: blob.size, sourceUrl: sourceUrl.toString() }
+  }
   await assertPublicHost(sourceUrl)
 
   const response = await fetchWithTimeout(
@@ -239,6 +258,18 @@ export async function fetchRemoteImage(urlValue) {
 }
 
 export async function createDerivatives(buffer) {
+  // A Content-Type header (and a client-supplied filename) does not describe
+  // trusted bytes. Restrict the decoder before sharp sees untrusted input.
+  if (!Buffer.isBuffer(buffer) || !buffer.length || buffer.length > MAX_IMAGE_BYTES) {
+    throw new Error('Images must be 15MB or smaller.')
+  }
+  const isJpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+  const isPng = buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  const isGif = buffer.length >= 6 && ['GIF87a', 'GIF89a'].includes(buffer.toString('ascii', 0, 6))
+  const isWebp = buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP'
+  if (!isJpeg && !isPng && !isGif && !isWebp) {
+    throw new Error('Only JPEG, PNG, WebP, or GIF image bytes are supported.')
+  }
   const source = sharp(buffer, {
     animated: false,
     limitInputPixels: 64_000_000,
@@ -268,11 +299,11 @@ function tableFor(targetType) {
   throw new Error('Choose whether this media belongs to a category or image.')
 }
 
-function derivativePaths(targetType, id) {
+function derivativePaths(targetType, id, creatorId) {
   const folder = targetType === 'category' ? 'categories' : 'images'
   return {
-    thumbnailPath: `derivatives/${folder}/${id}/thumbnail.webp`,
-    mediumPath: `derivatives/${folder}/${id}/medium.webp`,
+    thumbnailPath: `${creatorId}/derivatives/${folder}/${id}/thumbnail.webp`,
+    mediumPath: `${creatorId}/derivatives/${folder}/${id}/medium.webp`,
   }
 }
 
@@ -343,7 +374,7 @@ async function assertCanMutate(admin, row, userId, requireOwnership) {
 export async function writeDerivativesForRow(admin, targetType, row, buffer) {
   const table = tableFor(targetType)
   const { thumbnail, medium, width, height } = await createDerivatives(buffer)
-  const { thumbnailPath, mediumPath } = derivativePaths(targetType, row.id)
+  const { thumbnailPath, mediumPath } = derivativePaths(targetType, row.id, row.creator_id)
 
   const uploadOptions = {
     contentType: 'image/webp',
@@ -400,6 +431,12 @@ export async function processShadowPinRow({ admin, targetType, id, userId, requi
     throw new Error('This ShadowPin image does not have a processable storage object.')
   }
   await assertCanMutate(admin, row, userId, requireOwnership)
+  const legacyCategoryCover = targetType === 'category' && /^[0-9a-f-]{36}$/.test(row.image_path.split('/')[0])
+    && row.image_path.split('/').slice(1, 4).join('/') === `categories/${row.id}/cover`
+  if (!row.creator_id || (!row.image_path.startsWith(`${row.creator_id}/`) && !legacyCategoryCover)
+    || row.image_path.split('/').some(part => !part || part === '.' || part === '..' || /[\\\u0000-\u001f\u007f]/.test(part))) {
+    throw new Error('The source object does not belong to this image creator.')
+  }
 
   await admin
     .from(table)
@@ -466,6 +503,7 @@ export async function processShadowPinRowForUser({ admin, targetType, id, userId
 
 export async function createImportedShadowPinItem({
   admin,
+  userClient,
   userId,
   targetType,
   categoryId,
@@ -476,7 +514,7 @@ export async function createImportedShadowPinItem({
   let activeCategory = null
   if (targetType === 'image') {
     if (!categoryId) throw new Error('Category is required.')
-    const { data, error } = await admin
+    const { data, error } = await (userClient || admin)
       .from('shadow_pin_categories')
       .select('id')
       .eq('id', categoryId)
@@ -487,7 +525,7 @@ export async function createImportedShadowPinItem({
     activeCategory = data
   }
 
-  const imported = await fetchRemoteImage(url)
+  const imported = await fetchRemoteImage(url, userClient)
   const recordId = crypto.randomUUID()
   const originalPath = targetType === 'category'
     ? `${userId}/categories/${recordId}/cover/original.${imported.extension}`
@@ -556,6 +594,7 @@ export async function createImportedShadowPinItem({
 
 export async function updateImportedShadowPinImage({
   admin,
+  userClient,
   userId,
   imageId,
   title,
@@ -584,9 +623,9 @@ export async function updateImportedShadowPinImage({
   if (!category) throw new Error('ShadowPin category is not available.')
 
   const sourceUrl = normalizeImageUrl(url)
-  const imported = await fetchRemoteImage(sourceUrl.toString())
+  const imported = await fetchRemoteImage(sourceUrl.toString(), userClient)
   const originalId = crypto.randomUUID()
-  const originalPath = `${userId}/categories/${current.category_id}/pins/${current.id}/${originalId}/original.${imported.extension}`
+  const originalPath = `${current.creator_id}/categories/${current.category_id}/pins/${current.id}/${originalId}/original.${imported.extension}`
 
   const { error: uploadError } = await admin.storage
     .from(SHADOW_PIN_BUCKET)
@@ -649,6 +688,7 @@ export async function updateImportedShadowPinImage({
 
 export async function updateImportedShadowPinCategoryCover({
   admin,
+  userClient,
   userId,
   categoryId,
   title,
@@ -667,9 +707,9 @@ export async function updateImportedShadowPinCategoryCover({
   if (!current) throw new Error('ShadowPin category is not available.')
   await assertCanMutate(admin, current, userId, true)
 
-  const imported = await fetchRemoteImage(url)
+  const imported = await fetchRemoteImage(url, userClient)
   const originalId = crypto.randomUUID()
-  const originalPath = `${userId}/categories/${current.id}/cover/${originalId}/original.${imported.extension}`
+  const originalPath = `${current.creator_id}/categories/${current.id}/cover/${originalId}/original.${imported.extension}`
 
   const { error: uploadError } = await admin.storage
     .from(SHADOW_PIN_BUCKET)
@@ -851,8 +891,13 @@ async function processCreatorDraftImageBuffer({
 }
 
 export async function processShadowPinDraftImage({
-  admin, userId, draftId, expectedRevision, storagePath, contentType, sizeBytes,
+  admin, userId, draftId, expectedRevision, storagePath, contentType,
 }) {
+  // Check the caller's draft and object namespace before a service-role read.
+  if (typeof storagePath !== 'string' || !storagePath.startsWith(`${userId}/${draftId}/`)) {
+    throw new Error('Draft storage path is invalid.')
+  }
+  await getCreatorDraftForWorker(admin, userId, draftId)
   const existing = await findDraftImageAsset(admin, userId, draftId, 'original_path', storagePath)
   if (existing && ['ready', 'publish_ready'].includes(existing.state)) {
     const draft = await getCreatorDraftForWorker(admin, userId, draftId)
@@ -866,11 +911,11 @@ export async function processShadowPinDraftImage({
   const buffer = Buffer.from(await blob.arrayBuffer())
   return processCreatorDraftImageBuffer({
     admin, userId, draftId, expectedRevision, storagePath, buffer,
-    contentType, sizeBytes: Number(sizeBytes) || buffer.byteLength,
+    contentType, sizeBytes: buffer.byteLength,
   })
 }
 
-export async function stageShadowPinDraftImageFromUrl({ admin, userId, draftId, expectedRevision, url }) {
+export async function stageShadowPinDraftImageFromUrl({ admin, userClient, userId, draftId, expectedRevision, url }) {
   const sourceUrl = normalizeImageUrl(url).toString()
   const existing = await findDraftImageAsset(admin, userId, draftId, 'source_url', sourceUrl)
   if (existing && ['ready', 'publish_ready'].includes(existing.state)) {
@@ -881,7 +926,7 @@ export async function stageShadowPinDraftImageFromUrl({ admin, userId, draftId, 
     return { draft: activeDraft, asset: existing }
   }
   await getCreatorDraftForWorker(admin, userId, draftId, expectedRevision)
-  const imported = await fetchRemoteImage(sourceUrl)
+  const imported = await fetchRemoteImage(sourceUrl, userClient)
   const assetToken = crypto.randomUUID()
   const storagePath = `${userId}/${draftId}/${assetToken}/original.${imported.extension}`
   const { error } = await admin.storage.from(SHADOW_PIN_DRAFT_BUCKET).upload(storagePath, imported.buffer, {

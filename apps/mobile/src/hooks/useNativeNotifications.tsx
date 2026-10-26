@@ -21,7 +21,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { getSupabase, isSupabaseConfigured, nativeRealtimeOptions, nativeRealtimeTopic } from '@/lib/supabase';
+import { appRuntime } from '@/lib/appRuntime';
 import { configureNativeNotifications } from '@/lib/notifications/config';
 import {
   clearNativeNotificationInstallationCredential,
@@ -100,7 +101,7 @@ function NativeNotificationBanner({
   return (
     <View pointerEvents="box-none" style={[styles.bannerLayer, { top: insets.top + 10 }]}>
       <View accessibilityLiveRegion="polite" style={styles.banner}>
-        {actor?.avatarUrl ? (
+        {!appRuntime.streamlined && actor?.avatarUrl ? (
           <Image accessibilityIgnoresInvertColors source={{ uri: actor.avatarUrl }} style={styles.avatar} />
         ) : (
           <View style={styles.avatarFallback}>
@@ -119,7 +120,7 @@ function NativeNotificationBanner({
           <Text numberOfLines={1} style={styles.bannerTitle}>{envelope.content.title}</Text>
           {body ? <Text numberOfLines={2} style={styles.bannerBody}>{body}</Text> : null}
         </Pressable>
-        {envelope.privacy === 'full' && envelope.media?.thumbnailUrl ? (
+        {!appRuntime.streamlined && envelope.privacy === 'full' && envelope.media?.thumbnailUrl ? (
           <Pressable accessibilityRole="button" onPress={onOpen}>
             <Image
               accessibilityIgnoresInvertColors
@@ -641,7 +642,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     if (!session?.user) return;
     const client = getSupabase();
     const channel = client
-      .channel(`native-notifications:${session.user.id}`)
+      .channel(nativeRealtimeTopic(`native-notifications:${session.user.id}`), nativeRealtimeOptions)
       .on(
         'postgres_changes',
         {

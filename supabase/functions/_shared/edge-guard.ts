@@ -92,6 +92,17 @@ export const getBearerToken = (req: Request) => {
   return token
 }
 
+export const requireActiveEdgeMember = async (supabase: unknown, userId: string) => {
+  const { data, error } = await callEdgeRpc(supabase, 'is_active_member_for_service', {
+    target_user_id: userId,
+  })
+  if (error || data !== true) {
+    const denied = new EdgeAuthenticationError('This account no longer has member access.')
+    denied.status = 403
+    throw denied
+  }
+}
+
 export const authenticateEdgeUser = async (req: Request): Promise<AuthenticatedEdgeUser> => {
   const token = getBearerToken(req)
   const { supabaseUrl, supabaseAnonKey } = getEdgeSupabaseEnv()
@@ -110,6 +121,8 @@ export const authenticateEdgeUser = async (req: Request): Promise<AuthenticatedE
   if (typeof user.id !== 'string' || !user.id) {
     throw new EdgeAuthenticationError('Invalid or expired session')
   }
+
+  await requireActiveEdgeMember(createEdgeAdminClient(), user.id)
 
   return {
     id: user.id,

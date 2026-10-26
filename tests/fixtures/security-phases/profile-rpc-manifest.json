@@ -1,0 +1,283 @@
+{
+  "reviewedAt": "2026-10-23T23:43:47.864Z",
+  "columns": [
+    {
+      "name": "id",
+      "field": "id",
+      "type": "uuid"
+    },
+    {
+      "name": "username",
+      "field": "username",
+      "type": "text"
+    },
+    {
+      "name": "display_name",
+      "field": "display_name",
+      "type": "text"
+    },
+    {
+      "name": "avatar_url",
+      "field": "avatar_url",
+      "type": "text"
+    },
+    {
+      "name": "avatar_thumbnail_url",
+      "field": "avatar_thumbnail_url",
+      "type": "text"
+    },
+    {
+      "name": "avatar_thumbnail_path",
+      "field": "avatar_thumbnail_path",
+      "type": "text"
+    },
+    {
+      "name": "banner_url",
+      "field": "banner_url",
+      "type": "text"
+    },
+    {
+      "name": "banner_thumbnail_url",
+      "field": "banner_thumbnail_url",
+      "type": "text"
+    },
+    {
+      "name": "banner_thumbnail_path",
+      "field": "banner_thumbnail_path",
+      "type": "text"
+    },
+    {
+      "name": "status",
+      "field": "status",
+      "type": "text"
+    },
+    {
+      "name": "status_message",
+      "field": "status_message",
+      "type": "text"
+    },
+    {
+      "name": "presence_visibility",
+      "field": "presence_visibility",
+      "type": "text"
+    },
+    {
+      "name": "color",
+      "field": "color",
+      "type": "text"
+    },
+    {
+      "name": "chat_color",
+      "field": "chat_color",
+      "type": "text"
+    },
+    {
+      "name": "admin_role",
+      "field": "admin_role",
+      "type": "text"
+    },
+    {
+      "name": "checkers_crown",
+      "field": "checkers_crown",
+      "type": "boolean"
+    },
+    {
+      "name": "war_sword",
+      "field": "war_sword",
+      "type": "boolean"
+    },
+    {
+      "name": "shadow_pin_gold_pin",
+      "field": "shadow_pin_gold_pin",
+      "type": "boolean"
+    },
+    {
+      "name": "shadow_runner_sprint_medal",
+      "field": "shadow_runner_sprint_medal",
+      "type": "boolean"
+    },
+    {
+      "name": "shadow_runner_knight_medal",
+      "field": "shadow_runner_knight_medal",
+      "type": "boolean"
+    },
+    {
+      "name": "shadow_runner_knight_level_id",
+      "field": "shadow_runner_knight_level_id",
+      "type": "text"
+    },
+    {
+      "name": "gold_easter_egg",
+      "field": "gold_easter_egg",
+      "type": "boolean"
+    },
+    {
+      "name": "dm_discoverable",
+      "field": "dm_discoverable",
+      "type": "boolean"
+    },
+    {
+      "name": "last_active",
+      "field": "last_active",
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "created_at",
+      "field": "created_at",
+      "type": "timestamp with time zone"
+    },
+    {
+      "name": "updated_at",
+      "field": "updated_at",
+      "type": "timestamp with time zone"
+    }
+  ],
+  "functions": [
+    {
+      "signature": "get_dm_message_window(uuid,uuid,integer)",
+      "beforeProsrcSha256": "03910da8612dcac655aebbddd559e2650a9695b97064c601e1c8e986b7d4a3b3",
+      "beforeDefinitionSha256": "d40f8d0d08f150fdbf4de5c587dafa0123bcc4e1181346e678be99d8f05048d4",
+      "aliases": [
+        "profiles"
+      ],
+      "callCount": 1,
+      "afterProsrcSha256": "db10adb8a24531da43209bc2bb4c575f44c78e57f5bda7fe145339cfd5355b26"
+    },
+    {
+      "signature": "get_dm_read_window(uuid,uuid,timestamp with time zone,uuid,timestamp with time zone,uuid,boolean,integer)",
+      "beforeProsrcSha256": "006bcbec5927ab28dcfaf93b14d38bfa12aaa4e17ea44b8f4813e140ace2db25",
+      "beforeDefinitionSha256": "1c9978512429b11433d833d8786a8e4a981978c14a4aa79b2654ff010795bd96",
+      "aliases": [
+        "author"
+      ],
+      "callCount": 1,
+      "afterProsrcSha256": "499a1592062f340988d588bdc3be8a40dab0190576555c7a41df4f8f56ba8e98"
+    },
+    {
+      "signature": "get_general_chat_message_window(uuid,uuid,timestamp with time zone,integer)",
+      "beforeProsrcSha256": "595a66674e9d821e59918310a146f9035829ca364d7daf07fe59da5b5d053b55",
+      "beforeDefinitionSha256": "8a01387c53d185f0f24f568ccb721a135686a592a1fe9e3bca59302ad48f6618",
+      "aliases": [
+        "user_row"
+      ],
+      "callCount": 2,
+      "afterProsrcSha256": "770fe2c6d5d02a878af3b3f9951c6b434f9237f4f719729c644f207ff9381bf9"
+    },
+    {
+      "signature": "get_general_chat_thread(uuid,uuid,timestamp with time zone,uuid,integer)",
+      "beforeProsrcSha256": "ba298736f0bab250be0add41f31f5eb6271411c6314d4eccda84561427a9eac1",
+      "beforeDefinitionSha256": "1105a79e3d6e52bfa3ec6f83a0d5d7163beb5586a9a66ee1e2d660c4c6c75e70",
+      "aliases": [
+        "root_author",
+        "reply_author"
+      ],
+      "callCount": 2,
+      "afterProsrcSha256": "49e185670ed4fe433b2a684b0ee6d01574667ad56638ae465e04f4bf7d188d87"
+    },
+    {
+      "signature": "get_general_chat_thread_read_window(uuid,uuid,timestamp with time zone,uuid,timestamp with time zone,uuid,boolean,integer)",
+      "beforeProsrcSha256": "da92f712ffdecc556fbd5b35c3840d71d394c5b9960c83a3c2cdeaa2727378be",
+      "beforeDefinitionSha256": "65d668d8c57b34937cc8a090287f4003ec807ff6134e7f8fec33629c52b3f083",
+      "aliases": [
+        "author"
+      ],
+      "callCount": 2,
+      "afterProsrcSha256": "52cff22c534757dd4b69d5079213b326bd102725a103ac6125397003a6093f4d"
+    },
+    {
+      "signature": "get_general_chat_thread_summaries(uuid[])",
+      "beforeProsrcSha256": "1da8e6bc1313776212a40531a81ce85ae5b3378d489ddab0eb6f25c74849c7c7",
+      "beforeDefinitionSha256": "b7efa8b6b4e8c25f51f27491043a891b639b6a0176159898d039badc18c2795c",
+      "aliases": [
+        "latest_author",
+        "participant_profile"
+      ],
+      "callCount": 2,
+      "afterProsrcSha256": "93a86167c66b791d84c82b8413c841186d4bd436d6ce6756298e9614de4376ac"
+    },
+    {
+      "signature": "get_general_chat_threaded_window(uuid,uuid,timestamp with time zone,integer)",
+      "beforeProsrcSha256": "33ba22df7af471f29869e5ec4a6e16bd1a97ef4ea6a4dd32c297d12f667c7ed7",
+      "beforeDefinitionSha256": "90293f1959785c4bb8ad87488fc1bf54a37a03c41d6ede8a6a5136a5c217cd4b",
+      "aliases": [
+        "author"
+      ],
+      "callCount": 2,
+      "afterProsrcSha256": "fc6e6b1d6ba3932baafa40783b47f33c22004577acd5813c968eb72576cd9759"
+    },
+    {
+      "signature": "get_my_catch_up_v1(integer,integer)",
+      "beforeProsrcSha256": "3e78f8399de70137f7c8cfc8737d50f86059952f6f833bd493e28e4a64b81e50",
+      "beforeDefinitionSha256": "1380370077afc01302c7dd6f33187daf271693ab480f99a23ec3d314a120dc92",
+      "aliases": [
+        "actor",
+        "other_user",
+        "author"
+      ],
+      "callCount": 3,
+      "afterProsrcSha256": "7d94fff461f285dec1894c5b318d25ed72c9c1020452e592ac8a4c9757d78834"
+    },
+    {
+      "signature": "list_dm_shared_content(uuid,text,integer,timestamp with time zone,uuid)",
+      "beforeProsrcSha256": "3dfc5534f52b4177babf96e96d971c0a220bed0b3c7f5482b7d39a813f388ec6",
+      "beforeDefinitionSha256": "9418dfa7850e5472b12bf6dd10db859782e30cfa8be759e1396e59afbd021876",
+      "aliases": [
+        "profiles"
+      ],
+      "callCount": 1,
+      "afterProsrcSha256": "3071bd8e6f9512d079d074414a3f3bfadca26cc5507aa5e0204263b6131b0b8a"
+    },
+    {
+      "signature": "list_my_saved_discovery_items(uuid,integer)",
+      "beforeProsrcSha256": "defec34ef15ac96048e976cac8633ee665e2ff3f5af22617fd9c49aef4e1c777",
+      "beforeDefinitionSha256": "bbf54fe520231fd34e421da9404887965a323a68a6a80fc9cd14da2c5f286b05",
+      "aliases": [
+        "profiles"
+      ],
+      "callCount": 1,
+      "afterProsrcSha256": "a74ea545441e2810f44e38b9ae6f6a4322761c386ca8263b125ed8ccf9424919"
+    },
+    {
+      "signature": "list_my_saved_messages(uuid,integer)",
+      "beforeProsrcSha256": "4df0f3fb0a19e544e267ecb183aae32e8ce56912a6e39a620df0ab5a3d9855c2",
+      "beforeDefinitionSha256": "ac78de1884644f858758ce013d5ad7d7ea8ee5d35c339aa6797dca871727bccc",
+      "aliases": [
+        "profiles"
+      ],
+      "callCount": 2,
+      "afterProsrcSha256": "258dd7cc5a4444423394771b1ac2ab5775f1277487b3536371f768aea15f2977"
+    },
+    {
+      "signature": "search_dm_conversation_messages(uuid,text,integer,timestamp with time zone,uuid)",
+      "beforeProsrcSha256": "b01864ba1d17bb3f11569b21c9d2b87f02d5c2b4ca1cd3a91fdd92697a9fa835",
+      "beforeDefinitionSha256": "7bad5995844ba18f7c0fa00714185d71ed1581bc2711d795e0aef52921a352fa",
+      "aliases": [
+        "profiles"
+      ],
+      "callCount": 1,
+      "afterProsrcSha256": "16a0cb5fa25cd6194870d584c8def082a0be2b56db02f946ae253522b0500405"
+    },
+    {
+      "signature": "search_my_messages(text,integer,timestamp with time zone)",
+      "beforeProsrcSha256": "d9f9b30a2427f684cee213dc520aba2ce1159b375dc4fc8d24b444405e4ef32d",
+      "beforeDefinitionSha256": "957c8468fa8e848f5d0617b6868a7718f66d72471fdf023cd72c88f739bfe42a",
+      "aliases": [
+        "profiles"
+      ],
+      "callCount": 2,
+      "afterProsrcSha256": "ba03770fd080c961079b66cd8c33203595af7f2a6ff5f4ec93581631487ce155"
+    }
+  ],
+  "internalFunctions": [
+    {
+      "schema": "connections_private",
+      "signature": "emit_connection_notification(public.user_connections,uuid,uuid,text,text)",
+      "beforeProsrcSha256": "a958763c59003cbc786032671a7bf0b7af0c42ef9b8215d58a91a2bdd03efd18",
+      "afterProsrcSha256": "be64e6500033b7a6b3f7d1468d0af62376eb692b176d335e08b0e17cdea3097a",
+      "aliases": [
+        "profiles"
+      ],
+      "callCount": 1
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import { requireActiveEdgeMember } from './edge-guard.ts'
 import { PUBLIC_PROFILE_SELECT } from './public-profile.ts'
 
 export const corsHeaders = {
@@ -42,11 +43,18 @@ const getEnv = () => {
   return { supabaseUrl, supabaseAnonKey, serviceRoleKey }
 }
 
-export const getSupabaseAdmin = () => {
+export const getSupabaseAdmin = (options?: { signal?: AbortSignal }) => {
   const { supabaseUrl, serviceRoleKey } = getEnv()
 
   return createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(options?.signal ? { global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => {
+      options.signal!.throwIfAborted()
+      const signals = [options.signal!]
+      if (input instanceof Request) signals.push(input.signal)
+      if (init?.signal) signals.push(init.signal)
+      return fetch(input, { ...init, signal: AbortSignal.any(signals) })
+    } } } : {}),
   })
 }
 
@@ -125,7 +133,7 @@ export const triggerPushDispatch = async (
   }
 }
 
-export const authenticateRequest = async (req: Request) => {
+export const authenticateRequest = async (req: Request): Promise<{ error: Response } | { userId: string }> => {
   const authorization = req.headers.get('Authorization') ?? ''
   if (!authorization.startsWith('Bearer ')) {
     return { error: unauthorized('Authentication required') }
@@ -149,6 +157,8 @@ export const authenticateRequest = async (req: Request) => {
   if (!user?.id) {
     return { error: unauthorized('Invalid or expired session') }
   }
+
+  await requireActiveEdgeMember(getSupabaseAdmin(), user.id)
 
   return { userId: user.id as string }
 }

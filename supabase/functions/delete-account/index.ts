@@ -1,95 +1,44 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import {
-  badRequest,
-  corsHeaders,
-  forbidden,
-  getSupabaseAdmin,
-  json,
-  unauthorized,
-} from '../_shared/bridge.ts'
+import { badRequest, corsHeaders, getSupabaseAdmin, hashToken, json } from '../_shared/bridge.ts'
+import { AccountDeletionRequestError, runAccountDeletion, runLegacyAccountDeletion, type DeletionManifest } from '../_shared/account-deletion-workflow.ts'
+import { cleanupAccountProviders, createBunnyVideoDeletionProvider } from '../_shared/account-deletion-providers.ts'
+import { createLiveKitClients } from '../_shared/shado-live.ts'
+import { captureModerationMedia } from '../_shared/moderation-media.ts'
+import { ACCOUNT_DELETION_CAPABILITIES } from '../_shared/account-deletion-protocol.ts'
+import { isDeletionReconciliationRequest, LEGACY_DELETION_CONTROL_TIMEOUT_MS, LEGACY_DELETION_WORK_TIMEOUT_MS, reconcileLegacyAccountDeletion } from '../_shared/account-deletion-reconciliation.ts'
 
-const USER_STORAGE_BUCKETS = [
-  'avatars',
-  'banners',
-  'message-media',
-  'chat-uploads',
-  'art-board',
-  'shadow-pin',
-  'shado-tv',
-  'feedback-attachments',
-]
-
-type StorageListItem = {
-  id?: string | null
-  name: string
+const bearerToken = (req: Request) => {
+  const value = req.headers.get('Authorization') ?? ''
+  return /^Bearer\s+/i.test(value) ? value.replace(/^Bearer\s+/i, '').trim() || null : null
 }
-
-const joinStoragePath = (prefix: string, name: string) =>
-  prefix ? `${prefix}/${name}` : name
-
-const chunk = <T>(items: T[], size: number) => {
-  const groups: T[][] = []
-  for (let index = 0; index < items.length; index += size) {
-    groups.push(items.slice(index, index + size))
-  }
-  return groups
-}
-
-const removeStoragePrefix = async (
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  bucket: string,
-  prefix: string,
-) => {
-  const pendingFolders = [prefix]
-  const pathsToRemove: string[] = []
-
-  while (pendingFolders.length > 0) {
-    const folder = pendingFolders.pop()!
-    let offset = 0
-
-    for (;;) {
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .list(folder, { limit: 1000, offset })
-
-      if (error) {
-        throw new Error(`Could not list ${bucket}/${folder}: ${error.message}`)
-      }
-
-      const entries = (data ?? []) as StorageListItem[]
-      for (const entry of entries) {
-        const entryPath = joinStoragePath(folder, entry.name)
-        if (entry.id === null) {
-          pendingFolders.push(entryPath)
-        } else {
-          pathsToRemove.push(entryPath)
-        }
-      }
-
-      if (entries.length < 1000) {
-        break
-      }
-
-      offset += entries.length
-    }
-  }
-
-  for (const batch of chunk(pathsToRemove, 100)) {
-    const { error } = await supabase.storage.from(bucket).remove(batch)
-    if (error) {
-      throw new Error(`Could not remove ${bucket} objects: ${error.message}`)
-    }
-  }
-}
-
-const removeUserStorageObjects = async (
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  userId: string,
-) => {
-  for (const bucket of USER_STORAGE_BUCKETS) {
-    await removeStoragePrefix(supabase, bucket, userId)
-  }
-}
+const cleanupActions = (supabase: ReturnType<typeof getSupabaseAdmin>, signal?: AbortSignal) => ({
+  cleanupProviders: async (manifest: DeletionManifest, userId: string) => {
+    signal?.throwIfAborted()
+    const live = manifest.live_rooms.length || manifest.live_memberships.length
+      ? createLiveKitClients(signal ? { requestTimeout: 10, failover: false } : undefined).rooms : null
+    await cleanupAccountProviders({
+      removeLiveParticipant: async (room, id) => {
+        if (!live) throw new Error('Live provider unavailable')
+        await live.removeParticipant(room, id, { revokeTokenTs: BigInt(Math.floor(Date.now() / 1000)) })
+      },
+      deleteLiveRoom: async room => { if (!live) throw new Error('Live provider unavailable'); await live.deleteRoom(room) },
+      deleteBunnyVideo: createBunnyVideoDeletionProvider(() => ({
+        libraryId: Deno.env.get('BUNNY_STREAM_LIBRARY_ID'),
+        apiKey: Deno.env.get('BUNNY_STREAM_API_KEY'),
+      }), signal),
+    }, manifest, userId, signal)
+  },
+  preserveEvidence: async (userId: string) => {
+    signal?.throwIfAborted()
+    const pending = await supabase.rpc('get_pending_moderation_media_for_owner', { target_user_id: userId })
+    signal?.throwIfAborted()
+    if (pending.error) throw new Error('Submitted evidence preservation is not ready')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    if (!supabaseUrl) throw new Error('Evidence capture configuration is missing')
+    await captureModerationMedia(supabase, pending.data, { supabaseUrl })
+    signal?.throwIfAborted()
+  },
+})
 
 serve(async req => {
   if (req.method === 'OPTIONS') {
@@ -101,58 +50,69 @@ serve(async req => {
   }
 
   try {
-    const authorization = req.headers.get('Authorization') ?? ''
-    if (!authorization.startsWith('Bearer ')) {
-      return unauthorized('Authentication required')
+    const body = await req.json().catch(() => ({})) as { action?: string; confirm?: string; receipt?: string; expectedUserId?: string } | null
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return badRequest('A request object is required')
+    if (body.action !== undefined) {
+      // This public probe is intentionally before admin clients, hashing, Auth,
+      // database and provider work. Mixed probe/deletion bodies fail closed.
+      if (Object.keys(body).length !== 1) return badRequest('Invalid action request')
+      if (body.action === 'capabilities') {
+        return new Response(JSON.stringify(ACCOUNT_DELETION_CAPABILITIES), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+        })
+      }
+      if (body.action !== 'reconcile-legacy') return badRequest('Invalid action request')
+      if (!(await isDeletionReconciliationRequest(
+        { apiKey: req.headers.get('apikey'), bearer: bearerToken(req) },
+        { secretKeysJson: Deno.env.get('SUPABASE_SECRET_KEYS'), legacyServiceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') },
+      ))) {
+        return json({ error: 'Service authentication is required' }, 401)
+      }
+      const signal = AbortSignal.timeout(LEGACY_DELETION_WORK_TIMEOUT_MS)
+      const control = getSupabaseAdmin({ signal: AbortSignal.timeout(LEGACY_DELETION_CONTROL_TIMEOUT_MS) })
+      const work = getSupabaseAdmin({ signal })
+      const { cleanupProviders, preserveEvidence } = cleanupActions(work, signal)
+      try {
+        const result = await reconcileLegacyAccountDeletion(control, work, cleanupProviders, preserveEvidence, signal)
+        return json({ ok: true, ...result })
+      } catch {
+        return json({ error: 'Legacy deletion reconciliation needs retry', retryable: true }, 503)
+      }
     }
-
-    const body = await req.json().catch(() => ({})) as { confirm?: string }
     if (body.confirm !== 'DELETE') {
       return badRequest('Deletion confirmation is required')
     }
-
+    const legacyRequest = Object.keys(body).length === 1
+    // Only the published client's exact body uses legacy compatibility. A
+    // malformed or partial receipt request must never fall back to that path.
+    if (!legacyRequest && (typeof body.receipt !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(body.receipt))) {
+      return badRequest('A valid deletion receipt is required')
+    }
+    if (!legacyRequest && (typeof body.expectedUserId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.expectedUserId))) {
+      return badRequest('The account to delete must be identified')
+    }
+    const token = bearerToken(req)
+    if (legacyRequest && !token) throw new AccountDeletionRequestError('Authentication is required to start account deletion', 401)
     const supabase = getSupabaseAdmin()
-    const token = authorization.replace(/^Bearer\s+/i, '')
-    const { data: authData, error: authError } = await supabase.auth.getUser(token)
-
-    if (authError || !authData.user?.id) {
-      return unauthorized('Invalid or expired session')
+    const { cleanupProviders, preserveEvidence } = cleanupActions(supabase)
+    if (legacyRequest) {
+      // Domain-separated bearer hashes remain server-only and never appear in
+      // responses/logs. A fresh opaque digest is used only for a brand-new job.
+      const generatedReceiptDigest = Array.from(crypto.getRandomValues(new Uint8Array(32)), byte => byte.toString(16).padStart(2, '0')).join('')
+      await runLegacyAccountDeletion(supabase, token!, await hashToken(`legacy-delete-bearer:v1:${token}`), generatedReceiptDigest, cleanupProviders, preserveEvidence)
+    } else {
+      // New clients save their completion-only receipt before the first POST.
+      await runAccountDeletion(supabase, token, await hashToken(body.receipt!), body.expectedUserId!, cleanupProviders, preserveEvidence)
     }
-
-    const userId = authData.user.id
-    const { data: isFullAdmin, error: adminRoleError } = await supabase.rpc('is_app_admin', {
-      target_user_id: userId,
-    })
-
-    if (adminRoleError) {
-      throw adminRoleError
-    }
-
-    if (isFullAdmin) {
-      const { count, error: adminCountError } = await supabase
-        .from('user_roles')
-        .select('user_id', { count: 'exact', head: true })
-        .eq('role', 'admin')
-
-      if (adminCountError) {
-        throw adminCountError
-      }
-
-      if ((count ?? 0) <= 1) {
-        return forbidden('Transfer full admin access before deleting the only full admin account.')
-      }
-    }
-
-    await removeUserStorageObjects(supabase, userId)
-
-    const { error: deleteError } = await supabase.auth.admin.deleteUser(userId)
-    if (deleteError) {
-      throw deleteError
-    }
-
     return json({ ok: true })
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Account deletion failed'
-    return json({ error: message }, 500)
+    if (error instanceof AccountDeletionRequestError) return json({ error: error.message, deletionStarted: false, ...(error.status === 503 ? { retryable: true } : {}) }, error.status)
+    return json({
+      code: 'account_deletion_incomplete',
+      error: 'Account deletion is not yet complete. Access is restricted once cleanup starts. Return to the deletion page and try again to finish removing your account and uploads.',
+      retryable: true,
+      partialDeletion: true,
+    }, 503)
   }
 })

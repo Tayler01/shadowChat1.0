@@ -8,6 +8,7 @@ import notifee, {
 } from '@notifee/react-native';
 
 import { getAndroidSoundChannelId } from './config';
+import { appRuntime } from '../appRuntime';
 import {
   parseNotificationEnvelopeV2,
   type NotificationEnvelopeV2,
@@ -16,7 +17,11 @@ import {
 const SUMMARY_PREFIX = 'shadowchat-summary:';
 
 const stringData = (envelope: NotificationEnvelopeV2) => ({
-  envelopeV2: JSON.stringify(envelope),
+  envelopeV2: JSON.stringify(appRuntime.streamlined ? {
+    ...envelope,
+    actor: envelope.actor ? { ...envelope.actor, avatarUrl: null } : null,
+    media: null,
+  } : envelope),
   eventId: envelope.eventId,
   groupKey: envelope.groupKey,
   route: envelope.route,
@@ -69,7 +74,7 @@ const androidStyle = (
           person: {
             ...(actor?.id ? { id: actor.id } : {}),
             name: actor?.label ?? envelope.content.title,
-            ...(actor?.avatarUrl ? { icon: actor.avatarUrl } : {}),
+            ...(!appRuntime.streamlined && actor?.avatarUrl ? { icon: actor.avatarUrl } : {}),
           },
         },
       ],
@@ -77,7 +82,7 @@ const androidStyle = (
     };
   }
   if (
-    envelope.privacy === 'full' &&
+    !appRuntime.streamlined && envelope.privacy === 'full' &&
     envelope.media?.thumbnailUrl
   ) {
     return {
@@ -182,7 +187,7 @@ export const displayAndroidNotificationEnvelope = async (
       color: '#E9C766',
       groupAlertBehavior: AndroidGroupAlertBehavior.CHILDREN,
       groupId: envelope.groupKey,
-      largeIcon: actor?.avatarUrl ?? undefined,
+      largeIcon: appRuntime.streamlined ? undefined : actor?.avatarUrl ?? undefined,
       onlyAlertOnce: true,
       pressAction: { id: 'open', launchActivity: 'default' },
       smallIcon: 'notification_icon',

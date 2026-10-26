@@ -3,9 +3,11 @@ import {
   createAdminClient,
   ensureShadoAIProfile,
   getAIAnswer,
+  getAISharingInfo,
   insertShadoAIMessage,
   requestAICompletion,
 } from '../_shared/ai.ts'
+import { AISharingConsentError, validateAISharingConsent } from '../_shared/ai-sharing.ts'
 import {
   authenticateEdgeUser,
   claimEdgeRequest,
@@ -28,9 +30,9 @@ const DEFAULT_POST_TO_CHAT_HOURLY_LIMIT = 10
 const DEFAULT_AI_REQUESTS_PER_MINUTE = 20
 const AI_CLAIM_SCOPE = 'openai-chat'
 
-const unauthorized = (message: string) =>
+const unauthorized = (message: string, status = 401) =>
   new Response(JSON.stringify({ error: message }), {
-    status: 401,
+    status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 
@@ -162,8 +164,11 @@ serve(async req => {
 
   try {
     const user = await authenticateEdgeUser(req)
-    const { messages, model, post_to_chat: postToChatSnake, postToChat } = await req.json()
+    const { action, messages, model, sharingConsent, post_to_chat: postToChatSnake, postToChat } = await req.json()
     const shouldPostToChat = Boolean(postToChatSnake ?? postToChat)
+    const sharingInfo = getAISharingInfo(model)
+    if (action === 'sharing-info') return json(sharingInfo)
+    validateAISharingConsent(sharingConsent, sharingInfo, messages, shouldPostToChat)
     const supabase = createAdminClient()
     let sourceMessageId: string | null = null
 
@@ -227,7 +232,7 @@ serve(async req => {
         })
       }
 
-      const data = await requestAICompletion(messages, model)
+      const data = await requestAICompletion(messages, model, sharingConsent)
       const answer = getAIAnswer(data)
       let responseBody: unknown = data
 
@@ -273,8 +278,9 @@ serve(async req => {
       throw error
     }
   } catch (error) {
+    if (error instanceof AISharingConsentError) return json({ error: error.message }, error.status)
     if (error instanceof EdgeAuthenticationError) {
-      return unauthorized(error.message)
+      return unauthorized(error.message, error.status)
     }
     if (error instanceof EdgeRateLimitError) {
       return new Response(JSON.stringify({ error: error.message }), {

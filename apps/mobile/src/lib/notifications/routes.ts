@@ -1,24 +1,22 @@
-import Constants from 'expo-constants';
-
-const defaultWebAppUrl = 'https://shadochat.online';
+import { appRuntime } from '../appRuntime';
 
 export const normalizeNotificationRoute = (value: unknown) => {
   if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//')) {
-    return '/?view=catchup';
+    return appRuntime.fallbackRoute;
   }
   try {
-    const parsed = new URL(value, defaultWebAppUrl);
-    if (parsed.origin !== defaultWebAppUrl) return '/?view=catchup';
+    const parsed = new URL(value, appRuntime.origin);
+    if (parsed.origin !== appRuntime.origin) return appRuntime.fallbackRoute;
+    if (appRuntime.streamlined && parsed.pathname === '/') {
+      const view = parsed.searchParams.get('view');
+      if (view && !['chat', 'dms', 'pins', 'settings', 'active-users', 'discover'].includes(view)) return appRuntime.fallbackRoute;
+    }
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
-    return '/?view=catchup';
+    return appRuntime.fallbackRoute;
   }
 };
 
 export const getNotificationWebUrl = (route: string) => {
-  const configured = Constants.expoConfig?.extra?.webAppUrl;
-  const origin = typeof configured === 'string' && configured.startsWith('https://')
-    ? configured.replace(/\/+$/, '')
-    : defaultWebAppUrl;
-  return new URL(normalizeNotificationRoute(route), origin).href;
+  return new URL(normalizeNotificationRoute(route), appRuntime.origin).href;
 };

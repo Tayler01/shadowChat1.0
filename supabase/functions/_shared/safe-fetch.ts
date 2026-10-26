@@ -1,3 +1,5 @@
+import { fetchPinnedHttp, isIpLiteral, MAX_RESPONSE_BYTES, withAbort } from './pinned-http.ts'
+
 type DnsResolver = (hostname: string) => Promise<string[]>
 type FetchLike = (input: URL | string, init?: RequestInit) => Promise<Response>
 
@@ -13,6 +15,7 @@ type SafeUrlOptions = {
 type SafeFetchOptions = SafeUrlOptions & {
   fetchImpl?: FetchLike
   maxRedirects?: number
+  maxResponseBytes?: number
 }
 
 const DEFAULT_UNSAFE_HOST_MESSAGE = 'Private or local URLs cannot be fetched.'
@@ -21,6 +24,7 @@ const DEFAULT_INVALID_SCHEME_MESSAGE = 'Only http and https URLs are supported.'
 const DEFAULT_TOO_LONG_MESSAGE = 'A valid URL is required.'
 const DEFAULT_MAX_URL_LENGTH = 2048
 const DEFAULT_MAX_REDIRECTS = 4
+const DEFAULT_REQUEST_TIMEOUT_MS = 15_000
 
 const normalizeHostname = (hostname: string) =>
   hostname
@@ -42,7 +46,7 @@ const parseIpv4 = (value: string) => {
   return parts
 }
 
-const isUnsafeIpv4Parts = ([a, b]: number[]) => (
+const isUnsafeIpv4Parts = ([a, b, c]: number[]) => (
   a === 0 ||
   a === 10 ||
   a === 127 ||
@@ -52,6 +56,8 @@ const isUnsafeIpv4Parts = ([a, b]: number[]) => (
   (a === 192 && b === 0) ||
   (a === 192 && b === 168) ||
   (a === 198 && (b === 18 || b === 19)) ||
+  (a === 198 && b === 51 && c === 100) ||
+  (a === 203 && b === 0 && c === 113) ||
   a >= 224
 )
 
@@ -80,7 +86,10 @@ const getIpv4MappedAddress = (host: string) => {
 }
 
 export const isUnsafeIpAddress = (hostname: string) => {
-  const host = normalizeHostname(hostname)
+  let host = normalizeHostname(hostname)
+  if (host.includes(':')) {
+    try { host = normalizeHostname(new URL(`http://[${host}]`).hostname) } catch { return true }
+  }
   const ipv4 = parseIpv4(host)
   if (ipv4) return isUnsafeIpv4Parts(ipv4)
 
@@ -90,13 +99,11 @@ export const isUnsafeIpAddress = (hostname: string) => {
   if (!host.includes(':')) return false
 
   return (
-    host === '::' ||
-    host === '::1' ||
-    host.startsWith('fc') ||
-    host.startsWith('fd') ||
-    /^fe[89ab]/.test(host) ||
-    host.startsWith('ff') ||
-    host.startsWith('2001:db8')
+    !/^[23][0-9a-f]{3}:/.test(host) ||
+    host.startsWith('2001:db8:') ||
+    host.startsWith('2001:0:') ||
+    host.startsWith('2001::') ||
+    host.startsWith('2002:')
   )
 }
 
@@ -160,14 +167,15 @@ export const assertPublicUrl = async (url: URL, options: SafeUrlOptions = {}) =>
   }
 
   if (parseIpv4(host) || host.includes(':')) {
-    return
+    return [host]
   }
 
   const resolver = options.resolver || getDefaultResolver()
   const addresses = await resolver(host)
-  if (!addresses.length || addresses.some(address => isUnsafeIpAddress(address))) {
+  if (!addresses.length || addresses.some(address => !isIpLiteral(address) || isUnsafeIpAddress(address))) {
     throw new Error(unsafeHostMessage)
   }
+  return [...new Set(addresses)]
 }
 
 export const safeFetch = async (
@@ -176,29 +184,42 @@ export const safeFetch = async (
   options: SafeFetchOptions = {}
 ) => {
   const maxRedirects = options.maxRedirects ?? DEFAULT_MAX_REDIRECTS
-  const fetchImpl = options.fetchImpl || fetch
   let currentUrl = normalizePublicHttpUrl(input instanceof URL ? input : String(input), options)
+  const timeoutSignal = AbortSignal.timeout(DEFAULT_REQUEST_TIMEOUT_MS)
+  const signal = init.signal ? AbortSignal.any([init.signal, timeoutSignal]) : timeoutSignal
+  let requestInit: RequestInit = { ...init, headers: new Headers(init.headers), signal, redirect: 'manual' }
 
   for (let redirectCount = 0; redirectCount <= maxRedirects; redirectCount += 1) {
-    await assertPublicUrl(currentUrl, options)
-    const response = await fetchImpl(currentUrl, {
-      ...init,
-      redirect: 'manual',
-    })
+    const addresses = await withAbort(assertPublicUrl(currentUrl, options), signal)
+    const response = options.fetchImpl
+      ? await options.fetchImpl(currentUrl, requestInit)
+      : await fetchPinnedHttp(currentUrl, requestInit, addresses, options.maxResponseBytes ?? MAX_RESPONSE_BYTES)
 
-    if (response.status < 300 || response.status >= 400) {
+    if (![301, 302, 303, 307, 308].includes(response.status)) {
       const finalUrl = response.url ? normalizePublicHttpUrl(response.url, options) : currentUrl
-      await assertPublicUrl(finalUrl, options)
+      if (finalUrl.toString() !== currentUrl.toString()) await withAbort(assertPublicUrl(finalUrl, options), signal)
       return response
     }
 
     const location = response.headers.get('location')
     if (!location) return response
+    await response.body?.cancel?.().catch(() => undefined)
     if (redirectCount >= maxRedirects) {
       throw new Error('Too many redirects while fetching URL.')
     }
 
-    currentUrl = normalizePublicHttpUrl(new URL(location, currentUrl).toString(), options)
+    const nextUrl = normalizePublicHttpUrl(new URL(location, currentUrl).toString(), options)
+    if (currentUrl.protocol === 'https:' && nextUrl.protocol !== 'https:') throw new Error('HTTPS redirects cannot downgrade to HTTP.')
+    const headers = new Headers(requestInit.headers)
+    if (currentUrl.origin !== nextUrl.origin) {
+      for (const name of ['authorization', 'cookie', 'proxy-authorization']) headers.delete(name)
+    }
+    const method = String(requestInit.method || 'GET').toUpperCase()
+    if ((response.status === 303 && method !== 'HEAD') || ([301, 302].includes(response.status) && method === 'POST')) {
+      for (const name of ['content-type', 'content-length', 'content-encoding', 'content-language', 'content-location']) headers.delete(name)
+      requestInit = { ...requestInit, method: 'GET', body: undefined, headers }
+    } else requestInit = { ...requestInit, headers }
+    currentUrl = nextUrl
   }
 
   throw new Error('Too many redirects while fetching URL.')
@@ -211,6 +232,7 @@ export const readLimitedArrayBuffer = async (
 ) => {
   const contentLength = Number(response.headers.get('content-length') ?? '0')
   if (contentLength > maxBytes) {
+    await response.body?.cancel?.().catch(() => undefined)
     throw new Error(tooLargeMessage)
   }
 

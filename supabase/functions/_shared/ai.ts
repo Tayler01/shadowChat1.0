@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
 import { embedPublicProfile } from './public-profile.ts'
+import { buildAISharingInfo, validateAISharingConsent } from './ai-sharing.ts'
 
 const DEFAULT_OPENROUTER_MODEL = 'mistralai/mistral-nemo'
 const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini'
@@ -136,9 +137,19 @@ const sanitizeMessages = (messages: unknown) => {
   })
 }
 
+export const getAISharingInfo = (model: unknown) => {
+  const provider = resolveProvider()
+  const defaultModel = resolveDefaultModel(provider)
+  const allowedModels = resolveAllowedModels(defaultModel, provider)
+  const safeModel = typeof model === 'string' && allowedModels.has(model) ? model : defaultModel
+  resolveAIConfig(provider) // Fail closed if the selected service is unavailable.
+  return buildAISharingInfo(provider, safeModel, MAX_MESSAGES, MAX_CONTENT_LENGTH)
+}
+
 export const requestAICompletion = async (
   messages: unknown,
   model: unknown,
+  sharingConsent?: unknown,
 ) => {
   const provider = resolveProvider()
   const defaultModel = resolveDefaultModel(provider)
@@ -146,6 +157,7 @@ export const requestAICompletion = async (
   const safeModel = typeof model === 'string' && allowedModels.has(model)
     ? model
     : defaultModel
+  validateAISharingConsent(sharingConsent, buildAISharingInfo(provider, safeModel, MAX_MESSAGES, MAX_CONTENT_LENGTH), messages, false)
   const sanitizedMessages = sanitizeMessages(messages)
   const aiConfig = resolveAIConfig(provider)
   const controller = new AbortController()

@@ -10,7 +10,7 @@ const checks = [
   {
     feature: 'Boards and News',
     enabled: isEnabled('VITE_FEATURE_BOARDS'),
-    filenamePatterns: [/board/iu, /news/iu],
+    filenamePatterns: [/board(?!ing)/iu, /news/iu],
     contentPatterns: [
       'get_board_badge_counts',
       'news_feed_items',

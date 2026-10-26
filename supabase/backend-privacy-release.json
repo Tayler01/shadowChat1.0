@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "projectRef": "shsqqouecvdoifzufkqm",
+  "libraryId": "666331",
+  "hashFormat": "sha256-lf",
+  "baselineVersion": "20260930215719",
+  "baselineSha256": "ec0c135ca5d2f8c29922da8e503c43f7bd86004e6f5d2ba5ebbd306089410725",
+  "backendFilesSha256": "8fb19dd30f0e8e4cc847aa1679f9487856e0c4f20ddacbfa3b41c33f5d2e08da",
+  "foundation": [
+    {
+      "path": "supabase/migrations/20261022231053_member_media_visibility_policies.sql",
+      "sha256": "2159b432227391f5cf60621145425a8d72286c7d5bb058e85c7e6e897a299864"
+    },
+    {
+      "path": "supabase/migrations/20261022231054_account_deletion_pin_reference.sql",
+      "sha256": "74067b03aa9717025e0851b2e9eeab70d5c3db8c9dbe153a96c9e7ccb8c6409c"
+    },
+    {
+      "path": "supabase/migrations/20261023001140_active_member_access_boundary.sql",
+      "sha256": "1901c5ca052d904ea44bdd0a1d6517c9153e51241bfa55622d15a61efbab9283"
+    },
+    {
+      "path": "supabase/migrations/20261023001141_complete_account_deletion.sql",
+      "sha256": "1f090be505bdb8601d25e0d94a1dba379dff08f4bbd23ef822785d3589285f1d"
+    },
+    {
+      "path": "supabase/migrations/20261023001218_streamlined_membership_acknowledgement.sql",
+      "sha256": "d3ce806dbe1a2d90a194b8d656f97617295def641711438bf1aa22e53f91782b"
+    },
+    {
+      "path": "supabase/migrations/20261023002455_moderation_retention_cleanup.sql",
+      "sha256": "2fab92a319eaf4de7f60b813b1a4de8778fe3a0b8ddca83dbd4e09363c813691"
+    },
+    {
+      "path": "supabase/migrations/20261023002845_authorized_typing_state.sql",
+      "sha256": "ca49897a902d67ef5338b2de7467d7f56c70c0f38a356888a4f27e988c498fa3"
+    },
+    {
+      "path": "supabase/migrations/20261023004143_private_bunny_media_registry.sql",
+      "sha256": "4305425f4a6cba585a14cc052e8769f824fdc90dd64a985080f3014352c0d4c8"
+    },
+    {
+      "path": "supabase/migrations/20261023004153_report_target_visibility_boundary.sql",
+      "sha256": "e1a5d65fc50f2193faf0ee05fd513c184d2ab557b3db376f49ff4b557be94791"
+    },
+    {
+      "path": "supabase/migrations/20261023004723_bunny_upload_deletion_reservations.sql",
+      "sha256": "24421a1214992e333b58ca4093d259f651d9980fe01ea949376273c46ffbe023"
+    },
+    {
+      "path": "supabase/migrations/20261023004930_private_realtime_authorization.sql",
+      "sha256": "17518939d7b3b77829f546981ed9179db29a6312935d56de91efccd4c04901d9"
+    },
+    {
+      "path": "supabase/migrations/20261023004931_shadow_war_lobby_presence.sql",
+      "sha256": "e1a2bd9657a00322e289e5c5566408cb684b5808312185788e5395a808634eee"
+    },
+    {
+      "path": "supabase/migrations/20261023005459_reported_media_evidence.sql",
+      "sha256": "b89890defd0cccdc1899a4e900b5d4674296f90eb35f2c86b0b077f94c833314"
+    },
+    {
+      "path": "supabase/migrations/20261023005759_account_deletion_evidence_retention.sql",
+      "sha256": "9b9e0dd1ff1255512bce057abbb37ca5483f3b0226eb7a78d7a17aede70017e6"
+    },
+    {
+      "path": "supabase/migrations/20261023011311_bunny_media_removal_claims.sql",
+      "sha256": "93a24ecd1f75f9d2aa5d96a1b8fcc0167872f3fed7bb94ef83316ff1e14b1005"
+    },
+    {
+      "path": "supabase/migrations/20261023011620_account_deletion_service_privileges.sql",
+      "sha256": "6c938655c8db733d0afa7c201086977b6deb961db46aa5ee1db79f04f219bb31"
+    },
+    {
+      "path": "supabase/migrations/20261023012556_account_deletion_provider_tombstones.sql",
+      "sha256": "9f67ea06b6d5340937365a0ccbc7419912b1aec7b9fde3b59f88f70123371251"
+    },
+    {
+      "path": "supabase/migrations/20261023223132_legacy_account_deletion_compatibility.sql",
+      "sha256": "5d3dbeb568b3ca581d6bc25d658834ce3a8d584129ce475c7d874d24bf82cf3e"
+    },
+    {
+      "path": "supabase/migrations/20261023224207_moderation_retention_removal_claims.sql",
+      "sha256": "7c890f15a167aa74baaa844187bc426ff155df6599c35802f3fc88b980d5ead9"
+    },
+    {
+      "path": "supabase/migrations/20261023224356_legacy_account_deletion_reconciliation.sql",
+      "sha256": "32b3b365b33a5517ddeaef97e60f3977e0f94ff2d08f5213fed34c045e8c5249"
+    }
+  ],
+  "activation": [
+    {
+      "path": "supabase/migrations/20261023224455_security_privacy_activation.sql",
+      "sha256": "9729cad612270addd30b64de79ce61139bf240d42550982bdfa7cf964ff99280"
+    }
+  ],
+  "producers": [
+    {
+      "name": "shadow-pin-video",
+      "verifyJwt": false
+    },
+    {
+      "name": "shado-tv-bunny-upload",
+      "verifyJwt": true
+    },
+    {
+      "name": "moderation-media",
+      "verifyJwt": false
+    }
+  ]
+}

@@ -36,7 +36,7 @@ describe('openai-chat postToChat policy contract', () => {
 
   it('validates postToChat before requesting an AI completion', () => {
     const validationIndex = compactSource.indexOf('validateposttochat(supabase, user.id, messages)')
-    const requestIndex = compactSource.indexOf('requestaicompletion(messages, model)')
+    const requestIndex = compactSource.indexOf('requestaicompletion(messages, model, sharingconsent)')
 
     expect(validationIndex).toBeGreaterThan(-1)
     expect(requestIndex).toBeGreaterThan(-1)
@@ -45,5 +45,16 @@ describe('openai-chat postToChat policy contract', () => {
 
   it('declares the manual JWT validation contract in Supabase config', () => {
     expect(compactConfig).toContain('[functions.openai-chat] verify_jwt = false')
+  })
+
+  it('returns metadata only after authenticated membership and validates reviewed configuration before claims or provider calls', () => {
+    const authentication = compactSource.indexOf('await authenticateedgeuser(req)')
+    const metadata = compactSource.indexOf("if (action === 'sharing-info') return json(sharinginfo)")
+    const consent = compactSource.indexOf('validateaisharingconsent(sharingconsent, sharinginfo, messages, shouldposttochat)')
+    const claim = compactSource.indexOf('const claim = await claimedgerequest(')
+    expect(authentication).toBeGreaterThan(-1)
+    expect(metadata).toBeGreaterThan(authentication)
+    expect(consent).toBeGreaterThan(metadata)
+    expect(claim).toBeGreaterThan(consent)
   })
 })

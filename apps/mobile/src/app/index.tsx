@@ -44,8 +44,9 @@ import {
   type SerializedCommandQueue,
 } from '@/lib/serializedCommandQueue';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { appRuntime } from '@/lib/appRuntime';
 
-const APP_ORIGIN = 'https://shadochat.online';
+const APP_ORIGIN = appRuntime.origin;
 const APP_URL = getNotificationWebUrl('/?nativeApp=1&nativeBridge=3');
 const NATIVE_BOOTSTRAP_SCRIPT = `
   (function () {

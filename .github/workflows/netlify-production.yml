@@ -13,7 +13,8 @@ permissions:
 
 concurrency:
   group: netlify-production-${{ github.ref }}
-  cancel-in-progress: true
+  # A later push must not interrupt a partially applied backend release.
+  cancel-in-progress: false
 
 jobs:
   quality:
@@ -27,6 +28,9 @@ jobs:
 
   deploy:
     name: Build and deploy
+    # Hold the full-app publisher during the separate streamlined rollout.
+    # Backend phases have their own workflow and do not publish a frontend.
+    if: ${{ github.ref == 'refs/heads/main' && vars.STREAMLINED_BACKEND_ROLLOUT_HOLD != 'true' }}
     needs: [quality, security, codeql]
     runs-on: ubuntu-latest
     env:
@@ -38,6 +42,7 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+      BUNNY_STREAM_LIBRARY_ID: ${{ vars.BUNNY_STREAM_LIBRARY_ID }}
       VITE_APP_BUILD_ID: ${{ github.sha }}
       VITE_APP_COMMIT_SHA: ${{ github.sha }}
       VITE_APP_DEPLOY_CONTEXT: production
@@ -113,8 +118,20 @@ jobs:
       - name: Verify app build metadata
         run: node scripts/verify-app-build-metadata.mjs
 
+      # This blocks implicit activation BEFORE any schema/config mutation.
+      # The explicit backend workflow completes the reviewed phases first.
+      # It proves live metadata only; client compatibility is a separate gate.
+      - name: Verify explicit backend security activation is complete
+        run: node scripts/backend-privacy-release.mjs --production-check
+
+      - name: Verify deletion preparation before backend changes
+        run: npm run supabase:deletion:release-check
+
       - name: Apply production migrations
         run: supabase db push --linked --yes --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Recheck deletion preparation before function publication
+        run: npm run supabase:deletion:release-check
 
       - name: Align Supabase Auth and function configuration
         run: supabase config push --project-ref "$SUPABASE_PROJECT_ID" --yes

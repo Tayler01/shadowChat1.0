@@ -39,6 +39,7 @@ export async function handler(event) {
     }
 
     const body = JSON.parse(event.body || '{}')
+    const userClient = createUserScopedClient(authorization)
     const action = body?.action
     await consumeShadowPinCreatorMediaBudget(admin, user.id, action)
 
@@ -58,6 +59,7 @@ export async function handler(event) {
     if (action === 'stage-draft-image-from-url') {
       const result = await stageShadowPinDraftImageFromUrl({
         admin,
+        userClient,
         userId: user.id,
         draftId: body?.draftId,
         expectedRevision: Number(body?.expectedRevision),
@@ -129,6 +131,7 @@ export async function handler(event) {
       const description = cleanText(body?.description, 300, 'Description', false)
       const category = await updateImportedShadowPinCategoryCover({
         admin,
+        userClient,
         userId: user.id,
         categoryId: body?.categoryId,
         title,
@@ -144,6 +147,7 @@ export async function handler(event) {
       const description = cleanText(body?.description, 500, 'Description', false)
       const image = await updateImportedShadowPinImage({
         admin,
+        userClient,
         userId: user.id,
         imageId: body?.imageId,
         title,
@@ -160,6 +164,7 @@ export async function handler(event) {
       const description = cleanText(body?.description, targetType === 'category' ? 300 : 500, 'Description', false)
       const item = await createImportedShadowPinItem({
         admin,
+        userClient,
         userId: user.id,
         targetType,
         categoryId: body?.categoryId,

@@ -1,7 +1,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import { requireActiveEdgeMember } from '../_shared/edge-guard.ts'
+import { assertRasterImageBytes, downloadMemberMedia } from '../_shared/member-media.ts'
 import {
-  assertPublicUrl,
   normalizePublicHttpUrl,
   readLimitedArrayBuffer,
   safeFetch,
@@ -81,15 +82,12 @@ const authenticate = async (authorization: string) => {
   }
 
   const user = await authResponse.json()
+  if (typeof user?.id === 'string') await requireActiveEdgeMember(createAdminClient(), user.id)
   return typeof user?.id === 'string' ? { id: user.id as string } : null
 }
 
 const normalizeUrl = (value: string) => {
   return normalizePublicHttpUrl(value, SAFE_IMAGE_URL_OPTIONS)
-}
-
-const assertPublicHost = async (url: URL) => {
-  await assertPublicUrl(url, SAFE_IMAGE_URL_OPTIONS)
 }
 
 const resolveImageType = (contentTypeHeader: string | null) => {
@@ -142,15 +140,18 @@ serve(async req => {
     const title = cleanText(body.title, targetType === 'category' ? 60 : 80, 'Title', true)
     const description = cleanText(body.description, targetType === 'category' ? 300 : 500, 'Description', false)
     const sourceUrl = normalizeUrl(body.url)
-    await assertPublicHost(sourceUrl)
-
     const admin = createAdminClient()
+    const { supabaseUrl, supabaseAnonKey } = getSupabaseEnv()
+    const actor = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: req.headers.get('Authorization')! } },
+    })
     let activeCategory: { id: string } | null = null
     if (targetType === 'image') {
       if (!body.categoryId) {
         return json({ error: 'Category is required.' }, 400)
       }
-      const { data, error } = await admin
+      const { data, error } = await actor
         .from('shadow_pin_categories')
         .select('id')
         .eq('id', body.categoryId)
@@ -163,7 +164,8 @@ serve(async req => {
       activeCategory = data
     }
 
-    const response = await safeFetch(sourceUrl, {
+    const memberBlob = await downloadMemberMedia(sourceUrl.toString(), supabaseUrl, actor)
+    const response = memberBlob ? new Response(memberBlob, { headers: { 'content-type': memberBlob.type } }) : await safeFetch(sourceUrl, {
       signal: AbortSignal.timeout(8000),
       headers: {
         accept: 'image/avif,image/webp,image/png,image/jpeg,image/gif;q=0.9,*/*;q=0.5',
@@ -171,15 +173,15 @@ serve(async req => {
       },
     }, SAFE_IMAGE_URL_OPTIONS)
 
-    if (!response.ok) {
-      throw new Error(`Image fetch failed with ${response.status}`)
-    }
-
-    const finalUrl = new URL(response.url || sourceUrl.toString())
-    await assertPublicHost(finalUrl)
-
-    const { contentType, extension } = resolveImageType(response.headers.get('content-type'))
-    const bytes = await readLimitedArrayBuffer(response, MAX_IMAGE_BYTES, 'Image is larger than 15MB.')
+    let imageType: ReturnType<typeof resolveImageType>
+    let bytes: ArrayBuffer
+    try {
+      if (!response.ok) throw new Error(`Image fetch failed with ${response.status}`)
+      imageType = resolveImageType(response.headers.get('content-type'))
+      bytes = await readLimitedArrayBuffer(response, MAX_IMAGE_BYTES, 'Image is larger than 15MB.')
+      assertRasterImageBytes(bytes)
+    } finally { await response.body?.cancel().catch(() => undefined) }
+    const { contentType, extension } = imageType
 
     const recordId = crypto.randomUUID()
     const path = targetType === 'category'

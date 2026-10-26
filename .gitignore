@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+apps/streamlined/dist-local-preview/
 *.local
 
 # Editor directories and files

@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import { requireActiveEdgeMember } from '../_shared/edge-guard.ts'
 import {
   assertPublicUrl,
   normalizePublicHttpUrl,
@@ -77,6 +78,7 @@ const authenticate = async (authorization: string) => {
   }
 
   const user = await authResponse.json()
+  if (typeof user?.id === 'string') await requireActiveEdgeMember(createAdminClient(), user.id)
   return typeof user?.id === 'string' ? { id: user.id as string } : null
 }
 

@@ -1,3 +1,34 @@
+## October 26 streamlined release verification
+
+- Fixed a Windows-only module identity split in the edition resolver that
+  bundled two authentication providers and stopped the app at startup. The
+  build verifier now rejects duplicate module identities; its 11 mode and
+  isolation tests pass. The release bundle is 752 kB initial JavaScript,
+  227 kB gzip, with chat, radial controls, DMs and ShadowPin retained.
+- Lint, both edition typechecks/builds and documentation checks pass. Android
+  Chromium and iPhone WebKit pass four core scenarios plus focused DM reload
+  checks with exact fixture cleanup; see the [mobile QA log](../qa/mobile-pwa-qa-log.md).
+  The harness supports streamlined navigation while preserving the full-app
+  default. Local-only preview output is excluded from Git.
+- Fresh read-only production checks confirm the expected 243-migration baseline
+  and unchanged deletion restrictions. No October backend phase or streamlined
+  hosting release has been applied. Apple/EAS access works; the configured
+  streamlined build is 18, while the latest uploaded build remains 17.
+- The [App Review packet](../STREAMLINED_APP_REVIEW_PACKET.md) records listing
+  copy, reviewer access, privacy disclosures and signed-artifact checks still
+  needed before submission. No App Store submission has occurred.
+
+## October 23 streamlined production-source reconciliation
+
+- Imported the separate streamlined shell, settings, policy routes, adult
+  acknowledgement flow and round brand asset into a release worktree based on
+  production `main`. The header keeps one Settings destination and one presence
+  indicator as reviewed in the local preview.
+- Preserved the newer full-app work recorded below. Backend activation and a
+  signed streamlined iPhone build remain in progress; the earlier isolated
+  results are not production evidence. See
+  [store readiness](../STREAMLINED_STORE_READINESS.md) for phase boundaries.
+
 ## October 5 Shadow Checkers selection, audio and rendering follow-up
 
 - Fixed board-wide mandatory-capture filtering, same-piece deselection and

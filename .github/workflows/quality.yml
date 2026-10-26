@@ -20,10 +20,12 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run typecheck:streamlined
       - run: npm run test:node
       - run: npm run supabase:functions:verify
       - run: npm run docs:verify
       - run: npm run build
+      - run: npm run build:streamlined
       - run: npx jest --runInBand
       - run: npm audit --omit=dev --audit-level=low
       - name: Verify News worker lockfile
@@ -32,9 +34,7 @@ jobs:
         run: npm audit --prefix services/news-scraper --audit-level=low
 
   mobile:
-    # TestFlight/native delivery is intentionally paused. Restore this job only
-    # when the native release track resumes.
-    if: ${{ false }}
+    # The streamlined iPhone release resumes the native quality gate.
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -47,7 +47,8 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
       - run: npm ci
-      - run: npm audit --omit=dev --audit-level=low
+      - run: npm run audit:release
+      - run: npm run test:dependencies && npm run test:dependency-security && npm run test:clipboard && npm run test:streamlined
       - run: npm run lint
       - run: npx tsc --noEmit
       - run: npm run doctor

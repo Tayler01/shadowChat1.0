@@ -1,0 +1,2438 @@
+import { createClient } from '@supabase/supabase-js'
+import { invokeEdgeFunctionWithRetry } from '../../../../src/lib/edgeFunctionRetry'
+import {
+  VITE_SUPABASE_ANON_KEY,
+  VITE_SUPABASE_URL,
+  VITE_PRIVATE_REALTIME_ENABLED,
+} from './env'
+import { configurePrivateRealtimeChannels } from '../../../../src/lib/privateRealtimeChannels'
+import { optimizeImageFile } from '../../../../src/lib/imageOptimization'
+import { createStoredImageAsset, type MediaThumbnailProfile } from '../../../../src/lib/mediaAssets'
+import { getResumableStorageEndpoint } from '../../../../src/lib/resumableStorageEndpoint'
+import {
+  CHAT_FILE_UPLOAD_RULE,
+  CHAT_IMAGE_UPLOAD_RULE,
+  CHAT_VIDEO_UPLOAD_RULE,
+  resolveUploadMimeType,
+  sanitizeUploadFileName,
+  validateUpload,
+  VOICE_UPLOAD_RULE,
+} from '../../../../src/lib/uploadLimits'
+import {
+  pickPublicProfile,
+  PUBLIC_PROFILE_SELECT,
+} from '../../../../supabase/functions/_shared/public-profile'
+
+type AnySupabaseClient = any
+type SessionResponse = {
+  data: { session: any }
+  error: any
+}
+type RefreshSessionResponse = {
+  data: { session: any }
+  error: any
+}
+
+const loggingFetch: typeof fetch = async (input, init) => {
+  const requestUrl = typeof input === 'string'
+    ? input
+    : input instanceof URL
+      ? input.href
+      : input.url
+  const url = new URL(requestUrl, VITE_SUPABASE_URL)
+  // These tiny lifecycle writes must survive document replacement. WebKit
+  // otherwise cancels them as access-control failures during page teardown.
+  // Keep uploads, arbitrary RPCs and other origins on the normal fetch path.
+  const keepalive =
+    url.origin === new URL(VITE_SUPABASE_URL).origin &&
+    init?.method?.toUpperCase() === 'POST' &&
+    typeof init.body === 'string' &&
+    init.body.length <= 2048 &&
+    [
+      '/rest/v1/rpc/finish_shadow_pin_activity_session',
+      '/rest/v1/rpc/set_my_notification_installation_foreground_v2',
+    ].includes(url.pathname)
+  return fetch(input, keepalive ? { ...init, keepalive: true } : init)
+}
+
+const shouldUseRealtimeWorker =
+  typeof window !== 'undefined' && typeof Worker !== 'undefined'
+
+export const SUPABASE_URL = VITE_SUPABASE_URL
+export const SUPABASE_ANON_KEY = VITE_SUPABASE_ANON_KEY
+
+const supabaseUrl = SUPABASE_URL
+const supabaseAnonKey = SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
+}
+
+// Extract project ref for storage key
+const projectRefMatch = supabaseUrl.match(/https?:\/\/(.*?)\./)
+const projectRef = projectRefMatch ? projectRefMatch[1] : ''
+export const localStorageKey = `sb-${projectRef}-auth-token`
+
+// Remove stale auth keys left over from previous fresh clients
+export const purgeOldAuthKeys = (activeKey?: string) => {
+  if (typeof localStorage === 'undefined') return
+  const prefix = `sb-${projectRef}-auth-token-fresh-`
+  const toRemove: string[] = []
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i)
+    if (key && key.startsWith(prefix) && key !== activeKey) {
+      toRemove.push(key)
+    }
+  }
+  toRemove.forEach(k => {
+    try {
+      localStorage.removeItem(k)
+    } catch {
+      // ignore
+    }
+  })
+}
+
+const attachRealtimeHeartbeat = (client: AnySupabaseClient) => {
+  configurePrivateRealtimeChannels(client, VITE_PRIVATE_REALTIME_ENABLED === 'true')
+  try {
+    client.realtime.onHeartbeat?.((status: string) => {
+      if (
+        (status === 'disconnected' || status === 'timeout') &&
+        (typeof navigator === 'undefined' || navigator.onLine)
+      ) {
+        client.realtime.connect?.()
+      }
+    })
+  } catch {
+    // ignore heartbeat hook failures on unsupported runtimes
+  }
+}
+
+// Create fresh client with unique storage key to avoid conflicts
+export function createFreshSupabaseClient() {
+  const uniqueStorageKey = `sb-${projectRef}-auth-token-fresh-${
+    typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
+  }`
+  purgeOldAuthKeys(uniqueStorageKey)
+
+  try {
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storageKey: uniqueStorageKey, // unique per instance
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      realtime: {
+        worker: shouldUseRealtimeWorker,
+        params: {
+          eventsPerSecond: 50,
+        },
+      },
+      global: {
+        fetch: loggingFetch,
+      },
+    })
+    attachRealtimeHeartbeat(client)
+    ;(client as any).__storageKey = uniqueStorageKey
+    return client
+  } catch {
+    // Return a minimal client object to prevent null reference errors
+    const client = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storageKey: uniqueStorageKey,
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      realtime: {
+        worker: shouldUseRealtimeWorker,
+      },
+    })
+    attachRealtimeHeartbeat(client)
+    ;(client as any).__storageKey = uniqueStorageKey
+    return client
+  }
+}
+
+// Main client with default storage key
+export let supabase: AnySupabaseClient
+
+declare global {
+  var __supabaseClient: AnySupabaseClient | undefined
+}
+
+const globalRef = globalThis as typeof globalThis & {
+  __supabaseClient?: AnySupabaseClient
+}
+
+if (!globalRef.__supabaseClient) {
+  try {
+    globalRef.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      realtime: {
+        worker: shouldUseRealtimeWorker,
+        params: {
+          eventsPerSecond: 50,
+        },
+      },
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+      global: {
+        fetch: loggingFetch,
+      },
+    })
+    attachRealtimeHeartbeat(globalRef.__supabaseClient)
+  } catch {
+    // Create a minimal fallback client
+    globalRef.__supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+      realtime: {
+        worker: shouldUseRealtimeWorker,
+      },
+    })
+    attachRealtimeHeartbeat(globalRef.__supabaseClient)
+  }
+}
+
+supabase = configurePrivateRealtimeChannels(globalRef.__supabaseClient!, VITE_PRIVATE_REALTIME_ENABLED === 'true')
+
+export const getStoredRefreshToken = (): string | null => {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(localStorageKey)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return (
+      parsed?.currentSession?.refresh_token ||
+      parsed?.refresh_token ||
+      parsed?.refreshToken ||
+      null
+    )
+  } catch {
+    return null
+  }
+}
+
+// Client management
+let currentSupabaseClient = supabase
+export const setSupabaseClient = (client: AnySupabaseClient) => {
+  supabase = client
+  currentSupabaseClient = client
+}
+let fallbackClient: AnySupabaseClient | null = null
+
+export const getRealtimeClient = (): AnySupabaseClient | null => {
+  return (
+    currentSupabaseClient ||
+    fallbackClient ||
+    globalRef.__supabaseClient ||
+    supabase ||
+    null
+  )
+}
+
+// Timeout helper
+const timeout = (ms: number) => new Promise((_, reject) =>
+  setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)
+)
+
+const SESSION_LOOKUP_TIMEOUT_MS = 4000
+const SESSION_REFRESH_TIMEOUT_MS = 10000
+const SESSION_SET_TIMEOUT_MS = 5000
+
+export const withTimeout = async <T>(
+  promise: Promise<T>,
+  ms: number,
+  message: string
+): Promise<T> => {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(message)), ms)
+    ),
+  ]) as Promise<T>
+}
+
+export const getSessionWithTimeout = async (
+  client?: AnySupabaseClient,
+  timeoutMs = SESSION_LOOKUP_TIMEOUT_MS
+): Promise<SessionResponse> => {
+  const targetClient = client ?? (await getWorkingClient())
+  return withTimeout(
+    targetClient.auth.getSession(),
+    timeoutMs,
+    `Session lookup timeout after ${timeoutMs}ms`
+  ) as Promise<SessionResponse>
+}
+
+// Promote fallback client to main client
+export const promoteFallbackToMain = async (): Promise<void> => {
+
+  if (!fallbackClient) {
+    return
+  }
+
+  try {
+    // Test that fallback client is actually working
+    const isResponsive = await testClientResponsiveness(fallbackClient, 2000)
+
+    if (!isResponsive) {
+      return
+    }
+
+    // Destroy old main client
+    await destroyClient(currentSupabaseClient)
+
+    // Promote fallback to main
+    currentSupabaseClient = fallbackClient
+    fallbackClient = null
+    setSupabaseClient(currentSupabaseClient)
+    purgeOldAuthKeys((currentSupabaseClient as any).__storageKey)
+  } catch {
+  }
+}
+
+// Test client responsiveness
+const testClientResponsiveness = async (client: AnySupabaseClient, timeoutMs = 2000): Promise<boolean> => {
+  if (!client) {
+    return false
+  }
+
+  try {
+    await Promise.race([
+      client.from('users').select('id').limit(1),
+      timeout(timeoutMs),
+    ])
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Destroy stale client before creating new ones
+const destroyClient = async (client: AnySupabaseClient | null) => {
+  if (!client) return
+
+  try {
+    if (client.realtime && typeof client.realtime.disconnect === 'function') {
+      await client.realtime.disconnect()
+    }
+  } catch {
+  }
+}
+
+// Centralized getWorkingClient that tracks and rotates clients
+export const getWorkingClient = async (): Promise<AnySupabaseClient> => {
+  const client =
+    currentSupabaseClient ||
+    fallbackClient ||
+    globalRef.__supabaseClient ||
+    supabase
+
+  if (!client) {
+    throw new Error('No Supabase client available')
+  }
+
+  return client
+}
+
+// Force client recreation (simulates page reload)
+export const recreateSupabaseClient = async (): Promise<AnySupabaseClient> => {
+  const client = await getWorkingClient()
+
+  try {
+    const channels = client.getChannels?.() || []
+    channels.forEach((channel: any) => {
+      try {
+        client.removeChannel?.(channel)
+      } catch {
+        // ignore cleanup failures
+      }
+    })
+  } catch {
+    // ignore channel lookup failures
+  }
+
+  try {
+    client.realtime?.disconnect?.()
+  } catch {
+    // ignore disconnect failures
+  }
+
+  const restored = await restoreSessionIfNeeded(client)
+  if (!restored) {
+    const storedToken = getStoredRefreshToken()
+    if (storedToken) {
+      try {
+        const refreshResult = (await withTimeout(
+          client.auth.refreshSession(),
+          SESSION_REFRESH_TIMEOUT_MS,
+          `Session refresh timeout after ${SESSION_REFRESH_TIMEOUT_MS}ms`
+        )) as RefreshSessionResponse
+        client.realtime?.setAuth?.(refreshResult.data?.session?.access_token || '')
+      } catch {
+        // ignore refresh failures during client recreation
+      }
+    }
+  }
+
+  try {
+    client.realtime?.connect?.()
+  } catch {
+    // ignore reconnect failures
+  }
+
+  return client
+}
+
+// Restore session from localStorage to a fresh client
+export const restoreSessionIfNeeded = async (client: AnySupabaseClient): Promise<boolean> => {
+
+  try {
+    const raw = localStorage.getItem(localStorageKey)
+    const stored = raw ? JSON.parse(raw) : null
+
+    if (!stored?.currentSession?.refresh_token && !stored?.refresh_token) {
+      return false
+    }
+
+    const refreshToken = stored.currentSession?.refresh_token || stored.refresh_token
+    const accessToken = stored.currentSession?.access_token || stored.access_token || ''
+
+
+    const { data, error } = (await withTimeout(
+      client.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      }),
+      SESSION_SET_TIMEOUT_MS,
+      `Session set timeout after ${SESSION_SET_TIMEOUT_MS}ms`
+    )) as RefreshSessionResponse
+
+    if (error) {
+      return false
+    } else {
+      // Update realtime auth token
+      client.realtime.setAuth(data.session?.access_token || '')
+      return true
+    }
+  } catch {
+    return false
+  }
+}
+
+// Force session restoration for diagnostics
+export const forceSessionRestore = async (): Promise<boolean> => {
+
+  try {
+    const workingClient = await getWorkingClient()
+
+    // First check if we already have a session
+    const { data: { session }, error } = await getSessionWithTimeout(workingClient)
+    if (!error && session) {
+      return true
+    }
+
+    // Try to restore from localStorage
+    const restored = await restoreSessionIfNeeded(workingClient)
+    if (restored) {
+      return true
+    }
+
+    return false
+  } catch {
+    return false
+  }
+}
+// --- Refresh session locking -------------------------------------------------
+// Prevent multiple concurrent refreshSession calls from triggering duplicate
+// network requests. Any callers will await the same promise while a refresh is
+// in flight.
+let refreshSessionPromise: Promise<{ data: any; error: any }> | null = null
+let resumeRecoveryPromise: Promise<boolean> | null = null
+
+export const clearRefreshSessionPromise = () => {
+  refreshSessionPromise = null
+}
+
+export const recoverSessionAfterResume = async (): Promise<boolean> => {
+  if (resumeRecoveryPromise) {
+    return resumeRecoveryPromise
+  }
+
+  resumeRecoveryPromise = (async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return false
+    }
+
+    const storedToken = getStoredRefreshToken()
+
+    const applyRecoveredSession = async (client: AnySupabaseClient, accessToken?: string | null) => {
+      try {
+        client.realtime.setAuth(accessToken || '')
+      } catch {
+        // ignore auth propagation failures
+      }
+      try {
+        client.realtime.connect?.()
+      } catch {
+        // ignore reconnect failures
+      }
+      return true
+    }
+
+    const attemptRecovery = async (client: AnySupabaseClient) => {
+      if (storedToken) {
+        try {
+          const refreshResult = (await withTimeout(
+            client.auth.refreshSession(),
+            SESSION_REFRESH_TIMEOUT_MS,
+            `Session refresh timeout after ${SESSION_REFRESH_TIMEOUT_MS}ms`
+          )) as RefreshSessionResponse
+
+          if (refreshResult.data?.session) {
+            return applyRecoveredSession(client, refreshResult.data.session.access_token)
+          }
+        } catch {
+          // ignore refresh failures and fall through to local restore
+        }
+      }
+
+      const restored = await restoreSessionIfNeeded(client)
+      if (restored) {
+        try {
+          const { data: { session } } = await getSessionWithTimeout(client)
+          return applyRecoveredSession(client, session?.access_token)
+        } catch {
+          return applyRecoveredSession(client)
+        }
+      }
+
+      return false
+    }
+
+    try {
+      const currentClient = await getWorkingClient()
+      return attemptRecovery(currentClient)
+    } catch {
+      return false
+    }
+  })().finally(() => {
+    resumeRecoveryPromise = null
+  })
+
+  return resumeRecoveryPromise
+}
+
+export const refreshSessionLocked = async () => {
+  if (!refreshSessionPromise) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return Promise.reject(new Error('Offline: cannot refresh session'))
+    }
+
+    let workingClient = await getWorkingClient()
+    let session: any = null
+
+    try {
+      const sessionResult = await getSessionWithTimeout(workingClient)
+      session = sessionResult.data.session
+    } catch (sessionError) {
+      const recovered = await recoverSessionAfterResume()
+      if (!recovered) {
+        return Promise.reject(sessionError)
+      }
+
+      workingClient = await getWorkingClient()
+      const sessionResult = await getSessionWithTimeout(workingClient)
+      session = sessionResult.data.session
+    }
+
+    const storedToken = getStoredRefreshToken()
+
+    if (!session && !storedToken) {
+      return Promise.reject(new Error('No session to refresh'))
+    }
+
+    const refresh = workingClient.auth
+      .refreshSession()
+      .then((res: any) => {
+        if (!res.data?.session) {
+          throw new Error('Failed to refresh session')
+        }
+        if (res.data?.session) {
+          workingClient.realtime.setAuth(res.data.session?.access_token || '')
+          // Reconnect websocket in case it was closed on token expiry
+          try {
+            workingClient.realtime.connect()
+          } catch {
+          }
+        }
+        return res
+      })
+      .catch((err: any) => {
+        throw err
+      })
+    refreshSessionPromise = (withTimeout(
+      refresh,
+      SESSION_REFRESH_TIMEOUT_MS,
+      `Session refresh timeout after ${SESSION_REFRESH_TIMEOUT_MS}ms`
+    ) as Promise<{
+      data: any
+      error: any
+    }>)
+      .then((res) => {
+        clearRefreshSessionPromise()
+        return res
+      })
+      .finally(() => {
+        refreshSessionPromise = null
+      })
+  }
+  return refreshSessionPromise
+}
+
+export const forceRefreshSession = async () => {
+  clearRefreshSessionPromise()
+  return refreshSessionLocked()
+}
+
+export const resetRealtimeConnection = async () => {
+  const currentClient = await getWorkingClient()
+  if (!currentClient) {
+    return
+  }
+
+  const { data: { session } } = await getSessionWithTimeout(currentClient)
+
+  // Clean up existing channels on current client
+  try {
+    const channels = currentClient.getChannels?.() || []
+    channels.forEach((ch: any) => {
+      try {
+        if (currentClient.removeChannel && typeof currentClient.removeChannel === 'function') {
+          currentClient.removeChannel(ch)
+        }
+      } catch {
+      }
+    })
+  } catch {
+  }
+
+  // Disconnect current realtime connection
+  try {
+    if (currentClient.realtime && typeof currentClient.realtime.disconnect === 'function') {
+      currentClient.realtime.disconnect()
+    }
+  } catch {
+  }
+
+  // Set auth token on realtime
+  if (currentClient.realtime && typeof currentClient.realtime.setAuth === 'function') {
+    currentClient.realtime.setAuth(session?.access_token || '')
+  }
+
+  // Connect realtime with fresh bindings
+  try {
+    if (currentClient.realtime && typeof currentClient.realtime.connect === 'function') {
+      currentClient.realtime.connect()
+    }
+  } catch {
+  }
+}
+
+export const VOICE_BUCKET = 'message-media'
+export const UPLOADS_BUCKET = 'chat-uploads'
+export const ART_BOARD_BUCKET = 'art-board'
+export const SHADOW_PIN_BUCKET = 'shadow-pin'
+export const SHADO_TV_BUCKET = 'shado-tv'
+const RESUMABLE_UPLOAD_THRESHOLD_BYTES = 6 * 1024 * 1024
+const RESUMABLE_UPLOAD_CHUNK_BYTES = 6 * 1024 * 1024
+
+export type ChatUploadProgressOptions = {
+  signal?: AbortSignal
+  onProgress?: (percent: number) => void
+}
+
+const uploadResumableStorageObject = async (
+  workingClient: AnySupabaseClient,
+  bucketName: string,
+  objectName: string,
+  file: File,
+  contentType: string,
+  options: ChatUploadProgressOptions = {}
+) => {
+  let { data: { session }, error } = await workingClient.auth.getSession()
+  if (error || !session?.access_token) {
+    await ensureSession(true)
+    const refreshed = await workingClient.auth.getSession()
+    session = refreshed.data.session
+    error = refreshed.error
+  }
+  if (error || !session?.access_token) throw error || new Error('Not authenticated')
+
+  const { Upload } = await import('tus-js-client')
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
+  await new Promise<void>((resolve, reject) => {
+    let settled = false
+    const upload = new Upload(file, {
+      endpoint: getResumableStorageEndpoint(SUPABASE_URL),
+      retryDelays: [0, 3000, 5000, 10000, 20000],
+      headers: {
+        authorization: `Bearer ${session.access_token}`,
+        'x-upsert': 'false',
+      },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      metadata: {
+        bucketName,
+        objectName,
+        contentType,
+        cacheControl: '31536000',
+      },
+      chunkSize: RESUMABLE_UPLOAD_CHUNK_BYTES,
+      onProgress: (uploadedBytes, totalBytes) => options.onProgress?.(totalBytes > 0 ? (uploadedBytes / totalBytes) * 100 : 0),
+      onError: error => {
+        if (settled) return
+        settled = true
+        options.signal?.removeEventListener('abort', onAbort)
+        reject(error)
+      },
+      onSuccess: () => {
+        if (settled) return
+        settled = true
+        options.signal?.removeEventListener('abort', onAbort)
+        options.onProgress?.(100)
+        resolve()
+      },
+    })
+
+    const onAbort = () => {
+      if (settled) return
+      settled = true
+      void upload.abort(true).catch(() => undefined)
+      reject(new DOMException('Upload canceled', 'AbortError'))
+    }
+    options.signal?.addEventListener('abort', onAbort, { once: true })
+
+    // The object path is deliberately unique. A tus fingerprint is based on
+    // the local file and can point at an older object path, so cross-session
+    // fingerprint recovery would make the newly returned public URL invalid.
+    // Retries within this Upload instance remain resumable and reliable.
+    if (options.signal?.aborted) onAbort()
+    else upload.start()
+  })
+}
+
+export type ShadoTvArtworkTarget =
+  | 'channel-ticket'
+  | 'channel-hero'
+  | 'video-poster'
+  | 'video-thumbnail'
+
+const SHADO_TV_ARTWORK_UPLOAD_CONFIG: Record<ShadoTvArtworkTarget, {
+  maxWidth: number
+  maxHeight: number
+  quality: number
+  prefix: string
+}> = {
+  'channel-ticket': { maxWidth: 1024, maxHeight: 1536, quality: 0.84, prefix: 'shado-tv-ticket' },
+  'channel-hero': { maxWidth: 1920, maxHeight: 1080, quality: 0.84, prefix: 'shado-tv-hero' },
+  'video-poster': { maxWidth: 1200, maxHeight: 1800, quality: 0.84, prefix: 'shado-tv-poster' },
+  'video-thumbnail': { maxWidth: 1600, maxHeight: 900, quality: 0.82, prefix: 'shado-tv-thumbnail' },
+}
+
+export const uploadVoiceMessage = async (blob: Blob, mimeType = 'audio/webm') => {
+  const contentType = validateUpload(
+    { size: blob.size, type: mimeType },
+    VOICE_UPLOAD_RULE
+  )
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const ext = contentType === 'audio/mpeg'
+    ? 'mp3'
+    : contentType.split('/')[1] || 'webm'
+  const filePath = `${user.id}/${Date.now()}.${ext}`
+  const { error } = await workingClient.storage.from(VOICE_BUCKET).upload(filePath, blob, {
+    contentType,
+    cacheControl: '31536000',
+  })
+  if (error) throw error
+  const { data } = workingClient.storage.from(VOICE_BUCKET).getPublicUrl(filePath)
+  return data.publicUrl
+}
+
+export const uploadChatFileAsset = async (file: File, options: ChatUploadProgressOptions = {}) => {
+  validateUpload(file, CHAT_FILE_UPLOAD_RULE)
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
+
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const uploadFile = resolveUploadMimeType(file).startsWith('image/')
+    ? await optimizeImageFile(file, {
+      maxWidth: 1600,
+      maxHeight: 1600,
+      quality: 0.82,
+      fileNamePrefix: 'chat-image',
+      maxInputPixels: 32_000_000,
+    })
+    : file
+  const contentType = validateUpload(uploadFile, CHAT_FILE_UPLOAD_RULE)
+  const safeName = sanitizeUploadFileName(uploadFile.name)
+  const filePath = `${user.id}/${Date.now()}_${crypto.randomUUID()}_${safeName}`
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
+  if (options.onProgress || options.signal || uploadFile.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES) {
+    await uploadResumableStorageObject(
+      workingClient,
+      UPLOADS_BUCKET,
+      filePath,
+      uploadFile,
+      contentType,
+      options
+    )
+  } else {
+    const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
+      contentType,
+      cacheControl: '31536000',
+    })
+    if (error) throw error
+  }
+  const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
+  return { path: filePath, publicUrl: data.publicUrl }
+}
+
+export const uploadChatFile = async (file: File) => (await uploadChatFileAsset(file)).publicUrl
+
+export const uploadChatVideoAsset = async (file: File, options: ChatUploadProgressOptions = {}) => {
+  validateUpload(file, CHAT_VIDEO_UPLOAD_RULE)
+  return uploadChatFileAsset(file, options)
+}
+
+export const uploadChatImageAsset = async (
+  file: File,
+  thumbnailProfile: MediaThumbnailProfile = 'chat',
+  options: ChatUploadProgressOptions = {}
+) => {
+  validateUpload(file, CHAT_IMAGE_UPLOAD_RULE)
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
+
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: 1600,
+    maxHeight: 1600,
+    quality: 0.82,
+    fileNamePrefix: thumbnailProfile === 'weather' ? 'weather-share' : 'chat-image',
+    maxInputPixels: 32_000_000,
+  })
+  const contentType = validateUpload(uploadFile, CHAT_IMAGE_UPLOAD_RULE)
+  const safeName = sanitizeUploadFileName(uploadFile.name, 'chat-image')
+  const filePath = `${user.id}/${Date.now()}_${crypto.randomUUID()}_${safeName}`
+  if (options.signal?.aborted) throw new DOMException('Upload canceled', 'AbortError')
+  if (options.onProgress || options.signal || uploadFile.size > RESUMABLE_UPLOAD_THRESHOLD_BYTES) {
+    await uploadResumableStorageObject(workingClient, UPLOADS_BUCKET, filePath, uploadFile, contentType, options)
+  } else {
+    const { error } = await workingClient.storage.from(UPLOADS_BUCKET).upload(filePath, uploadFile, {
+      contentType,
+      cacheControl: '31536000',
+    })
+    if (error) throw error
+  }
+  const { data } = workingClient.storage.from(UPLOADS_BUCKET).getPublicUrl(filePath)
+  return createStoredImageAsset(filePath, data.publicUrl, thumbnailProfile)
+}
+
+export const removeUnusedChatUploadAsset = async (path: string) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user || !path.startsWith(`${user.id}/`)) throw new Error('Cannot remove this upload')
+  const { error } = await workingClient.storage.from(UPLOADS_BUCKET).remove([path])
+  if (error) throw error
+}
+
+export const uploadArtBoardImage = async (file: File) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: 1600,
+    maxHeight: 1600,
+    quality: 0.82,
+    fileNamePrefix: 'art-image',
+  })
+  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'art-image'
+  const filePath = `${user.id}/uploads/${Date.now()}_${safeName}`
+  const { error } = await workingClient.storage.from(ART_BOARD_BUCKET).upload(filePath, uploadFile, {
+    contentType: uploadFile.type,
+    cacheControl: '31536000',
+  })
+  if (error) throw error
+  const { data } = workingClient.storage.from(ART_BOARD_BUCKET).getPublicUrl(filePath)
+  return createStoredImageAsset(filePath, data.publicUrl, 'art-board')
+}
+
+export const uploadShadowPinImage = async (
+  file: File,
+  target: 'category' | 'image',
+  scopeId?: string
+) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: 2400,
+    maxHeight: 2400,
+    quality: 0.86,
+    fileNamePrefix: 'shadow-pin',
+  })
+  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || 'shadow-pin-image'
+  const folder = target === 'category'
+    ? `${user.id}/categories/${scopeId || Date.now()}/cover`
+    : `${user.id}/categories/${scopeId || 'uncategorized'}/pins`
+  const filePath = `${folder}/${Date.now()}_${safeName}`
+  const { error } = await workingClient.storage.from(SHADOW_PIN_BUCKET).upload(filePath, uploadFile, {
+    cacheControl: '31536000',
+    contentType: uploadFile.type,
+  })
+  if (error) throw error
+  const { data } = workingClient.storage.from(SHADOW_PIN_BUCKET).getPublicUrl(filePath)
+  return { path: filePath, publicUrl: data.publicUrl }
+}
+
+export const uploadShadoTvArtwork = async (
+  file: File,
+  target: ShadoTvArtworkTarget,
+  scopeId?: string
+) => {
+  const workingClient = await getWorkingClient()
+  const { data: { user } } = await workingClient.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+  if (!file.type.startsWith('image/')) throw new Error('Choose an image file.')
+
+  const config = SHADO_TV_ARTWORK_UPLOAD_CONFIG[target]
+  const uploadFile = await optimizeImageFile(file, {
+    maxWidth: config.maxWidth,
+    maxHeight: config.maxHeight,
+    quality: config.quality,
+    fileNamePrefix: config.prefix,
+  })
+  const safeName = uploadFile.name.replace(/[^a-zA-Z0-9._-]+/g, '-').slice(-120) || `${config.prefix}.webp`
+  const folder = `${user.id}/artwork/${target}/${scopeId || Date.now()}`
+  const filePath = `${folder}/${Date.now()}_${safeName}`
+  const { error } = await workingClient.storage.from(SHADO_TV_BUCKET).upload(filePath, uploadFile, {
+    cacheControl: '31536000',
+    contentType: uploadFile.type,
+  })
+  if (error) throw error
+  return { path: filePath }
+}
+
+// Database types matching the actual schema
+import type { PresenceState, PresenceVisibility, UserStatus } from '../../../../src/types'
+
+export type AdminRole = 'admin' | 'sub_admin'
+
+export interface User {
+  id: string
+  username: string
+  display_name: string
+  avatar_url?: string
+  avatar_thumbnail_url?: string | null
+  avatar_thumbnail_path?: string | null
+  banner_url?: string
+  banner_thumbnail_url?: string | null
+  banner_thumbnail_path?: string | null
+  status: UserStatus
+  status_message: string
+  presence_visibility?: PresenceVisibility
+  color: string
+  chat_color?: string | null
+  admin_role?: AdminRole | null
+  checkers_crown?: boolean
+  war_sword?: boolean
+  shadow_pin_gold_pin?: boolean
+  shadow_runner_sprint_medal?: boolean
+  shadow_runner_knight_medal?: boolean
+  shadow_runner_knight_level_id?: string | null
+  gold_easter_egg?: boolean
+  dm_discoverable?: boolean
+  last_active: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AuthenticatedUser extends User {
+  email: string
+}
+
+export type ChatMessageType = 'text' | 'command' | 'audio' | 'image' | 'video' | 'file' | 'hype'
+
+export type HypeEventType = 'bell' | 'message'
+
+export interface HypeUserSummary {
+  user_id: string
+  display_name: string
+  username?: string | null
+  created_at?: string
+}
+
+export interface HypeEventMetadata {
+  kind?: HypeEventType
+  title?: string
+  summary?: string
+  actor_id?: string
+  actor_display_name?: string
+  actor_username?: string | null
+  message_author_id?: string
+  message_author_display_name?: string
+  message_author_username?: string | null
+  message_preview?: string
+}
+
+export interface HypeEvent {
+  id: string
+  actor_id: string | null
+  event_type: HypeEventType
+  message_id: string | null
+  message_author_id: string | null
+  metadata: HypeEventMetadata
+  created_at: string
+  expires_at: string
+}
+
+export interface HypeStatus {
+  used: number
+  remaining: number
+  limit_per_day: number
+  reset_at: string
+}
+
+export interface Message {
+  id: string
+  client_message_id?: string | null
+  user_id: string
+  content: string
+  message_type: ChatMessageType
+  audio_url?: string | null
+  audio_duration?: number | null
+  file_url?: string | null
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  media_width?: number | null
+  media_height?: number | null
+  media_processed_at?: string | null
+  reactions: Record<string, { count: number; users: string[] }>
+  hype_count?: number
+  hype_users?: HypeUserSummary[]
+  pinned: boolean
+  pinned_by?: string | null
+  pinned_at?: string | null
+  edited_at?: string | null
+  reply_to?: string | null
+  thread_summary?: GeneralChatThreadSummary | null
+  created_at: string
+  updated_at: string
+  user?: User
+  optimistic?: boolean
+  delivery_status?: 'sending' | 'sent' | 'failed'
+}
+
+export interface GeneralChatThreadSummary {
+  thread_id: string
+  reply_count: number
+  unread_count: number
+  latest_reply_id?: string | null
+  latest_reply_at?: string | null
+  latest_reply_preview?: string | null
+  latest_reply_author?: User | null
+  participants?: User[]
+}
+
+export type GeneralChatMessageWindowMode = 'latest' | 'older' | 'newer' | 'target'
+export type GeneralChatMessageWindowStatus =
+  | 'idle'
+  | 'pending'
+  | 'found'
+  | 'resolved'
+  | 'timestamp_fallback'
+  | 'latest'
+  | 'missing'
+  | 'not_requested'
+  | 'error'
+
+export interface GeneralChatMessageKey {
+  created_at: string
+  id: string
+}
+
+export interface GeneralChatMessageWindowRequest {
+  mode: GeneralChatMessageWindowMode
+  limit: number
+  anchor?: GeneralChatMessageKey | null
+  targetMessageId?: string | null
+  targetLastReadMessageId?: string | null
+  targetLastReadAt?: string | null
+}
+
+export interface GeneralChatMessageWindowResult {
+  messages: Message[]
+  pinnedMessages: Message[]
+  hasOlder: boolean
+  hasNewer: boolean
+  windowMode: GeneralChatMessageWindowMode
+  targetStatus: GeneralChatMessageWindowStatus
+  anchorStatus: GeneralChatMessageWindowStatus
+  targetThreadId?: string | null
+}
+
+const normalizeGeneralChatWindowMode = (
+  value: unknown,
+  fallback: GeneralChatMessageWindowMode
+): GeneralChatMessageWindowMode => {
+  return value === 'latest' || value === 'older' || value === 'newer' || value === 'target'
+    ? value
+    : fallback
+}
+
+const normalizeGeneralChatWindowStatus = (
+  value: unknown,
+  fallback: GeneralChatMessageWindowStatus
+): GeneralChatMessageWindowStatus => {
+  return (
+    value === 'idle' ||
+    value === 'pending' ||
+    value === 'found' ||
+    value === 'resolved' ||
+    value === 'timestamp_fallback' ||
+    value === 'latest' ||
+    value === 'missing' ||
+    value === 'not_requested' ||
+    value === 'error'
+  )
+    ? value
+    : fallback
+}
+
+const normalizeGeneralChatMessages = (value: unknown): Message[] => (
+  Array.isArray(value) ? value as Message[] : []
+)
+
+// RPC signature supplied by the General Chat message-window migration:
+// get_general_chat_message_window(
+//   target_message_id uuid default null,
+//   target_last_read_message_id uuid default null,
+//   target_last_read_at timestamptz default null,
+//   target_limit integer default 50
+// ) returns table(messages jsonb, pinned_messages jsonb, has_older boolean, has_newer boolean, anchor_status text).
+export const fetchGeneralChatMessageWindow = async (
+  request: GeneralChatMessageWindowRequest
+): Promise<GeneralChatMessageWindowResult> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_general_chat_message_window', {
+    target_message_id: request.targetMessageId ?? null,
+    target_last_read_message_id: request.targetLastReadMessageId ?? null,
+    target_last_read_at: request.targetLastReadAt ?? null,
+    target_limit: request.limit,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  const row = Array.isArray(data) ? data[0] : data
+  const anchorStatus = normalizeGeneralChatWindowStatus(
+    row?.anchor_status ?? row?.anchorStatus,
+    request.targetMessageId || request.targetLastReadMessageId || request.targetLastReadAt
+      ? 'missing'
+      : 'latest'
+  )
+  const targetFallback: GeneralChatMessageWindowStatus = request.targetMessageId
+    ? 'missing'
+    : 'not_requested'
+
+  return {
+    messages: normalizeGeneralChatMessages(row?.messages ?? row?.window_messages),
+    pinnedMessages: normalizeGeneralChatMessages(row?.pinned_messages ?? row?.pinnedMessages),
+    hasOlder: Boolean(row?.has_older ?? row?.hasOlder),
+    hasNewer: Boolean(row?.has_newer ?? row?.hasNewer),
+    windowMode: normalizeGeneralChatWindowMode(row?.window_mode ?? row?.windowMode, request.mode),
+    targetStatus: normalizeGeneralChatWindowStatus(
+      row?.target_status ?? row?.targetStatus,
+      request.targetMessageId && anchorStatus === 'resolved' ? 'found' : targetFallback
+    ),
+    anchorStatus,
+  }
+}
+
+export const fetchGeneralChatThreadedWindow = async (
+  request: GeneralChatMessageWindowRequest
+): Promise<GeneralChatMessageWindowResult> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_general_chat_threaded_window', {
+    target_message_id: request.targetMessageId ?? null,
+    target_last_read_message_id: request.targetLastReadMessageId ?? null,
+    target_last_read_at: request.targetLastReadAt ?? null,
+    target_limit: request.limit,
+  })
+
+  if (error) throw error
+
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row || (row.messages === undefined && row.window_messages === undefined)) {
+    const unavailable = new Error('Function get_general_chat_threaded_window is unavailable') as Error & { code?: string }
+    unavailable.code = 'PGRST202'
+    throw unavailable
+  }
+  const anchorStatus = normalizeGeneralChatWindowStatus(
+    row?.anchor_status ?? row?.anchorStatus,
+    request.targetMessageId || request.targetLastReadMessageId || request.targetLastReadAt
+      ? 'missing'
+      : 'latest'
+  )
+
+  return {
+    messages: normalizeGeneralChatMessages(row?.messages ?? row?.window_messages),
+    pinnedMessages: normalizeGeneralChatMessages(row?.pinned_messages ?? row?.pinnedMessages),
+    hasOlder: Boolean(row?.has_older ?? row?.hasOlder),
+    hasNewer: Boolean(row?.has_newer ?? row?.hasNewer),
+    windowMode: normalizeGeneralChatWindowMode(row?.window_mode ?? row?.windowMode, request.mode),
+    targetStatus: normalizeGeneralChatWindowStatus(
+      row?.target_status ?? row?.targetStatus,
+      request.targetMessageId && anchorStatus === 'resolved' ? 'found' : 'not_requested'
+    ),
+    anchorStatus,
+    targetThreadId: row?.target_thread_id ?? row?.targetThreadId ?? null,
+  }
+}
+
+export const fetchGeneralChatThreadSummaries = async (rootMessageIds: string[]) => {
+  const uniqueIds = [...new Set(rootMessageIds.filter(Boolean))].slice(0, 50)
+  if (uniqueIds.length === 0) return new Map<string, GeneralChatThreadSummary>()
+
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_general_chat_thread_summaries', {
+    target_root_ids: uniqueIds,
+  })
+  if (error) throw error
+
+  return new Map<string, GeneralChatThreadSummary>(
+    (Array.isArray(data) ? data : []).flatMap((row: any) => {
+      const threadId = String(row?.thread_id ?? row?.threadId ?? '')
+      const summary = row?.summary as GeneralChatThreadSummary | null | undefined
+      return threadId && summary ? [[threadId, summary]] : []
+    })
+  )
+}
+
+export const resolveGeneralChatThreadId = async (messageId: string) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient
+    .from('general_chat_thread_replies')
+    .select('thread_id')
+    .eq('message_id', messageId)
+    .maybeSingle()
+
+  if (error) throw error
+  return data?.thread_id ? String(data.thread_id) : null
+}
+
+export const isGeneralChatMessageWindowRpcUnavailable = (error: unknown) => {
+  const record = error as { code?: string; message?: string; details?: string; hint?: string }
+  const haystack = `${record?.code || ''} ${record?.message || ''} ${record?.details || ''} ${record?.hint || ''}`
+  return haystack.includes('PGRST202') ||
+    /could not find (the )?function/i.test(haystack) ||
+    /function .*get_general_chat_message_window.* does not exist/i.test(haystack)
+}
+
+export const isGeneralChatThreadRpcUnavailable = (error: unknown) => {
+  const record = error as { code?: string; message?: string; details?: string; hint?: string }
+  const haystack = `${record?.code || ''} ${record?.message || ''} ${record?.details || ''} ${record?.hint || ''}`
+  return haystack.includes('PGRST202') ||
+    /could not find (the )?function/i.test(haystack) ||
+    /relation .*general_chat_thread_replies.* does not exist/i.test(haystack) ||
+    /function .*general_chat_thread/i.test(haystack)
+}
+
+const normalizeHypeEvent = (value: any): HypeEvent => ({
+  id: String(value.id),
+  actor_id: value.actor_id ?? null,
+  event_type: value.event_type === 'message' ? 'message' : 'bell',
+  message_id: value.message_id ?? null,
+  message_author_id: value.message_author_id ?? null,
+  metadata: (value.metadata && typeof value.metadata === 'object' ? value.metadata : {}) as HypeEventMetadata,
+  created_at: String(value.created_at),
+  expires_at: String(value.expires_at),
+})
+
+const firstHypeEvent = (data: unknown): HypeEvent | null => {
+  const row = Array.isArray(data) ? data[0] : data
+  return row ? normalizeHypeEvent(row) : null
+}
+
+const normalizeHypeStatus = (data: unknown): HypeStatus => {
+  const row = Array.isArray(data) ? data[0] : data as any
+  return {
+    used: Number(row?.used ?? 0),
+    remaining: Number(row?.remaining ?? 0),
+    limit_per_day: Number(row?.limit_per_day ?? 2),
+    reset_at: String(row?.reset_at ?? ''),
+  }
+}
+
+export const fetchHypeStatus = async (): Promise<HypeStatus> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_hype_status')
+
+  if (error) {
+    throw error
+  }
+
+  return normalizeHypeStatus(data)
+}
+
+export const ringHypeBell = async (): Promise<HypeEvent> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('ring_hype_bell')
+
+  if (error) {
+    throw error
+  }
+
+  const event = firstHypeEvent(data)
+  if (!event) {
+    throw new Error('Hype event was not created.')
+  }
+
+  return event
+}
+
+export const hypeMessage = async (messageId: string): Promise<HypeEvent> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('hype_message', {
+    target_message_id: messageId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  const event = firstHypeEvent(data)
+  if (!event) {
+    throw new Error('Hype event was not created.')
+  }
+
+  return event
+}
+
+export const fetchHypeEvent = async (eventId: string): Promise<HypeEvent | null> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_hype_event', {
+    event_id: eventId,
+  })
+
+  if (error) {
+    throw error
+  }
+
+  return firstHypeEvent(data)
+}
+
+export const fetchPendingHypeEvents = async (): Promise<HypeEvent[]> => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_pending_hype_events')
+
+  if (error) {
+    throw error
+  }
+
+  return Array.isArray(data) ? data.map(normalizeHypeEvent) : []
+}
+
+export const markHypeEventsPlayed = async (eventIds: string[]) => {
+  if (!eventIds.length) return
+
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('mark_hype_events_played', {
+    event_ids: eventIds,
+  })
+
+  if (error) {
+    throw error
+  }
+}
+
+export type NewsPlatform = 'x' | 'truth'
+
+export type NewsReactionSummary = Record<string, { count: number; users: string[] }>
+
+export interface NewsSource {
+  id: string
+  platform: NewsPlatform
+  handle: string
+  normalized_handle?: string
+  display_name?: string | null
+  profile_url?: string | null
+  external_account_id?: string | null
+  enabled: boolean
+  scrape_interval_seconds: number
+  last_seen_external_id?: string | null
+  last_seen_at?: string | null
+  last_checked_at?: string | null
+  last_success_at?: string | null
+  health_status: 'pending' | 'ok' | 'degraded' | 'blocked' | 'error'
+  last_error?: string | null
+  created_by?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsFeedMedia {
+  type?: 'image' | 'video' | 'link'
+  url: string
+  thumbnail_url?: string
+  alt?: string
+}
+
+export interface NewsFeedItem {
+  id: string
+  source_id?: string | null
+  platform: NewsPlatform
+  external_id: string
+  post_kind: 'post' | 'reply' | 'repost' | 'quote' | 'retruth' | 'unknown'
+  author_handle: string
+  author_display_name?: string | null
+  author_avatar_url?: string | null
+  headline: string
+  body_text: string
+  source_url: string
+  canonical_url?: string | null
+  media: NewsFeedMedia[]
+  metrics: Record<string, unknown>
+  raw: Record<string, unknown>
+  reactions: NewsReactionSummary
+  posted_at?: string | null
+  detected_at: string
+  visible_day: string
+  hidden: boolean
+  hidden_by?: string | null
+  hidden_at?: string | null
+  created_at: string
+  updated_at: string
+  source?: NewsSource | null
+}
+
+export interface NewsChatMessage {
+  id: string
+  user_id: string
+  content: string
+  edited_at?: string | null
+  reactions: NewsReactionSummary
+  created_at: string
+  updated_at: string
+  user?: User
+}
+
+export interface BoardChatMessage extends Message {
+  id: string
+  board_slug: string
+  user_id: string
+  content: string
+  client_message_id?: string | null
+  message_type: ChatMessageType
+  audio_url?: string | null
+  audio_duration?: number | null
+  file_url?: string | null
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  media_width?: number | null
+  media_height?: number | null
+  media_processed_at?: string | null
+  edited_at?: string | null
+  reactions: NewsReactionSummary
+  pinned: boolean
+  pinned_by?: string | null
+  pinned_at?: string | null
+  reply_to?: string | null
+  created_at: string
+  updated_at: string
+  user?: User
+  optimistic?: boolean
+  delivery_status?: 'sending' | 'sent' | 'failed'
+}
+
+export type GameType = 'shadow_war' | 'shadow_checkers'
+export type GameSessionStatus = 'waiting' | 'active' | 'completed' | 'cancelled'
+export type ShadowWarMatchStatus = 'setup' | 'active' | 'completed' | 'cancelled'
+export type ShadowWarPhase = 'placement' | 'reveal' | 'sudden_war' | 'complete'
+export type ShadowWarPlayerSlot = 'player_one' | 'player_two'
+export type ShadowCheckersPlayerSlot = 'player_one' | 'player_two'
+export type ShadowCheckersMatchStatus = 'waiting' | 'active' | 'completed' | 'cancelled'
+export type ShadowCheckersBoardSkin = 'classic' | 'cinematic'
+export type ShadowCheckersWinReason = 'all_pieces_captured' | 'no_legal_moves' | 'resignation'
+export type ShadowCheckersInvitationStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled'
+
+export interface ShadowCheckersInvitation {
+  id: string
+  inviter_id: string
+  invitee_id: string
+  inviter_character_key: string
+  board_skin: ShadowCheckersBoardSkin
+  status: ShadowCheckersInvitationStatus
+  session_id: string | null
+  match_id: string | null
+  expires_at: string
+  created_at: string
+  updated_at: string
+  responded_at: string | null
+  inviter?: BasicUser | null
+  invitee?: BasicUser | null
+}
+
+export interface GameSession {
+  id: string
+  game_type: GameType
+  status: GameSessionStatus
+  created_by: string
+  player_one_id: string
+  player_two_id?: string | null
+  winner_id?: string | null
+  loser_id?: string | null
+  current_match_id?: string | null
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+  player_one?: BasicUser | null
+  player_two?: BasicUser | null
+  winner?: BasicUser | null
+}
+
+export interface ShadowWarMatch {
+  id: string
+  session_id: string
+  status: ShadowWarMatchStatus
+  round_number: number
+  target_score: number
+  player_one_score: number
+  player_two_score: number
+  current_phase: ShadowWarPhase
+  state: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+}
+
+export interface ShadowWarPlayerStateRow {
+  match_id: string
+  user_id: string
+  player_slot: ShadowWarPlayerSlot
+  state: Record<string, unknown>
+  updated_at: string
+}
+
+export interface ShadowWarMove {
+  id: string
+  match_id: string
+  user_id: string
+  player_slot: ShadowWarPlayerSlot
+  round_number: number
+  move_type: 'placement' | 'sudden_war'
+  payload: Record<string, unknown>
+  revealed_at?: string | null
+  created_at: string
+}
+
+export interface ShadowWarStats {
+  user_id: string
+  wins: number
+  losses: number
+  total_games: number
+  rounds_won: number
+  rounds_lost: number
+  last_win_at?: string | null
+  updated_at: string
+  user?: BasicUser | null
+}
+
+export interface GameSessionQueueEntry {
+  id: string
+  session_id: string
+  user_id: string
+  position: number
+  status: 'queued' | 'invited' | 'joined' | 'skipped' | 'left'
+  metadata?: Record<string, unknown>
+  created_at: string
+  updated_at: string
+  user?: BasicUser | null
+}
+
+export interface GameSessionPresence {
+  session_id: string
+  user_id: string
+  last_seen_at: string
+  created_at: string
+  user?: BasicUser | null
+}
+
+export interface ShadowCheckersMatch {
+  id: string
+  session_id: string
+  continuation_match_id?: string | null
+  status: ShadowCheckersMatchStatus
+  player_one_id: string
+  player_two_id?: string | null
+  player_one_character_key: string
+  player_two_character_key?: string | null
+  board_skin?: ShadowCheckersBoardSkin
+  current_turn_user_id?: string | null
+  board_state: Record<string, unknown>
+  move_count: number
+  winner_id?: string | null
+  loser_id?: string | null
+  win_reason?: ShadowCheckersWinReason | null
+  created_at: string
+  updated_at: string
+  completed_at?: string | null
+  cancelled_at?: string | null
+  player_one?: BasicUser | null
+  player_two?: BasicUser | null
+  winner?: BasicUser | null
+  loser?: BasicUser | null
+}
+
+export interface ShadowCheckersMove {
+  id: string
+  match_id: string
+  user_id: string
+  player_slot: ShadowCheckersPlayerSlot
+  move_number: number
+  piece_id: string
+  path: Array<{ row: number; col: number }>
+  captures: Array<{ row: number; col: number }>
+  crowned: boolean
+  notation: string
+  created_at: string
+  user?: BasicUser | null
+}
+
+export interface ShadowCheckersChatMessage {
+  id: string
+  match_id: string
+  user_id: string
+  body: string
+  created_at: string
+  user?: BasicUser | null
+}
+
+export interface ShadowCheckersStats {
+  user_id: string
+  wins: number
+  losses: number
+  total_games: number
+  captures_made: number
+  kings_crowned: number
+  last_win_at?: string | null
+  updated_at: string
+  user?: BasicUser | null
+}
+
+export type ArtBoardItemType = 'image' | 'note'
+export type ArtBoardFrameStyle = 'clean' | 'print' | 'polaroid' | 'pinned'
+export type ArtBoardNoteColor = 'butter' | 'rose' | 'sage' | 'sky' | 'lavender' | 'peach'
+export type ArtBoardReaction = 'heart' | 'spark' | 'fire' | 'idea'
+export type ArtBoardLinkLabel = 'inspired by' | 'reference' | 'related' | 'part of' | 'contrast'
+
+export interface ArtBoardItem {
+  id: string
+  user_id: string
+  item_type: ArtBoardItemType
+  title?: string | null
+  caption?: string | null
+  tags: string[]
+  image_url?: string | null
+  image_path?: string | null
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  image_width?: number | null
+  image_height?: number | null
+  media_processed_at?: string | null
+  alt_text?: string | null
+  note_text?: string | null
+  note_color: ArtBoardNoteColor
+  frame_style: ArtBoardFrameStyle
+  position_x: number
+  position_y: number
+  width: number
+  height: number
+  rotation: number
+  z_index: number
+  chunk_x: number
+  chunk_y: number
+  reactions: Record<string, { count: number; users: string[] }>
+  deleted_at?: string | null
+  deleted_by?: string | null
+  created_at: string
+  updated_at: string
+  user?: User
+}
+
+export interface ArtBoardLink {
+  id: string
+  item_a_id: string
+  item_b_id: string
+  created_by: string
+  label: ArtBoardLinkLabel
+  created_at: string
+  updated_at: string
+}
+
+export interface DMConversation {
+  id: string
+  participants: string[]
+  last_message_at: string
+  created_at: string
+  other_user?: User
+  unread_count?: number
+  last_message?: DMMessage
+  is_blocked?: boolean
+  blocked_by_me?: boolean
+}
+
+export interface DMMessage {
+  id: string
+  client_message_id?: string | null
+  conversation_id: string
+  sender_id: string
+  content: string
+  message_type: ChatMessageType
+  audio_url?: string
+  audio_duration?: number
+  file_url?: string
+  thumbnail_url?: string | null
+  thumbnail_path?: string | null
+  media_width?: number | null
+  media_height?: number | null
+  media_processed_at?: string | null
+  reply_to?: string | null
+  read_at?: string
+  read_by?: string[]
+  reactions: Record<string, { count: number; users: string[] }>
+  edited_at?: string
+  created_at: string
+  updated_at: string
+  sender?: User
+  optimistic?: boolean
+  delivery_status?: 'sending' | 'sent' | 'failed'
+}
+
+export interface BasicUser
+  extends Pick<
+    User,
+    'id' | 'username' | 'display_name' | 'avatar_url' | 'avatar_thumbnail_url' | 'color' | 'status' | 'admin_role' | 'checkers_crown' | 'war_sword' | 'shadow_pin_gold_pin' | 'shadow_runner_sprint_medal' | 'shadow_runner_knight_medal' | 'shadow_runner_knight_level_id' | 'gold_easter_egg' | 'presence_visibility' | 'dm_discoverable'
+  > {}
+
+export interface ShadowRunnerLevelCompletionPayload {
+  levelId: string
+  score?: number | null
+  coinsCollected?: number | null
+  totalCoins?: number | null
+  enemiesDefeated?: number | null
+  totalEnemies?: number | null
+}
+
+export interface PresenceSnapshot {
+  user_id: string
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  color?: string | null
+  presence_visibility: PresenceVisibility
+  presence_state: PresenceState
+  is_active: boolean
+  last_seen?: string | null
+}
+
+export interface ActiveUserSnapshot {
+  user_id: string
+  username?: string | null
+  display_name?: string | null
+  avatar_url?: string | null
+  color?: string | null
+  last_seen?: string | null
+}
+
+export interface AdminAccessUser extends User {
+  email: string | null
+  role_created_at?: string | null
+  role_created_by?: string | null
+}
+
+export interface AdminRoleNotification {
+  id: string
+  role: AdminRole
+  message: string
+  created_at: string
+}
+
+export type AppReleaseRestartPolicy =
+  | 'notice_only'
+  | 'optional_restart'
+  | 'required_restart'
+  | 'critical_force_restart'
+
+export type AppReleaseSeverity = 'info' | 'feature' | 'maintenance' | 'critical'
+
+export type AppReleaseSectionKind = 'standard' | 'recognition'
+
+export interface AppReleaseRecognition {
+  userId?: string | null
+  username?: string | null
+  displayName: string
+  avatarUrl?: string | null
+  avatarThumbnailUrl?: string | null
+  bannerUrl?: string | null
+  bannerThumbnailUrl?: string | null
+  profileColor?: string | null
+  submissionId?: string | null
+  submissionTitle?: string | null
+  submissionType?: string | null
+  featureTitle?: string | null
+  shippedAt?: string | null
+}
+
+export interface AppReleaseSection {
+  heading: string
+  items: string[]
+  kind?: AppReleaseSectionKind
+  recognition?: AppReleaseRecognition | null
+}
+
+export interface AppRelease {
+  id: string
+  build_id: string
+  commit_sha?: string | null
+  deploy_id?: string | null
+  deploy_url?: string | null
+  title: string
+  summary: string
+  sections: AppReleaseSection[]
+  restart_policy: AppReleaseRestartPolicy
+  severity: AppReleaseSeverity
+  published_at: string
+}
+
+export interface AppReleaseReceipt {
+  release_id: string
+  user_id: string
+  delivered_at?: string | null
+  seen_at?: string | null
+  dismissed_at?: string | null
+  acknowledged_at?: string | null
+  restarted_at?: string | null
+  current_build_id?: string | null
+  client_user_agent?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type AppReleaseReceiptEvent =
+  | 'delivered'
+  | 'seen'
+  | 'dismissed'
+  | 'acknowledged'
+  | 'restarted'
+
+export interface VisibleAppRelease extends AppRelease {
+  delivered_at?: string | null
+  seen_at?: string | null
+  dismissed_at?: string | null
+  acknowledged_at?: string | null
+  restarted_at?: string | null
+}
+
+export type ChatMessage = Message | DMMessage | BoardChatMessage
+
+export interface UserSession {
+  id: string
+  user_id: string
+  session_token: string
+  last_ping: string
+  created_at: string
+}
+
+// Helper functions
+export const updateUserPresence = async () => {
+  const isForeground = () => typeof document === 'undefined' || document.visibilityState === 'visible'
+  try {
+    if (!isForeground()) return
+    const workingClient = await getWorkingClient()
+    if (!workingClient || !isForeground()) {
+      return
+    }
+
+    const { data, error } = await workingClient.rpc('update_user_last_active_v2')
+    if (error) {
+      // A page/navigation abort is not an older-server signal. Starting another
+      // request during teardown causes avoidable WebKit access-control errors.
+      if (isForeground() && (error.code === 'PGRST202' || error.code === '42883')) {
+        await workingClient.rpc('update_user_last_active')
+      }
+      return
+    }
+
+    if (isForeground() && typeof data === 'string' && data) {
+      void invokeEdgeFunctionWithRetry(workingClient, 'send-push', {
+        type: 'presence_active',
+        activationId: data,
+      })
+        .catch(() => {
+          // Presence remains correct even when optional notification dispatch fails.
+        })
+    }
+  } catch {
+  }
+}
+
+export const setUserPresenceVisibility = async (visibility: PresenceVisibility) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('set_presence_visibility', {
+    next_visibility: visibility,
+  })
+  if (error) throw error
+  return (data ?? visibility) as PresenceVisibility
+}
+
+export const markUserOffline = async () => {
+  try {
+    const workingClient = await getWorkingClient()
+    const { data: { user } } = await workingClient.auth.getUser()
+    if (!user) return
+
+    await workingClient
+      .from('user_presence')
+      .update({
+        status: 'offline',
+        last_seen: null,
+        current_channel: null,
+        typing_in: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id)
+  } catch {
+    // Best-effort only; stale heartbeats expire after the active window.
+  }
+}
+
+export const fetchPresenceStates = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('list_presence_states')
+  if (error) {
+    return [] as PresenceSnapshot[]
+  }
+  return (data ?? []) as PresenceSnapshot[]
+}
+
+export const fetchActiveUsers = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_active_users')
+  if (error) {
+    return [] as ActiveUserSnapshot[]
+  }
+  return (data ?? []) as ActiveUserSnapshot[]
+}
+
+export const toggleReaction = async (messageId: string, emoji: string, isDM = false) => {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('toggle_message_reaction', {
+    message_id: messageId,
+    emoji: emoji,
+    is_dm: isDM
+  })
+  if (error) throw error
+}
+
+export const fetchDMConversations = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_dm_conversations')
+  if (error) {
+    throw error
+  }
+
+  const rows = (data ?? []) as any[]
+
+  const missingIds = rows
+    .filter(r => !r.other_user && r.other_user_id)
+    .map(r => r.other_user_id as string)
+
+  let usersMap: Record<string, User> = {}
+  if (missingIds.length) {
+    const userQuery = await workingClient
+      .from('users')
+      .select(PUBLIC_PROFILE_SELECT)
+      .in('id', missingIds)
+    if (userQuery.error) {
+    } else {
+      usersMap = Object.fromEntries(
+        (userQuery.data ?? []).map((u: any) => [
+          u.id,
+          pickPublicProfile(u as Record<string, unknown>) as unknown as User,
+        ])
+      )
+    }
+  }
+
+  return rows.map((row) => {
+    const lastMsg = row.last_message ||
+      (row.last_message_id && {
+        id: row.last_message_id,
+        conversation_id: row.id,
+        sender_id: row.last_message_sender_id,
+        content: row.last_message_content,
+        created_at: row.last_message_created_at,
+      })
+
+    const otherUser = (row.other_user
+      ? pickPublicProfile(row.other_user as Record<string, unknown>) as unknown as User
+      : null) ||
+      usersMap[row.other_user_id] ||
+      (row.other_user_id && {
+        id: row.other_user_id,
+        username: row.other_user_username,
+        display_name: row.other_user_display_name,
+      })
+
+    return {
+      id: row.id,
+      participants: row.participants,
+      last_message_at: row.last_message_at,
+      created_at: row.created_at,
+      other_user: otherUser,
+      unread_count: row.unread_count,
+      last_message: lastMsg,
+      is_blocked: row.is_blocked === true,
+      blocked_by_me: row.blocked_by_me === true,
+    } as DMConversation
+  })
+}
+
+export const getOrCreateDMConversation = async (otherUserId: string) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_or_create_dm_conversation', {
+    other_user_id: otherUserId
+  })
+  if (error) {
+    if (error.code === '42501' && /messaging is unavailable/i.test(error.message ?? '')) {
+      throw new Error('Messaging is unavailable for this user')
+    }
+    return null
+  }
+  if (typeof data === 'string') {
+    return data
+  }
+
+  if (data && typeof data === 'object' && 'id' in data && typeof (data as { id?: unknown }).id === 'string') {
+    return (data as { id: string }).id
+  }
+
+  return null
+}
+
+export const markDMMessagesRead = async (conversationId: string) => {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('mark_dm_messages_read', {
+    conversation_id: conversationId
+  })
+
+  if (error) {
+    throw error
+  }
+}
+
+export const searchUsersStrict = async (
+  term: string,
+  options?: { signal?: AbortSignal }
+) => {
+  const workingClient = await getWorkingClient()
+  let query = workingClient.rpc('search_users', { term })
+  if (options?.signal && typeof query.abortSignal === 'function') {
+    query = query.abortSignal(options.signal)
+  }
+  const { data, error } = await query
+  if (error) {
+    throw error
+  }
+  return (data ?? []).map((user: any) =>
+    pickPublicProfile(user as Record<string, unknown>) as unknown as BasicUser
+  )
+}
+
+export const markDMMessagesReadThrough = async (
+  conversationId: string,
+  throughMessageId: string
+) => {
+  const persistedIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (!persistedIdPattern.test(conversationId) || !persistedIdPattern.test(throughMessageId)) {
+    console.warn('DM read-through skipped', { operation: 'mark_dm_messages_read_through', code: 'INVALID_ANCHOR' })
+    throw Object.assign(new Error('Read receipts require a persisted message'), { code: 'INVALID_ANCHOR' })
+  }
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('mark_dm_messages_read_through', {
+    conversation_id: conversationId,
+    through_message_id: throughMessageId,
+  })
+
+  if (error) {
+    // Do not log the RPC arguments or raw message/details: these can include
+    // conversation/message IDs. Preserve the original error for caller retry.
+    const code = typeof error.code === 'string' && /^[A-Z0-9]{5,12}$/.test(error.code)
+      ? error.code
+      : 'UNKNOWN'
+    console.warn('DM read-through failed', { operation: 'mark_dm_messages_read_through', code })
+    throw error
+  }
+  return Math.max(0, Number(data) || 0)
+}
+
+export const markGeneralNotificationEventsReadThrough = async (
+  throughMessageId: string,
+  threadId?: string
+) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('mark_general_notification_events_read_through', {
+    through_message_id: throughMessageId,
+    target_thread_id: threadId ?? null,
+  })
+
+  if (error) throw error
+  return Math.max(0, Number(data) || 0)
+}
+
+export const searchUsers = async (
+  term: string,
+  options?: { signal?: AbortSignal }
+) => {
+  try {
+    return await searchUsersStrict(term, options)
+  } catch {
+    return [] as BasicUser[]
+  }
+}
+
+export const fetchAllUsers = async (options?: { signal?: AbortSignal }) => {
+  const workingClient = await getWorkingClient()
+  const buildQuery = () => {
+    let query = workingClient
+      .from('users')
+      .select(PUBLIC_PROFILE_SELECT)
+      .eq('dm_discoverable', true)
+      .order('display_name', { ascending: true })
+    if (options?.signal && typeof query.abortSignal === 'function') {
+      query = query.abortSignal(options.signal)
+    }
+    return query
+  }
+
+  const query = buildQuery()
+  const { data, error } = await query
+  if (error) {
+    return [] as BasicUser[]
+  }
+  return (data ?? []).map((user: any) =>
+    pickPublicProfile(user as Record<string, unknown>) as unknown as BasicUser
+  )
+}
+
+export const getMyAdminRole = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_my_admin_role')
+  if (error) throw error
+  return (data ?? null) as AdminRole | null
+}
+
+export const fetchAdminAccessUsers = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('list_admin_access_users')
+  if (error) throw error
+  return (data ?? []) as AdminAccessUser[]
+}
+
+export const setSubAdminStatus = async (targetUserId: string, enabled: boolean) => {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('set_sub_admin_status', {
+    target_user_id: targetUserId,
+    enabled,
+  })
+  if (error) throw error
+}
+
+export const fetchPendingAdminRoleNotifications = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_pending_admin_role_notifications')
+  if (error) throw error
+  return (data ?? []) as AdminRoleNotification[]
+}
+
+export const markAdminRoleNotificationSeen = async (notificationId: string) => {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('mark_admin_role_notification_seen', {
+    notification_id: notificationId,
+  })
+  if (error) throw error
+}
+
+export const claimGoldEasterEgg = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('claim_gold_easter_egg')
+  if (error) throw error
+  return Boolean(data)
+}
+
+export const recordShadowRunnerLevelCompletion = async ({
+  levelId,
+  score = null,
+  coinsCollected = null,
+  totalCoins = null,
+  enemiesDefeated = null,
+  totalEnemies = null,
+}: ShadowRunnerLevelCompletionPayload) => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('record_shadow_runner_level_completion', {
+    completed_level_id: levelId,
+    completion_score: score,
+    completion_coins_collected: coinsCollected,
+    completion_total_coins: totalCoins,
+    completion_enemies_defeated: enemiesDefeated,
+    completion_total_enemies: totalEnemies,
+  })
+  if (error) throw error
+  return Boolean(data)
+}
+
+const normalizeAppReleaseString = (value: unknown, maxLength: number) => {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const text = value.trim()
+  return text ? text.slice(0, maxLength) : null
+}
+
+const normalizeAppReleaseRecognition = (value: unknown): AppReleaseRecognition | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const record = value as Record<string, unknown>
+  const username = normalizeAppReleaseString(record.username, 80)
+  const displayName =
+    normalizeAppReleaseString(record.displayName ?? record.display_name, 120) ||
+    username ||
+    'ShadowChat member'
+
+  return {
+    userId: normalizeAppReleaseString(record.userId ?? record.user_id, 80),
+    username,
+    displayName,
+    avatarUrl: normalizeAppReleaseString(record.avatarUrl ?? record.avatar_url, 600),
+    avatarThumbnailUrl: normalizeAppReleaseString(
+      record.avatarThumbnailUrl ?? record.avatar_thumbnail_url,
+      600
+    ),
+    bannerUrl: normalizeAppReleaseString(record.bannerUrl ?? record.banner_url, 600),
+    bannerThumbnailUrl: normalizeAppReleaseString(
+      record.bannerThumbnailUrl ?? record.banner_thumbnail_url,
+      600
+    ),
+    profileColor: normalizeAppReleaseString(record.profileColor ?? record.profile_color, 40),
+    submissionId: normalizeAppReleaseString(record.submissionId ?? record.submission_id, 80),
+    submissionTitle: normalizeAppReleaseString(record.submissionTitle ?? record.submission_title, 180),
+    submissionType: normalizeAppReleaseString(record.submissionType ?? record.submission_type, 40),
+    featureTitle: normalizeAppReleaseString(record.featureTitle ?? record.feature_title, 180),
+    shippedAt: normalizeAppReleaseString(record.shippedAt ?? record.shipped_at, 80),
+  }
+}
+
+export const normalizeAppReleaseSections = (value: unknown): AppReleaseSection[] => {
+  if (!Array.isArray(value)) {
+    return []
+  }
+
+  return value
+    .map(section => {
+      if (!section || typeof section !== 'object') {
+        return null
+      }
+
+      const record = section as Record<string, unknown>
+      const heading = typeof record.heading === 'string' ? record.heading.trim() : ''
+      const items = Array.isArray(record.items)
+        ? record.items.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+        : []
+
+      if (!heading && items.length === 0) {
+        return null
+      }
+
+      const normalized: AppReleaseSection = {
+        heading: heading || 'Changes',
+        items: items.map(item => item.trim()),
+      }
+
+      const kind = record.kind === 'recognition' ? 'recognition' : undefined
+      const recognition = normalizeAppReleaseRecognition(record.recognition)
+      if (kind === 'recognition' && recognition) {
+        normalized.kind = kind
+        normalized.recognition = recognition
+      }
+
+      return normalized
+    })
+    .filter((section): section is AppReleaseSection => Boolean(section))
+}
+
+const mapVisibleAppRelease = (row: any): VisibleAppRelease => ({
+  id: row.id,
+  build_id: row.build_id,
+  commit_sha: row.commit_sha ?? null,
+  deploy_id: row.deploy_id ?? null,
+  deploy_url: row.deploy_url ?? null,
+  title: row.title,
+  summary: row.summary ?? '',
+  sections: normalizeAppReleaseSections(row.sections),
+  restart_policy: row.restart_policy,
+  severity: row.severity,
+  published_at: row.published_at,
+  delivered_at: row.delivered_at ?? null,
+  seen_at: row.seen_at ?? null,
+  dismissed_at: row.dismissed_at ?? null,
+  acknowledged_at: row.acknowledged_at ?? null,
+  restarted_at: row.restarted_at ?? null,
+})
+
+export const fetchVisibleAppReleases = async () => {
+  const workingClient = await getWorkingClient()
+  const { data, error } = await workingClient.rpc('get_visible_app_releases')
+  if (error) throw error
+  return (data ?? []).map(mapVisibleAppRelease) as VisibleAppRelease[]
+}
+
+export const recordAppReleaseReceipt = async (
+  releaseId: string,
+  event: AppReleaseReceiptEvent,
+  currentBuildId?: string | null,
+  clientUserAgent?: string | null
+) => {
+  const workingClient = await getWorkingClient()
+  const { error } = await workingClient.rpc('record_app_release_receipt', {
+    target_release_id: releaseId,
+    receipt_event: event,
+    current_build_id: currentBuildId ?? null,
+    client_user_agent: clientUserAgent ?? null,
+  })
+  if (error) throw error
+}
+
+// Helper function to ensure valid session before database operations
+export const ensureSession = async (force = false) => {
+  try {
+    let workingClient = await getWorkingClient()
+    let session: any = null
+    let error: any = null
+
+    try {
+      const sessionResult = await getSessionWithTimeout(workingClient)
+      session = sessionResult.data.session
+      error = sessionResult.error
+    } catch {
+      const recovered = await recoverSessionAfterResume()
+      if (!recovered) {
+        return false
+      }
+      workingClient = await getWorkingClient()
+      const sessionResult = await getSessionWithTimeout(workingClient)
+      session = sessionResult.data.session
+      error = sessionResult.error
+    }
+
+    if (error) {
+      return false
+    }
+
+    if (!session) {
+      const recovered = await recoverSessionAfterResume()
+      if (!recovered) {
+        return false
+      }
+      const recoveredClient = await getWorkingClient()
+      const recoveredSessionResult = await getSessionWithTimeout(recoveredClient)
+      session = recoveredSessionResult.data.session
+      if (!session) {
+        return false
+      }
+    }
+
+    // Check if session is expired or about to expire (within 5 minutes)
+    const expiresAt = session.expires_at
+    const now = Math.floor(Date.now() / 1000)
+    const fiveMinutes = 5 * 60
+
+    if (force || (expiresAt && (expiresAt - now) < fiveMinutes)) {
+      const { data: refreshData, error: refreshError } = await refreshSessionLocked()
+
+      if (refreshError) {
+        return false
+      }
+
+      if (!refreshData.session) {
+        return false
+      }
+    }
+
+    return true
+  } catch {
+    return false
+  }
+}
+
+export interface UserStats {
+  messages: number
+  reactions: number
+  connections: number
+}
+
+export const fetchUserStats = async (userId: string): Promise<UserStats> => {
+  const sessionValid = await ensureSession()
+
+  if (!sessionValid) {
+    return { messages: 0, reactions: 0, connections: 0 }
+  }
+
+  const workingClient = await getWorkingClient()
+
+  const [messagesRes, reactionsGivenRes, channelReactionsRes, dmReactionsRes, connectionsRes] = await Promise.all([
+    workingClient
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
+    workingClient.rpc('count_user_reactions', { target_user_id: userId }),
+    workingClient.rpc('count_reactions_to_user_messages_v2', { target_user_id: userId }),
+    workingClient.rpc('count_reactions_to_user_dm_messages_v2', { target_user_id: userId }),
+    workingClient.rpc('get_my_connection_summary'),
+  ])
+
+  return {
+    messages: messagesRes.count || 0,
+    reactions:
+      (reactionsGivenRes.data as number || 0) +
+      (channelReactionsRes.data as number || 0) +
+      (dmReactionsRes.data as number || 0),
+    connections: Number((connectionsRes.data as { connections?: number } | null)?.connections ?? 0),
+  }
+}

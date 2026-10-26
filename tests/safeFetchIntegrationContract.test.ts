@@ -18,10 +18,24 @@ describe('SEC-001 safe-fetch integration contracts', () => {
       expect(source).toContain("from '../_shared/safe-fetch.ts'")
       expect(source).toContain('safeFetch(')
       expect(source).toContain('normalizePublicHttpUrl')
-      expect(source).toContain('assertPublicUrl')
+      // safeFetch resolves and pins the actual connection. Consumers must not
+      // rely on a separate preflight DNS assertion that the transport can bypass.
+      const helper = read('supabase/functions/_shared/safe-fetch.ts')
+      expect(helper).toContain('withAbort(assertPublicUrl(currentUrl, options), signal)')
+      expect(helper).toContain('fetchPinnedHttp(currentUrl, requestInit, addresses,')
       expect(source).not.toContain("redirect: 'follow'")
       expect(source).not.toContain('const isPrivateIpv4')
     }
+  })
+
+  it('downloads member Storage URLs as the actor before considering public-network imports', () => {
+    const source = read('supabase/functions/shadow-pin-import-image/index.ts')
+    expect(source).toContain('downloadMemberMedia(sourceUrl.toString(), supabaseUrl, actor)')
+    expect(source).toContain('memberBlob ? new Response(memberBlob')
+    expect(source).toContain(': await safeFetch(sourceUrl')
+    const helper = read('supabase/functions/_shared/member-media.ts')
+    expect(helper).toContain('actor.storage.from(target.bucket).download(target.path)')
+    expect(helper).toContain('throw new Error')
   })
 
   it('routes Netlify ShadowPin media imports through the Node safe-fetch helper', () => {

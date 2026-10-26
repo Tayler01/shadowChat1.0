@@ -374,11 +374,11 @@ export const getLiveKitEnvironment = () => {
   }
 }
 
-export const createLiveKitClients = () => {
+export const createLiveKitClients = (options?: { requestTimeout?: number; failover?: boolean }) => {
   const environment = getLiveKitEnvironment()
   return {
     ...environment,
-    rooms: new RoomServiceClient(environment.serviceUrl, environment.apiKey, environment.apiSecret),
+    rooms: new RoomServiceClient(environment.serviceUrl, environment.apiKey, environment.apiSecret, options),
     webhooks: new WebhookReceiver(environment.apiKey, environment.apiSecret),
   }
 }

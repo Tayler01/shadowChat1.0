@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
+import { requireActiveEdgeMember } from '../_shared/edge-guard.ts'
+import { createRegisteredBunnyUpload } from '../_shared/bunny-upload-workflow.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +40,7 @@ type BunnyVideoRow = {
   subtitle: string | null
   provider_payload: Record<string, unknown> | null
   provider_asset_id: string | null
+  created_by: string | null
   deleted_at: string | null
 }
 
@@ -109,6 +112,7 @@ const authenticateOperator = async (req: Request): Promise<OperatorAuthResult> =
   }
 
   const supabase = getSupabaseAdmin()
+  await requireActiveEdgeMember(supabase, user.id)
   const { data: isOperator, error } = await supabase.rpc('is_app_operator', {
     target_user_id: user.id,
   })
@@ -140,7 +144,7 @@ const normalizeUuid = (value: unknown) =>
 const getVideo = async (supabase: ReturnType<typeof getSupabaseAdmin>, videoId: string) => {
   const { data, error } = await supabase
     .from('shado_tv_videos')
-    .select('id, title, subtitle, provider_payload, provider_asset_id, deleted_at')
+    .select('id, title, subtitle, provider_payload, provider_asset_id, created_by, deleted_at')
     .eq('id', videoId)
     .single()
 
@@ -173,6 +177,27 @@ const createBunnyVideo = async (libraryId: string, apiKey: string, title: string
   }
 
   return { guid, raw: body as Record<string, unknown> }
+}
+
+const requireTrustedTVAsset = async (
+  supabase: ReturnType<typeof getSupabaseAdmin>, video: BunnyVideoRow, assetId: string, libraryId: string,
+) => {
+  const { data, error } = await supabase.rpc('get_trusted_bunny_media_asset', {
+    target_source_type: 'shado_tv_asset', target_source_id: video.id, target_asset_id: assetId,
+  })
+  if (error || !Array.isArray(data) || !data.some(asset => asset.library_id === libraryId && asset.owner_id === video.created_by)) {
+    throw new Error('This video asset needs verified ownership before it can be changed.')
+  }
+}
+
+const removeUnpublishedBunnyUpload = async (
+  libraryId: string, apiKey: string, assetId: string,
+) => {
+  const response = await fetch(`https://video.bunnycdn.com/library/${encodeURIComponent(libraryId)}/videos/${encodeURIComponent(assetId)}`, {
+    method: 'DELETE', headers: { AccessKey: apiKey }, signal: AbortSignal.timeout(20_000),
+  })
+  await response.body?.cancel()
+  if (!response.ok && response.status !== 404) throw new Error('Provider cleanup remains pending for a retry.')
 }
 
 const sha256Hex = async (value: string) => {
@@ -234,8 +259,16 @@ const handleCreateUpload = async (
 
   const { libraryId, apiKey } = getBunnyEnv()
   const appVideo = await getVideo(auth.supabase, videoId)
+  if (!appVideo.created_by) return badRequest('Assign an active content owner before uploading this video.')
+  await requireActiveEdgeMember(auth.supabase, appVideo.created_by)
   const title = `${appVideo.subtitle ? `${appVideo.subtitle}: ` : ''}${appVideo.title}${uploadKind === 'trailer' ? ' Trailer' : ''}`
-  const bunnyVideo = await createBunnyVideo(libraryId, apiKey, title)
+  return createRegisteredBunnyUpload(auth.supabase, {
+    ownerId: appVideo.created_by, libraryId, sourceType: 'shado_tv_asset', sourceId: videoId,
+  }, {
+    create: reservationId => createBunnyVideo(libraryId, apiKey, `${title.slice(0, 160)} [upload:${reservationId}]`),
+    removeUnpublished: video => removeUnpublishedBunnyUpload(libraryId, apiKey, video.guid),
+    reconciliationNeeded: (reservationId, assetId) => console.error('Bunny upload requires reconciliation', { reservationId, libraryId, assetId }),
+    publish: async bunnyVideo => {
   const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60
   const authorizationSignature = await sha256Hex(`${libraryId}${apiKey}${expiresAt}${bunnyVideo.guid}`)
   const embedUrl = `https://iframe.mediadelivery.net/embed/${libraryId}/${bunnyVideo.guid}`
@@ -272,11 +305,7 @@ const handleCreateUpload = async (
       updated_by: auth.userId,
     }
 
-  const { error: updateError } = await auth.supabase
-    .from('shado_tv_videos')
-    .update(updates)
-    .eq('id', videoId)
-
+  const { error: updateError } = await auth.supabase.from('shado_tv_videos').update(updates).eq('id', videoId)
   if (updateError) throw updateError
   await insertProcessingJob(auth.supabase, videoId, auth.userId, uploadKind, 'queued', uploadPayload)
 
@@ -291,6 +320,8 @@ const handleCreateUpload = async (
     authorizationSignature,
     authorizationExpire: expiresAt,
     embedUrl,
+  })
+    },
   })
 }
 
@@ -309,6 +340,7 @@ const handleCompleteUpload = async (
   if (!bunnyVideoId) return badRequest('bunnyVideoId is required.')
 
   const appVideo = await getVideo(auth.supabase, videoId)
+  await requireTrustedTVAsset(auth.supabase, appVideo, bunnyVideoId, getBunnyEnv().libraryId)
   const existingPayload = appVideo.provider_payload
   const nextPayload = mergeProviderPayload(existingPayload, uploadKind, {
     completedAt: new Date().toISOString(),
@@ -370,6 +402,7 @@ const handleCaption = async (req: Request, body: CaptionPayload): Promise<Respon
   }
 
   const { libraryId, apiKey } = getBunnyEnv()
+  await requireTrustedTVAsset(auth.supabase, appVideo, appVideo.provider_asset_id, libraryId)
   const endpoint = `https://video.bunnycdn.com/library/${encodeURIComponent(libraryId)}/videos/${encodeURIComponent(appVideo.provider_asset_id)}/captions/${encodeURIComponent(languageCode)}`
   const isDelete = body.action === 'delete-caption'
   const label = typeof body.label === 'string' ? body.label.trim().slice(0, 80) : ''

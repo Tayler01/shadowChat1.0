@@ -14,6 +14,9 @@ import {
 } from '../_shared/safe-fetch.ts'
 import { getBunnyStreamReadyState } from '../_shared/bunny-stream-status.ts'
 import { buildBunnyPosterPatch, FALLBACK_VIDEO_POSTER_URL, needsBunnyPosterRepair } from '../_shared/bunny-stream-poster.ts'
+import { authorizeBunnyMediaSource, type BunnyVisibleReference } from '../_shared/bunny-media-access.ts'
+import { removeClaimedBunnyMedia } from '../_shared/bunny-media-removal.ts'
+import { createRegisteredBunnyUpload } from '../_shared/bunny-upload-workflow.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -54,6 +57,7 @@ const SAFE_PREVIEW_IMAGE_URL_OPTIONS = {
 
 type Provider = 'bunny_stream' | 'youtube' | 'x' | 'pinterest' | 'instagram' | 'external'
 type VideoAction =
+  | 'resolve-private-media'
   | 'create-upload'
   | 'complete-upload'
   | 'sync-status'
@@ -462,13 +466,14 @@ const probeDirectVideoUrl = async (url: URL): Promise<string | null> => {
   }
 
   const checkResponse = async (response: Response) => {
-    if (!response.ok && response.status !== 206) return null
-    const finalUrl = new URL(response.url || url.toString())
-    await assertPublicHost(finalUrl)
-    const contentType = response.headers.get('content-type') || ''
-    return isPlayableVideoContentType(contentType) || isDirectVideoUrl(finalUrl)
-      ? finalUrl.toString()
-      : null
+    try {
+      if (!response.ok && response.status !== 206) return null
+      const finalUrl = new URL(response.url || url.toString())
+      const contentType = response.headers.get('content-type') || ''
+      return isPlayableVideoContentType(contentType) || isDirectVideoUrl(finalUrl)
+        ? finalUrl.toString()
+        : null
+    } finally { await response.body?.cancel().catch(() => undefined) }
   }
 
   const headResponse = await safeFetch(url, {
@@ -544,13 +549,17 @@ const storeExternalPreviewImage = async (
     }, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
 
     if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined)
       throw new Error(`Preview image fetch failed with ${response.status}.`)
     }
 
-    const finalUrl = new URL(response.url || sourceUrl.toString())
-    await assertPublicUrl(finalUrl, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
-    const { contentType, extension } = resolvePreviewImageType(response.headers.get('content-type'))
-    const bytes = await readLimitedArrayBuffer(response, MAX_PREVIEW_IMAGE_BYTES, 'Preview image is larger than 15MB.')
+    let imageType: ReturnType<typeof resolvePreviewImageType>
+    let bytes: ArrayBuffer
+    try {
+      imageType = resolvePreviewImageType(response.headers.get('content-type'))
+      bytes = await readLimitedArrayBuffer(response, MAX_PREVIEW_IMAGE_BYTES, 'Preview image is larger than 15MB.')
+    } finally { await response.body?.cancel().catch(() => undefined) }
+    const { contentType, extension } = imageType
     const imagePath = `${userId}/categories/${categoryId}/pins/${imageId}/external-preview.${extension}`
 
     const { error: uploadError } = await supabase.storage
@@ -934,12 +943,15 @@ const fetchOpenGraphPreview = async (url: URL): Promise<ExternalPreview | null> 
     },
   }, SAFE_VIDEO_URL_OPTIONS)
 
-  if (!response.ok) return null
+  if (!response.ok) {
+    await response.body?.cancel().catch(() => undefined)
+    return null
+  }
   const finalUrl = new URL(response.url || url.toString())
-  await assertPublicHost(finalUrl)
 
   const contentType = response.headers.get('content-type') || ''
   if (contentType.startsWith('video/') || isDirectVideoUrl(finalUrl)) {
+    await response.body?.cancel().catch(() => undefined)
     return {
       canonicalUrl: finalUrl.toString(),
       title: finalUrl.pathname.split('/').filter(Boolean).pop(),
@@ -949,6 +961,7 @@ const fetchOpenGraphPreview = async (url: URL): Promise<ExternalPreview | null> 
   }
 
   if (!contentType.includes('text/html') && !contentType.includes('application/xhtml')) {
+    await response.body?.cancel().catch(() => undefined)
     return null
   }
 
@@ -1338,6 +1351,101 @@ const finishUploadSession = async (
   })
 }
 
+const requireTrustedBunnyAsset = async (supabase: SupabaseAdmin, sourceType: string, sourceId: string, ownerId: string, assetId: string) => {
+  const { libraryId } = getBunnyEnv()
+  const { data, error } = await supabase.rpc('get_trusted_bunny_media_asset', {
+    target_source_type: sourceType, target_source_id: sourceId, target_asset_id: assetId,
+  })
+  if (error || !Array.isArray(data) || !data.some(row => row.library_id === libraryId && row.owner_id === ownerId)) {
+    throw new Error('This video requires verified provider ownership before it can be changed.')
+  }
+}
+
+const deleteClaimedBunnyAsset = async (
+  supabase: SupabaseAdmin, sourceType: string, sourceId: string, ownerId: string, assetId: string,
+) => {
+  const { libraryId, apiKey } = getBunnyEnv()
+  return removeClaimedBunnyMedia({ libraryId, assetId, ownerId, sourceType, sourceId }, {
+    claim: async identity => {
+      const { data, error } = await supabase.rpc('claim_bunny_media_removal', {
+        target_library_id: identity.libraryId, target_asset_id: identity.assetId,
+        target_owner_id: identity.ownerId, target_source_type: identity.sourceType, target_source_id: identity.sourceId,
+      })
+      if (error) throw error
+      if (typeof data !== 'string') throw new Error('Video removal claim is unavailable.')
+      return data
+    },
+    remove: () => deleteBunnyVideo(libraryId, apiKey, assetId),
+    finish: async claimId => {
+      const { error } = await supabase.rpc('finish_bunny_media_removal', { target_removal_id: claimId })
+      if (error) throw error
+    },
+  })
+}
+
+/** Persist the external-create intent before any provider write. Unknown replies
+ * remain reserved for reconciliation; account deletion can never overlook them. */
+const createRegisteredBunnyAsset = async <T>(
+  supabase: SupabaseAdmin, ownerId: string, sourceType: 'shadow_pin_image' | 'shadow_pin_draft_asset', sourceId: string, title: string,
+  publish: (video: Awaited<ReturnType<typeof createBunnyVideo>>) => Promise<T>,
+): Promise<T> => {
+  const { libraryId, apiKey } = getBunnyEnv()
+  return createRegisteredBunnyUpload(supabase, { ownerId, libraryId, sourceType, sourceId }, {
+    create: reservationId => createBunnyVideo(libraryId, apiKey, `${title.slice(0, 80)} [upload:${reservationId}]`),
+    publish,
+    removeUnpublished: video => deleteBunnyVideo(libraryId, apiKey, video.guid),
+    reconciliationNeeded: (reservationId, assetId) => console.error('Bunny upload requires reconciliation', { reservationId, libraryId, assetId }),
+  })
+}
+
+const handleResolvePrivateMedia = async (req: Request, body: VideoPayload) => {
+  const auth = await authenticate(req)
+  if ('error' in auth) return auth.error
+  if (!body.sourceUrl || body.sourceUrl.length > 4096) return badRequest('A media source is required.')
+  await consumeEdgeRateLimit(auth.supabase, {
+    userId: auth.userId, scope: 'shadow-pin-video:private-signing:minute', windowSeconds: 60,
+    limit: resolvePositiveLimit('BUNNY_PRIVATE_SIGNING_REQUESTS_PER_MINUTE', 240, 600),
+    message: 'Too many video previews requested. Please try again shortly.',
+  })
+  const { libraryId, pullZoneUrl } = getBunnyEnv()
+  const tokenSecurityKey = Deno.env.get('BUNNY_STREAM_TOKEN_SECURITY_KEY') ?? ''
+  const actor = getUserScopedSupabase(req)
+  const result = await authorizeBunnyMediaSource(body.sourceUrl, { libraryId, pullZoneUrl, tokenSecurityKey }, {
+    visibleReferences: async assetId => {
+      const { data, error } = await actor.from('shadow_pin_images')
+        .select('id,creator_id,provider_asset_id,image_url,thumbnail_url,medium_url,video_preview_url,video_playback_url,video_hls_url,video_embed_url')
+        .eq('provider', 'bunny_stream').eq('provider_asset_id', assetId).is('deleted_at', null)
+      if (error) throw error
+      const references: BunnyVisibleReference[] = (data ?? []).map(row => ({
+        id: row.id, ownerId: row.creator_id, sourceType: 'shadow_pin_image', assetId: row.provider_asset_id,
+        mediaUrls: [row.image_url, row.thumbnail_url, row.medium_url, row.video_preview_url, row.video_playback_url, row.video_hls_url, row.video_embed_url],
+      }))
+      // TV shares the provider library in the full edition. RLS remains the
+      // viewing authority and a trusted source row is still mandatory.
+      const { data: tv, error: tvError } = await actor.from('shado_tv_videos')
+        .select('id,created_by,provider_asset_id,provider_payload,embed_url,trailer_asset_url,thumbnail_asset_url,poster_asset_url')
+        .eq('provider', 'bunny_stream').is('deleted_at', null)
+        .or(`provider_asset_id.eq.${assetId},provider_payload->bunny_stream->episode->>videoId.eq.${assetId},provider_payload->bunny_stream->trailer->>videoId.eq.${assetId}`)
+      if (tvError) throw tvError
+      for (const row of tv ?? []) {
+        if (row.created_by) references.push({ id: row.id, ownerId: row.created_by, sourceType: 'shado_tv_asset', assetId,
+          mediaUrls: [row.embed_url, row.trailer_asset_url, row.thumbnail_asset_url, row.poster_asset_url] })
+      }
+      return references
+    },
+    trustedReferences: async reference => {
+      const { data, error } = await auth.supabase.rpc('get_trusted_bunny_media_asset', {
+        target_source_type: reference.sourceType, target_source_id: reference.id, target_asset_id: reference.assetId,
+      })
+      if (error) throw error
+      return data ?? []
+    },
+  })
+  return new Response(JSON.stringify({ ok: true, ...result }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  })
+}
+
 const handleCreateUpload = async (req: Request, body: VideoPayload) => {
   const auth = await authenticate(req)
   if ('error' in auth) return auth.error
@@ -1354,16 +1462,18 @@ const handleCreateUpload = async (req: Request, body: VideoPayload) => {
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'create-upload')
 
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
-  const bunnyVideo = await createBunnyVideo(libraryId, apiKey, title)
+  const imageId = crypto.randomUUID()
+  return await createRegisteredBunnyAsset(auth.supabase, auth.userId, 'shadow_pin_image', imageId, title, async bunnyVideo => {
   const record = buildNativePinRecord(auth.userId, categoryId, title, description, body, bunnyVideo, libraryId, pullZoneUrl)
   const { data, error } = await auth.supabase
     .from('shadow_pin_images')
-    .insert(record)
+    .insert({ ...record, id: imageId })
     .select('*')
     .single()
 
   if (error) throw error
   return await finishUploadSession(data, bunnyVideo.guid, libraryId, apiKey)
+  })
 }
 
 const handleReplaceUpload = async (req: Request, body: VideoPayload) => {
@@ -1383,7 +1493,7 @@ const handleReplaceUpload = async (req: Request, body: VideoPayload) => {
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'replace-upload')
 
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
-  const bunnyVideo = await createBunnyVideo(libraryId, apiKey, title)
+  return await createRegisteredBunnyAsset(auth.supabase, pin.creator_id, 'shadow_pin_image', imageId, title, async bunnyVideo => {
   const record = buildNativePinRecord(auth.userId, pin.category_id, title, description, body, bunnyVideo, libraryId, pullZoneUrl)
   const providerPayload = mergeProviderPayload(pin.provider_payload, {
     previous_media: {
@@ -1408,6 +1518,7 @@ const handleReplaceUpload = async (req: Request, body: VideoPayload) => {
 
   if (error) throw error
   return await finishUploadSession(data, bunnyVideo.guid, libraryId, apiKey)
+  })
 }
 
 const handleCompleteUpload = async (req: Request, body: VideoPayload) => {
@@ -1424,6 +1535,7 @@ const handleCompleteUpload = async (req: Request, body: VideoPayload) => {
   if (pin.provider_asset_id !== bunnyVideoId) {
     return forbidden('Upload session does not match this pin.')
   }
+  await requireTrustedBunnyAsset(auth.supabase, 'shadow_pin_image', imageId, pin.creator_id, bunnyVideoId)
 
   const providerPayload = mergeProviderPayload(pin.provider_payload, {
     upload: {
@@ -1460,6 +1572,7 @@ const handleSyncStatus = async (req: Request, body: VideoPayload) => {
   if (pin.provider !== 'bunny_stream' || !pin.provider_asset_id) {
     return badRequest('Pin does not have a Bunny Stream video id.')
   }
+  await requireTrustedBunnyAsset(auth.supabase, 'shadow_pin_image', imageId, pin.creator_id, pin.provider_asset_id)
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'sync-status')
 
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
@@ -1734,9 +1847,7 @@ const handleDeleteVideoAsset = async (req: Request, body: VideoPayload) => {
     return forbidden('Video assets can only be cleaned up after a pin is deleted or failed.')
   }
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'delete-video-asset')
-
-  const { libraryId, apiKey } = getBunnyEnv()
-  const bunnyDelete = await deleteBunnyVideo(libraryId, apiKey, pin.provider_asset_id)
+  const bunnyDelete = await deleteClaimedBunnyAsset(auth.supabase, 'shadow_pin_image', imageId, pin.creator_id, pin.provider_asset_id)
   const providerPayload = mergeProviderPayload(pin.provider_payload, {
     asset_cleanup: {
       deletedAt: new Date().toISOString(),
@@ -1932,6 +2043,7 @@ const handleCreateDraftUpload = async (req: Request, body: VideoPayload) => {
   if (existing) {
     const draft = await getCreatorDraft(auth.supabase, auth.userId, draftId)
     if (existing.provider === 'bunny_stream' && existing.provider_asset_id) {
+      await requireTrustedBunnyAsset(auth.supabase, 'shadow_pin_draft_asset', existing.id, existing.creator_id, existing.provider_asset_id)
       const activeDraft = draft.active_asset_id === assetId
         ? draft
         : await activateDraftAsset(auth.supabase, draftId, assetId, existing.state)
@@ -1982,7 +2094,8 @@ const handleCreateDraftUpload = async (req: Request, body: VideoPayload) => {
   const upload = validateNativeUpload(body)
   await enforceDailyDraftNativeUploadLimit(auth.supabase, auth.userId)
   const { libraryId, apiKey } = getBunnyEnv()
-  const bunnyVideo = await createBunnyVideo(libraryId, apiKey, cleanText(body.title, 80) || 'ShadowPin draft')
+  return await createRegisteredBunnyAsset(auth.supabase, auth.userId, 'shadow_pin_draft_asset', assetId,
+    cleanText(body.title, 80) || 'ShadowPin draft', async bunnyVideo => {
   const providerPayload = {
     bunny_stream: {
       libraryId, videoId: bunnyVideo.guid,
@@ -2010,12 +2123,10 @@ const handleCreateDraftUpload = async (req: Request, body: VideoPayload) => {
       video_hls_url: null, video_embed_url: null,
     })
     .select('*').single()
-  if (assetError) {
-    await deleteBunnyVideo(libraryId, apiKey, bunnyVideo.guid).catch(() => undefined)
-    throw assetError
-  }
+  if (assetError) throw assetError
   const activeDraft = await activateDraftAsset(auth.supabase, draftId, assetId, 'uploading')
   return finishDraftUploadSession(activeDraft, asset, bunnyVideo.guid, libraryId, apiKey)
+  })
 }
 
 const handleCompleteDraftUpload = async (req: Request, body: VideoPayload) => {
@@ -2035,6 +2146,7 @@ const handleCompleteDraftUpload = async (req: Request, body: VideoPayload) => {
   if (asset.provider !== 'bunny_stream' || asset.provider_asset_id !== bunnyVideoId) {
     return forbidden('Upload session does not match this draft asset.')
   }
+  await requireTrustedBunnyAsset(auth.supabase, 'shadow_pin_draft_asset', asset.id, asset.creator_id, bunnyVideoId)
   if (asset.state === 'processing' || asset.state === 'publish_ready') {
     const draft = await getCreatorDraft(auth.supabase, auth.userId, draftId)
     return json({ ok: true, draft, asset })
@@ -2070,6 +2182,7 @@ const handleSyncDraftStatus = async (req: Request, body: VideoPayload) => {
   if (asset.provider !== 'bunny_stream' || !asset.provider_asset_id) {
     return badRequest('Draft asset does not have a Bunny Stream video id.')
   }
+  await requireTrustedBunnyAsset(auth.supabase, 'shadow_pin_draft_asset', asset.id, asset.creator_id, asset.provider_asset_id)
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'sync-draft-status')
   const { libraryId, apiKey, pullZoneUrl } = getBunnyEnv()
   const bunnyStatus = await getBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
@@ -2130,6 +2243,7 @@ const handlePublishDraftVideo = async (req: Request, body: VideoPayload) => {
   if (asset.provider !== 'bunny_stream' || asset.asset_kind !== 'video' || !asset.provider_asset_id) {
     return badRequest('Draft asset is not a Bunny Stream video.')
   }
+  await requireTrustedBunnyAsset(auth.supabase, 'shadow_pin_draft_asset', asset.id, asset.creator_id, asset.provider_asset_id)
   if (draft.state !== 'published' && !['ready', 'publish_ready'].includes(asset.state)) {
     return badRequest('Draft video is not ready to publish.')
   }
@@ -2224,8 +2338,7 @@ const handleDeleteDraftVideoAsset = async (req: Request, body: VideoPayload) => 
   await enforceProviderRequestLimit(auth.supabase, auth.userId, 'delete-draft-video-asset')
   let cleanup: Record<string, unknown> | null = null
   if (asset.provider === 'bunny_stream' && asset.provider_asset_id) {
-    const { libraryId, apiKey } = getBunnyEnv()
-    cleanup = await deleteBunnyVideo(libraryId, apiKey, asset.provider_asset_id)
+    cleanup = await deleteClaimedBunnyAsset(auth.supabase, 'shadow_pin_draft_asset', asset.id, asset.creator_id, asset.provider_asset_id)
   }
   const { data: updatedAsset, error } = await auth.supabase
     .from('shadow_pin_draft_assets')
@@ -2263,6 +2376,8 @@ serve(async (req): Promise<Response> => {
   try {
     const body = await readJson<VideoPayload>(req)
     switch (body.action) {
+      case 'resolve-private-media':
+        return ensureResponse(await handleResolvePrivateMedia(req, body))
       case 'create-upload':
         return ensureResponse(await handleCreateUpload(req, body))
       case 'replace-upload':

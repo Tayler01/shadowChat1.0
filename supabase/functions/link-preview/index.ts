@@ -296,7 +296,15 @@ const shouldStorePreviewImage = (sourceUrl: URL, preview: LinkPreview) =>
     (isInstagramHost(sourceUrl) || isInstagramPreviewImageHost(preview.image))
   )
 
-const storePreviewImage = async (preview: LinkPreview): Promise<string | null> => {
+const isMemberMediaUrl = (value: string) => {
+  try {
+    const url = new URL(value)
+    return url.origin === new URL(Deno.env.get('SUPABASE_URL') || '').origin &&
+      /^\/storage\/v1\/(?:object|render\/image)\/(?:public|authenticated|sign)\/(?:chat-uploads|message-media|shadow-pin)\//.test(url.pathname)
+  } catch { return false }
+}
+
+const storePreviewImage = async (preview: LinkPreview, userId: string): Promise<string | null> => {
   if (!preview.image) return null
   const admin = getSupabaseAdmin()
 
@@ -312,15 +320,19 @@ const storePreviewImage = async (preview: LinkPreview): Promise<string | null> =
     }, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
 
     if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined)
       throw new Error(`Preview image fetch failed with ${response.status}.`)
     }
 
-    const finalUrl = new URL(response.url || sourceUrl.toString())
-    await assertPublicUrl(finalUrl, SAFE_PREVIEW_IMAGE_URL_OPTIONS)
-    const { contentType, extension } = resolvePreviewImageType(response.headers.get('content-type'))
-    const bytes = await readLimitedArrayBuffer(response, MAX_PREVIEW_IMAGE_BYTES, 'Preview image is larger than 4MB.')
+    let imageType: ReturnType<typeof resolvePreviewImageType>
+    let bytes: ArrayBuffer
+    try {
+      imageType = resolvePreviewImageType(response.headers.get('content-type'))
+      bytes = await readLimitedArrayBuffer(response, MAX_PREVIEW_IMAGE_BYTES, 'Preview image is larger than 4MB.')
+    } finally { await response.body?.cancel().catch(() => undefined) }
+    const { contentType, extension } = imageType
     const key = await hashPreviewKey(preview.canonicalUrl || preview.url)
-    const path = `link-previews/${key}.${extension}`
+    const path = `${userId}/link-previews/${key}.${extension}`
 
     const { error: uploadError } = await admin.storage
       .from(LINK_PREVIEW_IMAGE_BUCKET)
@@ -339,9 +351,10 @@ const storePreviewImage = async (preview: LinkPreview): Promise<string | null> =
   }
 }
 
-const makePreviewImageDurable = async (sourceUrl: URL, preview: LinkPreview) => {
+const makePreviewImageDurable = async (sourceUrl: URL, preview: LinkPreview, userId: string) => {
+  if (preview.image && isMemberMediaUrl(preview.image)) return { ...preview, image: undefined }
   if (!shouldStorePreviewImage(sourceUrl, preview)) return preview
-  const storedImage = await storePreviewImage(preview)
+  const storedImage = await storePreviewImage(preview, userId)
   return storedImage ? { ...preview, image: storedImage } : preview
 }
 
@@ -500,6 +513,9 @@ serve(async req => {
     }
 
     const url = normalizeUrl(body.url)
+    if (isMemberMediaUrl(url.toString())) {
+      return json({ ok: true, preview: { url: url.toString(), mediaType: 'link' } })
+    }
     await assertPublicHost(url)
 
     await consumeEdgeRateLimit(getSupabaseAdmin(), {
@@ -519,7 +535,7 @@ serve(async req => {
     if (!preview) {
       throw new Error('Unable to load link preview.')
     }
-    const durablePreview = await makePreviewImageDurable(url, preview)
+    const durablePreview = await makePreviewImageDurable(url, preview, user.id)
 
     return json({
       ok: true,

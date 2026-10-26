@@ -1,0 +1,74 @@
+[
+  {
+    "name": "20261022231052_profile_identity_select_containment.sql",
+    "sha256": "520b753cdb01dba3bade9f1cd4e61d6795019a464fa30aa1c3f68453781f8713"
+  },
+  {
+    "name": "20261022231053_member_media_visibility_policies.sql",
+    "sha256": "2159b432227391f5cf60621145425a8d72286c7d5bb058e85c7e6e897a299864"
+  },
+  {
+    "name": "20261022231054_account_deletion_pin_reference.sql",
+    "sha256": "3cd69608b1af0f56a322be4be3a620f5ef2a827cce238cc78254e18869ef1cdf"
+  },
+  {
+    "name": "20261023001140_active_member_access_boundary.sql",
+    "sha256": "1901c5ca052d904ea44bdd0a1d6517c9153e51241bfa55622d15a61efbab9283"
+  },
+  {
+    "name": "20261023001141_complete_account_deletion.sql",
+    "sha256": "82353e26b75c3fcf596b1f1fcd25136fd3c5702a6ed9372138bd437fda095bcb"
+  },
+  {
+    "name": "20261023001218_streamlined_membership_acknowledgement.sql",
+    "sha256": "d3ce806dbe1a2d90a194b8d656f97617295def641711438bf1aa22e53f91782b"
+  },
+  {
+    "name": "20261023002455_moderation_retention_cleanup.sql",
+    "sha256": "2fab92a319eaf4de7f60b813b1a4de8778fe3a0b8ddca83dbd4e09363c813691"
+  },
+  {
+    "name": "20261023002845_authorized_typing_state.sql",
+    "sha256": "ca49897a902d67ef5338b2de7467d7f56c70c0f38a356888a4f27e988c498fa3"
+  },
+  {
+    "name": "20261023004143_private_bunny_media_registry.sql",
+    "sha256": "f0477b4cdc474c68ec9065d9511f6b973c8ac829ff30c69e2f1a69a8f50d81ae"
+  },
+  {
+    "name": "20261023004153_report_target_visibility_boundary.sql",
+    "sha256": "e1a5d65fc50f2193faf0ee05fd513c184d2ab557b3db376f49ff4b557be94791"
+  },
+  {
+    "name": "20261023004723_bunny_upload_deletion_reservations.sql",
+    "sha256": "24421a1214992e333b58ca4093d259f651d9980fe01ea949376273c46ffbe023"
+  },
+  {
+    "name": "20261023004930_private_realtime_authorization.sql",
+    "sha256": "f83714ff891b0e6e9ac92dbef28a021345e0f8a74769e2e8e6053ce9813ebd6d"
+  },
+  {
+    "name": "20261023004931_shadow_war_lobby_presence.sql",
+    "sha256": "e1a2bd9657a00322e289e5c5566408cb684b5808312185788e5395a808634eee"
+  },
+  {
+    "name": "20261023005459_reported_media_evidence.sql",
+    "sha256": "3b3de3cc9ad3ed290c0bb6f72c00258d2086eaf1be8293820bc6dec0bb9be9d3"
+  },
+  {
+    "name": "20261023005759_account_deletion_evidence_retention.sql",
+    "sha256": "9b9e0dd1ff1255512bce057abbb37ca5483f3b0226eb7a78d7a17aede70017e6"
+  },
+  {
+    "name": "20261023011311_bunny_media_removal_claims.sql",
+    "sha256": "93a24ecd1f75f9d2aa5d96a1b8fcc0167872f3fed7bb94ef83316ff1e14b1005"
+  },
+  {
+    "name": "20261023011620_account_deletion_service_privileges.sql",
+    "sha256": "6c938655c8db733d0afa7c201086977b6deb961db46aa5ee1db79f04f219bb31"
+  },
+  {
+    "name": "20261023012556_account_deletion_provider_tombstones.sql",
+    "sha256": "9f67ea06b6d5340937365a0ccbc7419912b1aec7b9fde3b59f88f70123371251"
+  }
+]

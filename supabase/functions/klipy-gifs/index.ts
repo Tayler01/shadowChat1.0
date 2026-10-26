@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createEdgeAdminClient, requireActiveEdgeMember } from '../_shared/edge-guard.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -58,6 +59,7 @@ const authenticate = async (authorization: string) => {
   }
 
   const user = await authResponse.json()
+  if (typeof user?.id === 'string') await requireActiveEdgeMember(createEdgeAdminClient(), user.id)
   return Boolean(user?.id)
 }
 

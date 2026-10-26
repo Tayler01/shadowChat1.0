@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __SHADOWCHAT_STREAMLINED_EDITION__: boolean
+declare const __SHADOWCHAT_LOCAL_FEATURE_PREVIEW__: boolean
 declare const __SHADOWCHAT_BOARDS_ENABLED__: boolean
 declare const __SHADOWCHAT_ESP_ADMIN_ENABLED__: boolean
 declare const __SHADOWCHAT_ACTIVITY_ENABLED__: boolean

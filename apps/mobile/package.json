@@ -5,17 +5,18 @@
   "dependencies": {
     "@notifee/react-native": "^9.1.8",
     "@supabase/supabase-js": "^2.39.0",
-    "expo": "~57.0.26",
+    "decode-uri-component": "file:./vendor/shadowchat-decode-uri-component-cjs-0.0.0.tgz",
+    "expo": "~57.0.31",
     "expo-application": "~57.0.3",
     "expo-constants": "~57.0.6",
-    "expo-crypto": "~57.0.3",
-    "expo-dev-client": "~57.0.19",
+    "expo-crypto": "~57.0.4",
+    "expo-dev-client": "~57.0.20",
     "expo-device": "~57.0.2",
-    "expo-linking": "~57.0.11",
-    "expo-notifications": "~57.0.21",
-    "expo-router": "~57.0.24",
+    "expo-linking": "~57.0.13",
+    "expo-notifications": "~57.0.24",
+    "expo-router": "~57.0.29",
     "expo-secure-store": "~57.0.4",
-    "expo-splash-screen": "~57.0.9",
+    "expo-splash-screen": "~57.0.10",
     "expo-status-bar": "~57.0.1",
     "expo-system-ui": "~57.0.4",
     "expo-task-manager": "~57.0.21",
@@ -38,12 +39,10 @@
     "eslint-plugin-react-hooks": "5.2.0",
     "expo-doctor": "^1.20.0",
     "globals": "15.15.0",
-    "patch-package": "^8.0.1",
     "typescript": "~6.0.3",
     "typescript-eslint": "8.63.0"
   },
   "scripts": {
-    "postinstall": "patch-package --error-on-fail",
     "test:dependencies": "node --test tests/runtime-dependency-compatibility.test.cjs",
     "test:clipboard": "node --test tests/native-clipboard-controller.test.cjs",
     "assets:brand": "node scripts/generate-brand-icons.mjs",
@@ -52,13 +51,23 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "doctor": "expo-doctor"
+    "doctor": "expo-doctor",
+    "test:dependency-security": "node --test tests/dependency-security.test.cjs",
+    "test:streamlined": "node --test tests/streamlined-configuration.test.cjs",
+    "postinstall": "node scripts/apply-tooling-security.cjs",
+    "test:tooling-security": "node --test tests/tooling-security.test.cjs",
+    "audit:release": "node scripts/audit-native-release.cjs"
   },
   "overrides": {
-    "decode-uri-component": "0.5.0",
-    "image-size": "2.0.4",
+    "decode-uri-component": "$decode-uri-component",
+    "metro": "0.84.5",
+    "metro-config": "0.84.5",
+    "metro-core": "0.84.5",
     "postcss": "8.5.23",
-    "uuid": "11.1.1"
+    "uuid": "11.1.1",
+    "@expo/cli": {
+      "zod": "4.6.7"
+    }
   },
   "expo": {
     "doctor": {

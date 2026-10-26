@@ -133,6 +133,11 @@ verify_jwt = false
 [functions.delete-account]
 verify_jwt = false
 
+# Validates the caller JWT and active membership, then authorizes the exact case
+# before copying or signing its submitted media. No arbitrary URL input exists.
+[functions.moderation-media]
+verify_jwt = false
+
 [functions.art-board-import-image]
 enabled = true
 verify_jwt = true

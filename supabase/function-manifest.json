@@ -5,6 +5,7 @@
     { "name": "deliver-notifications-v2", "verifyJwt": false },
     { "name": "klipy-gifs", "verifyJwt": true },
     { "name": "link-preview", "verifyJwt": false },
+    { "name": "moderation-media", "verifyJwt": false },
     { "name": "openai-chat", "verifyJwt": false },
     { "name": "send-push", "verifyJwt": false },
     { "name": "shado-tv-bunny-upload", "verifyJwt": true },

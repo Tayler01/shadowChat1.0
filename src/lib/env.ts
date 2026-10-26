@@ -10,3 +10,8 @@ export const VITE_APP_MODE = import.meta.env.MODE
 export const VITE_SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN
 export const VITE_SUPABASE_IMAGE_TRANSFORMS_ENABLED =
   import.meta.env.VITE_SUPABASE_IMAGE_TRANSFORMS_ENABLED
+
+// Default-off transport preparation; enable only after the coordinated rollout.
+export const VITE_PRIVATE_MEDIA_ENABLED = import.meta.env.VITE_PRIVATE_MEDIA_ENABLED
+export const VITE_BUNNY_STREAM_CDN_ORIGIN = import.meta.env.VITE_BUNNY_STREAM_CDN_ORIGIN
+export const VITE_PRIVATE_REALTIME_ENABLED = import.meta.env.VITE_PRIVATE_REALTIME_ENABLED

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
+import { FULL_APP_ORIGIN, resolveAppConfiguration } from '../apps/mobile/src/lib/appConfiguration.ts'
 
 const repoRoot = join(import.meta.dirname, '..')
 const mobileRoot = join(repoRoot, 'apps', 'mobile')
@@ -27,6 +28,7 @@ const nativeAppSource = readFileSync(
   join(mobileRoot, 'src', 'app', 'index.tsx'),
   'utf8',
 )
+const nativeRuntimeSource = readFileSync(join(mobileRoot, 'src', 'lib', 'appRuntime.ts'), 'utf8')
 const nativeSupabaseSource = readFileSync(
   join(mobileRoot, 'src', 'lib', 'supabase.ts'),
   'utf8',
@@ -231,7 +233,13 @@ test('native auth loss, opt-out, read state, and badges are durable', () => {
 test('signed mobile client contains the full production app and ticketed native enrollment', () => {
   assert.equal(typeof mobilePackage.dependencies['react-native-webview'], 'string')
   assert.match(nativeAppSource, /from 'react-native-webview'/)
-  assert.match(nativeAppSource, /https:\/\/shadochat\.online/)
+  assert.equal(FULL_APP_ORIGIN, 'https://shadochat.online')
+  assert.equal(resolveAppConfiguration(appConfig.expo.extra).origin, FULL_APP_ORIGIN)
+  assert.match(nativeRuntimeSource, /resolveAppConfiguration\(Constants\.expoConfig\?\.extra\)/)
+  assert.match(nativeAppSource, /import \{ appRuntime \} from '@\/lib\/appRuntime'/)
+  assert.match(nativeAppSource, /const APP_ORIGIN = appRuntime\.origin/)
+  assert.throws(() => resolveAppConfiguration({ webAppUrl: 'https://shadochat.online/other' }))
+  assert.throws(() => resolveAppConfiguration({ webAppUrl: 'http://shadochat.online' }))
   assert.match(nativeAppSource, /new URL\(value\)\.origin === APP_ORIGIN/)
   assert.doesNotMatch(nativeAppSource, /sb-shsqqouecvdoifzufkqm-auth-token/)
   assert.doesNotMatch(nativeAppSource, /publishWebSession/)

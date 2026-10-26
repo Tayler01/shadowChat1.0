@@ -6,10 +6,16 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:streamlined": "vite --config apps/streamlined/vite.config.ts",
+    "build:streamlined": "vite build --config apps/streamlined/vite.config.ts && node scripts/verify-streamlined-build.mjs",
+    "build:streamlined:local-preview": "vite build --config apps/streamlined/vite.config.ts --mode local-preview && node scripts/verify-streamlined-build.mjs --local-preview",
+    "preview:streamlined": "vite preview --config apps/streamlined/vite.config.ts",
+    "preview:streamlined:local-preview": "vite preview --config apps/streamlined/vite.config.ts --mode local-preview",
     "build": "vite build && node scripts/write-build-health-manifest.mjs && node scripts/verify-paused-feature-build.mjs && node scripts/verify-build-budgets.mjs",
     "lint": "eslint . --max-warnings=0",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "typecheck:streamlined": "tsc --noEmit -p apps/streamlined/tsconfig.json",
     "shadow-circuit:build": "node scripts/shadow-circuit/build.mjs",
     "shadow-circuit:test-rules": "node --test tests/shadowCircuitCore.node.test.mjs",
     "shadow-circuit:content-audit": "node scripts/shadow-circuit/content-audit.mjs",
@@ -18,11 +24,12 @@
     "shadow-circuit:validate-assets": "node scripts/shadow-circuit/validate-assets.mjs",
     "shadow-circuit:qa": "node scripts/shadow-circuit/browser-smoke.mjs",
     "test": "jest",
-    "test:node": "node --test tests/buildBudgets.node.test.mjs tests/edgeRequestGuards.node.test.mjs tests/mobileHeaderOverlay.node.test.mjs tests/nativeNotificationPresentationV2.node.test.mjs tests/netlifySafeFetch.node.test.mjs tests/netlifySecurityHeaders.node.test.mjs tests/newsScraperSelection.node.test.mjs tests/notificationRecoveryScheduler.node.test.mjs tests/notificationDeliveryRecoveryFaults.node.test.mjs tests/pushAttachmentPreview.node.test.mjs tests/operationsHealth.node.test.mjs tests/productionHealth.node.test.mjs tests/serviceWorkerCaching.node.test.mjs tests/shadowRunnerRuntimeAssets.node.test.mjs tests/supabaseFunctionManifest.node.test.mjs tests/supabaseSecurityDefinerAllowlist.node.test.mjs tests/weatherSavedLocationsSql.node.test.mjs tests/shadowRunnerRouteProof.node.test.mjs tests/shadowRunnerCheckpointRecovery.node.test.mjs tests/shadowRunnerOpeningRoutePolicies.node.test.mjs tests/shadowRunnerCausewayRoutePolicies.node.test.mjs tests/shadowRunnerCatacombRoutePolicies.node.test.mjs tests/shadowRunnerCaptainRoutePolicies.node.test.mjs tests/shadowRunnerRelayRoutePolicies.node.test.mjs tests/shadowRunnerPhaseRoutePolicies.node.test.mjs tests/shadowRunnerRelayMasteryPolicy.node.test.mjs tests/shadowRunnerRecoveredEnemies.node.test.mjs tests/shadowRunnerRebuildLifecycleSmoke.node.test.mjs tests/shadowRunnerNarrativeSmoke.node.test.mjs tests/shadowRunnerTiltDiagnostics.node.test.mjs tests/storageUploadLimits.node.test.mjs",
+    "test:node": "node --test tests/buildBudgets.node.test.mjs tests/edgeRequestGuards.node.test.mjs tests/mobileHeaderOverlay.node.test.mjs tests/nativeNotificationPresentationV2.node.test.mjs tests/netlifySafeFetch.node.test.mjs tests/netlifySecurityHeaders.node.test.mjs tests/newsScraperSelection.node.test.mjs tests/notificationRecoveryScheduler.node.test.mjs tests/notificationDeliveryRecoveryFaults.node.test.mjs tests/pushAttachmentPreview.node.test.mjs tests/operationsHealth.node.test.mjs tests/productionHealth.node.test.mjs tests/serviceWorkerCaching.node.test.mjs tests/shadowRunnerRuntimeAssets.node.test.mjs tests/supabaseFunctionManifest.node.test.mjs tests/supabaseSecurityDefinerAllowlist.node.test.mjs tests/weatherSavedLocationsSql.node.test.mjs tests/shadowRunnerRouteProof.node.test.mjs tests/shadowRunnerCheckpointRecovery.node.test.mjs tests/shadowRunnerOpeningRoutePolicies.node.test.mjs tests/shadowRunnerCausewayRoutePolicies.node.test.mjs tests/shadowRunnerCatacombRoutePolicies.node.test.mjs tests/shadowRunnerCaptainRoutePolicies.node.test.mjs tests/shadowRunnerRelayRoutePolicies.node.test.mjs tests/shadowRunnerPhaseRoutePolicies.node.test.mjs tests/shadowRunnerRelayMasteryPolicy.node.test.mjs tests/shadowRunnerRecoveredEnemies.node.test.mjs tests/shadowRunnerRebuildLifecycleSmoke.node.test.mjs tests/shadowRunnerNarrativeSmoke.node.test.mjs tests/shadowRunnerTiltDiagnostics.node.test.mjs tests/storageUploadLimits.node.test.mjs tests/dependencySecurityBackport.node.test.mjs tests/pausedFeatureBuild.node.test.mjs tests/shadowPinMediaSecurity.node.test.mjs tests/accountDeletionReleaseGate.node.test.mjs tests/bunnyOwnershipBackfill.node.test.mjs tests/privateMediaRepairPlan.node.test.mjs tests/privateMediaRepairExecutor.node.test.mjs tests/streamlinedBuildMode.node.test.mjs tests/streamlinedRealtimePrivacy.node.test.mjs tests/securityMigrationPhases.node.test.mjs tests/hostedTestTarget.node.test.mjs tests/livekitCleanupIsolation.node.test.mjs tests/accountDeletionLegacySql.node.test.mjs tests/backendPrivacyRelease.node.test.mjs tests/accountDeletionReconciliationSql.node.test.mjs tests/legacyDeletionScheduler.node.test.mjs tests/moderationRetentionClaims.node.test.mjs tests/moderationRetentionWorker.node.test.mjs tests/profileRpcColumnAcl.node.test.mjs tests/streamlinedNetlifyRelease.node.test.mjs tests/smokeArtifactLedger.node.test.mjs",
     "supabase:security-contract:local": "node scripts/verify-supabase-security-contract.mjs",
     "supabase:security-contract:linked": "node scripts/verify-supabase-security-contract.mjs --linked",
     "supabase:functions:verify": "node scripts/deploy-supabase-functions.mjs",
     "supabase:functions:deploy": "node scripts/deploy-supabase-functions.mjs --deploy",
+    "supabase:deletion:release-check": "node scripts/verify-account-deletion-release.mjs --linked",
     "supabase:bridge-auth:pause": "node scripts/pause-bridge-auth-users.mjs --apply",
     "supabase:bridge-auth:verify": "node scripts/deploy-supabase-functions.mjs --verify-bridge-auth-hold",
     "docs:verify": "node scripts/verify-docs-integrity.mjs",
@@ -102,11 +109,12 @@
     "recharts": "^3.8.1",
     "semver": "^7.8.0",
     "sentiment": "^5.0.2",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "tailwind-merge": "^2.2.0",
     "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
     "@eslint/js": "^9.9.1",
     "@remotion/cli": "^4.0.464",
     "@testing-library/jest-dom": "^6.4.2",
@@ -134,7 +142,7 @@
     "ts-jest": "^29.1.1",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.3.0",
-    "vite": "^7.3.6"
+    "vite": "^7.3.7"
   },
   "overrides": {
     "@remotion/renderer": {

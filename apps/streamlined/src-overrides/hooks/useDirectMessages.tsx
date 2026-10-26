@@ -1,0 +1,1433 @@
+import { prepareMessageMedia } from '../../../../src/lib/privateMediaCopies';
+import { PRIVATE_MEDIA_ENABLED } from '../../../../src/lib/privateMediaUrls';
+import { beginChatTiming } from '../../../../src/lib/chatPerformance';
+/* eslint-disable react-refresh/only-export-components */
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  createContext,
+  useContext,
+} from 'react';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  getWorkingClient,
+  getRealtimeClient,
+  DMConversation,
+  DMMessage,
+  type ChatMessageType,
+  getOrCreateDMConversation,
+  markDMMessagesRead,
+  markDMMessagesReadThrough,
+  fetchDMConversations,
+  ensureSession,
+  refreshSessionLocked,
+  withTimeout,
+} from '../lib/supabase';
+import { runRealtimeRecovery } from '../../../../src/lib/realtimeRecovery';
+import { createRealtimeChannelName } from '../../../../src/lib/realtimeChannelName';
+import { triggerDMPushNotification, triggerReactionPushNotification } from '../../../../src/lib/push';
+import {
+  createClientMessageId,
+  findMatchingMessageIndex,
+  isClientMessageIdSchemaError,
+  isMediaThumbnailSchemaError,
+  isReplyToSchemaError,
+  markMessageSendFailed,
+  mergeRealtimeMessageUpdate,
+  upsertMessageIntoState,
+} from '../../../../src/lib/optimisticMessages';
+import { MESSAGE_FETCH_LIMIT } from '../../../../src/config';
+import { useAuth } from './useAuth';
+import { useRealtimeRecovery } from '../../../../src/hooks/useRealtimeRecovery';
+import { useSoundEffects } from '../../../../src/hooks/useSoundEffects';
+import { clearDMNotifications, requestAppBadgeRefresh } from '../../../../src/lib/appBadge';
+import { compareMessageKey } from '../../../../src/lib/readCursors';
+import {
+  createRealtimeSubscriptionManager,
+  isRecoverableRealtimeStatus,
+} from '../../../../src/lib/realtimeSubscription';
+import { embedPublicProfile } from '../../../../supabase/functions/_shared/public-profile';
+import { getDMMessageWindow, getDMReadWindow, type DMRetrievedMessage } from '../../../../src/lib/dmConversationRetrieval';
+
+const DM_MESSAGE_WITH_SENDER_SELECT = `
+  *,
+  ${embedPublicProfile('sender', 'users!sender_id')}
+`;
+import {
+  loadLocalOutboxEntries,
+  removeLocalOutboxEntry,
+  upsertLocalOutboxEntry,
+  type LocalMessageOutboxEntry,
+} from '../lib/localMessageOutbox';
+
+interface DirectMessagesContextValue {
+  conversations: DMConversation[];
+  loading: boolean;
+  currentConversation: string | null;
+  setCurrentConversation: React.Dispatch<React.SetStateAction<string | null>>;
+  messages: DMMessage[];
+  messagesConversationId: string | null;
+  messagesLoading: boolean;
+  sending: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  hasNewer: boolean;
+  startConversation: (username: string) => Promise<string | null>;
+  sendMessage: (
+    content: string,
+    messageType?: ChatMessageType,
+    fileUrl?: string,
+    replyTo?: string,
+    thumbnailUrl?: string | null,
+    options?: { clientMessageId?: string; onQueued?: () => void }
+  ) => Promise<DMMessage | null>;
+  retryFailedMessage: (messageId: string) => Promise<DMMessage | null>;
+  discardFailedMessage: (messageId: string) => void;
+  editMessage: (messageId: string, content: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
+  toggleReaction: (messageId: string, emoji: string) => Promise<void>;
+  markAsRead: (conversationId: string, throughMessageId?: string) => Promise<void>;
+  loadOlderMessages: () => Promise<void>;
+  loadLatestMessages: () => Promise<void>;
+  loadMessageWindow: (messageId: string) => Promise<boolean>;
+  loadReadWindow: () => Promise<boolean>;
+  loadNewerMessages: () => Promise<void>;
+  setFollowingLatest: (following: boolean) => void;
+}
+
+const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
+const SEND_OPERATION_TIMEOUT_MS = 12000;
+
+const getDMOutboxScope = (conversationId: string) => `dm:${conversationId}`;
+
+const sortDMMessagesByCreatedAt = (items: DMMessage[]) =>
+  [...items].sort((a, b) => compareMessageKey(a, b));
+
+const isServerDMCursorMessage = (message: DMMessage) => (
+  Boolean(message.id && message.created_at) &&
+  !message.optimistic &&
+  message.delivery_status !== 'sending' &&
+  message.delivery_status !== 'failed'
+);
+
+const getOldestServerDMCursor = (items: DMMessage[]) => (
+  sortDMMessagesByCreatedAt(items.filter(isServerDMCursorMessage))[0] ?? null
+);
+
+const buildOlderDMKeysetFilter = (anchor: Pick<DMMessage, 'created_at' | 'id'>) =>
+  `created_at.lt.${anchor.created_at},and(created_at.eq.${anchor.created_at},id.lt.${anchor.id})`;
+
+const mergeDMMessagesByStableKey = (items: DMMessage[]) => sortDMMessagesByCreatedAt(
+  items.reduce<DMMessage[]>((acc, message) => upsertMessageIntoState(acc, message), [])
+);
+
+export const MAX_DM_SERVER_MESSAGE_WINDOW = 200;
+
+export const boundDMMessagesForWindow = (
+  items: DMMessage[],
+  retain: 'oldest' | 'latest'
+) => {
+  const merged = mergeDMMessagesByStableKey(items);
+  const localMessages = merged.filter(message => !isServerDMCursorMessage(message));
+  const serverMessages = merged.filter(isServerDMCursorMessage);
+  const trimmed = serverMessages.length > MAX_DM_SERVER_MESSAGE_WINDOW;
+  const boundedServerMessages = retain === 'oldest'
+    ? serverMessages.slice(0, MAX_DM_SERVER_MESSAGE_WINDOW)
+    : serverMessages.slice(-MAX_DM_SERVER_MESSAGE_WINDOW);
+
+  return {
+    messages: mergeDMMessagesByStableKey([...boundedServerMessages, ...localMessages]),
+    trimmed,
+  };
+};
+
+const localOutboxEntryToDMMessage = (
+  entry: LocalMessageOutboxEntry,
+  conversationId: string,
+  user?: Partial<NonNullable<DMMessage['sender']>> | null
+) => ({
+  id: entry.clientMessageId,
+  client_message_id: entry.clientMessageId,
+  conversation_id: conversationId,
+  sender_id: entry.senderId,
+  content: entry.messageType === 'audio' ? '' : entry.content,
+  message_type: entry.messageType,
+  file_url: entry.fileUrl,
+  thumbnail_url: entry.thumbnailUrl ?? null,
+  ...(entry.replyTo ? { reply_to: entry.replyTo } : {}),
+  ...(entry.messageType === 'audio' ? { audio_url: entry.content } : {}),
+  read_at: undefined,
+  read_by: [entry.senderId],
+  reactions: {},
+  created_at: entry.createdAt,
+  updated_at: entry.failedAt,
+  sender: user,
+  optimistic: true,
+  delivery_status: 'failed',
+} as DMMessage);
+
+type SendDMMessageOptions = {
+  clientMessageId?: string;
+  onQueued?: () => void;
+  createdAt?: string;
+}
+
+type FetchConversationMessagesOptions = {
+  silent?: boolean;
+}
+
+const retrievedDMToMessage = (message: DMRetrievedMessage): DMMessage => ({
+  id: message.id, client_message_id: message.clientMessageId,
+  conversation_id: message.conversationId, sender_id: message.senderId,
+  content: message.content, message_type: message.messageType,
+  file_url: message.fileUrl ?? undefined, thumbnail_url: message.thumbnailUrl,
+  thumbnail_path: message.thumbnailPath, audio_url: message.audioUrl ?? undefined,
+  audio_duration: message.audioDuration ?? undefined, reply_to: message.replyTo,
+  read_at: message.readAt ?? undefined, read_by: message.readBy,
+  reactions: message.reactions, edited_at: message.editedAt ?? undefined,
+  created_at: message.createdAt, updated_at: message.updatedAt,
+  media_width: message.mediaWidth, media_height: message.mediaHeight,
+  media_processed_at: message.mediaProcessedAt, sender: message.sender,
+} as DMMessage);
+
+function useProvideDirectMessages(): DirectMessagesContextValue {
+  const [conversations, setConversations] = useState<DMConversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentConversation, setCurrentConversation] = useState<string | null>(null);
+  const { user } = useAuth();
+  const { playMessage } = useSoundEffects();
+  const dmMessagesSubscriptionRef = useRef<ReturnType<typeof createRealtimeSubscriptionManager> | null>(null);
+  const refreshConversationsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeMessageHandlersRef = useRef<{
+    insert: (incoming: Partial<DMMessage>) => void | Promise<void>;
+    update: (incoming: Partial<DMMessage>) => void;
+    delete: (removed: Partial<DMMessage>) => void;
+  }>({
+    insert: () => undefined,
+    update: () => undefined,
+    delete: () => undefined,
+  });
+
+  const {
+    messages,
+    conversationId: messagesConversationId,
+    loading: messagesLoading,
+    sending,
+    sendMessage: sendConversationMessage,
+    retryFailedMessage: retryConversationFailedMessage,
+    discardFailedMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
+    loadingMore,
+    hasMore,
+    hasNewer,
+    loadOlderMessages,
+    loadLatestMessages,
+    loadMessageWindow,
+    loadReadWindow,
+    loadNewerMessages,
+    setFollowingLatest,
+    handleRealtimeInsert,
+    handleRealtimeUpdate,
+    handleRealtimeDelete,
+    refreshVisibleMessages,
+  } = useConversationMessages(currentConversation);
+  const selectedConversationRef = useRef(currentConversation);
+  selectedConversationRef.current = currentConversation;
+
+  activeMessageHandlersRef.current = {
+    insert: handleRealtimeInsert,
+    update: handleRealtimeUpdate,
+    delete: handleRealtimeDelete,
+  };
+
+  const refreshConversations = useCallback(async () => {
+    try {
+      const convs = await fetchDMConversations();
+      setConversations(convs);
+    } catch {
+      // Keep the last known inbox during transient resume/network failures.
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const refreshConversationsDebounced = useCallback((delay = 250) => {
+    if (refreshConversationsTimerRef.current) {
+      clearTimeout(refreshConversationsTimerRef.current);
+    }
+
+    refreshConversationsTimerRef.current = setTimeout(() => {
+      refreshConversationsTimerRef.current = null;
+      void refreshConversations();
+    }, delay);
+  }, [refreshConversations]);
+
+  useEffect(() => {
+    return () => {
+      if (refreshConversationsTimerRef.current) {
+        clearTimeout(refreshConversationsTimerRef.current);
+      }
+    };
+  }, []);
+
+  const resetWithFreshClient = useCallback(async () => {
+    await refreshConversations();
+    await Promise.allSettled([
+      refreshVisibleMessages(),
+      dmMessagesSubscriptionRef.current?.resubscribe() ?? Promise.resolve(null),
+    ]);
+  }, [refreshConversations, refreshVisibleMessages]);
+
+  useRealtimeRecovery(() => {
+    void resetWithFreshClient();
+  });
+
+  // Fetch conversations
+  useEffect(() => {
+    if (!user) return;
+
+    void refreshConversations();
+  }, [refreshConversations, user]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !user) return;
+
+    const handlePersonalBlocksChanged = () => {
+      void Promise.allSettled([
+        refreshConversations(),
+        refreshVisibleMessages(),
+      ]);
+    };
+
+    window.addEventListener('shadowchat:personal-blocks-changed', handlePersonalBlocksChanged);
+    return () => {
+      window.removeEventListener('shadowchat:personal-blocks-changed', handlePersonalBlocksChanged);
+    };
+  }, [refreshConversations, refreshVisibleMessages, user]);
+
+  // One inbox-wide channel owns both conversation summaries and the active thread.
+  useEffect(() => {
+    if (!user) return;
+
+    let disposed = false;
+    let latestChannel: RealtimeChannel | null = null;
+    const manager = createRealtimeSubscriptionManager({ getFallbackClient: getRealtimeClient });
+    dmMessagesSubscriptionRef.current = manager;
+
+    const subscribeToChannel = async () => {
+      const realtimeClient =
+        (await getWorkingClient().catch(() => getRealtimeClient())) ||
+        getRealtimeClient();
+
+      if (!realtimeClient?.channel || typeof realtimeClient.channel !== 'function') {
+        throw new Error('Realtime client unavailable');
+      }
+
+      const nextChannel = realtimeClient
+        .channel(createRealtimeChannelName(`dm_messages:${user.id}`))
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'dm_messages' },
+          (payload: any) => {
+            const incoming = payload.new as Partial<DMMessage>;
+            if (!incoming.id || !incoming.conversation_id || !incoming.sender_id || !incoming.created_at) {
+              void refreshConversations();
+              return;
+            }
+            const incomingId = incoming.id;
+            const incomingConversationId = incoming.conversation_id;
+            const incomingSenderId = incoming.sender_id;
+            const incomingCreatedAt = incoming.created_at;
+            let missing = false;
+
+            setConversations(prev => {
+              const convIndex = prev.findIndex(c => c.id === incomingConversationId);
+              if (convIndex < 0) {
+                missing = true;
+                return prev;
+              }
+
+              const updated = [...prev];
+              let unread = updated[convIndex].unread_count;
+              if (incomingSenderId !== user.id) {
+                unread = (unread || 0) + 1;
+              }
+
+              updated[convIndex] = {
+                ...updated[convIndex],
+                last_message_at: incomingCreatedAt,
+                last_message: {
+                  id: incomingId,
+                  conversation_id: incomingConversationId,
+                  sender_id: incomingSenderId,
+                  client_message_id: incoming.client_message_id,
+                  content: incoming.content ?? '',
+                  message_type: incoming.message_type ?? 'text',
+                  audio_url: incoming.audio_url ?? undefined,
+                  file_url: incoming.file_url ?? undefined,
+                  thumbnail_url: incoming.thumbnail_url ?? undefined,
+                  media_processed_at: incoming.media_processed_at ?? undefined,
+                  reply_to: incoming.reply_to ?? undefined,
+                  read_at: incoming.read_at,
+                  reactions: incoming.reactions ?? {},
+                  edited_at: incoming.edited_at,
+                  created_at: incomingCreatedAt,
+                  updated_at: incoming.updated_at ?? incomingCreatedAt,
+                },
+                unread_count: unread,
+              };
+              const [moved] = updated.splice(convIndex, 1);
+              updated.unshift(moved);
+              return updated;
+            });
+
+            if (missing) {
+              void refreshConversations();
+            } else {
+              refreshConversationsDebounced();
+            }
+
+            void activeMessageHandlersRef.current.insert(incoming);
+            if (incomingSenderId !== user.id) {
+              playMessage();
+            }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'dm_messages' },
+          (payload: any) => {
+            const incoming = payload.new as Partial<DMMessage>;
+            setConversations(prev => {
+              const convIndex = prev.findIndex(c => c.id === incoming.conversation_id);
+              if (convIndex >= 0 && prev[convIndex].last_message?.id === incoming.id) {
+                const updated = [...prev];
+                updated[convIndex] = {
+                  ...updated[convIndex],
+                  last_message: {
+                    ...updated[convIndex].last_message!,
+                    reactions: incoming.reactions ?? updated[convIndex].last_message!.reactions,
+                    content: incoming.content ?? updated[convIndex].last_message!.content,
+                    read_at: incoming.read_at,
+                    edited_at: incoming.edited_at,
+                  },
+                };
+                return updated;
+              }
+              return prev;
+            });
+
+            activeMessageHandlersRef.current.update(incoming);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'DELETE', schema: 'public', table: 'dm_messages' },
+          (payload: any) => {
+            const removed = payload.old as Partial<DMMessage>;
+            activeMessageHandlersRef.current.delete(removed);
+            void refreshConversations();
+          }
+        );
+
+      latestChannel = nextChannel;
+      nextChannel.subscribe(async (status: string) => {
+        if (disposed || latestChannel !== nextChannel) return;
+
+        if (isRecoverableRealtimeStatus(status)) {
+          try {
+            await runRealtimeRecovery('channel-error');
+            await refreshConversations();
+          } catch {
+            // A scheduled plain resubscribe remains available below.
+          }
+        }
+
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          manager.scheduleResubscribe(status === 'CLOSED' ? 1000 : 1500);
+        }
+      });
+
+      return { channel: nextChannel, client: realtimeClient };
+    };
+
+    manager.setSubscribe(subscribeToChannel);
+    void manager.start().catch(() => {
+      // Manual refresh and the recovery event repair a transient boot failure.
+    });
+
+    return () => {
+      disposed = true;
+      latestChannel = null;
+      manager.clearSubscribe(subscribeToChannel);
+      void manager.stop();
+      if (dmMessagesSubscriptionRef.current === manager) {
+        dmMessagesSubscriptionRef.current = null;
+      }
+    };
+  }, [playMessage, refreshConversations, refreshConversationsDebounced, user]);
+
+  const sendMessage = useCallback(
+    async (
+      content: string,
+      messageType?: ChatMessageType,
+      fileUrl?: string,
+      replyTo?: string,
+      thumbnailUrl?: string | null,
+      options: { clientMessageId?: string; onQueued?: () => void } = {}
+    ) => {
+      const message = await sendConversationMessage(content, messageType, fileUrl, replyTo, thumbnailUrl, options);
+      if (message) {
+        if (hasNewer && selectedConversationRef.current === currentConversation) {
+          await loadLatestMessages();
+        }
+        refreshConversationsDebounced();
+      }
+      return message;
+    },
+    [currentConversation, hasNewer, loadLatestMessages, refreshConversationsDebounced, sendConversationMessage]
+  );
+
+  const retryFailedMessage = useCallback(async (messageId: string) => {
+    const message = await retryConversationFailedMessage(messageId);
+    if (message) {
+      refreshConversationsDebounced();
+    }
+    return message;
+  }, [refreshConversationsDebounced, retryConversationFailedMessage]);
+
+  const startConversation = useCallback(async (username: string) => {
+    if (!user) return null;
+
+    const workingClient = await getWorkingClient();
+    const { data: otherUser, error } = await workingClient
+      .from('users')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (error) {
+      throw error;
+    }
+
+    const match = otherUser as { id: string } | null;
+
+    if (!match) {
+      throw new Error('User not found');
+    }
+
+    const conversationId = await getOrCreateDMConversation(match.id);
+    if (conversationId) {
+      const convs = await fetchDMConversations();
+      setConversations(convs);
+      setCurrentConversation(conversationId);
+      return conversationId;
+    }
+    return null;
+  }, [user]);
+
+  const markAsRead = useCallback(async (conversationId: string, throughMessageId?: string) => {
+    if (!throughMessageId && hasNewer) return;
+    let remaining = 0;
+    if (throughMessageId) {
+      remaining = await markDMMessagesReadThrough(conversationId, throughMessageId);
+    } else {
+      await markDMMessagesRead(conversationId);
+    }
+    const readMessageIds = throughMessageId
+      ? (() => {
+          const target = messages.find(message => message.id === throughMessageId);
+          if (!target) return [throughMessageId];
+          return messages
+            .filter(message => (
+              message.conversation_id === conversationId &&
+              message.sender_id !== user?.id &&
+              compareMessageKey(message, target) <= 0
+            ))
+            .map(message => message.id);
+        })()
+      : undefined;
+    void clearDMNotifications(
+      conversationId,
+      readMessageIds?.length === 1 ? readMessageIds[0] : undefined,
+      readMessageIds && readMessageIds.length > 1 ? readMessageIds : undefined
+    );
+    requestAppBadgeRefresh();
+    setConversations(prev =>
+      prev.map(c =>
+        c.id === conversationId ? { ...c, unread_count: remaining } : c
+      )
+    );
+    refreshConversationsDebounced();
+  }, [hasNewer, messages, refreshConversationsDebounced, user?.id]);
+
+  return {
+    conversations,
+    loading,
+    currentConversation,
+    setCurrentConversation,
+    messages,
+    messagesConversationId,
+    messagesLoading,
+    sending,
+    loadingMore,
+    hasMore,
+    hasNewer,
+    startConversation,
+    sendMessage,
+    retryFailedMessage,
+    discardFailedMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
+    markAsRead,
+    loadOlderMessages,
+    loadLatestMessages,
+    loadMessageWindow,
+    loadReadWindow,
+    loadNewerMessages,
+    setFollowingLatest,
+  };
+}
+
+export function useConversationMessages(conversationId: string | null) {
+  const [messages, setMessages] = useState<DMMessage[]>([]);
+  const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [hasNewer, setHasNewerState] = useState(false);
+  const { user, profile } = useAuth();
+  const clientResetRef = useRef<() => Promise<void>>();
+  const activeConversationIdRef = useRef<string | null>(conversationId);
+  activeConversationIdRef.current = conversationId;
+  const hasNewerRef = useRef(false);
+  const fetchRequestIdRef = useRef(0);
+  const pendingIntentsRef = useRef(new Map<string, string>());
+  const activeUserIdRef = useRef(user?.id);
+  activeUserIdRef.current = user?.id;
+  const sendScopeKey = `${user?.id}:${conversationId}`;
+  const sendScopeEpochRef = useRef({ key: sendScopeKey, version: 0 });
+  if (sendScopeEpochRef.current.key !== sendScopeKey) sendScopeEpochRef.current = { key: sendScopeKey, version: sendScopeEpochRef.current.version + 1 };
+  const messageRevisionRef = useRef(0);
+  const messageChangesRef = useRef(new Map<string, { revision: number; deleted: boolean }>());
+  const latestMessagesRef = useRef<DMMessage[]>([]);
+  const hydrationFetchesRef = useRef<Map<string, Promise<DMMessage | null>>>(new Map());
+  const followingLatestRef = useRef(true);
+
+  const updateHasNewer = useCallback((value: boolean) => {
+    hasNewerRef.current = value;
+    setHasNewerState(value);
+  }, []);
+
+  useEffect(() => {
+    activeConversationIdRef.current = conversationId;
+    hydrationFetchesRef.current.clear();
+    messageChangesRef.current.clear();
+    setSending([...pendingIntentsRef.current.values()].includes(`${user?.id}:${conversationId}`));
+  }, [conversationId, user?.id]);
+
+  useEffect(() => {
+    latestMessagesRef.current = messages;
+  }, [messages]);
+
+  const hydrateLocalOutboxMessages = useCallback(() => {
+    if (!user?.id || !conversationId) return;
+
+    const entries = loadLocalOutboxEntries(getDMOutboxScope(conversationId))
+      .filter(entry => entry.senderId === user.id);
+    if (entries.length === 0) return;
+
+    setMessages(prev => sortDMMessagesByCreatedAt(entries.reduce<DMMessage[]>(
+      (acc, entry) => upsertMessageIntoState(acc, localOutboxEntryToDMMessage(entry, conversationId, profile ?? user)),
+      prev
+    )));
+  }, [conversationId, profile, user]);
+
+  const insertConversationMessage = useCallback(
+    async (
+      payload: {
+        conversation_id: string;
+        sender_id: string;
+        client_message_id?: string;
+        content: string;
+        message_type: ChatMessageType;
+        file_url?: string;
+        thumbnail_url?: string;
+        media_processed_at?: string;
+        audio_url?: string;
+        reply_to?: string;
+      }
+    ) => {
+      const workingClient = await getWorkingClient();
+      const insertPromise = workingClient
+        .from('dm_messages')
+        .insert(payload)
+        .select(DM_MESSAGE_WITH_SENDER_SELECT)
+        .single();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error('DM message insert timeout after 10 seconds')),
+          10000
+        )
+      );
+
+      let result = (await Promise.race([insertPromise, timeoutPromise])) as {
+        data: DMMessage | null;
+        error: any;
+      };
+
+      if (result.error && isMediaThumbnailSchemaError(result.error)) {
+        const {
+          thumbnail_url: _thumbnailUrl,
+          media_processed_at: _mediaProcessedAt,
+          ...legacyMediaPayload
+        } = payload;
+        const legacyMediaInsertPromise = workingClient
+          .from('dm_messages')
+          .insert(legacyMediaPayload)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
+          .single();
+
+        result = (await Promise.race([legacyMediaInsertPromise, timeoutPromise])) as {
+          data: DMMessage | null;
+          error: any;
+        };
+      }
+
+      if (result.error && payload.reply_to && isReplyToSchemaError(result.error)) {
+        const {
+          reply_to: _replyTo,
+          ...legacyReplyPayload
+        } = payload;
+        const legacyReplyInsertPromise = workingClient
+          .from('dm_messages')
+          .insert(legacyReplyPayload)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
+          .single();
+
+        result = (await Promise.race([legacyReplyInsertPromise, timeoutPromise])) as {
+          data: DMMessage | null;
+          error: any;
+        };
+      }
+
+      if (result.error && payload.client_message_id && isClientMessageIdSchemaError(result.error)) {
+        throw new Error('This server is missing message retry protection. Please try again after it is updated.');
+      }
+
+      if (result.error && payload.reply_to && isReplyToSchemaError(result.error)) {
+        const {
+          reply_to: _replyTo,
+          ...legacyReplyPayload
+        } = payload;
+        const legacyReplyInsertPromise = workingClient
+          .from('dm_messages')
+          .insert(legacyReplyPayload)
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
+          .single();
+
+        result = (await Promise.race([legacyReplyInsertPromise, timeoutPromise])) as {
+          data: DMMessage | null;
+          error: any;
+        };
+      }
+
+      if (
+        result.error &&
+        payload.client_message_id &&
+        (result.error.code === '23505' || result.error.status === 409)
+      ) {
+        result = await workingClient
+          .from('dm_messages')
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
+          .eq('sender_id', payload.sender_id)
+          .eq('client_message_id', payload.client_message_id)
+          .maybeSingle();
+      }
+
+      return result;
+    },
+    []
+  );
+
+  const fetchConversationMessage = useCallback(async (messageId: string) => {
+    if (!conversationId) return null;
+
+    const workingClient = await getWorkingClient();
+    const { data, error } = await workingClient
+      .from('dm_messages')
+      .select(DM_MESSAGE_WITH_SENDER_SELECT)
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data as unknown as DMMessage;
+  }, [conversationId]);
+
+  const hydrateConversationMessage = useCallback((messageId: string) => {
+    if (!conversationId) return Promise.resolve(null);
+
+    const existing = hydrationFetchesRef.current.get(messageId);
+    if (existing) return existing;
+
+    const request = getWorkingClient()
+      .then(workingClient =>
+        workingClient
+          .from('dm_messages')
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
+          .eq('id', messageId)
+          .eq('conversation_id', conversationId)
+          .maybeSingle()
+      )
+      .then(({ data, error }) => (error || !data ? null : data as unknown as DMMessage))
+      .catch(() => null)
+      .finally(() => {
+        hydrationFetchesRef.current.delete(messageId);
+      });
+
+    hydrationFetchesRef.current.set(messageId, request);
+    return request;
+  }, [conversationId]);
+
+  const loadLatestMessages = useCallback(async () => {
+    await clientResetRef.current?.();
+  }, []);
+
+  const refreshVisibleMessages = useCallback(async () => {
+    if (hasNewerRef.current || !followingLatestRef.current) {
+      const scope = activeConversationIdRef.current;
+      const ids = latestMessagesRef.current.filter(isServerDMCursorMessage).map(message => message.id);
+      if (!scope || ids.length === 0) return;
+      const finishReconnectTiming = beginChatTiming('reconnect', 'dm');
+      const snapshotRevision = messageRevisionRef.current;
+      const client = await getWorkingClient();
+      const { data, error } = await client.from('dm_messages').select(DM_MESSAGE_WITH_SENDER_SELECT)
+        .eq('conversation_id', scope).in('id', ids).order('created_at', { ascending: true }).order('id', { ascending: true });
+      if (error || activeConversationIdRef.current !== scope) return;
+      setMessages(previous => mergeDMMessagesByStableKey([
+        ...((data ?? []) as unknown as DMMessage[]).filter(message => (messageChangesRef.current.get(message.id)?.revision ?? 0) <= snapshotRevision),
+        ...previous.filter(message => !ids.includes(message.id) || (messageChangesRef.current.get(message.id)?.revision ?? 0) > snapshotRevision),
+      ]));
+      finishReconnectTiming();
+      return;
+    }
+    await clientResetRef.current?.();
+  }, []);
+
+  const setFollowingLatest = useCallback((following: boolean) => { followingLatestRef.current = following; }, []);
+
+  // Fetch messages for conversation
+  useEffect(() => {
+    if (!conversationId) {
+      fetchRequestIdRef.current += 1;
+      clientResetRef.current = undefined;
+      setMessages([]);
+      setLoadedConversationId(null);
+      setHasMore(true);
+      updateHasNewer(false);
+      setLoading(false);
+      return;
+    }
+
+    let disposed = false;
+
+    const fetchMessages = async (options: FetchConversationMessagesOptions = {}) => {
+      const snapshotRevision = messageRevisionRef.current;
+      const requestId = fetchRequestIdRef.current + 1;
+      fetchRequestIdRef.current = requestId;
+      if (!options.silent) {
+        setLoadedConversationId(null);
+        setLoading(true);
+      }
+
+      try {
+        const workingClient = await getWorkingClient();
+        const { data, error } = await workingClient
+          .from('dm_messages')
+          .select(DM_MESSAGE_WITH_SENDER_SELECT)
+          .eq('conversation_id', conversationId)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(MESSAGE_FETCH_LIMIT);
+
+        if (disposed || requestId !== fetchRequestIdRef.current) {
+          return;
+        }
+
+        if (error) {
+          if (!options.silent) {
+            setMessages(prev => prev.filter(
+              message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+            ));
+            setHasMore(false);
+          }
+        } else {
+          const fetchedMessages = ((data || []) as unknown as DMMessage[]).reverse()
+          setHasMore((data?.length || 0) === MESSAGE_FETCH_LIMIT);
+          updateHasNewer(false);
+          setMessages(prev => {
+            const pendingLocalMessages = prev.filter(
+              message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+            );
+            let mergedMessages = fetchedMessages.reduce<DMMessage[]>(
+              (acc, message) => upsertMessageIntoState(acc, { ...message, optimistic: false, delivery_status: 'sent' }),
+              pendingLocalMessages
+            );
+            for (const [id, change] of messageChangesRef.current) {
+              if (change.revision <= snapshotRevision) continue;
+              if (change.deleted) mergedMessages = mergedMessages.filter(message => message.id !== id);
+              else {
+                const current = prev.find(message => message.id === id);
+                if (current) mergedMessages = upsertMessageIntoState(mergedMessages, current);
+              }
+            }
+            return boundDMMessagesForWindow(mergedMessages, 'latest').messages;
+          });
+        }
+      } catch {
+        if (!disposed && requestId === fetchRequestIdRef.current) {
+          if (!options.silent) {
+            setMessages(prev => prev.filter(
+              message => message.optimistic || message.delivery_status === 'sending' || message.delivery_status === 'failed'
+            ));
+            setHasMore(false);
+          }
+        }
+      } finally {
+        if (!disposed && requestId === fetchRequestIdRef.current) {
+          setLoadedConversationId(conversationId);
+          setLoading(false);
+        }
+      }
+    };
+
+    const resetWithFreshClient = async () => {
+      if (!conversationId || disposed) return;
+      await fetchMessages({ silent: true });
+    };
+
+    clientResetRef.current = resetWithFreshClient;
+
+    setMessages([]);
+    setLoadedConversationId(null);
+    setHasMore(true);
+    updateHasNewer(false);
+    void fetchMessages();
+
+    return () => {
+      disposed = true;
+      fetchRequestIdRef.current += 1;
+      if (clientResetRef.current === resetWithFreshClient) {
+        clientResetRef.current = undefined;
+      }
+    };
+  }, [conversationId, updateHasNewer, user]);
+
+  useEffect(() => {
+    hydrateLocalOutboxMessages();
+  }, [hydrateLocalOutboxMessages]);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingMore || !hasMore || !conversationId) return;
+    const oldest = getOldestServerDMCursor(messages);
+    if (!oldest) return;
+    const requestId = fetchRequestIdRef.current;
+    setLoadingMore(true);
+    try {
+      const workingClient = await getWorkingClient();
+      const { data, error } = await workingClient
+        .from('dm_messages')
+        .select(DM_MESSAGE_WITH_SENDER_SELECT)
+        .eq('conversation_id', conversationId)
+        .or(buildOlderDMKeysetFilter(oldest))
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(MESSAGE_FETCH_LIMIT);
+
+      if (error) throw error;
+
+      if (activeConversationIdRef.current !== conversationId || requestId !== fetchRequestIdRef.current) {
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const newMessages = (data as unknown as DMMessage[]).reverse();
+        const boundedWindow = boundDMMessagesForWindow(
+          [...newMessages, ...latestMessagesRef.current],
+          'oldest'
+        );
+        setMessages(boundedWindow.messages);
+        if (boundedWindow.trimmed) {
+          updateHasNewer(true);
+        }
+        setHasMore(data.length === MESSAGE_FETCH_LIMIT);
+      } else {
+        setHasMore(false);
+      }
+    } finally {
+      if (activeConversationIdRef.current === conversationId && requestId === fetchRequestIdRef.current) setLoadingMore(false);
+    }
+  }, [loadingMore, hasMore, conversationId, messages, updateHasNewer]);
+
+  const handleRealtimeInsert = useCallback(async (incoming: Partial<DMMessage>) => {
+    const activeConversationId = activeConversationIdRef.current;
+    if (!activeConversationId || incoming.conversation_id !== activeConversationId || !incoming.id) return;
+
+    const alreadyHydrated = latestMessagesRef.current.some(message =>
+      message.id === incoming.id && !message.optimistic && Boolean(message.sender)
+    );
+    if (alreadyHydrated) return;
+
+    const message = await hydrateConversationMessage(incoming.id);
+    if (!message || activeConversationIdRef.current !== incoming.conversation_id) return;
+    const exists = findMatchingMessageIndex(latestMessagesRef.current, message) >= 0;
+    if (hasNewerRef.current && !exists) return;
+    const newest = latestMessagesRef.current.filter(isServerDMCursorMessage).slice(-1)[0];
+    if (!followingLatestRef.current && !exists && (!newest || compareMessageKey(message, newest) > 0)) {
+      updateHasNewer(true);
+      return;
+    }
+
+    messageChangesRef.current.set(message.id, { revision: ++messageRevisionRef.current, deleted: false });
+
+    setMessages(prev => boundDMMessagesForWindow([
+      ...prev,
+      {
+        ...message,
+        optimistic: false,
+        delivery_status: 'sent',
+      },
+    ], 'latest').messages);
+  }, [hydrateConversationMessage, updateHasNewer]);
+
+  const handleRealtimeUpdate = useCallback((incoming: Partial<DMMessage>) => {
+    if (
+      !incoming.id ||
+      !incoming.conversation_id ||
+      activeConversationIdRef.current !== incoming.conversation_id
+    ) return;
+    messageChangesRef.current.set(incoming.id, { revision: ++messageRevisionRef.current, deleted: false });
+
+    setMessages(prev => {
+      const existing = prev.find(message => message.id === incoming.id);
+      if (!existing) return prev;
+
+      const merged = mergeRealtimeMessageUpdate(existing, incoming, { sender: existing.sender });
+      return merged ? upsertMessageIntoState(prev, merged) : prev;
+    });
+  }, []);
+
+  const handleRealtimeDelete = useCallback((removed: Partial<DMMessage>) => {
+    if (!removed.id) return;
+    messageChangesRef.current.set(removed.id, { revision: ++messageRevisionRef.current, deleted: true });
+
+    setMessages(prev => prev.filter(message => message.id !== removed.id));
+  }, []);
+
+  const loadMessageWindow = useCallback(async (messageId: string) => {
+    if (!conversationId) return false;
+    const requestedConversationId = conversationId;
+    const requestId = ++fetchRequestIdRef.current;
+    setLoadingMore(true);
+    try {
+      const result = await getDMMessageWindow(requestedConversationId, messageId, { limit: 60 });
+      if (
+        requestId !== fetchRequestIdRef.current ||
+        result.targetStatus !== 'resolved' ||
+        activeConversationIdRef.current !== requestedConversationId
+      ) {
+        return false;
+      }
+
+      const windowMessages = result.messages.map(message => ({
+        id: message.id,
+        client_message_id: message.clientMessageId,
+        conversation_id: message.conversationId,
+        sender_id: message.senderId,
+        content: message.content,
+        message_type: message.messageType,
+        file_url: message.fileUrl ?? undefined,
+        thumbnail_url: message.thumbnailUrl,
+        thumbnail_path: message.thumbnailPath,
+        audio_url: message.audioUrl ?? undefined,
+        audio_duration: message.audioDuration ?? undefined,
+        reply_to: message.replyTo,
+        read_at: message.readAt ?? undefined,
+        read_by: message.readBy,
+        reactions: message.reactions,
+        edited_at: message.editedAt ?? undefined,
+        created_at: message.createdAt,
+        updated_at: message.updatedAt,
+        media_width: message.mediaWidth,
+        media_height: message.mediaHeight,
+        media_processed_at: message.mediaProcessedAt,
+        sender: message.sender,
+      } as DMMessage));
+
+      setMessages(previous => {
+        const local = previous.filter(message => !isServerDMCursorMessage(message));
+        return boundDMMessagesForWindow([...windowMessages, ...local], 'latest').messages;
+      });
+      setLoadedConversationId(requestedConversationId);
+      setHasMore(result.hasOlder);
+      updateHasNewer(result.hasNewer);
+      return true;
+    } finally {
+      if (activeConversationIdRef.current === conversationId && requestId === fetchRequestIdRef.current) setLoadingMore(false);
+    }
+  }, [conversationId, updateHasNewer]);
+
+  const loadReadWindow = useCallback(async () => {
+    if (!conversationId) return false;
+    const scope = conversationId;
+    const requestId = ++fetchRequestIdRef.current;
+    setLoadingMore(true);
+    try {
+      const result = await getDMReadWindow(scope, { readAnchor: true, limit: 60 });
+      if (activeConversationIdRef.current !== scope || fetchRequestIdRef.current !== requestId) return false;
+      setMessages(previous => boundDMMessagesForWindow([
+        ...result.messages.map(retrievedDMToMessage), ...previous.filter(message => !isServerDMCursorMessage(message)),
+      ], 'latest').messages);
+      setHasMore(result.hasOlder);
+      updateHasNewer(result.hasNewer);
+      setLoadedConversationId(scope);
+      return true;
+    } finally {
+      if (activeConversationIdRef.current === scope && fetchRequestIdRef.current === requestId) setLoadingMore(false);
+    }
+  }, [conversationId, updateHasNewer]);
+
+  const loadNewerMessages = useCallback(async () => {
+    if (!conversationId || loadingMore || !hasNewerRef.current) return;
+    const scope = conversationId;
+    const newest = latestMessagesRef.current.filter(isServerDMCursorMessage).slice(-1)[0];
+    if (!newest) return;
+    setLoadingMore(true);
+    try {
+      const result = await getDMReadWindow(scope, { after: { createdAt: newest.created_at, id: newest.id }, readAnchor: false, limit: 60 });
+      if (activeConversationIdRef.current !== scope) return;
+      setMessages(previous => boundDMMessagesForWindow([...previous, ...result.messages.map(retrievedDMToMessage)], 'latest').messages);
+      updateHasNewer(result.hasNewer);
+      setHasMore(previous => previous || result.hasOlder);
+    } finally {
+      if (activeConversationIdRef.current === scope) setLoadingMore(false);
+    }
+  }, [conversationId, loadingMore, updateHasNewer]);
+
+  const sendMessage = useCallback(
+    async (
+      content: string,
+      messageType: ChatMessageType = 'text',
+      fileUrl?: string,
+      replyTo?: string,
+      thumbnailUrl?: string | null,
+      options: SendDMMessageOptions = {}
+    ): Promise<DMMessage | null> => {
+
+      const trimmedContent = content.trim();
+      const requiresContent = messageType !== 'audio' && messageType !== 'image' && messageType !== 'video' && messageType !== 'file';
+      if (!user || !conversationId || (requiresContent && !trimmedContent)) return null;
+
+      const finishSendTiming = beginChatTiming('send-ack', 'dm');
+    const finishOptimisticTiming = beginChatTiming('optimistic-insert', 'dm');
+    const clientMessageId = options.clientMessageId || createClientMessageId();
+      const intentKey = `${user.id}:${clientMessageId}`;
+      const intentScope = `${user.id}:${conversationId}`;
+      const sendScopeEpoch = sendScopeEpochRef.current.version;
+      if (pendingIntentsRef.current.has(intentKey)) return null;
+      const createdAt = options.createdAt || new Date().toISOString();
+      const optimisticMessage = {
+        id: clientMessageId,
+        client_message_id: clientMessageId,
+        conversation_id: conversationId,
+        sender_id: user.id,
+        content: messageType === 'audio' ? '' : trimmedContent,
+        message_type: messageType,
+        file_url: fileUrl,
+        ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl, media_processed_at: createdAt } : {}),
+        ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
+        read_at: undefined,
+        read_by: [user.id],
+        reactions: {},
+        created_at: createdAt,
+        updated_at: createdAt,
+        sender: profile ?? user,
+        optimistic: true,
+        delivery_status: 'sending',
+      } as DMMessage;
+      upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
+        id: clientMessageId, clientMessageId, senderId: user.id, content: trimmedContent,
+        messageType, fileUrl, thumbnailUrl, replyTo, createdAt, failedAt: createdAt,
+      }, { requirePersistence: true });
+      pendingIntentsRef.current.set(intentKey, intentScope);
+      setSending(true);
+
+      setMessages(prev => upsertMessageIntoState(prev, optimisticMessage));
+      finishOptimisticTiming();
+      options.onQueued?.();
+
+      try {
+        return await withTimeout(
+          (async () => {
+            const sessionValid = await ensureSession();
+            if (!sessionValid) {
+              throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
+            }
+
+            if (activeUserIdRef.current !== user.id) throw new Error('The account changed while sending this message.');
+            const client = await getWorkingClient();
+            const lookup = await client.from('dm_messages').select(DM_MESSAGE_WITH_SENDER_SELECT)
+              .eq('sender_id', user.id).eq('conversation_id', conversationId)
+              .eq('client_message_id', clientMessageId).maybeSingle();
+            if (lookup.error) throw lookup.error;
+            const existing = lookup.data as unknown as DMMessage | null;
+            const media = !existing && PRIVATE_MEDIA_ENABLED
+              ? await prepareMessageMedia({ senderId: user.id, clientMessageId, messageType, content: trimmedContent, fileUrl, thumbnailUrl })
+              : { content: trimmedContent, fileUrl, thumbnailUrl };
+            if (activeUserIdRef.current !== user.id) throw new Error('The account changed while preparing this attachment.');
+            upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
+              id: clientMessageId, clientMessageId, senderId: user.id, messageType, replyTo,
+              ...media, createdAt, failedAt: createdAt,
+            }, { requirePersistence: true });
+            const insertPayload = {
+              conversation_id: conversationId,
+              sender_id: user.id,
+              client_message_id: clientMessageId,
+              content: messageType === 'audio' ? '' : media.content,
+              message_type: messageType,
+              file_url: media.fileUrl,
+              ...(media.thumbnailUrl ? { thumbnail_url: media.thumbnailUrl, media_processed_at: new Date().toISOString() } : {}),
+              ...(replyTo ? { reply_to: replyTo } : {}),
+              ...(messageType === 'audio' ? { audio_url: media.content } : {}),
+            };
+
+            const { data, error } = existing ? { data: existing, error: null } : await insertConversationMessage(insertPayload);
+
+            let finalData = data as unknown;
+            let finalError = error as any;
+            if (finalError) {
+              if (finalError.status === 401 || /jwt|token|expired/i.test(finalError.message ?? '')) {
+                const forcedSessionValid = await ensureSession(true);
+                if (forcedSessionValid) {
+                  const retry = await insertConversationMessage(insertPayload);
+                  finalData = retry.data as unknown;
+                  finalError = retry.error;
+                } else {
+                  const { error: refreshError } = await refreshSessionLocked();
+                  if (!refreshError) {
+                    const retry = await insertConversationMessage(insertPayload);
+                    finalData = retry.data as unknown;
+                    finalError = retry.error;
+                  }
+                }
+              }
+              if (finalError) throw finalError;
+            }
+
+            if (finalData) {
+              removeLocalOutboxEntry(getDMOutboxScope(conversationId), clientMessageId, user.id);
+              finishSendTiming();
+              const message = {
+                ...(finalData as DMMessage),
+                optimistic: false,
+                delivery_status: 'sent',
+              } as DMMessage;
+              if (activeConversationIdRef.current === conversationId && sendScopeEpochRef.current.version === sendScopeEpoch) {
+                messageChangesRef.current.set(message.id, { revision: ++messageRevisionRef.current, deleted: false });
+                setMessages(prev => upsertMessageIntoState(prev, message));
+              }
+              if (message.id) {
+                triggerDMPushNotification(message.id).catch(() => {
+                  // Push delivery should not block the DM send path.
+                });
+              }
+              return message;
+            }
+            return null;
+          })(),
+          SEND_OPERATION_TIMEOUT_MS,
+          'Message send timed out while reconnecting. Please try again.'
+        );
+      } catch (error) {
+        upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
+          id: clientMessageId,
+          clientMessageId,
+          senderId: user.id,
+          content: trimmedContent,
+          messageType,
+          fileUrl,
+          thumbnailUrl,
+          replyTo,
+          createdAt,
+          failedAt: new Date().toISOString(),
+        });
+        if (activeConversationIdRef.current === conversationId && sendScopeEpochRef.current.version === sendScopeEpoch) setMessages(prev => markMessageSendFailed(prev, clientMessageId));
+        await runRealtimeRecovery('send-error').catch(() => undefined);
+        if (error instanceof Error) {
+          (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
+          throw error;
+        }
+        const wrappedError = new Error('Failed to send message') as Error & { optimisticMessageId?: string };
+        wrappedError.optimisticMessageId = clientMessageId;
+        throw wrappedError;
+      } finally {
+        pendingIntentsRef.current.delete(intentKey);
+        setSending([...pendingIntentsRef.current.values()].includes(`${activeUserIdRef.current}:${activeConversationIdRef.current}`));
+      }
+    }, [user, conversationId, insertConversationMessage, profile]);
+
+  const retryFailedMessage = useCallback(async (messageId: string) => {
+    const failedMessage = latestMessagesRef.current.find(message =>
+      (message.id === messageId || message.client_message_id === messageId) &&
+      message.delivery_status === 'failed'
+    );
+
+    if (!failedMessage) return null;
+
+    const clientMessageId = failedMessage.client_message_id || failedMessage.id;
+    const retryContent = failedMessage.message_type === 'audio'
+      ? failedMessage.audio_url || failedMessage.content
+      : failedMessage.content;
+
+    return sendMessage(
+      retryContent,
+      failedMessage.message_type,
+      failedMessage.file_url,
+      failedMessage.reply_to ?? undefined,
+      failedMessage.thumbnail_url,
+      {
+        clientMessageId,
+        createdAt: new Date().toISOString(),
+      }
+    );
+  }, [sendMessage]);
+
+  const discardFailedMessage = useCallback((messageId: string) => {
+    if (!conversationId) return;
+
+    removeLocalOutboxEntry(getDMOutboxScope(conversationId), messageId);
+    setMessages(prev => prev.filter(message => (
+      message.id !== messageId &&
+      message.client_message_id !== messageId
+    )));
+  }, [conversationId]);
+
+  const editMessage = useCallback(async (messageId: string, content: string) => {
+    if (!user || !conversationId || !content.trim()) return;
+
+    const workingClient = await getWorkingClient();
+    const editedAt = new Date().toISOString();
+    const { error } = await workingClient
+      .from('dm_messages')
+      .update({ content: content.trim(), edited_at: editedAt })
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .eq('sender_id', user.id);
+
+    if (error) throw error;
+
+    setMessages(prev => prev.map(message => (
+      message.id === messageId
+        ? { ...message, content: content.trim(), edited_at: editedAt }
+        : message
+    )));
+  }, [conversationId, user]);
+
+  const deleteMessage = useCallback(async (messageId: string) => {
+    if (!user || !conversationId) return;
+
+    const workingClient = await getWorkingClient();
+    const { error } = await workingClient
+      .from('dm_messages')
+      .delete()
+      .eq('id', messageId)
+      .eq('conversation_id', conversationId)
+      .eq('sender_id', user.id);
+
+    if (error) throw error;
+
+    setMessages(prev => prev.filter(message => message.id !== messageId));
+  }, [conversationId, user]);
+
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!user || !conversationId) return;
+
+    const previousMembership = Boolean(
+      latestMessagesRef.current
+        .find(message => message.id === messageId)
+        ?.reactions?.[emoji]?.users.includes(user.id)
+    );
+
+    const workingClient = await getWorkingClient();
+    const { error } = await workingClient.rpc('toggle_message_reaction', {
+      message_id: messageId,
+      emoji,
+      is_dm: true,
+    });
+
+    if (error) throw error;
+
+    if (!previousMembership) {
+      void Promise.resolve(triggerReactionPushNotification(messageId, emoji, true)).catch(() => {
+        // The reaction is authoritative even when optional push delivery fails.
+      });
+    }
+
+    const message = await fetchConversationMessage(messageId);
+    if (message && activeConversationIdRef.current === conversationId) {
+      setMessages(prev => prev.map(existing => existing.id === message.id ? message : existing));
+    }
+  }, [conversationId, fetchConversationMessage, user]);
+
+  return {
+    messages,
+    conversationId: loadedConversationId,
+    loading,
+    sending,
+    loadingMore,
+    hasMore,
+    hasNewer,
+    sendMessage,
+    retryFailedMessage,
+    discardFailedMessage,
+    editMessage,
+    deleteMessage,
+    toggleReaction,
+    loadOlderMessages,
+    loadLatestMessages,
+    loadMessageWindow,
+    loadReadWindow,
+    loadNewerMessages,
+    setFollowingLatest,
+    handleRealtimeInsert,
+    handleRealtimeUpdate,
+    handleRealtimeDelete,
+    refreshVisibleMessages,
+  };
+}
+
+export function DirectMessagesProvider({ children }: { children: React.ReactNode }) {
+  const value = useProvideDirectMessages();
+  return (
+    <DirectMessagesContext.Provider value={value}>
+      {children}
+    </DirectMessagesContext.Provider>
+  );
+}
+
+export function useDirectMessages() {
+  const context = useContext(DirectMessagesContext);
+  if (!context) {
+    throw new Error('useDirectMessages must be used within a DirectMessagesProvider');
+  }
+  return context;
+}

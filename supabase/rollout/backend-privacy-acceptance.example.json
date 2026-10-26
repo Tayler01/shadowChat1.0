@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "phase": "activation",
+  "projectRef": "shsqqouecvdoifzufkqm",
+  "sourceCommit": "REPLACE_WITH_EXACT_MAIN_COMMIT",
+  "planSha256": "REPLACE_WITH_PLAN_MODE_DIGEST",
+  "observedAt": "REPLACE_WITH_VERIFIED_UTC_TIME",
+  "producers": [],
+  "deletionHandler": {
+    "name": "delete-account",
+    "version": 0,
+    "updatedAt": 0,
+    "verifyJwt": false
+  },
+  "referenceEvidence": {
+    "legacyReconciliation": {
+      "scope": "Isolated disposable branch acceptance; not production activation or scheduling authority",
+      "projectRef": "jwldrnmhrmwsyrfhmrkg",
+      "verifiedAt": "2026-10-23T23:29:26.871Z",
+      "passed": true,
+      "evidence": "output/privacy/streamlined-staged/scheduler-proof.json",
+      "cases": "Actual Cron/pg_net completed normal held deletion and an authorized job after synthetic Auth404, each in one attempt",
+      "teardown": "Zero fixture Auth, Storage, jobs, aliases, leases, active Cron, Vault secrets, dispatch targets and queued requests; dormant foundation dispatcher preserved"
+    }
+  },
+  "checks": {
+    "deletion_handover_start_guard": {
+      "passed": false,
+      "evidence": "Foundation keeps old deletion FKs and append-only guards intact. Both legacy and receipt handlers must return retryable503 without starting provider, Storage, session, Auth or durable-job changes before capture activation."
+    },
+    "old_deletion_requests_drained": {
+      "passed": false,
+      "evidence": "Required for activation: bind exact durable-handler metadata above, wait at least15minutes after deployment, and verify old handler request drain in current logs. Capability probe must confirm stagedHandover and legacyRequestCompatibility."
+    },
+    "foundation_preserves_existing_full_app": {
+      "passed": false,
+      "evidence": "Exact currently published client auth, General, DM, uploads and media acceptance result"
+    },
+    "existing_and_new_provider_actions": {
+      "passed": false,
+      "evidence": "Reviewed old and new Pin/TV upload, completion, playback and cleanup results"
+    },
+    "old_producer_requests_drained": {
+      "passed": false,
+      "evidence": "Fresh in-flight request and source-ownership inventory after compatible producers were deployed"
+    },
+    "moderation_capture_ready": {
+      "passed": false,
+      "evidence": "Reported Storage capture, authorized case access and deletion preservation result"
+    },
+    "profile_and_realtime_compatibility": {
+      "passed": false,
+      "evidence": "Currently published full client profile queries, signed media and private-channel behavior verified through the proposed activation"
+    },
+    "legacy_reconciliation_hosted": {
+      "passed": false,
+      "evidence": "Isolated proof passed: output/privacy/streamlined-staged/scheduler-proof.json. Bind a fresh review to this exact main commit, release-plan digest and deployed producer versions before marking this release check passed. Production scheduler enablement and verified bounded drain remain a separate operations step."
+    }
+  }
+}

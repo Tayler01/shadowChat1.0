@@ -5,18 +5,21 @@
 /.codex/
 /.git/
 /.github/
+/.netlify/
 /.playwright-cli/
 /contracts/
 /dist/
 /docs/
 /firmware/
 /netlify/
+/native/
 /output/
 /public/
 /release-notes/
 /scripts/
 /services/
 /source-assets/
+/assets-source/
 /src/
 /supabase/
 /tests/
@@ -36,6 +39,7 @@
 /jest.config.js
 /LICENSE
 /netlify.toml
+/netlify.streamlined.toml
 /package-lock.json
 /package.json
 /PLAN.md
@@ -54,6 +58,7 @@
 /vite.config.ts
 
 /apps/mobile/.env
+/apps/streamlined/
 /apps/mobile/.env.*
 /apps/mobile/.expo/
 /apps/mobile/android/

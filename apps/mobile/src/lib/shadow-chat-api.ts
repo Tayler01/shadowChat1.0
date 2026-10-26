@@ -1,6 +1,6 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 
-import { getSupabase } from './supabase';
+import { getSupabase, nativeRealtimeOptions, nativeRealtimeTopic } from './supabase';
 import type { GeneralChatMessage, ShadowUser } from '@/types/shadow-chat';
 
 const GENERAL_MESSAGE_SELECT = `
@@ -176,7 +176,7 @@ export const subscribeToGeneralMessages = (
   onError: (error: Error) => void
 ): RealtimeChannel => {
   const channel = getSupabase()
-    .channel(`native-general-chat:${Date.now()}:${Math.random().toString(36).slice(2)}`)
+    .channel(nativeRealtimeTopic(`native-general-chat:${Date.now()}:${Math.random().toString(36).slice(2)}`), nativeRealtimeOptions)
     .on(
       'postgres_changes',
       {

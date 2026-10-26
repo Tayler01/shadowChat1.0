@@ -50,7 +50,7 @@ describe('Edge Function abuse and idempotency boundaries', () => {
     const deterministicKey = handler.indexOf('deterministicrequestkey({ messages, model: model ?? null })')
     const claim = handler.indexOf('await claimedgerequest(supabase')
     const limit = handler.indexOf('await consumeedgeratelimit(supabase')
-    const provider = handler.indexOf('await requestaicompletion(messages, model)')
+    const provider = handler.indexOf('await requestaicompletion(messages, model, sharingconsent)')
 
     expect(validation).toBeGreaterThan(-1)
     expect(sourceKey).toBeGreaterThan(validation)
@@ -68,7 +68,7 @@ describe('Edge Function abuse and idempotency boundaries', () => {
     const auth = handler.indexOf('authenticateedgeuser(req)')
     const limit = handler.indexOf('consumeedgeratelimit(getsupabaseadmin()')
     const providers = handler.indexOf('fetchopengraphpreview(url)')
-    const storage = handler.indexOf('makepreviewimagedurable(url, preview)')
+    const storage = handler.indexOf('makepreviewimagedurable(url, preview, user.id)')
 
     expect(auth).toBeGreaterThan(-1)
     expect(limit).toBeGreaterThan(auth)
@@ -82,12 +82,13 @@ describe('Edge Function abuse and idempotency boundaries', () => {
     expect(source).toContain("scope: 'shadow-pin-video:provider-minute'")
 
     const actionContracts = [
-      ['handlecreateupload', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'create-upload')", 'createbunnyvideo('],
-      ['handlereplaceupload', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'replace-upload')", 'createbunnyvideo('],
+      ['handlecreateupload', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'create-upload')", 'createregisteredbunnyasset('],
+      ['handlereplaceupload', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'replace-upload')", 'createregisteredbunnyasset('],
       ['handlesyncstatus', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'sync-status')", 'getbunnyvideo('],
       ['handlecreateexternal', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'create-external')", 'buildexternalrecord('],
       ['handlereplaceexternal', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'replace-external')", 'buildexternalrecord('],
-      ['handledeletevideoasset', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'delete-video-asset')", 'deletebunnyvideo('],
+      ['handledeletevideoasset', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'delete-video-asset')", 'deleteclaimedbunnyasset('],
+      ['handledeletedraftvideoasset', "enforceproviderrequestlimit(auth.supabase, auth.userid, 'delete-draft-video-asset')", 'deleteclaimedbunnyasset('],
     ] as const
 
     for (const [handlerName, guardMarker, providerMarker] of actionContracts) {
@@ -98,6 +99,11 @@ describe('Edge Function abuse and idempotency boundaries', () => {
       expect(handler.indexOf(guardMarker)).toBeGreaterThan(-1)
       expect(handler.indexOf(providerMarker)).toBeGreaterThan(handler.indexOf(guardMarker))
     }
+    const claimedRemoval = source.slice(source.indexOf('const deleteclaimedbunnyasset'), source.indexOf('const createregisteredbunnyasset'))
+    expect(claimedRemoval).toContain("supabase.rpc('claim_bunny_media_removal'")
+    expect(claimedRemoval).toContain('removeclaimedbunnymedia(')
+    expect(claimedRemoval).toContain('remove: () => deletebunnyvideo(')
+    expect(claimedRemoval).toContain("supabase.rpc('finish_bunny_media_removal'")
   })
 
   it('claims push delivery before VAPID work and stores the replay response', () => {

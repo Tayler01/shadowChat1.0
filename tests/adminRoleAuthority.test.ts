@@ -38,6 +38,10 @@ describe('admin role authority contract', () => {
     const deleteAccountSource = readSource('supabase/functions/delete-account/index.ts')
       .replace(/\s+/g, ' ')
       .toLowerCase()
+    const deletionWorkflow = readSource('supabase/functions/_shared/account-deletion-workflow.ts')
+    const deletionSql = readSource('supabase/migrations/20261023001141_complete_account_deletion.sql')
+      .replace(/\s+/g, ' ')
+      .toLowerCase()
 
     expect(authorityCleanupSql).toContain('from public.user_roles roles')
     expect(authorityCleanupSql).toContain("roles.role in ('admin', 'sub_admin')")
@@ -52,8 +56,19 @@ describe('admin role authority contract', () => {
       'grant execute on function public.set_user_channel_bans(uuid, text[], integer, text) to authenticated'
     )
 
-    expect(deleteAccountSource).toContain("supabase.rpc('is_app_admin'")
-    expect(deleteAccountSource).toContain("from('user_roles')")
+    // Authority is checked atomically with job creation in Postgres, rather
+    // than a separate Edge read that could race a concurrent role transfer.
+    expect(deleteAccountSource).toContain('runaccountdeletion')
+    expect(deletionWorkflow).toContain("client.rpc('begin_account_deletion'")
+    const roleLock = deletionSql.indexOf("perform 1 from public.user_roles where role = 'admin' for update")
+    const adminGuard = deletionSql.indexOf("if exists (select 1 from public.user_roles where user_id = target_user_id and role = 'admin')")
+    const refusal = deletionSql.indexOf("errcode = 'pt403', message = 'transfer full admin access before deleting this account.'")
+    const jobInsert = deletionSql.indexOf('insert into private.account_deletion_jobs')
+    expect(roleLock).toBeGreaterThan(-1)
+    expect(adminGuard).toBeGreaterThan(roleLock)
+    expect(refusal).toBeGreaterThan(adminGuard)
+    expect(jobInsert).toBeGreaterThan(refusal)
+    expect(deletionSql).not.toContain('users.admin_role')
     expect(deleteAccountSource).not.toContain("select('admin_role')")
     expect(deleteAccountSource).not.toContain(".eq('admin_role', 'admin')")
   })

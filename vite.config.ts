@@ -20,7 +20,17 @@ export default defineConfig(({ mode }) => {
       __SHADOWCHAT_CATCH_UP_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_CATCH_UP')),
       __SHADOWCHAT_SHADOW_CIRCUIT_ENABLED__: JSON.stringify(shadowCircuitEnabled),
     },
-    plugins: [react(), privateCircuitPreview()],
+    plugins: [react(), privateCircuitPreview(), {
+      name: 'full-app-edition-isolation',
+      generateBundle() {
+        for (const id of this.getModuleIds()) {
+          const file = id.replace(/\\/g, '/');
+          if (file.includes('/apps/streamlined/') || file.includes('/src/streamlined/')) {
+            this.error('A streamlined-only module entered the full app: ' + file);
+          }
+        }
+      },
+    }],
     // Unity's asset cache is unrelated to Vite and changes heavily during imports.
     server: { watch: { ignored: ['**/native/shadow-checkers-unity/**'] } },
     optimizeDeps: {

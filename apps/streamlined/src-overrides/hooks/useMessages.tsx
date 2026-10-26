@@ -1,0 +1,1876 @@
+import { prepareMessageMedia } from '../../../../src/lib/privateMediaCopies';
+import { PRIVATE_MEDIA_ENABLED } from '../../../../src/lib/privateMediaUrls';
+import { beginChatTiming } from '../../../../src/lib/chatPerformance';
+/* eslint-disable react-refresh/only-export-components */
+import React, {
+  useEffect,
+  useState,
+  useCallback,
+  useRef
+} from 'react';
+import {
+  Message,
+  User,
+  type ChatMessageType,
+  fetchGeneralChatThreadedWindow,
+  fetchGeneralChatThreadSummaries,
+  isGeneralChatThreadRpcUnavailable,
+  resolveGeneralChatThreadId,
+  ensureSession,
+  refreshSessionLocked,
+  getRealtimeClient,
+  getWorkingClient,
+  type GeneralChatMessageKey,
+  type GeneralChatMessageWindowMode,
+  type GeneralChatMessageWindowRequest,
+  type GeneralChatMessageWindowResult,
+  type GeneralChatMessageWindowStatus,
+} from '../lib/supabase';
+import { runRealtimeRecovery } from '../../../../src/lib/realtimeRecovery';
+import { triggerGroupPushNotification, triggerReactionPushNotification } from '../../../../src/lib/push';
+import {
+  createClientMessageId,
+  findMatchingMessageIndex,
+  isClientMessageIdSchemaError,
+  isMediaThumbnailSchemaError,
+  markMessageSendFailed,
+  mergeRealtimeMessageUpdate,
+  upsertMessageIntoState,
+} from '../../../../src/lib/optimisticMessages';
+import { MESSAGE_FETCH_LIMIT } from '../../../../src/config';
+import type { RealtimeChannel } from '@supabase/supabase-js';
+import {
+  MessagesContext,
+  type MessagesContextValue,
+  useMessages,
+  useOptionalMessages,
+} from './MessagesContext';
+import { useAuth } from './useAuth';
+import { useRealtimeRecovery } from '../../../../src/hooks/useRealtimeRecovery';
+import { useSoundEffects } from '../../../../src/hooks/useSoundEffects';
+import { createRealtimeChannelName } from '../../../../src/lib/realtimeChannelName';
+import {
+  createRealtimeSubscriptionManager,
+  isRecoverableRealtimeStatus,
+} from '../../../../src/lib/realtimeSubscription';
+import {
+  loadLocalOutboxEntries,
+  removeLocalOutboxEntry,
+  upsertLocalOutboxEntry,
+  type LocalMessageOutboxEntry,
+} from '../lib/localMessageOutbox';
+import { embedPublicProfile } from '../../../../supabase/functions/_shared/public-profile';
+
+export { useMessages, useOptionalMessages };
+
+const MESSAGE_INSERT_TIMEOUT_MS = 10000;
+const MESSAGE_RECONCILE_QUERY_TIMEOUT_MS = 1000;
+const MESSAGE_RECONCILE_DELAYS_MS = [0, 250, 500] as const;
+const GROUP_OUTBOX_SCOPE = 'general';
+const MESSAGE_WITH_USER_SELECT = `
+  *,
+  ${embedPublicProfile('user', 'users!user_id')}
+`;
+
+const dedupeMessagesById = (items: Message[]) =>
+  items.reduce<Message[]>((acc, item) => upsertMessageIntoState(acc, item), [])
+
+const compareMessageKeys = (a: GeneralChatMessageKey, b: GeneralChatMessageKey) => {
+  const aCreatedAt = a.created_at || ''
+  const bCreatedAt = b.created_at || ''
+  const aTime = Date.parse(aCreatedAt)
+  const bTime = Date.parse(bCreatedAt)
+  if (Number.isFinite(aTime) && Number.isFinite(bTime) && aTime !== bTime) {
+    return aTime - bTime
+  }
+
+  const timeCompare = aCreatedAt.localeCompare(bCreatedAt)
+  if (timeCompare !== 0) {
+    return timeCompare
+  }
+
+  return (a.id || '').localeCompare(b.id || '')
+}
+
+const sortMessagesByStableKey = (items: Message[]) =>
+  [...items].sort(compareMessageKeys)
+
+export const toggleMessageReactionForUser = (
+  items: Message[],
+  messageId: string,
+  emoji: string,
+  userId: string
+) => {
+  const message = items.find(item => item.id === messageId)
+  const currentUsers = message?.reactions?.[emoji]?.users || []
+  return setMessageReactionMembership(items, messageId, emoji, userId, !currentUsers.includes(userId))
+}
+
+export const setMessageReactionMembership = (
+  items: Message[],
+  messageId: string,
+  emoji: string,
+  userId: string,
+  shouldReact: boolean
+) => {
+  const index = items.findIndex(message => message.id === messageId)
+  if (index === -1) return items
+
+  const message = items[index]
+  const reactions = { ...(message.reactions || {}) } as Record<string, { count: number; users: string[] }>
+  const current = reactions[emoji] || { count: 0, users: [] as string[] }
+  const reacted = current.users.includes(userId)
+
+  if (reacted === shouldReact) {
+    return items
+  }
+
+  if (!shouldReact) {
+    const users = current.users.filter(id => id !== userId)
+    if (users.length === 0) {
+      delete reactions[emoji]
+    } else {
+      reactions[emoji] = { count: users.length, users }
+    }
+  } else {
+    const users = [...current.users, userId]
+    reactions[emoji] = { count: users.length, users }
+  }
+
+  const next = [...items]
+  next[index] = { ...message, reactions } as Message
+  return next
+}
+
+const isLocalPendingMessage = (message: Message) =>
+  message.optimistic ||
+  message.delivery_status === 'sending' ||
+  message.delivery_status === 'failed'
+
+const isServerWindowMessage = (message: Message) =>
+  !message.pinned && !isLocalPendingMessage(message)
+
+const getOldestServerWindowMessage = (items: Message[]) =>
+  sortMessagesByStableKey(items.filter(isServerWindowMessage))[0] ?? null
+
+const getNewestServerWindowMessage = (items: Message[]) => {
+  const sorted = sortMessagesByStableKey(items.filter(isServerWindowMessage))
+  return sorted[sorted.length - 1] ?? null
+}
+
+const withSentDeliveryState = (message: Message) => ({
+  ...message,
+  optimistic: false,
+  delivery_status: 'sent' as const,
+})
+
+const trimMessageWindow = (items: Message[]) => {
+  const deduped = dedupeMessagesById(items).filter(message => !message.reply_to)
+  const pinned = deduped.filter(message => message.pinned)
+  const local = deduped.filter(isLocalPendingMessage)
+  const regular = deduped.filter(message => !message.pinned && !isLocalPendingMessage(message))
+
+  return sortMessagesByStableKey([
+    ...pinned,
+    ...local.filter(message => !message.pinned),
+    ...sortMessagesByStableKey(regular).slice(-MESSAGE_FETCH_LIMIT),
+  ])
+}
+
+const cacheMessages = (items: Message[]) => {
+  if (typeof localStorage === 'undefined') {
+    return
+  }
+
+  try {
+    const cacheableMessages = items.filter(
+      message => !message.reply_to && !message.optimistic && message.delivery_status !== 'sending' && message.delivery_status !== 'failed'
+    )
+    localStorage.setItem('chatHistory', JSON.stringify(trimMessageWindow(cacheableMessages)))
+  } catch {
+    // ignore storage errors
+  }
+}
+
+const createWindowResult = ({
+  messages,
+  pinnedMessages = [],
+  hasOlder,
+  hasNewer,
+  windowMode,
+  targetStatus = 'not_requested',
+  anchorStatus = 'not_requested',
+}: {
+  messages: Message[]
+  pinnedMessages?: Message[]
+  hasOlder: boolean
+  hasNewer: boolean
+  windowMode: GeneralChatMessageWindowMode
+  targetStatus?: GeneralChatMessageWindowStatus
+  anchorStatus?: GeneralChatMessageWindowStatus
+}): GeneralChatMessageWindowResult => ({
+  messages: messages.map(withSentDeliveryState),
+  pinnedMessages: pinnedMessages.map(withSentDeliveryState),
+  hasOlder,
+  hasNewer,
+  windowMode,
+  targetStatus,
+  anchorStatus,
+})
+
+const combineWindowMessages = (window: GeneralChatMessageWindowResult) =>
+  sortMessagesByStableKey(dedupeMessagesById([
+    ...window.pinnedMessages,
+    ...window.messages,
+  ].map(withSentDeliveryState)))
+
+const attachThreadSummaries = async (window: GeneralChatMessageWindowResult) => {
+  const allMessages = [...window.pinnedMessages, ...window.messages]
+  const rootIds = allMessages.filter(message => !message.reply_to).map(message => message.id)
+
+  try {
+    const summaries = await fetchGeneralChatThreadSummaries(rootIds)
+    const attach = (message: Message) => ({
+      ...message,
+      thread_summary: summaries.get(message.id) ?? message.thread_summary ?? null,
+    })
+    return {
+      ...window,
+      messages: window.messages.filter(message => !message.reply_to).map(attach),
+      pinnedMessages: window.pinnedMessages.filter(message => !message.reply_to).map(attach),
+    }
+  } catch (error) {
+    if (!isGeneralChatThreadRpcUnavailable(error)) throw error
+    return {
+      ...window,
+      messages: window.messages.filter(message => !message.reply_to),
+      pinnedMessages: window.pinnedMessages.filter(message => !message.reply_to),
+    }
+  }
+}
+
+const fetchPinnedMessages = async (workingClient: any) => {
+  const { data, error } = await workingClient
+    .from('messages')
+    .select(MESSAGE_WITH_USER_SELECT)
+    .eq('pinned', true)
+    .is('reply_to', null)
+    .order('pinned_at', { ascending: true })
+    .order('created_at', { ascending: true })
+    .order('id', { ascending: true })
+
+  if (error) throw error
+  return (data || []) as unknown as Message[]
+}
+
+const buildOlderKeysetFilter = (anchor: GeneralChatMessageKey) =>
+  `created_at.lt.${anchor.created_at},and(created_at.eq.${anchor.created_at},id.lt.${anchor.id})`
+
+const buildNewerKeysetFilter = (anchor: GeneralChatMessageKey) =>
+  `created_at.gt.${anchor.created_at},and(created_at.eq.${anchor.created_at},id.gt.${anchor.id})`
+
+const fetchLatestWindowDirect = async (
+  workingClient: any,
+  limit: number
+): Promise<GeneralChatMessageWindowResult> => {
+  const [pinnedMessages, messagesRes] = await Promise.all([
+    fetchPinnedMessages(workingClient),
+    workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('pinned', false)
+      .is('reply_to', null)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit),
+  ])
+
+  if (messagesRes.error) throw messagesRes.error
+
+  return createWindowResult({
+    messages: sortMessagesByStableKey(((messagesRes.data || []) as unknown as Message[])),
+    pinnedMessages,
+    hasOlder: (messagesRes.data?.length || 0) === limit,
+    hasNewer: false,
+    windowMode: 'latest',
+    anchorStatus: 'latest',
+  })
+}
+
+const fetchOlderWindowDirect = async (
+  workingClient: any,
+  anchor: GeneralChatMessageKey,
+  limit: number
+): Promise<GeneralChatMessageWindowResult> => {
+  const [pinnedMessages, messagesRes] = await Promise.all([
+    fetchPinnedMessages(workingClient),
+    workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('pinned', false)
+      .is('reply_to', null)
+      .or(buildOlderKeysetFilter(anchor))
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit),
+  ])
+
+  if (messagesRes.error) throw messagesRes.error
+
+  return createWindowResult({
+    messages: sortMessagesByStableKey(((messagesRes.data || []) as unknown as Message[])),
+    pinnedMessages,
+    hasOlder: (messagesRes.data?.length || 0) === limit,
+    hasNewer: false,
+    windowMode: 'older',
+    anchorStatus: 'found',
+  })
+}
+
+const fetchNewerWindowDirect = async (
+  workingClient: any,
+  anchor: GeneralChatMessageKey,
+  limit: number
+): Promise<GeneralChatMessageWindowResult> => {
+  const [pinnedMessages, messagesRes] = await Promise.all([
+    fetchPinnedMessages(workingClient),
+    workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('pinned', false)
+      .is('reply_to', null)
+      .or(buildNewerKeysetFilter(anchor))
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(limit),
+  ])
+
+  if (messagesRes.error) throw messagesRes.error
+
+  return createWindowResult({
+    messages: sortMessagesByStableKey(((messagesRes.data || []) as unknown as Message[])),
+    pinnedMessages,
+    hasOlder: false,
+    hasNewer: (messagesRes.data?.length || 0) === limit,
+    windowMode: 'newer',
+    anchorStatus: 'found',
+  })
+}
+
+const fetchTargetWindowDirect = async (
+  workingClient: any,
+  targetMessageId: string | null,
+  limit: number,
+  targetLastReadMessageId?: string | null,
+  targetLastReadAt?: string | null
+): Promise<GeneralChatMessageWindowResult> => {
+  let target: Message | null = null
+  let targetStatus: GeneralChatMessageWindowStatus = 'missing'
+
+  if (targetMessageId) {
+    const targetRes = await workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('id', targetMessageId)
+      .maybeSingle()
+
+    if (targetRes.error) throw targetRes.error
+    target = targetRes.data as unknown as Message | null
+    targetStatus = target ? 'found' : 'missing'
+  }
+
+  if (!target && targetLastReadAt) {
+    const anchor = {
+      created_at: targetLastReadAt,
+      id: targetLastReadMessageId ?? '00000000-0000-0000-0000-000000000000',
+    }
+    const fallbackRes = await workingClient
+      .from('messages')
+      .select(MESSAGE_WITH_USER_SELECT)
+      .eq('pinned', false)
+      .is('reply_to', null)
+      .or(buildNewerKeysetFilter(anchor))
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(1)
+
+    if (fallbackRes.error) throw fallbackRes.error
+    target = ((fallbackRes.data || []) as unknown as Message[])[0] ?? null
+    targetStatus = target ? 'timestamp_fallback' : 'missing'
+  }
+
+  if (!target) {
+    return createWindowResult({
+      messages: [],
+      hasOlder: false,
+      hasNewer: false,
+      windowMode: 'target',
+      targetStatus,
+    })
+  }
+
+  const olderLimit = Math.floor((limit - 1) / 2)
+  const newerLimit = Math.max(limit - 1 - olderLimit, 0)
+  const [pinnedMessages, olderRes, newerRes] = await Promise.all([
+    fetchPinnedMessages(workingClient),
+    olderLimit > 0
+      ? workingClient
+        .from('messages')
+        .select(MESSAGE_WITH_USER_SELECT)
+        .eq('pinned', false)
+        .is('reply_to', null)
+        .or(buildOlderKeysetFilter(target))
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(olderLimit)
+      : Promise.resolve({ data: [], error: null }),
+    newerLimit > 0
+      ? workingClient
+        .from('messages')
+        .select(MESSAGE_WITH_USER_SELECT)
+        .eq('pinned', false)
+        .is('reply_to', null)
+        .or(buildNewerKeysetFilter(target))
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .limit(newerLimit)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (olderRes.error) throw olderRes.error
+  if (newerRes.error) throw newerRes.error
+
+  return createWindowResult({
+    messages: sortMessagesByStableKey([
+      ...((olderRes.data || []) as unknown as Message[]),
+      target,
+      ...((newerRes.data || []) as unknown as Message[]),
+    ]),
+    pinnedMessages,
+    hasOlder: olderLimit > 0 && (olderRes.data?.length || 0) === olderLimit,
+    hasNewer: newerLimit > 0 && (newerRes.data?.length || 0) === newerLimit,
+    windowMode: 'target',
+    targetStatus,
+  })
+}
+
+const mergeMessageWindowIntoState = (
+  prev: Message[],
+  window: GeneralChatMessageWindowResult,
+  options: { replaceWindow: boolean; trimToLatest?: boolean }
+) => {
+  const serverMessages = combineWindowMessages(window)
+
+  if (options.replaceWindow) {
+    const pendingLocalMessages = prev.filter(isLocalPendingMessage)
+    const mergedMessages = [...serverMessages, ...pendingLocalMessages].reduce<Message[]>(
+      (acc, message) => upsertMessageIntoState(acc, message),
+      []
+    )
+    return options.trimToLatest === false
+      ? sortMessagesByStableKey(mergedMessages)
+      : trimMessageWindow(mergedMessages)
+  }
+
+  const fetchedById = new Map(serverMessages.map(message => [message.id, message]))
+  const pinnedIds = new Set(serverMessages.filter(message => message.pinned).map(message => message.id))
+  const baseMessages = prev.map(message => {
+    const fetched = fetchedById.get(message.id)
+    if (fetched) {
+      return fetched
+    }
+
+    if (message.pinned && !pinnedIds.has(message.id)) {
+      return { ...message, pinned: false, pinned_by: null, pinned_at: null } as Message
+    }
+
+    return message
+  })
+
+  const mergedMessages = serverMessages.reduce<Message[]>(
+    (acc, message) => upsertMessageIntoState(acc, message),
+    baseMessages
+  )
+
+  const pinnedAndLocal = mergedMessages.filter(message => message.pinned || isLocalPendingMessage(message))
+  const regular = sortMessagesByStableKey(mergedMessages.filter(isServerWindowMessage))
+  return sortMessagesByStableKey([...pinnedAndLocal, ...(window.windowMode === 'newer' ? regular.slice(-300) : regular.slice(0, 300))])
+}
+
+// --- Helper functions extracted from sendMessage workflow ---
+export const prepareMessageData = (
+  userId: string,
+  content: string,
+  messageType: ChatMessageType,
+  fileUrl?: string,
+  replyTo?: string,
+  clientMessageId?: string,
+  thumbnailUrl?: string | null
+) => ({
+  user_id: userId,
+  ...(clientMessageId ? { client_message_id: clientMessageId } : {}),
+  content: messageType === 'audio' ? '' : content.trim(),
+  message_type: messageType,
+  file_url: fileUrl,
+  ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl, media_processed_at: new Date().toISOString() } : {}),
+  ...(replyTo ? { reply_to: replyTo } : {}),
+  ...(messageType === 'audio' ? { audio_url: content.trim() } : {}),
+});
+
+export const insertMessage = async (messageData: {
+  user_id: string;
+  content: string;
+  message_type: ChatMessageType;
+  client_message_id?: string;
+  file_url?: string;
+  thumbnail_url?: string;
+  media_processed_at?: string;
+  audio_url?: string;
+  reply_to?: string;
+}) => {
+  const workingClient = await getWorkingClient();
+
+  const withBoundedWait = <T,>(
+    promise: PromiseLike<T>,
+    timeoutMs: number,
+    timeoutMessage: string
+  ) => new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    Promise.resolve(promise).then(
+      value => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timeoutId);
+        reject(error);
+      }
+    );
+  });
+
+  const reconcileCommittedMessage = async () => {
+    if (!messageData.client_message_id) return null;
+
+    for (const delayMs of MESSAGE_RECONCILE_DELAYS_MS) {
+      if (delayMs > 0) {
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+
+      try {
+        let query = workingClient
+          .from('messages')
+          .select(MESSAGE_WITH_USER_SELECT)
+          .eq('user_id', messageData.user_id)
+          .eq('client_message_id', messageData.client_message_id);
+        if (typeof query.retry === 'function') {
+          query = query.retry(false);
+        }
+        const reconciled = await withBoundedWait(
+          query.maybeSingle(),
+          MESSAGE_RECONCILE_QUERY_TIMEOUT_MS,
+          'Message reconciliation timed out'
+        );
+        if ((reconciled as any)?.data) {
+          return reconciled as { data: Message; error: null };
+        }
+      } catch {
+        // The original insert may still be completing. Try the next bounded lookup.
+      }
+    }
+
+    return null;
+  };
+
+  const isAmbiguousInsertFailure = (error: any) =>
+    error?.code === '23505' ||
+    [408, 409, 503, 504].includes(Number(error?.status)) ||
+    /timeout|timed out|network|failed to fetch|load failed/i.test(String(error?.message || error || ''));
+
+  const runInsert = (payload: Record<string, unknown>) => withBoundedWait(
+    workingClient
+      .from('messages')
+      .insert(payload)
+      .select(MESSAGE_WITH_USER_SELECT)
+      .single(),
+    MESSAGE_INSERT_TIMEOUT_MS,
+    'Database insert timeout after 10 seconds'
+  );
+
+  let result: any;
+  try {
+    result = await runInsert(messageData);
+  } catch (error) {
+    if (messageData.client_message_id && isAmbiguousInsertFailure(error)) {
+      const reconciled = await reconcileCommittedMessage();
+      if (reconciled) return reconciled;
+    }
+    throw error;
+  }
+
+  if (result.error && isMediaThumbnailSchemaError(result.error)) {
+    const {
+      thumbnail_url: _thumbnailUrl,
+      media_processed_at: _mediaProcessedAt,
+      ...legacyMediaMessageData
+    } = messageData;
+    result = await runInsert(legacyMediaMessageData);
+  }
+
+  if (result.error && messageData.client_message_id && isClientMessageIdSchemaError(result.error)) {
+    throw new Error('This server is missing message retry protection. Please try again after it is updated.');
+  }
+
+  if (result.error && messageData.client_message_id && isAmbiguousInsertFailure(result.error)) {
+    const reconciled = await reconcileCommittedMessage();
+    if (reconciled) return reconciled;
+  }
+
+  return result as { data: Message | null; error: any };
+};
+
+export const refreshSessionAndRetry = async (messageData: {
+  user_id: string;
+  content: string;
+  message_type: ChatMessageType;
+  client_message_id?: string;
+  file_url?: string;
+  thumbnail_url?: string;
+  media_processed_at?: string;
+  audio_url?: string;
+  reply_to?: string;
+}) => {
+  const refreshPromise = refreshSessionLocked();
+  const refreshTimeout = new Promise((_, reject) =>
+    setTimeout(
+      () => reject(new Error('Session refresh timeout after 5 seconds')),
+      5000
+    )
+  );
+
+  const { data: refreshData, error: refreshError } = (await Promise.race([
+    refreshPromise,
+    refreshTimeout,
+  ])) as any;
+
+  if (!refreshError && refreshData.session) {
+    return insertMessage(messageData);
+  }
+
+  return { data: null, error: refreshError } as {
+    data: Message | null;
+    error: any;
+  };
+};
+
+function useProvideMessages(): MessagesContextValue {
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('chatHistory');
+        if (stored) {
+          return trimMessageWindow(JSON.parse(stored) as Message[]);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+    return [] as Message[];
+  });
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasOlder, setHasOlder] = useState(true);
+  const [hasNewer, setHasNewer] = useState(false);
+  const [windowMode, setWindowMode] = useState<GeneralChatMessageWindowMode>('latest');
+  const [targetStatus, setTargetStatus] = useState<GeneralChatMessageWindowStatus>('not_requested');
+  const [anchorStatus, setAnchorStatus] = useState<GeneralChatMessageWindowStatus>('not_requested');
+  const { user, profile } = useAuth();
+  const { playMessage, playReaction } = useSoundEffects();
+  const channelRef = useRef<RealtimeChannel | null>(null);
+  const subscriptionRef = useRef<ReturnType<typeof createRealtimeSubscriptionManager> | null>(null);
+  if (!subscriptionRef.current) {
+    subscriptionRef.current = createRealtimeSubscriptionManager({ getFallbackClient: getRealtimeClient });
+  }
+  const clientResetRef = useRef<() => Promise<void>>();
+  const resetInFlightRef = useRef<Promise<void> | null>(null);
+  const fetchRequestIdRef = useRef(0);
+  const loadedOlderRef = useRef(false);
+  const followingLatestRef = useRef(true);
+  const setFollowingLatest = useCallback((following: boolean) => { followingLatestRef.current = following; }, []);
+  const pendingIntentsRef = useRef(new Set<string>());
+  const activeUserIdRef = useRef(user?.id);
+  activeUserIdRef.current = user?.id;
+  const latestMessagesRef = useRef<Message[]>(messages);
+  const messageRevisionRef = useRef(0);
+  const messageChangesRef = useRef(new Map<string, { revision: number; deleted: boolean }>());
+  const summaryVersionsRef = useRef(new Map<string, number>());
+  const hydrationFetchesRef = useRef<Map<string, Promise<Message | null>>>(new Map());
+  const windowModeRef = useRef<GeneralChatMessageWindowMode>('latest');
+  const hasNewerRef = useRef(false);
+  const windowRpcAvailableRef = useRef<boolean | null>(null);
+
+  const setWindowModeValue = useCallback((mode: GeneralChatMessageWindowMode) => {
+    windowModeRef.current = mode;
+    setWindowMode(mode);
+    loadedOlderRef.current = mode !== 'latest';
+  }, []);
+
+  const setHasNewerValue = useCallback((value: boolean) => {
+    hasNewerRef.current = value;
+    setHasNewer(value);
+  }, []);
+
+  const applyWindowMetadata = useCallback((window: GeneralChatMessageWindowResult) => {
+    setHasOlder(window.hasOlder);
+    setHasNewerValue(window.hasNewer);
+    setWindowModeValue(window.windowMode);
+    setTargetStatus(window.targetStatus);
+    setAnchorStatus(window.anchorStatus);
+  }, [setHasNewerValue, setWindowModeValue]);
+
+  const fetchWindowDirect = useCallback(async (request: GeneralChatMessageWindowRequest) => {
+    const workingClient = await getWorkingClient();
+    let window: GeneralChatMessageWindowResult
+
+    if (request.mode === 'older' && request.anchor) {
+      window = await fetchOlderWindowDirect(workingClient, request.anchor, request.limit);
+    } else if (request.mode === 'newer' && request.anchor) {
+      window = await fetchNewerWindowDirect(workingClient, request.anchor, request.limit);
+    } else if (request.mode === 'target' && (request.targetMessageId || request.targetLastReadAt)) {
+      window = await fetchTargetWindowDirect(
+        workingClient,
+        request.targetMessageId ?? null,
+        request.limit,
+        request.targetLastReadMessageId ?? null,
+        request.targetLastReadAt ?? null
+      );
+    } else {
+      window = await fetchLatestWindowDirect(workingClient, request.limit);
+    }
+
+    return attachThreadSummaries(window)
+  }, []);
+
+  const fetchMessageWindow = useCallback(async (request: GeneralChatMessageWindowRequest) => {
+    if (request.mode !== 'target') {
+      return fetchWindowDirect(request);
+    }
+
+    if (windowRpcAvailableRef.current !== false) {
+      try {
+        const window = await fetchGeneralChatThreadedWindow({
+          ...request,
+          targetMessageId: request.targetMessageId ?? request.anchor?.id ?? null,
+        });
+        windowRpcAvailableRef.current = true;
+        return { ...window, windowMode: request.mode };
+      } catch (error) {
+        if (!isGeneralChatThreadRpcUnavailable(error)) {
+          throw error;
+        }
+        windowRpcAvailableRef.current = false;
+      }
+    }
+
+    return fetchWindowDirect(request);
+  }, [fetchWindowDirect]);
+
+  const hydrateLocalOutboxMessages = useCallback(() => {
+    if (!user?.id) return;
+
+    const entries = loadLocalOutboxEntries(GROUP_OUTBOX_SCOPE)
+      .filter(entry => entry.senderId === user.id && !entry.replyTo);
+    if (entries.length === 0) return;
+
+    setMessages(prev => {
+      const nextMessages = entries.reduce<Message[]>(
+        (acc, entry) => upsertMessageIntoState(acc, localOutboxEntryToMessage(entry, profile ?? user)),
+        prev
+      );
+      return loadedOlderRef.current ? sortMessagesByStableKey(nextMessages) : trimMessageWindow(nextMessages);
+    });
+  }, [profile, user]);
+
+  const addNewMessage = useCallback(
+    (msg: Message) => {
+      let added = false;
+      const normalizedMessage = withSentDeliveryState(msg as Message) as Message;
+      if (normalizedMessage.reply_to) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('shadowchat:general-thread-message', {
+            detail: normalizedMessage,
+          }))
+        }
+        if (user && normalizedMessage.user_id !== user.id) playMessage()
+        return
+      }
+      messageChangesRef.current.set(normalizedMessage.id, { revision: ++messageRevisionRef.current, deleted: false });
+      const currentMessages = latestMessagesRef.current;
+      const existsInCurrentWindow = findMatchingMessageIndex(currentMessages, normalizedMessage) >= 0;
+      const newestWindowMessage = getNewestServerWindowMessage(currentMessages);
+      const isNewerThanWindow = newestWindowMessage
+        ? compareMessageKeys(normalizedMessage, newestWindowMessage) > 0
+        : true;
+
+      if (
+        (windowModeRef.current !== 'latest' || !followingLatestRef.current || hasNewerRef.current) &&
+        !existsInCurrentWindow &&
+        isNewerThanWindow
+      ) {
+        setHasNewerValue(true);
+        return;
+      }
+
+      setMessages(prev => {
+        const exists = findMatchingMessageIndex(prev, normalizedMessage) >= 0;
+        const nextMessages = upsertMessageIntoState(prev, {
+          ...normalizedMessage,
+        } as Message);
+        if (nextMessages === prev) return prev;
+        added = !exists;
+        return loadedOlderRef.current ? sortMessagesByStableKey(nextMessages) : trimMessageWindow(nextMessages);
+      });
+      if (added && user && msg.user_id !== user.id) {
+        playMessage();
+      }
+    },
+    [playMessage, setHasNewerValue, user]
+  );
+
+  const refreshThreadSummaries = useCallback(async (rootMessageIds?: string[]) => {
+    const ids = [...new Set(rootMessageIds?.length
+      ? rootMessageIds
+      : latestMessagesRef.current.filter(message => !message.reply_to).map(message => message.id))]
+    if (ids.length === 0) return
+    const versions = new Map(ids.map(id => {
+      const version = (summaryVersionsRef.current.get(id) ?? 0) + 1
+      summaryVersionsRef.current.set(id, version)
+      return [id, version] as const
+    }))
+    const summaries = new Map<string, Message['thread_summary']>()
+    for (let start = 0; start < ids.length; start += 50) {
+      const batch = await fetchGeneralChatThreadSummaries(ids.slice(start, start + 50))
+      batch.forEach((summary, id) => summaries.set(id, summary))
+    }
+    setMessages(prev => {
+      let changed = false
+      const next = prev.map(message => {
+        if (!versions.has(message.id) || summaryVersionsRef.current.get(message.id) !== versions.get(message.id)) return message
+        const summary = summaries.get(message.id) ?? null
+        const before = JSON.stringify(message.thread_summary ?? null)
+        const after = JSON.stringify(summary)
+        if (before === after) return message
+        changed = true
+        return { ...message, thread_summary: summary }
+      })
+      return changed ? next : prev
+    })
+  }, [])
+
+  const loadLatestMessages = useCallback(async () => {
+    const snapshotRevision = messageRevisionRef.current;
+    const requestId = fetchRequestIdRef.current + 1;
+    fetchRequestIdRef.current = requestId;
+
+    try {
+      const window = await fetchMessageWindow({
+        mode: 'latest',
+        limit: MESSAGE_FETCH_LIMIT,
+      });
+
+      if (requestId !== fetchRequestIdRef.current) {
+        return;
+      }
+
+      applyWindowMetadata({
+        ...window,
+        windowMode: 'latest',
+        targetStatus: 'not_requested',
+        anchorStatus: window.anchorStatus,
+      });
+
+      if (combineWindowMessages(window).length > 0) {
+        setMessages(prev => {
+          let nextMessages = mergeMessageWindowIntoState(prev, window, {
+            replaceWindow: true,
+            trimToLatest: true,
+          });
+          for (const [id, change] of messageChangesRef.current) {
+            if (change.revision <= snapshotRevision) continue;
+            if (change.deleted) nextMessages = nextMessages.filter(message => message.id !== id);
+            else {
+              const current = prev.find(message => message.id === id);
+              if (current) nextMessages = upsertMessageIntoState(nextMessages, current);
+            }
+          }
+          nextMessages = trimMessageWindow(nextMessages);
+          return nextMessages;
+        });
+      } else {
+        setMessages(prev => prev.filter(isLocalPendingMessage));
+        setHasOlder(false);
+        setHasNewerValue(false);
+        if (typeof localStorage !== 'undefined') {
+          try {
+            localStorage.removeItem('chatHistory');
+          } catch {
+            // ignore storage errors
+          }
+        }
+      }
+    } catch (error) {
+      throw error;
+    } finally {
+      if (requestId === fetchRequestIdRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [applyWindowMetadata, fetchMessageWindow, setHasNewerValue]);
+
+  const fetchMessages = loadLatestMessages;
+
+  const hydrateMessage = useCallback((messageId: string) => {
+    const existing = hydrationFetchesRef.current.get(messageId);
+    if (existing) return existing;
+
+    const request = getWorkingClient()
+      .then(workingClient =>
+        workingClient
+          .from('messages')
+          .select(MESSAGE_WITH_USER_SELECT)
+          .eq('id', messageId)
+          .maybeSingle()
+      )
+      .then(({ data, error }) => (error || !data ? null : data as unknown as Message))
+      .catch(() => null)
+      .finally(() => {
+        hydrationFetchesRef.current.delete(messageId);
+      });
+
+    hydrationFetchesRef.current.set(messageId, request);
+    return request;
+  }, []);
+
+  const loadOlderMessages = useCallback(async () => {
+    if (loadingMore || !hasOlder) return;
+    const anchor = getOldestServerWindowMessage(messages);
+    if (!anchor) {
+      setHasOlder(false);
+      return;
+    }
+
+    setLoadingMore(true);
+    setAnchorStatus('pending');
+    setTargetStatus('not_requested');
+    try {
+      const window = await fetchMessageWindow({
+        mode: 'older',
+        anchor,
+        limit: MESSAGE_FETCH_LIMIT,
+      });
+
+      setMessages(prev => mergeMessageWindowIntoState(prev, window, { replaceWindow: false }));
+      applyWindowMetadata({
+        ...window, windowMode: 'older',
+        hasNewer: hasNewerRef.current || window.hasNewer || latestMessagesRef.current.length + combineWindowMessages(window).length > 300,
+        targetStatus: 'not_requested',
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [applyWindowMetadata, fetchMessageWindow, hasOlder, loadingMore, messages]);
+
+  const loadNewerMessages = useCallback(async () => {
+    if (loadingMore || !hasNewer) return;
+    const anchor = getNewestServerWindowMessage(messages);
+    if (!anchor) {
+      await loadLatestMessages();
+      return;
+    }
+
+    setLoadingMore(true);
+    setAnchorStatus('pending');
+    setTargetStatus('not_requested');
+    try {
+      const window = await fetchMessageWindow({
+        mode: 'newer',
+        anchor,
+        limit: MESSAGE_FETCH_LIMIT,
+      });
+
+      setMessages(prev => mergeMessageWindowIntoState(prev, window, { replaceWindow: false }));
+      applyWindowMetadata({
+        ...window, windowMode: 'newer',
+        hasOlder: hasOlder || window.hasOlder || latestMessagesRef.current.length + combineWindowMessages(window).length > 300,
+        targetStatus: 'not_requested',
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [applyWindowMetadata, fetchMessageWindow, hasNewer, hasOlder, loadLatestMessages, loadingMore, messages]);
+
+  const ensureMessageWindow = useCallback(async (
+    targetMessageId: string | null,
+    options: {
+      force?: boolean
+      anchor?: GeneralChatMessageKey | null
+      targetLastReadMessageId?: string | null
+      targetLastReadAt?: string | null
+    } = {}
+  ) => {
+    if (!targetMessageId && !options.targetLastReadAt && !options.targetLastReadMessageId && !options.anchor) {
+      await loadLatestMessages();
+      return null;
+    }
+
+    const existing = targetMessageId
+      ? latestMessagesRef.current.find(message =>
+        message.id === targetMessageId || message.client_message_id === targetMessageId
+      ) ?? null
+      : null;
+    if (existing && !options.force) {
+      setTargetStatus('found');
+      setAnchorStatus(options.anchor ? 'found' : 'not_requested');
+      return existing;
+    }
+
+    const requestId = fetchRequestIdRef.current + 1;
+    fetchRequestIdRef.current = requestId;
+    setLoadingMore(true);
+    setTargetStatus('pending');
+    setAnchorStatus(options.anchor ? 'pending' : 'not_requested');
+
+    try {
+      const window = await fetchMessageWindow({
+        mode: 'target',
+        targetMessageId: targetMessageId ?? null,
+        targetLastReadMessageId: options.targetLastReadMessageId ?? null,
+        targetLastReadAt: options.targetLastReadAt ?? null,
+        anchor: options.anchor ?? null,
+        limit: MESSAGE_FETCH_LIMIT,
+      });
+
+      if (requestId !== fetchRequestIdRef.current) {
+        return null;
+      }
+
+      const windowMessages = combineWindowMessages(window);
+      const cursorAnchor = options.targetLastReadAt
+        ? {
+          created_at: options.targetLastReadAt,
+          id: options.targetLastReadMessageId ?? '00000000-0000-0000-0000-000000000000',
+        }
+        : null;
+      const targetMessage = targetMessageId
+        ? windowMessages.find(message => message.id === targetMessageId)
+          ?? (window.targetThreadId
+            ? windowMessages.find(message => message.id === window.targetThreadId) ?? null
+            : null)
+        : cursorAnchor
+          ? windowMessages.find(message =>
+            !message.pinned && compareMessageKeys(message, cursorAnchor) > 0
+          ) ?? null
+          : null;
+      applyWindowMetadata({
+        ...window,
+        windowMode: 'target',
+        targetStatus: targetMessage ? 'found' : targetMessageId ? 'missing' : window.targetStatus,
+        anchorStatus: window.anchorStatus,
+      });
+
+      if (!targetMessage) {
+        return null;
+      }
+
+      // The authoritative target/read window must commit at the same priority as
+      // its readiness flags. A deferred snapshot could otherwise expose the old
+      // latest page as ready and permanently settle the wrong unread target.
+      setMessages(prev => mergeMessageWindowIntoState(prev, window, {
+        replaceWindow: true,
+        trimToLatest: false,
+      }));
+      return targetMessage;
+    } finally {
+      if (requestId === fetchRequestIdRef.current) {
+        setLoadingMore(false);
+        setLoading(false);
+      }
+    }
+  }, [applyWindowMetadata, fetchMessageWindow, loadLatestMessages]);
+
+  const compactToLatestMessages = useCallback(() => {
+    if (hasNewerRef.current) {
+      void loadLatestMessages().catch(() => undefined);
+      return;
+    }
+
+    loadedOlderRef.current = false;
+    setWindowModeValue('latest');
+    setHasNewerValue(false);
+    setTargetStatus('not_requested');
+    setAnchorStatus('not_requested');
+    setMessages(prev => {
+      const nextMessages = trimMessageWindow(prev);
+      if (nextMessages === prev || nextMessages.length === prev.length) {
+        return prev;
+      }
+      return nextMessages;
+    });
+  }, [loadLatestMessages, setHasNewerValue, setWindowModeValue]);
+
+  const refreshVisibleMessages = useCallback(async () => {
+    const container = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
+    const browsing = !followingLatestRef.current || hasNewerRef.current || loadedOlderRef.current || Boolean(container && container.scrollHeight - container.scrollTop - container.clientHeight > 80)
+    if (!browsing) { await fetchMessages(); return }
+    const finishReconnectTiming = beginChatTiming('reconnect', 'general')
+    const snapshotRevision = messageRevisionRef.current
+    const ids = latestMessagesRef.current.filter(message => !isLocalPendingMessage(message)).map(message => message.id)
+    if (ids.length === 0) return
+    const client = await getWorkingClient()
+    const { data, error } = await client.from('messages').select(MESSAGE_WITH_USER_SELECT).in('id', ids)
+    if (error) throw error
+    const rows = (data ?? []) as unknown as Message[]
+    setMessages(current => sortMessagesByStableKey([
+      ...rows.filter(message => (messageChangesRef.current.get(message.id)?.revision ?? 0) <= snapshotRevision),
+      ...current.filter(message => !ids.includes(message.id) || (messageChangesRef.current.get(message.id)?.revision ?? 0) > snapshotRevision),
+    ]))
+    finishReconnectTiming()
+  }, [fetchMessages]);
+
+  // Reset function to reinitialize everything with fresh client
+  const resetWithFreshClient = useCallback(async () => {
+    if (resetInFlightRef.current) {
+      return resetInFlightRef.current;
+    }
+
+    resetInFlightRef.current = (async () => {
+      try {
+        await refreshVisibleMessages().catch(() => undefined);
+        const newChannel = await subscriptionRef.current?.resubscribe().catch(() => null);
+        channelRef.current = newChannel ?? null;
+      } catch {
+        await refreshVisibleMessages().catch(() => undefined);
+      } finally {
+        resetInFlightRef.current = null;
+      }
+    })();
+
+    return resetInFlightRef.current;
+  }, [refreshVisibleMessages]);
+
+  const handleVisible = useCallback(() => {
+    const channel = channelRef.current;
+    if (channel && channel.state === 'joined') {
+      void refreshVisibleMessages().catch(() => undefined);
+      return;
+    }
+
+    if (clientResetRef.current) {
+      void clientResetRef.current().catch(() => {
+        void refreshVisibleMessages().catch(() => undefined);
+      });
+    } else {
+      void refreshVisibleMessages().catch(() => undefined);
+    }
+  }, [refreshVisibleMessages]);
+
+  useRealtimeRecovery(handleVisible);
+
+  // Fetch initial messages
+  useEffect(() => {
+    void fetchMessages().catch(() => undefined);
+
+    // Store the reset function for visibility refresh
+    clientResetRef.current = resetWithFreshClient;
+
+  }, [fetchMessages, resetWithFreshClient]);
+
+  // Persist messages to localStorage whenever they change
+  useEffect(() => {
+    latestMessagesRef.current = messages;
+    if (!hasNewer) {
+      const timer = window.setTimeout(() => cacheMessages(messages), 250);
+      return () => window.clearTimeout(timer);
+    }
+  }, [hasNewer, messages]);
+
+  useEffect(() => {
+    hydrateLocalOutboxMessages();
+  }, [hydrateLocalOutboxMessages]);
+
+  useEffect(() => {
+    if (!profile) return;
+
+    setMessages(prev => {
+      let changed = false;
+      const nextMessages = prev.map(message => {
+        if (message.user_id !== profile.id || !message.user) {
+          return message;
+        }
+
+        const nextUser = { ...message.user, ...profile };
+        const badgesChanged =
+          message.user.gold_easter_egg !== nextUser.gold_easter_egg ||
+          message.user.checkers_crown !== nextUser.checkers_crown ||
+          message.user.war_sword !== nextUser.war_sword ||
+          message.user.shadow_pin_gold_pin !== nextUser.shadow_pin_gold_pin ||
+          message.user.shadow_runner_sprint_medal !== nextUser.shadow_runner_sprint_medal ||
+          message.user.shadow_runner_knight_medal !== nextUser.shadow_runner_knight_medal ||
+          message.user.shadow_runner_knight_level_id !== nextUser.shadow_runner_knight_level_id ||
+          message.user.admin_role !== nextUser.admin_role;
+
+        if (!badgesChanged) {
+          return message;
+        }
+
+        changed = true;
+        return { ...message, user: nextUser } as Message;
+      });
+
+      return changed ? nextMessages : prev;
+    });
+  }, [profile]);
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    let disposed = false;
+    const subscriptionManager = subscriptionRef.current;
+    const refreshSummaryForReply = async (message: Message) => {
+      if (!message.reply_to || disposed) return
+
+      const directRootId = latestMessagesRef.current.some(candidate => (
+        !candidate.reply_to && candidate.id === message.reply_to
+      ))
+        ? message.reply_to
+        : null
+      const canonicalThreadId = await resolveGeneralChatThreadId(message.id).catch(() => directRootId)
+      if (!canonicalThreadId || disposed) return
+      await refreshThreadSummaries([canonicalThreadId])
+    }
+
+    const subscribeToChannel = async () => {
+      let currentClient = await getWorkingClient().catch(() => getRealtimeClient());
+      currentClient = currentClient || getRealtimeClient();
+
+      if (!currentClient?.channel || typeof currentClient.channel !== 'function') {
+        throw new Error('Realtime client unavailable');
+      }
+
+      // Supabase reuses channels by topic, so each resubscribe gets a fresh topic.
+      // Message payloads arrive only through RLS-filtered Postgres Changes.
+      const newChannel = currentClient.channel(createRealtimeChannelName(`public:messages:${user.id}`))
+        .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        async (payload: any) => {
+          try {
+            const alreadyHydrated = latestMessagesRef.current.some(message =>
+              message.id === payload.new.id && !message.optimistic && Boolean(message.user)
+            );
+            if (alreadyHydrated) {
+              return;
+            }
+
+            const newMessage = await hydrateMessage(payload.new.id);
+            if (disposed) return;
+
+            if (newMessage) {
+              const normalizedMessage = newMessage as unknown as Message
+              addNewMessage(normalizedMessage)
+              void refreshSummaryForReply(normalizedMessage).catch(() => undefined)
+            }
+          } catch {
+            // ignore realtime fetch errors and wait for the next refresh
+          }
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'messages'
+          },
+          (payload: any) => {
+            const incoming = payload.new as Partial<Message>
+            if (!incoming?.id || disposed) return
+            messageChangesRef.current.set(incoming.id, { revision: ++messageRevisionRef.current, deleted: false });
+
+            setMessages(prev => {
+              const index = prev.findIndex(msg => msg.id === incoming.id)
+              if (index === -1) return prev
+
+              const prevMessage = prev[index]
+              const merged = mergeRealtimeMessageUpdate(prevMessage, incoming, { user: prevMessage.user })
+              if (!merged) return prev
+
+              const changed =
+                JSON.stringify(prevMessage.reactions) !== JSON.stringify(merged.reactions)
+              const newList = prev.map(msg =>
+                msg.id === merged.id ? (merged as unknown as Message) : msg
+              )
+              if (changed) {
+                const prevUsers = (prevMessage.reactions || {}) as Record<string, { users?: string[] }>
+                const currUsers = (merged.reactions || {}) as Record<string, { users?: string[] }>
+                const changedByCurrent = Object.keys({ ...prevUsers, ...currUsers }).some(e => {
+                  const before = prevUsers[e]?.users || []
+                  const after = currUsers[e]?.users || []
+                  const beforeHas = before.includes(user.id)
+                  const afterHas = after.includes(user.id)
+                  return beforeHas !== afterHas
+                })
+                if (!changedByCurrent) {
+                  playReaction()
+                }
+              }
+              return newList
+            })
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'messages'
+          },
+          (payload: any) => {
+            messageChangesRef.current.set(payload.old.id, { revision: ++messageRevisionRef.current, deleted: true });
+            setMessages(prev =>
+              prev.filter(msg => msg.id !== payload.old.id)
+            );
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'general_chat_thread_replies',
+          },
+          (payload: any) => {
+            const threadId = payload.new?.thread_id
+            if (!threadId || disposed) return
+            void refreshThreadSummaries([String(threadId)]).catch(() => undefined)
+          }
+        )
+        .on(
+          'postgres_changes',
+          {
+            event: 'DELETE',
+            schema: 'public',
+            table: 'general_chat_thread_replies',
+          },
+          () => {
+            if (disposed) return
+            void refreshThreadSummaries().catch(() => undefined)
+          }
+        )
+        .subscribe(async (status: string, err: any) => {
+          if (disposed) {
+            return;
+          }
+
+          if (err) {
+            // Handle specific binding mismatch error
+            if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
+              try {
+                await runRealtimeRecovery('channel-error');
+
+                // Use the comprehensive reset function
+                if (clientResetRef.current) {
+                  await clientResetRef.current();
+                }
+              } catch {
+                setTimeout(() => {
+                  void subscriptionManager?.resubscribe()
+                    .then(newCh => {
+                      channelRef.current = newCh;
+                    })
+                    .catch(() => undefined);
+                }, 2000);
+              }
+              return;
+            }
+          }
+          if (isRecoverableRealtimeStatus(status)) {
+            try {
+              await runRealtimeRecovery('channel-error');
+
+              // Use the comprehensive reset function
+              if (clientResetRef.current) {
+                await clientResetRef.current();
+              }
+            } catch {
+              setTimeout(() => {
+                void subscriptionManager?.resubscribe()
+                  .then(newCh => {
+                    channelRef.current = newCh;
+                  })
+                  .catch(() => undefined);
+              }, 2000);
+            }
+          } else if (status === 'CLOSED') {
+            setTimeout(() => {
+              void subscriptionManager?.resubscribe()
+                .then(newCh => {
+                  channelRef.current = newCh;
+                })
+                .catch(() => undefined);
+            }, 1000);
+          }
+        });
+
+      return { channel: newChannel, client: currentClient };
+    };
+
+    subscriptionManager?.setSubscribe(subscribeToChannel);
+    subscriptionManager?.start(subscribeToChannel)
+      .then(newChannel => {
+        channelRef.current = newChannel;
+      })
+      .catch(() => {});
+
+    return () => {
+      disposed = true;
+      subscriptionManager?.clearSubscribe(subscribeToChannel);
+      void subscriptionManager?.stop();
+      channelRef.current = null;
+    };
+  }, [addNewMessage, hydrateMessage, playReaction, refreshThreadSummaries, user]);
+
+  const sendMessage = useCallback(async (
+    content: string,
+    messageType: ChatMessageType = 'text',
+    fileUrl?: string,
+    replyTo?: string,
+    thumbnailUrl?: string | null,
+    options: SendMessageOptions = {}
+  ): Promise<Message | null> => {
+    // Text messages require content, but image/audio messages may provide just a file URL
+    if (!user || (!content.trim() && !fileUrl)) {
+      return null;
+    }
+
+    const finishSendTiming = beginChatTiming('send-ack', 'general');
+    const finishOptimisticTiming = beginChatTiming('optimistic-insert', 'general');
+    const clientMessageId = options.clientMessageId || createClientMessageId();
+    const intentKey = `${user.id}:${clientMessageId}`;
+    if (pendingIntentsRef.current.has(intentKey)) return null;
+    const createdAt = options.createdAt || new Date().toISOString();
+    const optimisticPayload = prepareMessageData(
+      user.id,
+      content,
+      messageType,
+      fileUrl,
+      replyTo,
+      clientMessageId,
+      thumbnailUrl
+    );
+    const optimisticMessage = {
+      id: clientMessageId,
+      ...optimisticPayload,
+      reactions: {},
+      pinned: false,
+      pinned_by: null,
+      pinned_at: null,
+      created_at: createdAt,
+      updated_at: createdAt,
+      user: profile ?? user,
+      optimistic: true,
+      delivery_status: 'sending',
+    } as Message;
+
+    upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
+      id: clientMessageId, clientMessageId, senderId: user.id,
+      content: content.trim(), messageType, fileUrl, thumbnailUrl, replyTo,
+      createdAt, failedAt: createdAt,
+    }, { requirePersistence: true });
+    pendingIntentsRef.current.add(intentKey);
+    setSending(true);
+    let inserted: Message | null = null;
+
+
+    if (!replyTo) {
+      setMessages(prev => {
+        const nextMessages = upsertMessageIntoState(prev, optimisticMessage);
+        return loadedOlderRef.current ? sortMessagesByStableKey(nextMessages) : trimMessageWindow(nextMessages);
+      });
+    } else if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('shadowchat:general-thread-local', {
+        detail: { action: 'upsert', message: optimisticMessage },
+      }))
+    }
+
+    finishOptimisticTiming();
+    options.onQueued?.();
+    const executeSend = async () => {
+      // Ensure we have a valid session before attempting database operations
+      const sessionValid = await ensureSession();
+      if (!sessionValid) {
+        throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
+      }
+
+      if (activeUserIdRef.current !== user.id) throw new Error('The account changed while sending this message.');
+      const client = await getWorkingClient();
+      const lookup = await client.from('messages').select(MESSAGE_WITH_USER_SELECT)
+        .eq('user_id', user.id).eq('client_message_id', clientMessageId).maybeSingle();
+      if (lookup.error) throw lookup.error;
+      const existing = lookup.data as unknown as Message | null;
+      const media = !existing && PRIVATE_MEDIA_ENABLED
+        ? await prepareMessageMedia({ senderId: user.id, clientMessageId, messageType, content, fileUrl, thumbnailUrl })
+        : { content, fileUrl, thumbnailUrl };
+      if (activeUserIdRef.current !== user.id) throw new Error('The account changed while preparing this attachment.');
+      upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
+        id: clientMessageId, clientMessageId, senderId: user.id, messageType, replyTo,
+        ...media, createdAt, failedAt: createdAt,
+      }, { requirePersistence: true });
+      const messageData = prepareMessageData(user.id, media.content, messageType, media.fileUrl, replyTo, clientMessageId, media.thumbnailUrl);
+
+      const attemptSend = async () => {
+        let { data, error } = existing ? { data: existing, error: null } : await insertMessage(messageData);
+
+        if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
+          const retry = await refreshSessionAndRetry(messageData);
+          data = retry.data;
+          error = retry.error;
+        }
+
+        if (error) {
+          throw error;
+        }
+
+        if (data) {
+          removeLocalOutboxEntry(GROUP_OUTBOX_SCOPE, clientMessageId, user.id);
+          inserted = {
+            ...(data as unknown as Message),
+            optimistic: false,
+            delivery_status: 'sent',
+          };
+
+          if (activeUserIdRef.current === user.id) addNewMessage(inserted);
+
+          if (data.id) {
+            triggerGroupPushNotification(data.id).catch(() => {
+              // Push delivery should never block the visible send path.
+            });
+          }
+
+        }
+      };
+
+      await attemptSend();
+    };
+
+    try {
+      await executeSend();
+    } catch (error) {
+      upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
+        id: clientMessageId,
+        clientMessageId,
+        senderId: user.id,
+        content: content.trim(),
+        messageType,
+        fileUrl,
+        thumbnailUrl,
+        replyTo,
+        createdAt,
+        failedAt: new Date().toISOString(),
+      });
+      if (!replyTo) {
+        if (activeUserIdRef.current === user.id) setMessages(prev => markMessageSendFailed(prev, clientMessageId));
+      } else if (activeUserIdRef.current === user.id && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('shadowchat:general-thread-local', {
+          detail: {
+            action: 'upsert',
+            message: {
+              ...optimisticMessage,
+              updated_at: new Date().toISOString(),
+              delivery_status: 'failed',
+            },
+          },
+        }))
+      }
+      void runRealtimeRecovery('send-error').catch(() => undefined);
+      if (error instanceof Error) {
+        (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
+        throw error;
+      }
+      const wrappedError = new Error('Failed to send message') as Error & { optimisticMessageId?: string };
+      wrappedError.optimisticMessageId = clientMessageId;
+      throw wrappedError;
+    } finally {
+      pendingIntentsRef.current.delete(intentKey);
+      setSending([...pendingIntentsRef.current].some(key => key.startsWith(`${activeUserIdRef.current}:`)));
+    }
+    if (inserted) finishSendTiming();
+    return inserted;
+  }, [addNewMessage, profile, user]);
+
+  const retryFailedMessage = useCallback(async (messageId: string) => {
+    const failedMessage = latestMessagesRef.current.find(message =>
+      (message.id === messageId || message.client_message_id === messageId) &&
+      message.delivery_status === 'failed'
+    );
+    const outboxEntry = loadLocalOutboxEntries(GROUP_OUTBOX_SCOPE).find(entry => (
+      entry.id === messageId || entry.clientMessageId === messageId
+    ))
+
+    if (!failedMessage && !outboxEntry) return null;
+
+    const clientMessageId = failedMessage?.client_message_id || failedMessage?.id || outboxEntry!.clientMessageId;
+    const messageType = failedMessage?.message_type ?? outboxEntry!.messageType
+    const retryContent = failedMessage
+      ? failedMessage.message_type === 'audio'
+        ? failedMessage.audio_url || failedMessage.content
+        : failedMessage.content
+      : outboxEntry!.content
+
+    return sendMessage(
+      retryContent,
+      messageType,
+      failedMessage?.file_url ?? outboxEntry?.fileUrl,
+      failedMessage?.reply_to ?? outboxEntry?.replyTo ?? undefined,
+      failedMessage?.thumbnail_url ?? outboxEntry?.thumbnailUrl,
+      {
+        clientMessageId,
+        createdAt: new Date().toISOString(),
+      }
+    );
+  }, [sendMessage]);
+
+  const discardFailedMessage = useCallback((messageId: string) => {
+    removeLocalOutboxEntry(GROUP_OUTBOX_SCOPE, messageId);
+    setMessages(prev => prev.filter(message => (
+      message.id !== messageId &&
+      message.client_message_id !== messageId
+    )));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('shadowchat:general-thread-local', {
+        detail: { action: 'remove', messageId },
+      }))
+    }
+  }, []);
+
+  const editMessage = useCallback(async (messageId: string, content: string) => {
+    if (!user) return;
+
+    try {
+      const workingClient = await getWorkingClient();
+
+      const { error } = await workingClient
+        .from('messages')
+        .update({
+          content,
+          edited_at: new Date().toISOString(),
+        })
+        .eq('id', messageId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Optimistically update local state
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === messageId ? { ...m, content, edited_at: new Date().toISOString() } as Message : m
+        )
+      );
+
+    } catch (error) {
+      throw error;
+    }
+  }, [user]);
+
+  const deleteMessage = useCallback(async (messageId: string) => {
+    if (!user) return;
+
+    try {
+      const workingClient = await getWorkingClient();
+
+      const { data, error } = await workingClient
+        .from('messages')
+        .delete()
+        .eq('id', messageId)
+        .select('id')
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('Message delete was not confirmed by the server.');
+      }
+
+      // Optimistically remove from local state
+      setMessages(prev => prev.filter(m => m.id !== messageId));
+
+    } catch (error) {
+      throw error;
+    }
+  }, [user]);
+
+  const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
+    if (!user) return;
+
+    const previousMembership = Boolean(
+      latestMessagesRef.current
+        .find(message => message.id === messageId)
+        ?.reactions?.[emoji]?.users.includes(user.id)
+    );
+
+    // Optimistically update local state so the reaction appears immediately
+    setMessages(prev => setMessageReactionMembership(
+      prev,
+      messageId,
+      emoji,
+      user.id,
+      !previousMembership
+    ));
+
+    try {
+      const workingClient = await getWorkingClient();
+
+      const { error } = await workingClient.rpc('toggle_message_reaction', {
+        message_id: messageId,
+        emoji: emoji,
+        is_dm: false,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!previousMembership) {
+        void Promise.resolve(triggerReactionPushNotification(messageId, emoji, false)).catch(() => {
+          // The reaction is authoritative even when optional push delivery fails.
+        });
+      }
+
+    } catch (error) {
+      // Restore the exact pre-optimistic membership. This is idempotent even if
+      // realtime has already delivered an authoritative reaction update.
+      setMessages(prev => setMessageReactionMembership(
+        prev,
+        messageId,
+        emoji,
+        user.id,
+        previousMembership
+      ));
+      throw error;
+    }
+  }, [user]);
+
+  const togglePin = useCallback(async (messageId: string) => {
+    if (!user) return;
+
+    try {
+      const workingClient = await getWorkingClient();
+
+      const { error } = await workingClient.rpc('toggle_message_pin', {
+        message_id: messageId,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setMessages(prev => {
+        const current = prev.find(m => m.id === messageId);
+        const isPinned = current?.pinned;
+
+        return prev.map(m => {
+          if (m.id === messageId) {
+            return {
+              ...m,
+              pinned: !isPinned,
+              pinned_by: !isPinned ? user.id : null,
+              pinned_at: !isPinned ? new Date().toISOString() : null,
+            };
+          }
+          return !isPinned
+            ? { ...m, pinned: false, pinned_by: null, pinned_at: null }
+            : m;
+        });
+      });
+
+    } catch (error) {
+      // Re-sync with database to revert optimistic updates
+      fetchMessages();
+      throw error;
+    }
+  }, [fetchMessages, user]);
+
+  return {
+    messages,
+    loading,
+    sending,
+    loadingMore,
+    hasOlder,
+    hasNewer,
+    hasMore: hasOlder,
+    windowMode,
+    targetStatus,
+    anchorStatus,
+    sendMessage,
+    editMessage,
+    deleteMessage,
+    retryFailedMessage,
+    discardFailedMessage,
+    toggleReaction,
+    togglePin,
+    loadLatestMessages,
+    loadOlderMessages,
+    loadNewerMessages,
+    ensureMessageWindow,
+    compactToLatestMessages,
+    setFollowingLatest,
+    refreshThreadSummaries,
+  };
+}
+
+const localOutboxEntryToMessage = (
+  entry: LocalMessageOutboxEntry,
+  user?: Partial<User> | null
+) => ({
+  id: entry.clientMessageId,
+  client_message_id: entry.clientMessageId,
+  user_id: entry.senderId,
+  content: entry.messageType === 'audio' ? '' : entry.content,
+  message_type: entry.messageType,
+  file_url: entry.fileUrl,
+  thumbnail_url: entry.thumbnailUrl ?? null,
+  ...(entry.replyTo ? { reply_to: entry.replyTo } : {}),
+  ...(entry.messageType === 'audio' ? { audio_url: entry.content } : {}),
+  reactions: {},
+  pinned: false,
+  pinned_by: null,
+  pinned_at: null,
+  created_at: entry.createdAt,
+  updated_at: entry.failedAt,
+  user,
+  optimistic: true,
+  delivery_status: 'failed',
+} as Message)
+
+type SendMessageOptions = {
+  clientMessageId?: string
+  onQueued?: () => void
+  createdAt?: string
+}
+
+export function MessagesProvider({ children }: { children: React.ReactNode }) {
+  const value = useProvideMessages();
+  return (
+    <MessagesContext.Provider value={value}>{children}</MessagesContext.Provider>
+  );
+}

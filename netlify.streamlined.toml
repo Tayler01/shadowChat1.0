@@ -1,0 +1,55 @@
+# Used only by scripts/prepare-streamlined-netlify.mjs in an isolated staging folder.
+# The full application's netlify.toml and published site remain unchanged.
+[build]
+publish = "public"
+
+[build.environment]
+NODE_VERSION = "24"
+
+[functions]
+directory = "functions"
+node_bundler = "esbuild"
+external_node_modules = ["semver", "sharp"]
+
+# Deliberately no scheduled functions: the shared backend's existing janitor
+# continues to run once, from the full application's deployment.
+[[headers]]
+for = "/*"
+[headers.values]
+X-Content-Type-Options = "nosniff"
+X-Frame-Options = "DENY"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Permissions-Policy = "camera=(self), display-capture=(), geolocation=(), microphone=(self), payment=(), usb=()"
+Content-Security-Policy-Report-Only = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://assets.mediadelivery.net https://assets.pinterest.com https://platform.x.com https://platform.twitter.com https://cdn.syndication.twimg.com https://www.instagram.com https://static.cdninstagram.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.ingest.sentry.io https://*.ingest.us.sentry.io https://*.mediadelivery.net https://syndication.twitter.com https://api.twitter.com https://www.instagram.com; frame-src 'self' data: blob: https://*.supabase.co https://www.youtube.com https://www.youtube-nocookie.com https://player.vimeo.com https://player.mediadelivery.net https://iframe.mediadelivery.net https://assets.pinterest.com https://platform.x.com https://platform.twitter.com https://www.instagram.com; worker-src 'self' blob:; manifest-src 'self'"
+
+[[headers]]
+for = "/sw.js"
+[headers.values]
+Cache-Control = "no-cache"
+
+[[headers]]
+for = "/index.html"
+[headers.values]
+Cache-Control = "no-cache"
+
+[[headers]]
+for = "/manifest.webmanifest"
+[headers.values]
+Content-Type = "application/manifest+json; charset=utf-8"
+
+[[headers]]
+for = "/.well-known/shadowchat-health.json"
+[headers.values]
+Cache-Control = "no-store, max-age=0"
+Content-Type = "application/json; charset=utf-8"
+
+[[redirects]]
+from = "/api/shadow-pin/media"
+to = "/.netlify/functions/shadow-pin-media"
+status = 200
+force = true
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
