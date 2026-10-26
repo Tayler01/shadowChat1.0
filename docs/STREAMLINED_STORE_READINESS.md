@@ -24,8 +24,13 @@ branch has been removed. The latest release status follows.
   disabled for this user**, despite repository Actions permissions being enabled.
   No workflow run or backend phase started. The full-app deployment hold remains
   enabled; live health still identifies production `a4437b1d`. Account recovery
-  requires GitHub Support; existing ticket `4819567` needs a signed-in browser
-  before its current response can be inspected.
+  requires GitHub Support. After user-approved GitHub Mobile authentication,
+  ticket `4819567` was checked live on October 26: still Open, with no Support
+  response after the user's October 3 usage explanation. The user approved a
+  follow-up about the Actions restriction; it was posted and verified as the
+  fourth comment (`tc-54975728210708`). A subsequent validation-only workflow
+  dispatch still returned the same HTTP 422 account-disabled error. GitHub
+  Support must restore Actions before the guarded backend workflow can run.
 - EAS produced signed streamlined iOS build **18**, build ID
   `43c06ae4-24e4-48f5-a745-c64d1d9aafd7`. Inspection found inherited Face ID and
   development-only local-network declarations. The streamlined-only correction
