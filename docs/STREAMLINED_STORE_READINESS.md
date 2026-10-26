@@ -15,6 +15,19 @@ branch has been removed. The latest release status follows.
 
 ## October 26 release status
 
+- The operator subsequently authorized the documented direct-release fallback:
+  run the required checks outside GitHub, retain the controlled backend phases,
+  preserve the full app's behavior and publish only the separate streamlined
+  site. GitHub recovery is therefore not the only route forward. Docker Desktop
+  was repaired by gracefully quitting, preserving its two stale runtime socket
+  directories and restarting; Docker Engine `29.6.2` responds and the preexisting
+  local containers are preserved. No factory reset or container-data deletion
+  occurred. The independent database replay and its security checks pass after
+  the fixes described in the [security audit](STREAMLINED_SECURITY_AUDIT.md).
+  Final integrated source checks and scanner review remain required before
+  production acceptance. Evidence is under
+  `output/release-evidence/offline-20261026/`.
+
 - Source preparation was committed and pushed as `76b5ce71`. The dedicated
   streamlined site package was prepared from that clean commit but not published.
   Android/Chromium and iPhone/WebKit passed four core chat scenarios plus focused
@@ -543,13 +556,14 @@ verify the copied object, and re-inventory afterward. This preparation is also
 unapplied.
 
 The implemented `.github/workflows/backend-privacy.yml` is an explicit,
-**main-only backend workflow** with three exact phases: `foundation`, `producers`
-and `activation`. It publishes neither frontend nor Auth configuration. Its
+**main-only backend workflow** with four exact phases: `foundation`, `producers`,
+`deletion-handover` and `activation`. It publishes neither frontend nor Auth configuration. Its
 runner, `scripts/backend-privacy-release.mjs`, verifies the exact baseline,
 migration hashes, backend source tree and target project in an immutable
 temporary workspace. Foundation applies only the 20 reviewed foundation files;
 producers deploys only `shadow-pin-video`, `shado-tv-bunny-upload` and
-`moderation-media`; activation applies the one final migration and deploys the
+`moderation-media`; deletion-handover deploys only the guarded durable handler;
+activation applies the one final migration and deploys the
 classified function inventory with `delete-account` last.
 
 The ordinary main-push publisher remains in place. Its new
@@ -597,7 +611,7 @@ receipt-based deletion is activated.
 The historical split proposal and subsequent implementation/proof appendix are
 in `output/security/security-foundation-activation-review-20261023.md`. The
 current reviewed plan is `supabase/backend-privacy-release.json`, SHA-256
-`c1f6d2b22759ffa3dc52830e40469bcbe304059e8e49ecbf567532ed1917a94b`.
+`b6bafa03390dfc2840efcc2eefe71e9999c5daeffae1e32fa80b37746916a774`.
 The final activation is `20261023224455_security_privacy_activation.sql`, SHA-256
 `9729cad612270addd30b64de79ce61139bf240d42550982bdfa7cf964ff99280`.
 The plan preserves the five September 30 migrations through baseline version

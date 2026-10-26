@@ -40,7 +40,7 @@ grant select,insert,update,delete on private.moderation_media_assets to service_
 -- by the capture worker before copying; every candidate also needs real owner
 -- provenance here, so even a forged hostname cannot identify another member's file.
 create function private.moderation_storage_url(value text)
-returns table(bucket text,path text) language plpgsql immutable security invoker set search_path='' as $$
+returns table(bucket text,path text) language plpgsql stable security invoker set search_path='' as $$
 declare parts text[]; encoded text; decoded bytea := ''::bytea; position integer := 1; token text;
 begin
   if value is null or length(value)>4096 then return; end if;

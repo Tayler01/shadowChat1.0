@@ -2,14 +2,19 @@
 -- intake hand-checked blocks but missed hidden categories and unready Pins.
 begin;
 
-alter function public.submit_member_report(text, uuid, text, uuid, text, jsonb) set schema private;
-alter function private.submit_member_report(text, uuid, text, uuid, text, jsonb) rename to submit_member_report_impl;
-revoke all on function private.submit_member_report_impl(text, uuid, text, uuid, text, jsonb) from public, anon, authenticated;
-grant execute on function private.submit_member_report_impl(text, uuid, text, uuid, text, jsonb) to authenticated;
+-- Keep privileged implementations inaccessible to direct browser-role SQL.
+-- Legacy full-app RPCs still require USAGE on the separate private schema.
+create schema if not exists member_mutation_private;
+revoke all on schema member_mutation_private from public, anon, authenticated, service_role;
+
+alter function public.submit_member_report(text, uuid, text, uuid, text, jsonb) set schema member_mutation_private;
+alter function member_mutation_private.submit_member_report(text, uuid, text, uuid, text, jsonb) rename to submit_member_report_impl;
+revoke all on function member_mutation_private.submit_member_report_impl(text, uuid, text, uuid, text, jsonb) from public, anon, authenticated;
+grant execute on function member_mutation_private.submit_member_report_impl(text, uuid, text, uuid, text, jsonb) to authenticated;
 
 create function private.member_report_target_is_visible(target_type text, target_id uuid)
 returns boolean language sql stable security invoker set search_path = ''
-begin atomic
+return (
   select case lower(trim(coalesce(target_type, '')))
     when 'user' then exists(select 1 from public.users where id = target_id)
     when 'general_message' then exists(select 1 from public.messages where id = target_id)
@@ -17,8 +22,8 @@ begin atomic
     when 'shadow_pin_image' then exists(select 1 from public.shadow_pin_images where id = target_id)
     when 'shadow_pin_comment' then exists(select 1 from public.shadow_pin_comments where id = target_id)
     else false
-  end;
-end;
+  end
+);
 revoke all on function private.member_report_target_is_visible(text, uuid) from public, anon, authenticated;
 grant execute on function private.member_report_target_is_visible(text, uuid) to authenticated;
 
@@ -46,7 +51,7 @@ $$;
 revoke all on function private.require_visible_member_report_target(uuid, boolean) from public, anon, authenticated;
 grant execute on function private.require_visible_member_report_target(uuid, boolean) to authenticated;
 
--- SQL-standard binding avoids granting private schema USAGE. The privileged
+-- SQL-standard binding avoids granting member_mutation_private USAGE. The privileged
 -- intake cannot run until its target argument passes this caller-RLS check.
 create function public.submit_member_report(
   p_target_type text,
@@ -59,7 +64,7 @@ create function public.submit_member_report(
 returns table (report_id uuid, case_id uuid, case_number bigint, case_status text)
 language sql volatile security invoker set search_path = ''
 begin atomic
-  select * from private.submit_member_report_impl(
+  select * from member_mutation_private.submit_member_report_impl(
     p_target_type,
     private.require_visible_member_report_target(p_target_id,
       private.is_active_member() and (

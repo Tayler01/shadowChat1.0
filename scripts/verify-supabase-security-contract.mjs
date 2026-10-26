@@ -80,6 +80,7 @@ const unexposedRows = query(`
     'activation_private',
     'connections_private',
     'inner_circles_private',
+    'member_mutation_private',
     'shado_live_private',
     'shadow_pin_private'
   )
@@ -132,6 +133,7 @@ const [unexposedDefinerSummary] = query(`
     'activation_private',
     'connections_private',
     'inner_circles_private',
+    'member_mutation_private',
     'shado_live_private',
     'shadow_pin_private'
   )
@@ -181,6 +183,18 @@ const usersUpdateColumnRows = query(`
     and privilege_type = 'UPDATE'
   order by column_name
 `)
+
+const schemaUsageRows = query(`
+  select expected.schema, expected.role,
+    has_schema_privilege(expected.role, expected.schema, 'usage') as usage
+  from jsonb_to_recordset('${JSON.stringify(contract.schema_usage_contract).replaceAll("'", "''")}'::jsonb)
+    as expected(schema text, role text, usage boolean, reason text)
+  order by expected.schema, expected.role
+`)
+assert.deepEqual(schemaUsageRows, contract.schema_usage_contract
+  .map(({ schema, role, usage }) => ({ schema, role, usage }))
+  .sort((a, b) => a.schema.localeCompare(b.schema) || a.role.localeCompare(b.role)),
+'Privileged mutation schema must deny direct access while legacy private-schema usage remains compatible')
 
 assert.deepEqual(
   authenticatedRows.map(row => row.signature).sort(),

@@ -326,13 +326,10 @@ const assertPublicHost = async (url: URL) => {
 
 const decodeHtml = (value: string) =>
   value
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&(amp|quot|apos|lt|gt|#\d+);/g, (_match, entity: string) =>
+      entity.startsWith('#')
+        ? String.fromCharCode(Number(entity.slice(1)))
+        : ({ amp: '&', quot: '"', apos: "'", lt: '<', gt: '>' } as Record<string, string>)[entity])
     .trim()
 
 const getMetaContent = (html: string, key: string) => {

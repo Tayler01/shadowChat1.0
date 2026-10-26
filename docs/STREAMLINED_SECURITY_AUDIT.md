@@ -9,6 +9,61 @@ native and provider requirements. No store submission has been made.
 
 ## Production-source reconciliation
 
+### October 26 independent release verification
+
+The user authorized the documented direct-release fallback while GitHub Actions
+is unavailable. Docker Engine 29.6.2 was restored without resetting containers.
+The exact Supabase CLI 2.109.1 replayed all 264 migrations in a separate local
+database; the existing local stack and production database were not reset.
+
+This exposed four migration correctness defects before release: two SQL-standard
+CASE bodies needed equivalent RETURN-expression syntax for the CLI parser, an
+integer FOR-loop variable was redundantly declared, and a UTF-8 URL decoder
+needed STABLE volatility. The unshipped migration hashes were deliberately
+revised; immutable historical fixtures remain preserved.
+
+Additional actual-role verification found a privileged helper boundary defect.
+The existing full app requires authenticated USAGE on `private`, so revoking it
+would break five existing RPCs. Only the new typing mutation and report intake
+implementations now reside in `member_mutation_private`, whose schema is not
+accessible to browser roles. Parsed caller-RLS wrappers remain authorized.
+The actual database denies direct implementation calls, permits valid typing
+and reporting, and preserves the existing full-app RPC paths. The security
+contract now verifies both schema boundaries. Local reset, lint, security and
+performance advisors, 52 targeted tests, and the typing/reporting role harnesses
+(45/24 assertions) passed; synthetic transactions rolled back cleanly.
+
+Compatible development dependency pins address Handlebars, source-map-js,
+Undici, fast-uri and Remotion's Zod. The resulting full audit has zero high or
+critical findings. Three related moderate rows still report selector-parser
+6.1.5 despite its verified security backport; the advisory-sized regression
+passes. Production root and News audits report zero findings. No native or
+production runtime dependency changed. Clean installs and Remotion bundling
+were exercised separately from the active preview's dependencies.
+
+The full-history secret scan's 11 new findings were individually verified as
+synthetic test values or game-content hashes; only exact fingerprints were
+added to the existing ignore file. Trivy filesystem/configuration scans pass.
+CodeQL's actionable findings are addressed with canonical X/Instagram embed
+templates instead of stored HTML, exact Bunny hostname boundaries, single-pass
+entity decoding and shell-free local QA launches. Nine other initial alerts
+have location-specific source/sink reviews (safe React/blob URL sinks, test-only
+matching, guarded dispatch, token correlation and non-secret identifiers), not
+blanket rule suppressions. Final committed-source rescanning remains a gate.
+
+Baseline browser checks against the unchanged full-app deployment `a4437b1`
+verified authentication, DMs, resume sending, phone navigation and image/file/
+voice access. Existing image-window following sometimes required reload, and
+one WebKit reaction propagation timed out. These are recorded pre-change
+limitations, not new-backend regressions. All 23 baseline test messages and
+eight uploaded objects were removed and verified. Phone-sized navigation and
+browser audio tests are not physical iPhone or native-push acceptance.
+
+Receipts are under `output/release-evidence/offline-20261026/` and
+`output/release-evidence/full-baseline-20261026/`. This section records local
+verification and baseline observations; it does not claim production rollout,
+global media privacy, App Review submission or store approval.
+
 The release worktree is based on production `main` at `a4437b1d`, whose five
 September 30 migrations must remain in the reviewed baseline through
 `20260930215719`. The earlier isolated acceptance below is historical evidence;

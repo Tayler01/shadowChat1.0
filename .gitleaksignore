@@ -4,3 +4,17 @@
 6d53f710858d00a57ee90f201b79c8756fa26445:README.md:generic-api-key:119
 8244cfc87780cf7bdb53ebefbdd1213dacbeee48:README.md:generic-api-key:123
 e3df2ebcdf44fab9d8c4445079aeb03367d58983:apps/mobile/google-services.json:gcp-api-key:18
+
+# Reviewed deterministic signing vectors, deliberately unsigned fake JWTs, and synthetic QA markers.
+76b5ce71440b108ba08b360693a42d2404b841b8:supabase/functions/_shared/bunny-private-media.test.ts:generic-api-key:13
+76b5ce71440b108ba08b360693a42d2404b841b8:supabase/functions/_shared/bunny-private-media.test.ts:generic-api-key:14
+76b5ce71440b108ba08b360693a42d2404b841b8:tests/accountDeletionLegacy.test.ts:jwt:273
+76b5ce71440b108ba08b360693a42d2404b841b8:tests/profileRpcColumnAcl.node.test.mjs:generic-api-key:327
+76b5ce71440b108ba08b360693a42d2404b841b8:tests/accountDeletionReconciliation.test.ts:jwt:37
+76b5ce71440b108ba08b360693a42d2404b841b8:tests/accountDeletionReconciliation.test.ts:jwt:73
+# Content SHA256 fields adjacent to game level titles containing Key/Secret; not credentials.
+25930141ad53d3e042314e369664829c788592c0:docs/shadow-circuit/LEVEL_STATUS.csv:generic-api-key:138
+25930141ad53d3e042314e369664829c788592c0:docs/shadow-circuit/LEVEL_STATUS.csv:generic-api-key:151
+25930141ad53d3e042314e369664829c788592c0:docs/shadow-circuit/LEVEL_STATUS.csv:generic-api-key:207
+25930141ad53d3e042314e369664829c788592c0:docs/shadow-circuit/LEVEL_STATUS.csv:generic-api-key:228
+25930141ad53d3e042314e369664829c788592c0:docs/shadow-circuit/LEVEL_STATUS.csv:generic-api-key:234

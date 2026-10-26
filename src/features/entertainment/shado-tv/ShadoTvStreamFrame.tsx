@@ -44,7 +44,9 @@ function isDirectVideoUrl(value: string) {
 
 function isBunnyEmbed(value: string) {
   try {
-    return new URL(value).hostname.endsWith('mediadelivery.net')
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password
+      && (url.hostname === 'mediadelivery.net' || url.hostname.endsWith('.mediadelivery.net'))
   } catch {
     return false
   }

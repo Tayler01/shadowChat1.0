@@ -5,6 +5,18 @@ import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
 
+test('constrained Zod collections reject oversized input before allocating per-item issues', () => {
+  const { z } = require('zod')
+  let visited = 0
+  const schema = z.array(z.preprocess(value => { visited++; return value }, z.string())).max(2)
+  assert.deepEqual(schema.parse(['photo', 'voice']), ['photo', 'voice'])
+  visited = 0
+  const result = schema.safeParse(Array(20_000).fill(42))
+  assert.equal(result.success, false)
+  assert.equal(visited, 0)
+  assert.equal(result.error.issues.length, 1)
+})
+
 test('the installed selector parser includes the security backport and handles the advisory-sized selector', () => {
   const version = require('postcss-selector-parser/package.json').version
   const [major, minor, patch] = version.split('.').map(Number)

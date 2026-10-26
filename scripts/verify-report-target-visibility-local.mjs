@@ -27,9 +27,11 @@ try {
   await db.exec(`
     create role anon;
     create role authenticated;
+    create role service_role bypassrls;
     create schema auth;
     create schema private;
     revoke all on schema private from public, anon, authenticated;
+    grant usage on schema private to authenticated;
     grant usage on schema public,auth to anon,authenticated;
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
     create table public.users(id uuid primary key, active boolean not null default true, visible boolean not null default true);
@@ -73,6 +75,8 @@ try {
     grant select on public.users,public.messages,public.dm_messages,public.shadow_pin_categories,public.shadow_pin_images,public.shadow_pin_comments to authenticated;
   `)
   await db.exec(await readFile(path.join(root, 'supabase/migrations/20261023004153_report_target_visibility_boundary.sql'), 'utf8'))
+  equal((await db.query("select has_schema_privilege('authenticated','private','usage') as legacy, has_schema_privilege('authenticated','member_mutation_private','usage') as guarded")).rows[0],
+    { legacy: true, guarded: false }, 'Legacy full-app access remains while direct mutation access is denied')
   const types = { user: 'users', general_message: 'messages', dm_message: 'dm_messages', shadow_pin_image: 'shadow_pin_images', shadow_pin_comment: 'shadow_pin_comments' }
   for (const [type, table] of Object.entries(types)) {
     await asMember(viewer)
@@ -93,7 +97,7 @@ try {
   await asMember(viewer)
   await rejected(submitSql, ['shadow_pin_image',target,clientId], 'Unready videos cannot be probed by known ID')
   await rejected(submitSql, ['shadow_pin_comment',target,clientId], 'Comments inherit unready video visibility')
-  await rejected("select * from private.submit_member_report_impl('user',$1,'other',$2,'','[]'::jsonb)", [target,clientId], 'Private original intake is not directly callable')
+  await rejected("select * from member_mutation_private.submit_member_report_impl('user',$1,'other',$2,'','[]'::jsonb)", [target,clientId], 'Private original intake is not directly callable')
   await rejected(submitSql, ['unknown',target,clientId], 'Unknown target type is rejected')
   await rejected(submitSql, ['user','40000000-0000-4000-8000-000000000001',clientId], 'Missing target is rejected')
 

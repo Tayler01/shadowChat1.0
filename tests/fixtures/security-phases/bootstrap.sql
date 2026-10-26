@@ -8,6 +8,8 @@ create schema private;
 create schema storage;
 create schema realtime;
 revoke all on schema private from public, anon, authenticated;
+-- Actual legacy operations-health migration grants this to full-app callers.
+grant usage on schema private to authenticated;
 grant usage on schema public, auth, storage, realtime to anon, authenticated, service_role;
 grant usage on schema private to service_role;
 create function auth.jwt() returns jsonb language sql stable as $$

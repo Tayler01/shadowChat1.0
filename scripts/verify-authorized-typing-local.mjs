@@ -35,6 +35,7 @@ try {
     create schema auth;
     create schema private;
     revoke all on schema private from public, anon, authenticated;
+    grant usage on schema private to authenticated;
     grant usage on schema public, auth to anon, authenticated, service_role;
     create function auth.uid() returns uuid language sql stable as
       $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
@@ -68,6 +69,8 @@ try {
   `)
   await db.exec(await readFile(path.join(root, 'supabase/migrations/20261023001140_active_member_access_boundary.sql'), 'utf8'))
   await db.exec(await readFile(path.join(root, 'supabase/migrations/20261023002845_authorized_typing_state.sql'), 'utf8'))
+  equal((await db.query("select has_schema_privilege('authenticated','private','usage') as legacy, has_schema_privilege('authenticated','member_mutation_private','usage') as guarded")).rows[0],
+    { legacy: true, guarded: false }, 'Legacy full-app access remains while forged mutation authorization is denied')
 
   await asMember(first)
   await db.exec('select public.require_active_member_request()')
@@ -81,7 +84,7 @@ try {
   await rejected('insert into public.typing_states(user_id,scope_key,expires_at,updated_at) values ($1,$2,now(),now())', [second, 'general'], 'Direct identity forgery is denied')
   await rejected('update public.typing_states set expires_at = now()', [], 'Direct timestamp writes are denied')
   await rejected('delete from public.typing_states', [], 'Direct deletes are denied')
-  await rejected("select private.set_typing_status_authorized('general', true, true)", [], 'Private authorization flag cannot be supplied directly')
+  await rejected("select member_mutation_private.set_typing_status_authorized('general', true, true)", [], 'Private authorization flag cannot be supplied directly')
   for (const scope of ['none', 'board-test', 'dm-invalid', `general-thread:${reply}`, 'general-thread:40000000-0000-4000-8000-000000000001']) await writeDenied(scope)
   await setTyping(`dm-${conversation}`)
   await setTyping(`general-thread:${thread}`)

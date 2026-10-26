@@ -49,7 +49,7 @@ beforeEach(() => {
   localStorage.clear()
   client = {
     from: jest.fn(() => query()),
-    channel: jest.fn(() => { const channel = { on: jest.fn(() => channel), subscribe: jest.fn(() => channel), state: 'joined' }; return channel }),
+    channel: jest.fn(() => { const channel: { on: jest.Mock; subscribe: jest.Mock; state: string } = { on: jest.fn(() => channel), subscribe: jest.fn(() => channel), state: 'joined' }; return channel }),
     removeChannel: jest.fn(), auth: { getSession: jest.fn(async () => ({ data: { session: { access_token: 'token', user: { id: 'u1' } } }, error: null })) },
   }
   Object.assign(supabase, client)

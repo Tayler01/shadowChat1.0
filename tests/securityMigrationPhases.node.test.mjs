@@ -16,12 +16,15 @@ const companionMigrations = [
   '20261023224356_legacy_account_deletion_reconciliation.sql',
 ]
 const moved = new Set([
+  '20261022231053_member_media_visibility_policies.sql',
   '20261022231052_profile_identity_select_containment.sql',
   '20261022231054_account_deletion_pin_reference.sql',
   '20261023001141_complete_account_deletion.sql',
   '20261023004143_private_bunny_media_registry.sql',
   '20261023004930_private_realtime_authorization.sql',
   '20261023005459_reported_media_evidence.sql',
+  '20261023002845_authorized_typing_state.sql',
+  '20261023004153_report_target_visibility_boundary.sql',
 ])
 const owner = '10000000-0000-4000-8000-000000000001'
 const other = '10000000-0000-4000-8000-000000000002'
@@ -140,6 +143,34 @@ async function apply(db, original = false) {
   // The restricted-column RPC repair is independently required on both paths;
   // it changes arguments only and is tested against the live baseline bodies.
   if (original) {
+    // Independent least-privilege repair: preserve legacy private USAGE while
+    // isolating the two newly introduced privileged member mutations.
+    await db.exec(`
+      create schema member_mutation_private;
+      revoke all on schema member_mutation_private from public,anon,authenticated,service_role;
+      alter function private.set_typing_status_authorized(text,boolean,boolean) set schema member_mutation_private;
+      alter function private.submit_member_report_impl(text,uuid,text,uuid,text,jsonb) set schema member_mutation_private;
+    `)
+    // The pinned CLI splits BEGIN ATOMIC at CASE's END. Apply the independently
+    // required RETURN-expression spelling to the original catalog too, while
+    // keeping the hashed pre-split migration bytes immutable above. Both forms
+    // bind dependencies at definition time and preserve caller-RLS execution.
+    for (const name of ['20261023002845_authorized_typing_state.sql', '20261023004153_report_target_visibility_boundary.sql']) {
+      const sql = await readSql(name)
+      const start = sql.indexOf('create function private.')
+      const end = sql.indexOf('\nrevoke all on function', start)
+      assert.ok(start >= 0 && end > start)
+      await db.exec(sql.slice(start, end).replace('create function private.', 'create or replace function private.'))
+    }
+    // Local PostgreSQL lint also requires the true STABLE volatility of UTF-8
+    // conversion and removal of a redundant integer FOR-loop declaration.
+    for (const [name, signature] of [
+      ['20261022231053_member_media_visibility_policies.sql', 'create or replace function private.can_read_member_media('],
+      ['20261023005459_reported_media_evidence.sql', 'create function private.moderation_storage_url('],
+    ]) {
+      await db.exec(functionSql(await readSql(name), signature)
+        .replace('create function private.', 'create or replace function private.'))
+    }
     await db.exec(await securityActivationSection('safe_profile_rpc_arguments'))
     // Independently required handover safety is shared by both final catalogs.
     // Immutable pre-split fixtures still prove the original FK/guard behavior.
@@ -182,7 +213,7 @@ async function definers(db) {
     has_function_privilege('anon',p.oid,'execute') as anon,
     exists(select 1 from unnest(p.proconfig) setting where setting like 'search_path=%') as pinned_path
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname in ('public','private') and p.prosecdef order by n.nspname,p.proname`)).rows
+    where n.nspname in ('public','private','member_mutation_private') and p.prosecdef order by n.nspname,p.proname`)).rows
 }
 
 test('foundation and activation preserve the complete pre-split SQL catalog', async context => {
@@ -223,6 +254,8 @@ test('every staged privileged function has the exact reviewed allowlist category
       assert.equal(row.pinned_path, true, `${row.signature} must pin search_path`)
       if (row.schema === 'private') {
         assert.ok(privateFunctions.has(row.signature), `Missing reviewed private helper: ${row.signature}`)
+      } else if (row.schema === 'member_mutation_private') {
+        assert.ok(securityDefinerAllowlist.unexposed_security_definers.includes(row.signature), `Missing guarded mutation: ${row.signature}`)
       } else {
         assert.equal(authenticated.has(row.signature), row.authenticated, `Authenticated category: ${row.signature}`)
         assert.equal(anon.has(row.signature), row.anon, `Anonymous category: ${row.signature}`)

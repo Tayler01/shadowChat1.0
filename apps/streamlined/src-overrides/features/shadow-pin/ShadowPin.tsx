@@ -371,15 +371,6 @@ const escapeHtmlAttribute = (value: string) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 
-const stripScriptTags = (html: string) => html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, '').trim()
-
-const getExternalOEmbedHtml = (image: ShadowPinImage) => {
-  const payload = asRecord(image.provider_payload)
-  const preview = asRecord(payload?.preview)
-  const oembed = asRecord(preview?.oembed) || asRecord(payload?.oembed)
-  return typeof oembed?.html === 'string' ? oembed.html : ''
-}
-
 const getExternalRichEmbedPermalink = (image: ShadowPinImage, provider: ExternalRichEmbedProvider) => {
   const candidates = [
     image.source_url,
@@ -390,6 +381,7 @@ const getExternalRichEmbedPermalink = (image: ShadowPinImage, provider: External
   for (const candidate of candidates) {
     try {
       const url = new URL(candidate)
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) continue
       const host = url.hostname.toLowerCase()
       const validHost = provider === 'x'
         ? /(^|\.)x\.com$|(^|\.)twitter\.com$/i.test(host)
@@ -406,6 +398,7 @@ const getExternalRichEmbedPermalink = (image: ShadowPinImage, provider: External
         const statusMatch = url.pathname.match(/\/status(?:es)?\/(\d{6,})/i)
         if (statusMatch?.[1]) return `https://x.com/i/status/${statusMatch[1]}`
       }
+      url.protocol = 'https:'
       return url.toString()
     } catch {
       // Try the next stored source.
@@ -418,25 +411,16 @@ const getExternalRichEmbedPermalink = (image: ShadowPinImage, provider: External
 const getExternalRichEmbedMarkup = (image: ShadowPinImage) => {
   if (!isExternalRichEmbedProvider(image.provider)) return ''
 
-  const oembedHtml = getExternalOEmbedHtml(image)
-  if (
-    image.provider === 'x' &&
-    /\bclass=["'][^"']*\btwitter-(?:tweet|timeline)\b/i.test(oembedHtml)
-  ) {
-    return stripScriptTags(oembedHtml)
-  }
-  if (
-    image.provider === 'instagram' &&
-    /\bclass=["'][^"']*\binstagram-media\b/i.test(oembedHtml)
-  ) {
-    return stripScriptTags(oembedHtml)
-  }
-
+  // Stored oEmbed HTML is untrusted. The official provider script only needs
+  // its canonical blockquote and validated permalink, never supplied markup.
   const permalink = getExternalRichEmbedPermalink(image, image.provider)
   if (!permalink) return ''
   const escapedPermalink = escapeHtmlAttribute(permalink)
 
   if (image.provider === 'x') {
+    if (!/^https:\/\/x\.com\/i\/status\/\d+$/.test(permalink)) {
+      return `<a class="twitter-timeline" data-theme="dark" data-dnt="true" href="${escapedPermalink}">Posts on X</a>`
+    }
     return `<blockquote class="twitter-tweet" data-theme="dark" data-dnt="true"><a href="${escapedPermalink}"></a></blockquote>`
   }
 

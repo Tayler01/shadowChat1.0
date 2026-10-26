@@ -15,7 +15,6 @@ declare
   encoded_path text := '';
   path_bytes bytea := convert_to(target_path, 'UTF8');
   byte_value integer;
-  byte_index integer;
   candidate_urls text[];
 begin
   if current_member is null

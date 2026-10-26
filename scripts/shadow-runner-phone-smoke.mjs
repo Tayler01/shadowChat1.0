@@ -111,12 +111,9 @@ const PHONE_PROFILES = {
 
 const repoRoot = process.cwd()
 const taskKillCommand = process.platform === 'win32' ? 'taskkill' : null
-const windowsCommandShell = process.env.ComSpec || 'cmd.exe'
-const platformCommand = name => process.platform === 'win32' ? `${name}.cmd` : name
 const viteScriptPath = path.join(repoRoot, 'node_modules', 'vite', 'bin', 'vite.js')
-const hasLocalViteScript = existsSync(viteScriptPath)
-const viteCommand = hasLocalViteScript ? process.execPath : platformCommand('vite')
-const viteBaseArgs = hasLocalViteScript ? [viteScriptPath] : []
+const viteCommand = process.execPath
+const viteBaseArgs = [viteScriptPath]
 
 const args = parseArgs(process.argv.slice(2))
 const config = buildConfig(args)
@@ -2141,14 +2138,7 @@ function attachDiagnostics(page, logPath, label) {
 }
 
 function spawnCli(command, commandArgs, options) {
-  if (process.platform === 'win32' && /\.cmd$/i.test(command)) {
-    return spawn(windowsCommandShell, ['/d', '/c', 'call', command, ...commandArgs], {
-      ...options,
-      shell: false,
-    })
-  }
-
-  return spawn(command, commandArgs, options)
+  return spawn(command, commandArgs, { ...options, shell: false })
 }
 
 function parseArgs(argv) {

@@ -1,8 +1,8 @@
 # Security migration phase fixtures
 
 `pre-split-manifest.json` records the exact 18 reviewed migration hashes before
-phase extraction. The four files changed by the split are preserved under
-`pre-split/`; the other 14 must still match their recorded hashes. This is test
+phase extraction. Files changed by extraction or the later CLI parser repair
+are preserved under `pre-split/`; other files must still match their recorded hashes. This is test
 input, never an alternative deployment migration directory.
 
 The Node test executes the full original sequence and the foundation followed by
@@ -19,6 +19,23 @@ They are included in parity without treating their new behavior as part of the
 original 18-file snapshot. The current sequence contains 20 foundation migrations
 followed by `20261023224455_security_privacy_activation.sql`; the test rejects
 uncovered staged migrations or activation ordered before a companion.
+
+The typing and report-visibility invoker helpers use SQL-standard RETURN
+expressions because the pinned CLI splits BEGIN ATOMIC bodies at CASE's END.
+Their immutable original bodies remain in the historical fixtures. The current
+equivalent spelling is applied to both final catalogs for parity; dependency
+binding remains at definition time, with no extra private-schema grants.
+The same independent lint fixes apply to both final catalogs: remove the
+redundant integer FOR-loop variable declaration and mark the URL decoder STABLE
+because PostgreSQL's UTF-8 conversion functions are STABLE.
+
+The fixtures retain the actual legacy authenticated USAGE grant on `private`.
+The two privileged typing/report implementations instead live in
+`member_mutation_private`, whose USAGE is denied to client roles. The original
+catalog receives this independently reviewed namespace move before parity.
+Bound invoker wrappers still call the exact implementations, while direct role
+calls cannot supply forged authorization. Existing full-app Catch-Up, discovery,
+and comment-reaction RPCs keep their `private.users_have_block` access.
 
 The foundation phase retains the existing profile grants, permits the legacy
 unregistered Creator write without treating it as trusted media, leaves capture

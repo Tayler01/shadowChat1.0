@@ -63,8 +63,6 @@
     "private.require_active_member_request()",
     "private.resolve_notification_installation_credential_v2(uuid,text)",
     "private.revoke_signup_invite(uuid,uuid,text)",
-    "private.set_typing_status_authorized(text,boolean,boolean)",
-    "private.submit_member_report_impl(text,uuid,text,uuid,text,jsonb)",
     "private.sync_dm_notification_reads()",
     "private.sync_notification_delivery_job()",
     "private.sync_shado_live_source_read()",
@@ -96,6 +94,8 @@
     "inner_circles_private.mutate_my_inner_circle_member_impl(uuid,uuid,text)",
     "inner_circles_private.set_my_inner_circle_members_impl(uuid,uuid[])",
     "inner_circles_private.teardown_pair_memberships()",
+    "member_mutation_private.set_typing_status_authorized(text,boolean,boolean)",
+    "member_mutation_private.submit_member_report_impl(text,uuid,text,uuid,text,jsonb)",
     "shado_live_private.apply_shado_live_case_action_impl(uuid,integer,text,text[],integer,text,text)",
     "shado_live_private.can_access_shado_live_room(uuid,uuid)",
     "shado_live_private.can_receive_shado_live_signal(uuid,uuid)",
@@ -542,6 +542,26 @@
         "supabase/migrations/20261023002455_moderation_retention_cleanup.sql",
         "docs/STREAMLINED_SECURITY_AUDIT.md"
       ]
+    }
+  ],
+  "schema_usage_contract": [
+    {
+      "schema": "private",
+      "role": "authenticated",
+      "usage": true,
+      "reason": "Existing full-app invoker RPCs call private.users_have_block."
+    },
+    {
+      "schema": "member_mutation_private",
+      "role": "authenticated",
+      "usage": false,
+      "reason": "Only prebound caller-RLS wrappers may call privileged member mutations."
+    },
+    {
+      "schema": "member_mutation_private",
+      "role": "anon",
+      "usage": false,
+      "reason": "Anonymous clients must not access member mutation implementations."
     }
   ]
 }

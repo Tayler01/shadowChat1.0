@@ -105,11 +105,8 @@ function decodeHtmlValue(value) {
     .replace(/\\u0026/gi, '&')
     .replace(/\\u002F/gi, '/')
     .replace(/\\\//g, '/')
-    .replace(/&amp;/gi, '&')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
+    .replace(/&(amp|quot|#39|lt|gt);/gi, (_match, entity) =>
+      ({ amp: '&', quot: '"', '#39': "'", lt: '<', gt: '>' })[entity.toLowerCase()])
     .trim()
 }
 

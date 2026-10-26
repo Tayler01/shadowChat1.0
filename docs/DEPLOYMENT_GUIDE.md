@@ -242,6 +242,22 @@ Actions production workflow. Netlify's native Git build service remains stopped.
 A human-run CLI deploy is a break-glass fallback only and must preserve the same
 backend-first checks. From the repo root:
 
+On October 26, the operator explicitly authorized running the required checks
+outside GitHub Actions and using direct, staged backend and separate streamlined
+site deployment while the GitHub account restriction is unresolved. This is an
+exception to the normal publisher, not permission to skip release gates. Use an
+independent clean checkout on actual `main`, bind receipts to the exact source
+and release-plan hashes, and retain quality, database, Gitleaks, Trivy and CodeQL
+results locally. Keep the existing GitHub rollout hold and full-site native-build
+stop enabled and serialize direct release operations with an exclusive local
+lock. Do not spoof GitHub environment variables or manufacture workflow success.
+Run the existing phase runner with fresh compatibility acceptance at each
+required boundary; do not apply all pending migrations together. Publish the
+streamlined bundle only to its dedicated site after backend acceptance and
+Linux function-package verification. The full site's source and deployment
+remain unchanged unless a separately verified compatibility update is needed
+to preserve its behavior through a later privacy cutover.
+
 ```powershell
 npx netlify deploy --prod
 ```

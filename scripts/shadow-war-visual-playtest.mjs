@@ -12,13 +12,9 @@ const DEFAULT_HOST = '127.0.0.1'
 const DEFAULT_PORT = 4174
 const DEFAULT_TIMEOUT_MS = 25_000
 const taskKillCommand = process.platform === 'win32' ? 'taskkill' : null
-const windowsCommandShell = process.env.ComSpec || 'cmd.exe'
-
-const platformCommand = name => process.platform === 'win32' ? `${name}.cmd` : name
 const viteScriptPath = path.join(process.cwd(), 'node_modules', 'vite', 'bin', 'vite.js')
-const hasLocalViteScript = existsSync(viteScriptPath)
-const viteCommand = hasLocalViteScript ? process.execPath : platformCommand('vite')
-const viteBaseArgs = hasLocalViteScript ? [viteScriptPath] : []
+const viteCommand = process.execPath
+const viteBaseArgs = [viteScriptPath]
 
 const repoRoot = process.cwd()
 const args = parseArgs(process.argv.slice(2))
@@ -566,14 +562,7 @@ function attachDiagnostics(page, logPath, label) {
 }
 
 function spawnCli(command, args, options) {
-  if (process.platform === 'win32' && /\.cmd$/i.test(command)) {
-    return spawn(windowsCommandShell, ['/d', '/c', 'call', command, ...args], {
-      ...options,
-      shell: false,
-    })
-  }
-
-  return spawn(command, args, options)
+  return spawn(command, args, { ...options, shell: false })
 }
 
 function parseArgs(argv) {

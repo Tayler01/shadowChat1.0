@@ -2,6 +2,11 @@
 -- through client-authored Broadcast payloads. Requires active-member boundary.
 begin;
 
+-- Keep privileged implementations inaccessible to direct browser-role SQL.
+-- Legacy full-app RPCs still require USAGE on the separate private schema.
+create schema if not exists member_mutation_private;
+revoke all on schema member_mutation_private from public, anon, authenticated, service_role;
+
 create table public.typing_states (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
@@ -20,10 +25,10 @@ grant select on public.typing_states to authenticated;
 grant all on public.typing_states to service_role;
 
 -- This helper is INVOKER so message/conversation RLS decides thread visibility.
--- SQL-standard bodies bind private helpers without granting schema USAGE.
+-- SQL-standard bodies retain definition-time dependencies on private helpers.
 create function private.typing_scope_is_visible(target_scope_key text)
 returns boolean language sql stable security invoker set search_path = ''
-begin atomic
+return (
   select (select private.is_active_member()) and case
     when target_scope_key = 'general' then true
     when target_scope_key ~ '^dm-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then exists (
@@ -41,8 +46,8 @@ begin atomic
         and message.reply_to is null
     )
     else false
-  end;
-end;
+  end
+);
 revoke all on function private.typing_scope_is_visible(text) from public, anon, authenticated;
 grant execute on function private.typing_scope_is_visible(text) to authenticated;
 
@@ -62,9 +67,9 @@ create policy "Members read authorized typing state"
   using (private.typing_scope_is_visible(scope_key) and private.typing_actor_is_visible(user_id));
 
 -- Only the bound invoker wrapper can supply caller-RLS authorization. Browsers
--- have no private schema USAGE and no table mutation grants, identity/time args,
+-- have no member_mutation_private USAGE and no table mutation grants, identity/time args,
 -- or public path accepting this authorization flag.
-create function private.set_typing_status_authorized(
+create function member_mutation_private.set_typing_status_authorized(
   target_scope_key text,
   p_is_typing boolean,
   p_scope_visible boolean
@@ -107,13 +112,13 @@ begin
   );
 end;
 $$;
-revoke all on function private.set_typing_status_authorized(text, boolean, boolean) from public, anon, authenticated;
-grant execute on function private.set_typing_status_authorized(text, boolean, boolean) to authenticated;
+revoke all on function member_mutation_private.set_typing_status_authorized(text, boolean, boolean) from public, anon, authenticated;
+grant execute on function member_mutation_private.set_typing_status_authorized(text, boolean, boolean) to authenticated;
 
 create function public.set_typing_status(target_scope_key text, p_is_typing boolean)
 returns void language sql volatile security invoker set search_path = ''
 begin atomic
-  select private.set_typing_status_authorized(target_scope_key, p_is_typing, private.typing_scope_is_visible(target_scope_key));
+  select member_mutation_private.set_typing_status_authorized(target_scope_key, p_is_typing, private.typing_scope_is_visible(target_scope_key));
 end;
 revoke all on function public.set_typing_status(text, boolean) from public, anon, authenticated;
 grant execute on function public.set_typing_status(text, boolean) to authenticated;

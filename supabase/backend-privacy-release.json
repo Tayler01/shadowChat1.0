@@ -5,11 +5,11 @@
   "hashFormat": "sha256-lf",
   "baselineVersion": "20260930215719",
   "baselineSha256": "ec0c135ca5d2f8c29922da8e503c43f7bd86004e6f5d2ba5ebbd306089410725",
-  "backendFilesSha256": "8fb19dd30f0e8e4cc847aa1679f9487856e0c4f20ddacbfa3b41c33f5d2e08da",
+  "backendFilesSha256": "ef2c08f0b4a7c9198eadab467269c486b7cc7c2a893d032acf04b319bb6362eb",
   "foundation": [
     {
       "path": "supabase/migrations/20261022231053_member_media_visibility_policies.sql",
-      "sha256": "2159b432227391f5cf60621145425a8d72286c7d5bb058e85c7e6e897a299864"
+      "sha256": "58e11bcc297f25542392988f84f3a408aeaf01ffeba0ab75850207d7e65440ca"
     },
     {
       "path": "supabase/migrations/20261022231054_account_deletion_pin_reference.sql",
@@ -33,7 +33,7 @@
     },
     {
       "path": "supabase/migrations/20261023002845_authorized_typing_state.sql",
-      "sha256": "ca49897a902d67ef5338b2de7467d7f56c70c0f38a356888a4f27e988c498fa3"
+      "sha256": "e6b3256e8f04728c97cc04e27936141e550d8689f64cd31a4d1a036bf8d5d03b"
     },
     {
       "path": "supabase/migrations/20261023004143_private_bunny_media_registry.sql",
@@ -41,7 +41,7 @@
     },
     {
       "path": "supabase/migrations/20261023004153_report_target_visibility_boundary.sql",
-      "sha256": "e1a5d65fc50f2193faf0ee05fd513c184d2ab557b3db376f49ff4b557be94791"
+      "sha256": "3eb72d50d769cdccdefe90a8d97a6ff982beb18e500f160e37ee069a8fe9ef11"
     },
     {
       "path": "supabase/migrations/20261023004723_bunny_upload_deletion_reservations.sql",
@@ -57,7 +57,7 @@
     },
     {
       "path": "supabase/migrations/20261023005459_reported_media_evidence.sql",
-      "sha256": "b89890defd0cccdc1899a4e900b5d4674296f90eb35f2c86b0b077f94c833314"
+      "sha256": "e16a0c099e7a912282b4c8668be382ec9cdd0ec190f302d0cc403d9dc682be0c"
     },
     {
       "path": "supabase/migrations/20261023005759_account_deletion_evidence_retention.sql",

@@ -1,6 +1,6 @@
 -- Canonical definitions, ACLs, policies, triggers, FK rules, indexes and role
 -- settings. Object OIDs/physical row ordering are intentionally not compared.
-with namespaces as (select oid from pg_namespace where nspname in ('public','private','storage','realtime','auth')),
+with namespaces as (select oid from pg_namespace where nspname in ('public','private','member_mutation_private','storage','realtime','auth')),
 objects as (
   select 'table'::text kind,n.nspname||'.'||c.relname identity,
     jsonb_build_object('rls',c.relrowsecurity,'force_rls',c.relforcerowsecurity,'replica_identity',c.relreplident,
