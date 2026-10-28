@@ -32,3 +32,33 @@ describe('notification installation registration identity and cache',()=>{
     expect(await pending).toBeNull();expect(rpc).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('streamlined demo notification delivery environment', () => {
+  test.each([
+    ['review-demo', 'production'],
+    ['production', 'production'],
+    ['deploy-preview', 'preview'],
+    ['preview', 'preview'],
+    [undefined, 'preview'],
+  ])('registers build context %s as %s without remapping other previews', async (context, expected) => {
+    const rpc = jest.fn().mockResolvedValue({ data: 'isolated-installation' })
+    let registration!: typeof import('../apps/streamlined/src-overrides/lib/notificationInstallation')
+    jest.isolateModules(() => {
+      jest.doMock('./mocks/env', () => ({ VITE_APP_DEPLOY_CONTEXT: context }))
+      jest.doMock('../apps/streamlined/src-overrides/lib/supabase', () => ({
+        getWorkingClient: async () => ({ rpc }),
+      }))
+      registration = jest.requireActual('../apps/streamlined/src-overrides/lib/notificationInstallation')
+    })
+    try {
+      registration.resetWebNotificationInstallationForUser('reviewer')
+      await registration.registerWebNotificationInstallation()
+      expect(rpc).toHaveBeenCalledWith('register_my_notification_installation_v2', expect.objectContaining({
+        target_platform: 'web', target_environment: expected,
+      }))
+    } finally {
+      jest.dontMock('./mocks/env')
+      jest.dontMock('../apps/streamlined/src-overrides/lib/supabase')
+    }
+  })
+})

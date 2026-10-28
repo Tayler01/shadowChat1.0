@@ -2,20 +2,28 @@ import React from 'react'
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { ChatView } from '../apps/streamlined/src-overrides/components/chat/ChatView'
 import { MobileNav } from '../src/streamlined/components/StreamlinedMobileNav'
+import { normalizeContentPolicyError } from '../src/lib/contentPolicy'
+import { getBlockedActionMessage } from '../src/lib/moderation'
+import { showActionErrorToast } from '../src/lib/toastNotifications'
 
 const mockTogglePin = jest.fn()
 const mockToggleReaction = jest.fn()
 const mockPinned = { id: 'pin-1', pinned: true, content: 'Saved message' }
 let mockDesktop = false
+const mockSendMessage = jest.fn()
+let mockComposerSend: ((content: string) => Promise<unknown>) | undefined
 
 jest.mock('../apps/streamlined/src-overrides/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'member-1' }, profile: { id: 'member-1' } }) }))
-jest.mock('../apps/streamlined/src-overrides/hooks/useMessages', () => ({ useMessages: () => ({ messages: [mockPinned], sendMessage: jest.fn(), sending: false }) }))
+jest.mock('../apps/streamlined/src-overrides/hooks/useMessages', () => ({ useMessages: () => ({ messages: [mockPinned], sendMessage: mockSendMessage, sending: false }) }))
 jest.mock('../apps/streamlined/src-overrides/hooks/MessagesContext', () => ({ useOptionalMessages: () => ({ messages: [mockPinned], togglePin: mockTogglePin, toggleReaction: mockToggleReaction }) }))
 jest.mock('../apps/streamlined/src-overrides/lib/supabase', () => ({ resolveGeneralChatThreadId: jest.fn() }))
 jest.mock('../src/hooks/useIsDesktop', () => ({ useIsDesktop: () => mockDesktop }))
 jest.mock('../src/lib/moderation', () => ({ getBlockedActionMessage: jest.fn() }))
 jest.mock('../src/lib/toastNotifications', () => ({ showActionErrorToast: jest.fn() }))
-jest.mock('../apps/streamlined/src-overrides/components/chat/MessageInput', () => ({ MessageInput: () => <textarea aria-label="Message" /> }))
+jest.mock('../apps/streamlined/src-overrides/components/chat/MessageInput', () => ({ MessageInput: ({ onSendMessage }: { onSendMessage: (content: string) => Promise<unknown> }) => {
+  mockComposerSend = onSendMessage
+  return <textarea aria-label="Message" />
+} }))
 jest.mock('../apps/streamlined/src-overrides/components/layout/MobileChatFooter', () => ({ MobileChatFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div> }))
 jest.mock('../src/components/chat/MessageList', () => ({ MessageList: () => <div data-testid="message-scroll">Chat messages<div data-testid="nested-message-scroll" style={{ overflowY: 'auto' }}>Scrollable attachment</div></div> }))
 jest.mock('../src/components/chat/PinnedMessagesButton', () => ({
@@ -27,7 +35,16 @@ jest.mock('../src/hooks/ClientResetContext', () => ({ useOptionalClientReset: ()
 jest.mock('../src/hooks/usePresence', () => ({ useActiveUsers: () => [{ id: 'member-1' }, { id: 'member-2' }] }))
 jest.mock('../src/components/ui/ClientResetIndicator', () => ({ ClientResetIndicator: () => <span data-testid="connection-indicator" /> }))
 
-beforeEach(() => { jest.clearAllMocks(); mockDesktop = false })
+beforeEach(() => { jest.clearAllMocks(); mockDesktop = false; mockSendMessage.mockReset(); mockComposerSend = undefined })
+
+test('preserves policy errors for the existing composer draft recovery without generic ban handling', async () => {
+  const rejection = normalizeContentPolicyError({ code: 'PT422', message: 'CONTENT_POLICY_REJECTED' })
+  mockSendMessage.mockRejectedValue(rejection)
+  render(<ChatView currentView="chat" onViewChange={jest.fn()} onSearch={jest.fn()} />)
+  await expect(mockComposerSend?.('Rejected draft')).rejects.toBe(rejection)
+  expect(getBlockedActionMessage).not.toHaveBeenCalled()
+  expect(showActionErrorToast).not.toHaveBeenCalled()
+})
 
 const touch = (clientY: number, clientX = 0, identifier = 1) => ({ clientY, clientX, identifier })
 const drag = (target: HTMLElement, startY: number, endY: number) => {

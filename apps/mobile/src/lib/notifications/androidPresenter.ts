@@ -9,6 +9,7 @@ import notifee, {
 
 import { getAndroidSoundChannelId } from './config';
 import { appRuntime } from '../appRuntime';
+import {currentTransportScope,readTransportScope} from '../../community/communityBindings';
 import {
   parseNotificationEnvelopeV2,
   type NotificationEnvelopeV2,
@@ -16,12 +17,21 @@ import {
 
 const SUMMARY_PREFIX = 'shadowchat-summary:';
 
-const stringData = (envelope: NotificationEnvelopeV2) => ({
+const scopedIdentity = (scope: unknown) => {
+  const value=readTransportScope({communityScope:scope});
+  return value?.version===1 && typeof value.projectRef==='string' && typeof value.userId==='string' && typeof value.installationKey==='string'
+    ? `${value.projectRef}:${value.userId}:${value.installationKey}` : null;
+};
+const notificationId=(value:string,scope:unknown)=>appRuntime.streamlined ? `${scopedIdentity(scope)}:${value}` : value;
+const sameScope=(data:unknown,scope:unknown)=>!appRuntime.streamlined || (scopedIdentity(scope)!==null && scopedIdentity(readTransportScope(data))===scopedIdentity(scope));
+
+const stringData = (envelope: NotificationEnvelopeV2,transportScope:unknown=currentTransportScope()) => ({
   envelopeV2: JSON.stringify(appRuntime.streamlined ? {
     ...envelope,
     actor: envelope.actor ? { ...envelope.actor, avatarUrl: null } : null,
     media: null,
   } : envelope),
+  communityScope: JSON.stringify(transportScope),
   eventId: envelope.eventId,
   groupKey: envelope.groupKey,
   route: envelope.route,
@@ -125,9 +135,11 @@ const summaryEnvelope = (
 };
 
 export const reconcileAndroidNotificationGroups = async (
-  targetGroupKeys?: Iterable<string>
+  targetGroupKeys?: Iterable<string>,
+  transportScope:unknown=currentTransportScope(),
 ) => {
-  const displayed = await notifee.getDisplayedNotifications();
+  if(appRuntime.streamlined && !scopedIdentity(transportScope))return;
+  const displayed = (await notifee.getDisplayedNotifications()).filter(item=>sameScope(item.notification.data,transportScope));
   const requested = targetGroupKeys
     ? new Set(targetGroupKeys)
     : new Set(
@@ -140,11 +152,11 @@ export const reconcileAndroidNotificationGroups = async (
     const children = displayed
       .filter(item =>
         item.notification.data?.groupKey === groupKey &&
-        item.notification.id !== `${SUMMARY_PREFIX}${groupKey}`
+        item.notification.id !== notificationId(`${SUMMARY_PREFIX}${groupKey}`,transportScope)
       )
       .map(item => parseNotifeeEnvelope(item.notification))
       .filter((envelope): envelope is NotificationEnvelopeV2 => Boolean(envelope));
-    const summaryId = `${SUMMARY_PREFIX}${groupKey}`;
+    const summaryId = notificationId(`${SUMMARY_PREFIX}${groupKey}`,transportScope);
     if (children.length < 2) {
       await notifee.cancelNotification(summaryId).catch(() => undefined);
       return;
@@ -155,11 +167,11 @@ export const reconcileAndroidNotificationGroups = async (
       id: summaryId,
       title: 'ShadowChat',
       body: `${children.length} updates`,
-      data: stringData(envelope),
+      data: stringData(envelope,transportScope),
       android: {
         channelId: getAndroidSoundChannelId(envelope.soundId),
         groupAlertBehavior: AndroidGroupAlertBehavior.CHILDREN,
-        groupId: groupKey,
+        groupId: notificationId(groupKey,transportScope),
         groupSummary: true,
         onlyAlertOnce: true,
         pressAction: { id: 'open', launchActivity: 'default' },
@@ -173,25 +185,27 @@ export const reconcileAndroidNotificationGroups = async (
 
 export const displayAndroidNotificationEnvelope = async (
   envelope: NotificationEnvelopeV2,
-  badgeCount = 0
+  badgeCount = 0,
+  transportScope:unknown=currentTransportScope(),
 ) => {
   const actor = envelope.privacy === 'private' ? null : envelope.actor;
+  if(appRuntime.streamlined && !scopedIdentity(transportScope))return;
   const notification: Notification = {
-    id: envelope.eventId,
-    title: envelope.content.title,
-    body: notificationBody(envelope),
-    data: stringData(envelope),
+    id: notificationId(envelope.eventId,transportScope),
+    title: appRuntime.streamlined ? 'ShadoChat' : envelope.content.title,
+    body: appRuntime.streamlined ? 'Open ShadoChat to view your update.' : notificationBody(envelope),
+    data: stringData(envelope,transportScope),
     android: {
       channelId: getAndroidSoundChannelId(envelope.soundId),
       category: androidCategory(envelope),
       color: '#E9C766',
       groupAlertBehavior: AndroidGroupAlertBehavior.CHILDREN,
-      groupId: envelope.groupKey,
+      groupId: notificationId(envelope.groupKey,transportScope),
       largeIcon: appRuntime.streamlined ? undefined : actor?.avatarUrl ?? undefined,
       onlyAlertOnce: true,
       pressAction: { id: 'open', launchActivity: 'default' },
       smallIcon: 'notification_icon',
-      style: androidStyle(envelope),
+      style: appRuntime.streamlined ? undefined : androidStyle(envelope),
       visibility: AndroidVisibility.PRIVATE,
       actions: [
         {
@@ -212,7 +226,7 @@ export const displayAndroidNotificationEnvelope = async (
     notifee.setBadgeCount(
       Math.max(0, Math.min(99, Math.floor(badgeCount)))
     ),
-    reconcileAndroidNotificationGroups([envelope.groupKey]),
+    reconcileAndroidNotificationGroups([envelope.groupKey],transportScope),
   ]);
 };
 

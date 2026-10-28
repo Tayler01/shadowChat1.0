@@ -1,4 +1,2 @@
-import Constants from 'expo-constants';
-import { resolveAppConfiguration } from './appConfiguration';
-
-export const appRuntime = resolveAppConfiguration(Constants.expoConfig?.extra);
+import {activeCommunity,baseAppRuntime} from '../community/communityBindings';
+export const appRuntime={...baseAppRuntime,get origin(){return activeCommunity()?.community.origin ?? baseAppRuntime.origin;}};

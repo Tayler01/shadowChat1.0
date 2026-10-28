@@ -1,4 +1,5 @@
 import type { WebView } from 'react-native-webview';
+import {requireCommunity} from '../community/communityBindings';
 
 import { getNotificationWebUrl, normalizeNotificationRoute } from './notifications/routes';
 import type { NativeNotificationStage } from './notifications/stages';
@@ -67,29 +68,15 @@ export const publishNativeNotificationEnrollmentChallenge = (
   `);
 };
 
-type RouteListener = (url: string) => void;
-
-let routeListener: RouteListener | null = null;
-let pendingRoute: string | null = null;
-
-export const publishNativeNotificationRoute = (route: string) => {
-  const url = getNotificationWebUrl(normalizeNotificationRoute(route));
-  if (routeListener) {
-    routeListener(url);
-  } else {
-    pendingRoute = url;
-  }
+type RouteListener=(url:string)=>void;
+let routeListener:{listener:RouteListener;context:ReturnType<typeof requireCommunity>}|null=null;
+let pendingRoute:{url:string;context:ReturnType<typeof requireCommunity>}|null=null;
+export const publishNativeNotificationRoute=(route:string)=>{
+ const context=requireCommunity();const url=getNotificationWebUrl(normalizeNotificationRoute(route));
+ if(routeListener?.context===context)routeListener.listener(url);else pendingRoute={url,context};
 };
-
-export const subscribeToNativeNotificationRoutes = (listener: RouteListener) => {
-  routeListener = listener;
-  if (pendingRoute) {
-    const route = pendingRoute;
-    pendingRoute = null;
-    listener(route);
-  }
-
-  return () => {
-    if (routeListener === listener) routeListener = null;
-  };
+export const subscribeToNativeNotificationRoutes=(listener:RouteListener)=>{
+ const context=requireCommunity();const subscription={listener,context};routeListener=subscription;
+ if(pendingRoute?.context===context)listener(pendingRoute.url);pendingRoute=null;
+ return()=>{if(routeListener===subscription)routeListener=null;};
 };

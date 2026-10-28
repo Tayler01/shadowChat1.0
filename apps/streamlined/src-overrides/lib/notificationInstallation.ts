@@ -76,7 +76,7 @@ const registerInstallation = async () => {
       target_platform: 'web',
       target_app_id: 'shadowchat-pwa',
       target_project_id: null,
-      target_environment: VITE_APP_DEPLOY_CONTEXT === 'production'
+      target_environment: VITE_APP_DEPLOY_CONTEXT === 'production' || VITE_APP_DEPLOY_CONTEXT === 'review-demo'
         ? 'production'
         : 'preview',
       target_app_version: VITE_APP_BUILD_ID || null,

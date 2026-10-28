@@ -4,11 +4,11 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const DEFAULT_BUILD_BUDGETS = Object.freeze({
-  // Wave One's pre-paint comfort runtime and global accessibility CSS bring the
-  // default build to about 1.26 MB raw / 336 kB gzip. Keep a narrow allowance
-  // for that intentional foundation without allowing a large eager dependency.
-  initialRawBytes: 1_270_000,
-  initialGzipBytes: 340_000,
+  // Private media signing and authorized Realtime add 9,904 raw / 3,553 gzip
+  // bytes on the same source, with no new eager vendor chunk. Allow that
+  // measured security cost; keep all individual JavaScript/lazy/deploy caps.
+  initialRawBytes: 1_271_000,
+  initialGzipBytes: 345_000,
   eagerJavaScriptRawBytes: 525_000,
   eagerJavaScriptGzipBytes: 160_000,
   regularJavaScriptRawBytes: 525_000,

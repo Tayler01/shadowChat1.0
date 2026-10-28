@@ -113,6 +113,13 @@ export interface NotificationPresentationPolicyV2 {
   previewMode?: NotificationPrivacyMode
   mediaEnabled?: boolean
   soundId?: NotificationSoundId | null
+  mediaUrlPolicy?: NotificationMediaUrlPolicy
+}
+
+/** Trusted build configuration only; never construct this from event payload URLs. */
+export interface NotificationMediaUrlPolicy {
+  readonly appOrigin: string | null
+  readonly supabaseOrigin: string | null
 }
 
 const asRecord = (value: unknown): Record<string, unknown> => (
@@ -178,14 +185,42 @@ const isUnsafeNotificationMediaHostname = (value: string) => {
   )
 }
 
-const isApprovedNotificationMediaUrl = (url: URL) => {
+/** Invalid or incomplete community configuration denies all media instead of using legacy hosts. */
+export const createCommunityNotificationMediaUrlPolicy = (
+  appOrigin: unknown,
+  supabaseUrl: unknown,
+): NotificationMediaUrlPolicy => {
+  const denied = Object.freeze({ appOrigin: null, supabaseOrigin: null })
+  try {
+    if (typeof appOrigin !== 'string' || typeof supabaseUrl !== 'string') return denied
+    const app = new URL(appOrigin)
+    const backend = new URL(supabaseUrl)
+    for (const url of [app, backend]) {
+      if (
+        url.protocol !== 'https:' || url.username || url.password || url.port ||
+        url.pathname !== '/' || url.search || url.hash ||
+        isUnsafeNotificationMediaHostname(url.hostname)
+      ) return denied
+    }
+    if (
+      !/^[a-z]{20}\.supabase\.co$/.test(backend.hostname) ||
+      app.hostname.endsWith('.supabase.co')
+    ) return denied
+    return Object.freeze({ appOrigin: app.origin, supabaseOrigin: backend.origin })
+  } catch {
+    return denied
+  }
+}
+
+const isApprovedNotificationMediaUrl = (url: URL, policy?: NotificationMediaUrlPolicy) => {
   const hostname = url.hostname.toLowerCase().replace(/\.$/, '')
   if (
-    APPROVED_NOTIFICATION_APP_HOSTS.has(hostname) ||
-    hostname.endsWith('.b-cdn.net')
+    policy
+      ? url.origin === policy.appOrigin
+      : APPROVED_NOTIFICATION_APP_HOSTS.has(hostname) || hostname.endsWith('.b-cdn.net')
   ) return true
   return (
-    APPROVED_NOTIFICATION_SUPABASE_HOSTS.has(hostname) &&
+    (policy ? url.origin === policy.supabaseOrigin : APPROVED_NOTIFICATION_SUPABASE_HOSTS.has(hostname)) &&
     (
       url.pathname.startsWith('/storage/v1/object/public/') ||
       url.pathname.startsWith('/storage/v1/render/image/public/') ||
@@ -207,7 +242,7 @@ const normalizeSafeRoute = (route: string) => {
   }
 }
 
-export const normalizeNotificationMediaUrl = (value: unknown) => {
+export const normalizeNotificationMediaUrl = (value: unknown, policy?: NotificationMediaUrlPolicy) => {
   const candidate = asString(value)
   if (!candidate || candidate.length > MAX_NOTIFICATION_MEDIA_URL_LENGTH) return null
   try {
@@ -218,7 +253,7 @@ export const normalizeNotificationMediaUrl = (value: unknown) => {
       parsed.password ||
       parsed.port ||
       isUnsafeNotificationMediaHostname(parsed.hostname) ||
-      !isApprovedNotificationMediaUrl(parsed)
+      !isApprovedNotificationMediaUrl(parsed, policy)
     ) return null
     if (parsed.pathname.startsWith('/storage/v1/render/image/public/')) {
       parsed.pathname = parsed.pathname.replace(
@@ -513,6 +548,7 @@ export const buildNotificationEnvelopeV2 = (
     payload.thumbnailUrl ??
     payload.image_thumbnail_url ??
     payload.media_thumbnail_url,
+    policy.mediaUrlPolicy,
   )
   const mediaKind = asString(payload.media_kind ?? payload.mediaKind) === 'video'
     ? 'video'
@@ -545,7 +581,7 @@ export const buildNotificationEnvelopeV2 = (
       : {
           id: actorId,
           label: bounded(actorLabel, 80) ?? 'ShadowChat member',
-          avatarUrl: normalizeNotificationMediaUrl(presentation.avatarUrl),
+          avatarUrl: normalizeNotificationMediaUrl(presentation.avatarUrl, policy.mediaUrlPolicy),
         },
     content: {
       eyebrow: typePolicy.eyebrow,
@@ -662,6 +698,7 @@ const isNotificationDateTime = (value: unknown): value is string => (
 
 export const isNotificationEnvelopeV2 = (
   value: unknown,
+  mediaUrlPolicy?: NotificationMediaUrlPolicy,
 ): value is NotificationEnvelopeV2 => {
   const record = asRecord(value)
   const eventIds = Array.isArray(record.eventIds) ? record.eventIds : []
@@ -703,7 +740,7 @@ export const isNotificationEnvelopeV2 = (
           actor.avatarUrl === null ||
           (
             isBoundedString(actor.avatarUrl, MAX_NOTIFICATION_MEDIA_URL_LENGTH) &&
-            normalizeNotificationMediaUrl(actor.avatarUrl) !== null
+            normalizeNotificationMediaUrl(actor.avatarUrl, mediaUrlPolicy) !== null
           )
         )
       )
@@ -726,7 +763,7 @@ export const isNotificationEnvelopeV2 = (
         hasExactKeys(media, ['kind', 'thumbnailUrl', 'alt']) &&
         (media.kind === 'image' || media.kind === 'video') &&
         isBoundedString(media.thumbnailUrl, MAX_NOTIFICATION_MEDIA_URL_LENGTH) &&
-        normalizeNotificationMediaUrl(media.thumbnailUrl) !== null &&
+        normalizeNotificationMediaUrl(media.thumbnailUrl, mediaUrlPolicy) !== null &&
         isBoundedString(media.alt, 120, true)
       )
     ) &&

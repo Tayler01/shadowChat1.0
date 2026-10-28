@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { NativeNotificationsProvider } from '@/hooks/useNativeNotifications';
+import { NativeCommunityBoundary } from '@/community/NativeCommunityBoundary';
 
 export default function RootLayout() {
   useEffect(() => {
@@ -10,7 +11,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <NativeNotificationsProvider>
+    <NativeCommunityBoundary><NativeNotificationsProvider>
       <Stack
           screenOptions={{
             contentStyle: { backgroundColor: '#050505' },
@@ -20,6 +21,6 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
         </Stack>
         <StatusBar style="light" />
-    </NativeNotificationsProvider>
+    </NativeNotificationsProvider></NativeCommunityBoundary>
   );
 }

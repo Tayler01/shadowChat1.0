@@ -6,6 +6,7 @@ import { MessageInput } from './MessageInput'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { MobileAppHeader } from '../layout/MobileAppHeader'
 import { getBlockedActionMessage } from '../../lib/moderation'
+import { isContentPolicyRejection } from '../../lib/contentPolicy'
 import { showActionErrorToast } from '../../lib/toastNotifications'
 import { resolveGeneralChatThreadId, type ChatMessageType } from '../../lib/supabase'
 import type { AppView } from '../../types/navigation'
@@ -118,6 +119,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       const msg = await sendMessage(content, type, fileUrl, replyToId, thumbnailUrl, { clientMessageId, onQueued })
       return msg
     } catch (error) {
+      if (isContentPolicyRejection(error)) throw error
       const message = await getBlockedActionMessage('general_chat', error, 'Failed to send message')
       showActionErrorToast(message)
       return null

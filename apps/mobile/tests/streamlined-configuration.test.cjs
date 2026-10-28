@@ -35,9 +35,15 @@ test('streamlined build uses an isolated HTTPS origin and advances only its buil
     const config = configure({ config: {} });
     assert.equal(config.extra.webAppUrl, origin);
     assert.equal(config.extra.appEdition, 'streamlined');
-    assert.equal(config.ios.buildNumber, '20');
+    assert.equal(config.ios.buildNumber, '22');
     assert.equal(config.ios.bundleIdentifier, expo.ios.bundleIdentifier);
-    assert.deepEqual(config.plugins.slice(0, -1), expo.plugins);
+    const isSplash = plugin => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen';
+    assert.deepEqual(config.plugins.slice(0, -1).filter(plugin => !isSplash(plugin)), expo.plugins.filter(plugin => !isSplash(plugin)));
+    assert.deepEqual(config.plugins.find(isSplash), ['expo-splash-screen', {
+      backgroundColor: '#0d0f10', image: './assets/images/shado-round-mark.png', imageWidth: 96, resizeMode: 'contain',
+      ios: { backgroundColor: '#0d0f10', image: './assets/images/shado-round-mark.png', imageWidth: 96 },
+      android: { backgroundColor: '#0d0f10', image: './assets/images/shado-round-mark.png', imageWidth: 96 },
+    }]);
     assert.equal(config.plugins.at(-1), './plugins/with-streamlined-store-permissions');
     assert.deepEqual(config.android, expo.android);
     assert.equal(config.orientation, expo.orientation);
@@ -60,7 +66,7 @@ test('the store build profile resolves the reviewed streamlined build and origin
   assert.equal(build.streamlined.environment, 'production');
   withEnv(build.streamlined.env, () => {
     const config = configure({ config: {} });
-    assert.equal(config.ios.buildNumber, '21');
+    assert.equal(config.ios.buildNumber, build.streamlined.env.SHADOWCHAT_IOS_BUILD_NUMBER);
     assert.equal(config.extra.appEdition, 'streamlined');
     assert.equal(config.extra.webAppUrl, origin);
     assert.equal(config.ios.bundleIdentifier, expo.ios.bundleIdentifier);

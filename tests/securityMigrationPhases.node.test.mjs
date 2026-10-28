@@ -229,7 +229,22 @@ test('foundation and activation preserve the complete pre-split SQL catalog', as
   assert.equal(canonicalSha(await readFile(new URL('../supabase/backend-privacy-release.json',import.meta.url))),followup.predecessor.planSha256,'Original activation plan remains immutable')
   const followupNames=followup.migrations.map(entry=>{assert.match(entry.path,/^supabase\/migrations\/\d{14}_[a-z0-9_]+\.sql$/);return entry.path.split('/').at(-1)})
   assert.deepEqual(followupNames,['20261028120650_member_content_filter.sql','20261028121930_notification_private_media_authorization.sql'],'Follow-up is an explicit reviewed pair, never an arbitrary future-migration exception')
-  assert.deepEqual(securityEraFiles.filter(name=>name>securityActivationName),followupNames,'Every migration after activation needs explicit follow-up review')
+  // The separately tested native capability is not part of the immutable
+  // privacy follow-up pair. Keep its exact SQL under its own review guard.
+  const scopedNativeCapability = '20261028215545_scoped_native_notification_community_capability.sql'
+  assert.equal(canonicalSha(await readSql(scopedNativeCapability)),
+    '1e8c63bdbf74a00e76bd7199438fa8638bfba2881d688e60547380e775154516',
+    'Separately reviewed scoped native capability SQL changed; rerun its PostgreSQL enrollment tests')
+  const nativeRevocationProof = '20261028220830_idempotent_native_notification_revocation_proof.sql'
+  assert.equal(canonicalSha(await readSql(nativeRevocationProof)),
+    '06aa1a2e933706c47843e94d4684029af7716aebb811f0eafdc219eb5f4c6c4d',
+    'Separately reviewed exact-credential native revocation SQL changed; rerun its PostgreSQL tests')
+  const pendingEnrollmentSettlement = '20261028222221_settle_pending_native_notification_enrollment_attempt.sql'
+  assert.equal(canonicalSha(await readSql(pendingEnrollmentSettlement)),
+    '53c839bb9fd4fd8d0091818d770f2c9386207b04bdf1d5d121d33daf377198c2',
+    'Separately reviewed pending native enrollment settlement SQL changed; rerun its PostgreSQL tests')
+  assert.deepEqual(securityEraFiles.filter(name=>name>securityActivationName),
+    [...followupNames, scopedNativeCapability, nativeRevocationProof, pendingEnrollmentSettlement], 'Every migration after activation needs explicit follow-up review')
   for(const entry of followup.migrations)assert.equal(canonicalSha(await readSql(entry.path.split('/').at(-1))),entry.sha256,`Reviewed follow-up SQL changed: ${entry.path}`)
   const expectedFiles = [...manifest.map(({ name }) => name).filter(name => !name.startsWith('20261022231052_')),
     ...companionMigrations, securityActivationName].sort()

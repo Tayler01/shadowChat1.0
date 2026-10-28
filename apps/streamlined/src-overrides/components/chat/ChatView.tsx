@@ -7,6 +7,7 @@ import { MessageOutboxStorageError } from '../../lib/localMessageOutbox'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
 import { GeneralChatRoomTools } from '../../../../../src/streamlined/components/StreamlinedGeneralChatRoomTools'
 import { getBlockedActionMessage } from '../../../../../src/lib/moderation'
+import { isContentPolicyRejection } from '../../../../../src/lib/contentPolicy'
 import { showActionErrorToast } from '../../../../../src/lib/toastNotifications'
 import { resolveGeneralChatThreadId, type ChatMessageType } from '../../lib/supabase'
 import type { AppView } from '../../../../../src/types/navigation'
@@ -188,6 +189,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
       return msg
     } catch (error) {
+      if (isContentPolicyRejection(error)) throw error
       const message = error instanceof MessageOutboxStorageError
         ? error.message
         : await getBlockedActionMessage('general_chat', error, 'Failed to send message')

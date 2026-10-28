@@ -13,12 +13,25 @@ module.exports = ({ config }) => {
       origin.hostname === 'localhost' || /^\d+(?:\.\d+){3}$/.test(origin.hostname)) {
     throw new Error('The streamlined build requires its own HTTPS origin, without paths or credentials.');
   }
-  const buildNumber = process.env.SHADOWCHAT_IOS_BUILD_NUMBER || '20';
-  if (!/^\d+$/.test(buildNumber) || Number(buildNumber) < 20) throw new Error('Streamlined iOS build number must be at least 20.');
+  const buildNumber = process.env.SHADOWCHAT_IOS_BUILD_NUMBER || '22';
+  if (!/^\d+$/.test(buildNumber) || Number(buildNumber) < 22) throw new Error('Streamlined iOS build number must be at least 22.');
   return {
     ...config, ...expo,
     ios: { ...expo.ios, buildNumber },
-    extra: { ...expo.extra, appEdition: 'streamlined', webAppUrl: origin.origin },
-    plugins: [...expo.plugins, './plugins/with-streamlined-store-permissions'],
+    extra: { ...expo.extra, appEdition: 'streamlined', webAppUrl: origin.origin, communities: {
+      schemaVersion:1,demoEnabled:process.env.SHADOWCHAT_DEMO_COMMUNITY_ENABLED==='true',
+      demo:{origin:process.env.SHADOWCHAT_DEMO_WEB_ORIGIN,projectRef:process.env.SHADOWCHAT_DEMO_PROJECT_REF,
+        supabaseUrl:process.env.EXPO_PUBLIC_DEMO_SUPABASE_URL,publicKey:process.env.EXPO_PUBLIC_DEMO_SUPABASE_KEY},
+    } },
+    plugins: [...expo.plugins.map(plugin => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen'
+      ? ['expo-splash-screen', {
+        backgroundColor: '#0d0f10',
+        image: './assets/images/shado-round-mark.png',
+        imageWidth: 96,
+        resizeMode: 'contain',
+        ios: { backgroundColor: '#0d0f10', image: './assets/images/shado-round-mark.png', imageWidth: 96 },
+        android: { backgroundColor: '#0d0f10', image: './assets/images/shado-round-mark.png', imageWidth: 96 },
+      }]
+      : plugin), './plugins/with-streamlined-store-permissions'],
   };
 };

@@ -23,18 +23,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getSupabase, isSupabaseConfigured, nativeRealtimeOptions, nativeRealtimeTopic } from '@/lib/supabase';
 import { appRuntime } from '@/lib/appRuntime';
+import {useCommunityBinding} from '@/community/NativeCommunityBoundary';
+import {isCurrentCommunity,runCommunityOperation,scopeMatchesInstallation,rememberedInstallation} from '@/community/communityBindings';
 import { configureNativeNotifications } from '@/lib/notifications/config';
 import {
-  clearNativeNotificationInstallationCredential,
-  getNativeNotificationDeviceOptOut,
-  getNativeNotificationInstallationCredential,
+  bindCommunityRegistration,
   isNativeNotificationCredentialRejectedError,
-  reconcileNativeNotificationInstallation,
-  registerNativeNotificationInstallation,
-  refreshNativeNotificationToken,
-  revokeNativeNotificationInstallation,
-  setNativeNotificationDeviceOptOut,
-  updateNativeNotificationForegroundLease,
 } from '@/lib/notifications/registration';
 import {
   parseNotifeeEnvelope,
@@ -72,7 +66,7 @@ const NativeNotificationsContext =
 const createNativeNotificationRequestId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const getEnvelopeFromNotification = (
+const parseEnvelopeFromNotification = (
   notification: Notifications.Notification
 ) => {
   const data = notification.request.content.data ?? {};
@@ -143,6 +137,20 @@ function NativeNotificationBanner({
 }
 
 export function NativeNotificationsProvider({ children }: { children: ReactNode }) {
+  const {context}=useCommunityBinding();
+  const registration=useMemo(()=>bindCommunityRegistration(context),[context]);
+  const client=useMemo(()=>getSupabase(context),[context]);
+  const valid=useCallback(()=>isCurrentCommunity(context),[context]);
+  const getEnvelopeFromNotification=useCallback((notification:Notifications.Notification)=>{
+    const identity=rememberedInstallation(context.community);
+    if(!valid()||(appRuntime.streamlined && (identity?.userId!==sessionRef.current?.user.id||!scopeMatchesInstallation(context.community,identity,notification.request.content.data))))return null;
+    return parseEnvelopeFromNotification(notification);
+  },[context,valid]);
+  const scopedNotifee=useCallback((notification:Parameters<typeof parseNotifeeEnvelope>[0])=>{
+    const identity=rememberedInstallation(context.community);
+    if(!valid()||(appRuntime.streamlined && (identity?.userId!==sessionRef.current?.user.id||!scopeMatchesInstallation(context.community,identity,notification?.data))))return null;
+    return parseNotifeeEnvelope(notification);
+  },[context,valid]);
   const [session, setSession] = useState<Session | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [permission, setPermission] =
@@ -168,11 +176,13 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
 
   const handleCredentialRejection = useCallback(async (caught: unknown) => {
     if (!isNativeNotificationCredentialRejectedError(caught)) return false;
-    await clearNativeNotificationInstallationCredential();
+    try{await registration.clearNativeNotificationInstallationCredential();}
+    catch{if(valid()){setEnabled(false);setError('Previous notification enrollment needs to be resolved. Retry setup.');}return true;}
+    if(!valid())return true;
     setEnabled(false);
     setError('Notification access expired on this device. Turn it on again.');
     return true;
-  }, []);
+  }, [registration, valid]);
 
   const reconcileCredential = useCallback((force = false) => {
     if (credentialReconcileInFlightRef.current) {
@@ -188,7 +198,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     lastCredentialReconcileAtRef.current = Date.now();
     const request = (async () => {
       try {
-        const reconciled = await reconcileNativeNotificationInstallation();
+        const reconciled = await registration.reconcileNativeNotificationInstallation();
         if (reconciled) setEnabled(true);
       } catch (caught) {
         await handleCredentialRejection(caught);
@@ -200,10 +210,11 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     });
     credentialReconcileInFlightRef.current = request;
     return request;
-  }, [handleCredentialRejection]);
+  }, [handleCredentialRejection, registration]);
 
-  const syncBadgeCount = useCallback(async () => {
-    const { data, error: badgeError } = await getSupabase().rpc(
+  const syncBadgeCount = useCallback(() => runCommunityOperation(context,async () => {
+    if(!valid())return;
+    const { data, error: badgeError } = await client.rpc(
       'get_app_badge_state_v2'
     );
     if (badgeError) throw badgeError;
@@ -212,6 +223,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
         ? data as Record<string, unknown>
         : {}
     );
+    if(!valid())return;
     const total = Number(record.total ?? 0);
     const bounded = Number.isFinite(total)
       ? Math.max(0, Math.min(99, Math.floor(total)))
@@ -220,9 +232,9 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       Notifications.setBadgeCountAsync(bounded),
       notifee.setBadgeCount(bounded),
     ]);
-  }, []);
+  }), [client, context, valid]);
 
-  const dismissEnvelopeNotifications = useCallback(async (eventIds: string[]) => {
+  const dismissEnvelopeNotifications = useCallback((eventIds: string[]) => runCommunityOperation(context,async () => {
     const targetIds = new Set(eventIds);
     const presented = await Notifications.getPresentedNotificationsAsync()
       .catch(() => []);
@@ -241,7 +253,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     await Promise.allSettled(
       displayed
         .filter(item => {
-          const envelope = parseNotifeeEnvelope(item.notification);
+          const envelope = scopedNotifee(item.notification);
           const matches =
             envelope?.eventIds.some(eventId => targetIds.has(eventId)) ?? false;
           if (matches && envelope?.groupKey) {
@@ -255,13 +267,14 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     );
     await reconcileAndroidNotificationGroups(affectedGroupKeys)
       .catch(() => undefined);
-  }, []);
+  }), [context, getEnvelopeFromNotification, scopedNotifee]);
 
   const markEnvelopeRead = useCallback(async (
     envelope: NotificationEnvelopeV2
-  ) => {
+  ) => runCommunityOperation(context,async () => {
+    if(!valid())return;
     for (const eventId of envelope.eventIds) {
-      const { error: readError } = await getSupabase().rpc(
+      const { error: readError } = await client.rpc(
         'mark_my_notification_event_read',
         { target_event_id: eventId }
       );
@@ -271,19 +284,23 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       dismissEnvelopeNotifications(envelope.eventIds),
       syncBadgeCount(),
     ]);
-  }, [dismissEnvelopeNotifications, syncBadgeCount]);
+  }), [client, context, dismissEnvelopeNotifications, syncBadgeCount, valid]);
 
   const openEnvelope = useCallback(async (envelope: NotificationEnvelopeV2) => {
+    if(!valid())return;
     setPresentation(null);
     publishNativeNotificationRoute(normalizeNotificationRoute(envelope.route));
     void markEnvelopeRead(envelope).catch(caught => {
       setError(caught instanceof Error ? caught.message : 'Could not mark notification as read.');
     });
-  }, [markEnvelopeRead]);
+  }, [markEnvelopeRead, valid]);
 
   const consumeResponse = useCallback(async (
     response: Notifications.NotificationResponse
   ) => {
+    if(!valid())return;
+    await registration.getNativeNotificationInstallationCredential();
+    if(!valid())return;
     if (!sessionRef.current?.user) {
       pendingResponseRef.current = response;
       return;
@@ -301,7 +318,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     }
 
     await openEnvelope(envelope);
-  }, [markEnvelopeRead, openEnvelope]);
+  }, [getEnvelopeFromNotification, markEnvelopeRead, openEnvelope, registration, valid]);
 
   const consumeNotifeeEvent = useCallback(async (
     event: Pick<NotifeeEvent, 'type' | 'detail'>
@@ -310,11 +327,14 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       event.type !== EventType.PRESS &&
       event.type !== EventType.ACTION_PRESS
     ) return;
+    if(!valid())return;
+    await registration.getNativeNotificationInstallationCredential();
+    if(!valid())return;
     if (!sessionRef.current?.user) {
       pendingNotifeeEventRef.current = event;
       return;
     }
-    const envelope = parseNotifeeEnvelope(event.detail.notification);
+    const envelope = scopedNotifee(event.detail.notification);
     if (!envelope) return;
     const actionKey = [
       event.detail.notification?.id ?? envelope.eventId,
@@ -327,7 +347,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       return;
     }
     await openEnvelope(envelope);
-  }, [markEnvelopeRead, openEnvelope]);
+  }, [markEnvelopeRead, openEnvelope, registration, scopedNotifee, valid]);
 
   const register = useCallback((
     requestPermission: boolean,
@@ -343,9 +363,9 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     const pending = registrationInFlightRef.current;
     if (pending?.requestId === activeRequestId) return pending.promise;
 
-    const registration = Promise.resolve().then(async () => {
+    const registrationWork = runCommunityOperation(context,async () => {
       const isCurrent = () =>
-        registrationInFlightRef.current?.requestId === activeRequestId;
+        valid() && registrationInFlightRef.current?.requestId === activeRequestId;
       setRequestId(activeRequestId);
       setBusy(true);
       setStage('reading_permission');
@@ -355,7 +375,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
         if (requestPermission) {
           await runNotificationStage({
             stage: 'reading_permission',
-            operation: () => setNativeNotificationDeviceOptOut(false),
+            operation: () => registration.setNativeNotificationDeviceOptOut(false),
           });
         }
 
@@ -368,7 +388,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
           throw new Error('A secure notification enrollment handshake is required.');
         }
 
-        const result = await registerNativeNotificationInstallation({
+        const result = await registration.registerNativeNotificationInstallation({
           requestPermission,
           enrollmentTicket,
           enrollmentVerifier,
@@ -408,10 +428,10 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
 
     registrationInFlightRef.current = {
       requestId: activeRequestId,
-      promise: registration,
+      promise: registrationWork,
     };
-    return registration;
-  }, []);
+    return registrationWork;
+  }, [context, registration, valid]);
 
   const enable = useCallback(
     (
@@ -431,7 +451,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     [register]
   );
 
-  const disableThisDevice = useCallback(async (nextRequestId?: string | null) => {
+  const disableThisDevice = useCallback((nextRequestId?: string | null) => runCommunityOperation(context,async () => {
     setRequestId(
       nextRequestId ?? createNativeNotificationRequestId('disable')
     );
@@ -439,9 +459,9 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     setStage('idle');
     setError(null);
     try {
-      await setNativeNotificationDeviceOptOut(true);
+      await registration.setNativeNotificationDeviceOptOut(true);
       setEnabled(false);
-      await revokeNativeNotificationInstallation();
+      await registration.revokeNativeNotificationInstallation();
       await Promise.all([
         Notifications.dismissAllNotificationsAsync(),
         Notifications.setBadgeCountAsync(0),
@@ -459,11 +479,11 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     } finally {
       setBusy(false);
     }
-  }, []);
+  }), [context,registration]);
 
   useEffect(() => {
     if (!isSupabaseConfigured) return;
-    const client = getSupabase();
+    // client is permanently bound to this provider context.
     let active = true;
     let authEventVersion = 0;
     void configureNativeNotifications()
@@ -471,18 +491,19 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       .then(async nextPermissions => {
         if (!active) return;
         const [optedOut, installationCredential] = await Promise.all([
-          getNativeNotificationDeviceOptOut(),
-          getNativeNotificationInstallationCredential(),
+          registration.getNativeNotificationDeviceOptOut(),
+          registration.getNativeNotificationInstallationCredential(),
         ]);
+        if(!active || !valid())return;
         setPermission(nextPermissions.status);
         const locallyEnabled =
           nextPermissions.status === 'granted' &&
           !optedOut &&
-          Boolean(installationCredential)
+          Boolean(installationCredential && !installationCredential.enrollmentPending)
         setEnabled(locallyEnabled);
         if (locallyEnabled) void reconcileCredential(true);
         if (optedOut && installationCredential) {
-          void revokeNativeNotificationInstallation().catch(() => undefined);
+          void registration.revokeNativeNotificationInstallation().catch(() => undefined);
         }
       })
       .catch(caught => {
@@ -498,22 +519,22 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     };
 
     void client.auth.getSession().then(({ data }) => {
-      if (active && authEventVersion === 0) applySession(data.session);
+      if (active && valid() && authEventVersion === 0) applySession(data.session);
     });
     const { data: authListener } = client.auth.onAuthStateChange((_event, nextSession) => {
       authEventVersion += 1;
-      if (active) applySession(nextSession);
+      if (active && valid()) applySession(nextSession);
     });
     return () => {
       active = false;
       authListener.subscription.unsubscribe();
     };
-  }, [reconcileCredential]);
+  }, [client.auth, reconcileCredential, registration, valid]);
 
   useEffect(() => {
     if (!enabled || permission !== 'granted') return;
     const subscription = Notifications.addPushTokenListener(devicePushToken => {
-      void refreshNativeNotificationToken(devicePushToken).catch(caught => {
+      void registration.refreshNativeNotificationToken(devicePushToken).catch(caught => {
         if (isNativeNotificationCredentialRejectedError(caught)) {
           void handleCredentialRejection(caught);
           return;
@@ -524,12 +545,12 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       });
     });
     return () => subscription.remove();
-  }, [enabled, handleCredentialRejection, permission]);
+  }, [enabled, handleCredentialRejection, permission, registration]);
 
   useEffect(() => {
     if (!enabled) return;
     const syncLease = (foreground: boolean) => {
-      void updateNativeNotificationForegroundLease(foreground).catch(caught => {
+      void registration.updateNativeNotificationForegroundLease(foreground).catch(caught => {
         void handleCredentialRejection(caught);
       });
     };
@@ -546,28 +567,23 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     return () => {
       clearInterval(intervalId);
       appStateSubscription.remove();
-      syncLease(false);
+      if(valid())syncLease(false);
     };
-  }, [
-    permission,
-    enabled,
-    session?.user,
-    syncBadgeCount,
-    handleCredentialRejection,
-  ]);
+  }, [permission, enabled, session?.user, syncBadgeCount, handleCredentialRejection, registration, valid]);
 
   useEffect(() => {
     const refreshPermission = async () => {
       const nextPermissions = await Notifications.getPermissionsAsync();
       const [optedOut, installationCredential] = await Promise.all([
-        getNativeNotificationDeviceOptOut(),
-        getNativeNotificationInstallationCredential(),
+        registration.getNativeNotificationDeviceOptOut(),
+        registration.getNativeNotificationInstallationCredential(),
       ]);
+      if(!valid())return;
       setPermission(nextPermissions.status);
       const locallyEnabled =
         nextPermissions.status === 'granted' &&
         !optedOut &&
-        Boolean(installationCredential)
+        Boolean(installationCredential && !installationCredential.enrollmentPending)
       setEnabled(locallyEnabled);
       if (locallyEnabled) void reconcileCredential();
     };
@@ -577,25 +593,28 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       }
     });
     return () => subscription.remove();
-  }, [reconcileCredential]);
+  }, [reconcileCredential, registration, valid]);
 
   useEffect(() => {
     const receiveSubscription = Notifications.addNotificationReceivedListener(notification => {
+      if(!valid())return;
+      void registration.getNativeNotificationInstallationCredential().then(()=>{
       const envelope = getEnvelopeFromNotification(notification);
       if (envelope && AppState.currentState === 'active') setPresentation(envelope);
+      }).catch(()=>undefined);
     });
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
-      void consumeResponse(response);
+      void consumeResponse(response).catch(()=>undefined);
     });
     const notifeeSubscription = notifee.onForegroundEvent(event => {
-      void consumeNotifeeEvent(event);
+      void consumeNotifeeEvent(event).catch(()=>undefined);
     });
     void Notifications.getLastNotificationResponseAsync().then(response => {
       if (!response) return;
       return consumeResponse(response).finally(() =>
         Notifications.clearLastNotificationResponseAsync()
       );
-    });
+    }).catch(()=>undefined);
     void notifee.getInitialNotification().then(initial => {
       if (!initial) return;
       return consumeNotifeeEvent({
@@ -605,16 +624,13 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
           pressAction: initial.pressAction,
         },
       });
-    });
+    }).catch(()=>undefined);
     return () => {
       receiveSubscription.remove();
       responseSubscription.remove();
       notifeeSubscription();
     };
-  }, [
-    consumeNotifeeEvent,
-    consumeResponse,
-  ]);
+  }, [consumeNotifeeEvent, consumeResponse, getEnvelopeFromNotification, registration, valid]);
 
   useEffect(() => {
     if (!session?.user) return;
@@ -640,7 +656,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
 
   useEffect(() => {
     if (!session?.user) return;
-    const client = getSupabase();
+    // client is permanently bound to this provider context.
     const channel = client
       .channel(nativeRealtimeTopic(`native-notifications:${session.user.id}`), nativeRealtimeOptions)
       .on(
@@ -652,6 +668,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
           filter: `user_id=eq.${session.user.id}`,
         },
         payload => {
+          if(!valid())return;
           void syncBadgeCount().catch(() => undefined);
           if (payload.eventType !== 'UPDATE') return;
           const updated = payload.new as {
@@ -668,7 +685,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     return () => {
       void client.removeChannel(channel);
     };
-  }, [dismissEnvelopeNotifications, session?.user, syncBadgeCount]);
+  }, [client, dismissEnvelopeNotifications, session?.user, syncBadgeCount, valid]);
 
   useEffect(() => {
     if (!presentation) return;

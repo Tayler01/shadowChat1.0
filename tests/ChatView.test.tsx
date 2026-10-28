@@ -1,6 +1,9 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import React from 'react'
 import { ChatView } from '../src/components/chat/ChatView'
+import { normalizeContentPolicyError } from '../src/lib/contentPolicy'
+import { getBlockedActionMessage } from '../src/lib/moderation'
+import { showActionErrorToast } from '../src/lib/toastNotifications'
 
 const createMessagesState = () => ({
   messages: [
@@ -25,6 +28,10 @@ const createMessagesState = () => ({
 })
 
 let mockMessagesState = createMessagesState()
+let mockComposerSend: ((content: string) => Promise<unknown>) | undefined
+
+jest.mock('../src/lib/moderation', () => ({ getBlockedActionMessage: jest.fn() }))
+jest.mock('../src/lib/toastNotifications', () => ({ showActionErrorToast: jest.fn() }))
 
 jest.mock('../src/hooks/useAuth', () => ({ useAuth: () => ({ profile: { id: 'u1' } }) }))
 
@@ -74,13 +81,16 @@ jest.mock('../src/components/search/GlobalSearchButton', () => ({
 }))
 
 jest.mock('../src/components/chat/MessageInput', () => ({
-  MessageInput: ({ disabled, className }: { disabled?: boolean; className?: string }) => (
+  MessageInput: ({ disabled, className, onSendMessage }: { disabled?: boolean; className?: string; onSendMessage: (content: string) => Promise<unknown> }) => {
+    mockComposerSend = onSendMessage
+    return (
     <div
       data-testid="message-input"
       data-disabled={String(Boolean(disabled))}
       data-class-name={className || ''}
     />
-  ),
+    )
+  },
 }))
 
 jest.mock('../src/components/hype/HypeBellButton', () => ({
@@ -137,7 +147,28 @@ jest.mock('../src/lib/sessionRecovery', () => ({
 }))
 
 beforeEach(() => {
+  jest.clearAllMocks()
   mockMessagesState = createMessagesState()
+  mockComposerSend = undefined
+})
+
+test('passes the exact policy rejection back to the composer for draft restoration without a generic ban toast', async () => {
+  const rejection = normalizeContentPolicyError({ code: 'PT422', message: 'CONTENT_POLICY_REJECTED' })
+  mockMessagesState.sendMessage.mockRejectedValue(rejection)
+  await act(async () => { render(<ChatView currentView="chat" onViewChange={() => {}} />) })
+  await expect(mockComposerSend?.('Rejected draft')).rejects.toBe(rejection)
+  expect(getBlockedActionMessage).not.toHaveBeenCalled()
+  expect(showActionErrorToast).not.toHaveBeenCalled()
+})
+
+test('retains existing ban handling for unrelated send failures', async () => {
+  const failure = new Error('ordinary failure')
+  mockMessagesState.sendMessage.mockRejectedValue(failure)
+  ;(getBlockedActionMessage as jest.Mock).mockResolvedValue('Existing channel ban message')
+  await act(async () => { render(<ChatView currentView="chat" onViewChange={() => {}} />) })
+  await expect(mockComposerSend?.('Draft')).resolves.toBeNull()
+  expect(getBlockedActionMessage).toHaveBeenCalledWith('general_chat', failure, 'Failed to send message')
+  expect(showActionErrorToast).toHaveBeenCalledWith('Existing channel ban message')
 })
 
 test('expands room-specific controls inline in the header without a selector popup', async () => {

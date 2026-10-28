@@ -9,6 +9,7 @@ import {
   type NotificationPreviewMode,
 } from '../_shared/notification-envelope-v2.ts'
 import { getNotificationSuppressionReason } from '../_shared/notification-delivery.ts'
+import { buildNotificationCommunityScope, type CommunityScopeInstallation } from '../_shared/notification-community-scope.ts'
 
 const privateNotificationMediaEnabled = () => Deno.env.get('PRIVATE_NOTIFICATION_MEDIA_ENABLED') === 'true'
 const notificationMediaSigningConfig = () => ({
@@ -41,7 +42,7 @@ type NativeTokenRow = {
   environment: string
 }
 
-type InstallationRow = {
+type InstallationRow = CommunityScopeInstallation & {
   id: string
   platform: 'ios' | 'android' | 'web'
   environment: string
@@ -406,7 +407,11 @@ export const toExpoMessage = (
   eventType: string,
   entityId: string,
   badge: number,
+  recipientUserId?: string,
 ) => {
+  const communityScope = buildNotificationCommunityScope(
+    installation, recipientUserId, Deno.env.get('SUPABASE_URL') || '',
+  )
   const sound = envelope.soundId === 'silent'
     ? null
     : envelope.soundId === 'system_default'
@@ -429,8 +434,10 @@ export const toExpoMessage = (
     ...envelope,
     type: eventType,
     entityId,
+    // Scoped transport cannot rely on the NSE running to remove enrichment.
+    ...(communityScope ? { actor: null, media: null } : {}),
   }
-  const richImage = envelope.privacy === 'full'
+  const richImage = !communityScope && envelope.privacy === 'full'
     ? envelope.media?.thumbnailUrl
     : null
   const message: Record<string, unknown> = installation.platform === 'android'
@@ -439,6 +446,7 @@ export const toExpoMessage = (
       data: {
         envelopeV2: deliveryEnvelope,
         badgeCount: badge,
+        ...(communityScope ? { communityScope } : {}),
       },
       priority: 'high',
       ttl: Math.max(1, Math.min(90, Math.floor(
@@ -447,11 +455,12 @@ export const toExpoMessage = (
     }
     : {
     to: token.token,
-    title: envelope.content.title,
-    subtitle: envelope.content.eyebrow,
-    body: envelope.content.body || undefined,
+    title: communityScope ? 'ShadowChat' : envelope.content.title,
+    subtitle: communityScope ? undefined : envelope.content.eyebrow,
+    body: communityScope ? 'Open ShadowChat to view your notification.' : envelope.content.body || undefined,
     data: {
       envelopeV2: deliveryEnvelope,
+      ...(communityScope ? { communityScope } : {}),
     },
     sound,
     badge,
@@ -469,7 +478,7 @@ export const toExpoMessage = (
     categoryId,
     threadId: envelope.groupKey.slice(0, 64),
     collapseId: envelope.eventId.slice(0, 64),
-    mutableContent: Boolean(envelope.media || envelope.actor),
+    mutableContent: !communityScope && Boolean(envelope.media || envelope.actor),
     ...(richImage ? { richContent: { image: richImage } } : {}),
   }
 
@@ -588,7 +597,7 @@ const processClaim = async (
       .maybeSingle(),
     supabase
       .from('notification_installations')
-      .select('id, platform, environment, foreground_until, channel_schema_version')
+      .select('id, user_id, installation_key, build_number, community_scope_version, platform, environment, foreground_until, channel_schema_version')
       .eq('user_id', claim.user_id)
       .eq('environment', deliveryEnvironment)
       .is('revoked_at', null)
@@ -701,7 +710,8 @@ const processClaim = async (
   const tokens = ((tokenData ?? []) as NativeTokenRow[])
     .filter(token => (
       token.provider === 'expo' &&
-      token.environment === deliveryEnvironment
+      token.environment === deliveryEnvironment &&
+      installationIds.includes(token.installation_id)
     ))
     .filter((token, index, all) => all.findIndex(item => item.installation_id === token.installation_id) === index)
     .slice(0, NATIVE_CANARY_LIMITS.installationsPerEvent)
@@ -910,6 +920,7 @@ const processClaim = async (
       event.type,
       event.entity_id,
       badge,
+      claim.user_id,
     )
   })
   const controller = new AbortController()

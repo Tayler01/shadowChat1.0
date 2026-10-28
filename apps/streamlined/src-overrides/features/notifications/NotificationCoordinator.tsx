@@ -50,6 +50,7 @@ import {
   type NotificationPresentation,
 } from '../../../../../src/features/notifications/notificationModel'
 import { NotificationBannerV2 } from './NotificationBannerV2'
+import { streamlinedNotificationMediaUrlPolicy } from '../../lib/notificationMediaPolicy'
 import {
   buildNotificationEnvelopeV2,
   getNotificationTypePolicyV2,
@@ -289,6 +290,7 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
       const presentation = buildNotificationPresentation(event)
       if (isNotificationSourceActive(presentation.route, window.location.href)) return
       const envelope = buildNotificationEnvelopeV2(event, presentation, {
+        mediaUrlPolicy: streamlinedNotificationMediaUrlPolicy,
         previewMode: preferences.notification_preview_mode,
         mediaEnabled: preferences.notification_media_enabled,
         soundId: preferences.notification_event_sound_map?.[event.type] ??

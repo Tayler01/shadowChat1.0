@@ -1,4 +1,5 @@
 import { PrivateMediaAudio } from '../ui/PrivateMediaPlayer'
+import { isContentPolicyRejection } from '../../lib/contentPolicy'
 import { PrivateMediaImage } from '../ui/PrivateMediaImage'
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -1138,6 +1139,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
       }
       return sent
     } catch (error) {
+      if (isContentPolicyRejection(error)) throw error
       console.error(error)
       toast.error('Failed to send message')
       return null

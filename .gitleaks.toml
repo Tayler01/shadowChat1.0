@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+# This exact demo-project publishable key is public client configuration, verified
+# against the isolated Supabase project. Secret/service-role keys remain scanned.
+[allowlist]
+description = "Verified public demo client configuration"
+regexTarget = "line"
+regexes = ['''^\s*"EXPO_PUBLIC_DEMO_SUPABASE_KEY": "sb_publishable_h-nPlfvK2mq9avGohB1kpQ__6MrSX9f",?\s*$''']

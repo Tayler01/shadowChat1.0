@@ -11,6 +11,7 @@ import {
   NOTIFICATION_PRIVACY_MODES,
   NOTIFICATION_SOUND_IDS,
   buildNotificationEnvelopeV2,
+  createCommunityNotificationMediaUrlPolicy,
   getEnvelopeVisibleContent,
   getNotificationPrimaryActionLabel,
   isNotificationEnvelopeV2,
@@ -76,6 +77,66 @@ const presentation = (
 })
 
 describe('notification envelope v2', () => {
+  const demoOrigin = 'https://shadowchat-review-demo.netlify.app'
+  const demoBackend = 'https://lzmbwrbvtugqnmuefdrm.supabase.co'
+  const demoPolicy = createCommunityNotificationMediaUrlPolicy(demoOrigin, demoBackend)
+  const demoMedia = `${demoBackend}/storage/v1/object/public/avatars/reviewer.jpg`
+
+  test('an explicit community policy replaces legacy hosts and preserves storage path restrictions', () => {
+    expect(normalizeNotificationMediaUrl(demoMedia, demoPolicy)).toBe(demoMedia)
+    expect(normalizeNotificationMediaUrl(`${demoOrigin}/icons/icon.png`, demoPolicy))
+      .toBe(`${demoOrigin}/icons/icon.png`)
+    expect(normalizeNotificationMediaUrl(`${demoBackend}/storage/v1/object/sign/avatars/a.jpg?token=demo`, demoPolicy))
+      .toBe(`${demoBackend}/storage/v1/object/sign/avatars/a.jpg?token=demo`)
+    for (const url of [
+      `${notificationMediaBase}/avatars/member.jpg`,
+      'https://shadochat.online/avatar.jpg',
+      'https://another-review-demo.netlify.app/avatar.jpg',
+      'https://video.b-cdn.net/avatar.jpg',
+      `${demoBackend}/functions/v1/avatar`,
+      `${demoBackend}/storage/v1/object/sign/avatars/a.jpg`,
+      `${demoBackend}:444/storage/v1/object/public/avatars/a.jpg`,
+      `https://user:pass@${new URL(demoBackend).hostname}/storage/v1/object/public/avatars/a.jpg`,
+      'https://127.0.0.1/avatar.jpg',
+    ]) expect(normalizeNotificationMediaUrl(url, demoPolicy)).toBeNull()
+    expect(normalizeNotificationMediaUrl(`${notificationMediaBase}/avatars/member.jpg`))
+      .toBe(`${notificationMediaBase}/avatars/member.jpg`)
+    expect(normalizeNotificationMediaUrl(demoMedia)).toBeNull()
+  })
+
+  test('missing or malformed community configuration denies all media without a legacy fallback', () => {
+    for (const [app, backend] of [
+      [undefined, demoBackend], [demoOrigin, undefined], ['', demoBackend],
+      [demoOrigin, 'https://attacker.example'], [demoOrigin, `${demoBackend}/functions/v1`],
+      ['http://shadowchat-review-demo.netlify.app', demoBackend],
+      ['https://localhost', demoBackend], ['https://127.0.0.1', demoBackend],
+      [`${demoOrigin}?host=anything`, demoBackend], [demoBackend, demoBackend],
+    ]) {
+      const invalid = createCommunityNotificationMediaUrlPolicy(app, backend)
+      for (const media of [demoMedia, `${demoOrigin}/avatar.jpg`, `${notificationMediaBase}/avatars/member.jpg`]) {
+        expect(normalizeNotificationMediaUrl(media, invalid)).toBeNull()
+      }
+    }
+  })
+
+  test('community media policy covers both avatar and thumbnail during envelope creation and validation', () => {
+    const source = event({ payload: { thumbnail_url: demoMedia } })
+    const envelope = buildNotificationEnvelopeV2(source, presentation(source, { avatarUrl: demoMedia }), {
+      mediaUrlPolicy: demoPolicy,
+    })
+    expect(envelope.actor?.avatarUrl).toBe(demoMedia)
+    expect(envelope.media?.thumbnailUrl).toBe(demoMedia)
+    expect(isNotificationEnvelopeV2(envelope, demoPolicy)).toBe(true)
+    expect(isNotificationEnvelopeV2(envelope)).toBe(false)
+    const memberAvatar = `${notificationMediaBase}/avatars/member.jpg`
+    expect(isNotificationEnvelopeV2({ ...envelope, actor: { ...envelope.actor, avatarUrl: memberAvatar } }, demoPolicy)).toBe(false)
+    expect(isNotificationEnvelopeV2({ ...envelope, media: { ...envelope.media, thumbnailUrl: memberAvatar } }, demoPolicy)).toBe(false)
+    const denied = buildNotificationEnvelopeV2(event({ payload: { thumbnail_url: memberAvatar } }),
+      presentation(source, { avatarUrl: memberAvatar }), { mediaUrlPolicy: demoPolicy })
+    expect(denied.actor?.avatarUrl).toBeNull()
+    expect(denied.media).toBeNull()
+  })
+
   test('brands Checkers invitations as a games notification with a decision action', () => {
     const source = event({
       type: 'shadow_checkers_invite',

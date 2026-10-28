@@ -11,7 +11,6 @@ import React, {
 import {
   ActivityIndicator,
   BackHandler,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -39,6 +38,7 @@ import { getNotificationWebUrl } from '@/lib/notifications/routes';
 import {
   getNativeNotificationInstallationCredential,
   getNativeNotificationInstallationKey,
+  settleNativeNotificationEnrollmentAttempt,
 } from '@/lib/notifications/registration';
 import {
   createSerializedCommandQueue,
@@ -46,12 +46,11 @@ import {
 } from '@/lib/serializedCommandQueue';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { appRuntime } from '@/lib/appRuntime';
+import { NativeLaunchLoader } from '@/components/NativeLaunchLoader';
+import { useCommunityBinding } from '@/community/NativeCommunityBoundary';
+import { addCommunityCleanup,announceCommunityChange,communityController,isCurrentCommunity,runCommunityOperation } from '@/community/communityBindings';
+import { resetCommunityMemory } from '@/lib/supabase';
 
-// Metro resolves bundled image assets through a static require.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const NATIVE_LOADING_MARK = require('../../assets/images/shado-round-mark.png');
-const APP_ORIGIN = appRuntime.origin;
-const APP_URL = getNotificationWebUrl('/?nativeApp=1&nativeBridge=3');
 const NATIVE_BOOTSTRAP_SCRIPT = `
   (function () {
     window.__SHADOWCHAT_NATIVE_APP__ = true;
@@ -73,23 +72,6 @@ const NATIVE_BOOTSTRAP_SCRIPT = `
   true;
 `;
 
-const isAllowedAppUrl = (value: string) => {
-  if (value === 'about:blank') return true;
-  try {
-    return new URL(value).origin === APP_ORIGIN;
-  } catch {
-    return false;
-  }
-};
-
-const sameSession = (
-  current: Session | null,
-  next: { accessToken: string; refreshToken: string; userId: string }
-) =>
-  current?.access_token === next.accessToken &&
-  current.refresh_token === next.refreshToken &&
-  current.user.id === next.userId;
-
 function ConfigurationNotice() {
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -104,9 +86,12 @@ function ConfigurationNotice() {
 }
 
 export default function ShadowChatAppScreen() {
+  const {context,requestChooser}=useCommunityBinding();
+  const APP_ORIGIN=context.community.origin;
+  const APP_URL=new URL('/?nativeApp=1&nativeBridge=3',APP_ORIGIN).href;
+  const isAllowedAppUrl=useCallback((value:string)=>communityController?.acceptsBridge(context,value)===true || (value==='about:blank' && isCurrentCommunity(context)),[context]);
   const webViewRef = useRef<WebView>(null);
   const clipboardBridge = useNativeClipboardBridge(webViewRef, APP_ORIGIN);
-  const authSyncRef = useRef<Promise<Session | null> | null>(null);
   const commandQueueRef = useRef<SerializedCommandQueue | null>(null);
   const notificationCommandQueueRef = useRef<SerializedCommandQueue | null>(null);
   const handledNativeCommandIdsRef = useRef(new Set<string>());
@@ -124,6 +109,7 @@ export default function ShadowChatAppScreen() {
   notificationCommandQueueRef.current ??= createSerializedCommandQueue();
   const nativeNotifications = useNativeNotifications();
   const [webReady, setWebReady] = useState(false);
+  const [loadProgress, setLoadProgress] = useState<number | undefined>();
   const [canGoBack, setCanGoBack] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
@@ -151,6 +137,7 @@ export default function ShadowChatAppScreen() {
   const publishTrackedNotificationState = useCallback((
     state: NativeNotificationBridgeState
   ) => {
+    if(!isCurrentCommunity(context))return;
     if (state.requestId) {
       const states = notificationStatesByRequestIdRef.current;
       states.set(state.requestId, state);
@@ -160,7 +147,7 @@ export default function ShadowChatAppScreen() {
       }
     }
     publishNativeNotificationState(webViewRef.current, state);
-  }, []);
+  }, [context]);
 
   const publishNotificationState = useCallback(() => {
     publishTrackedNotificationState(notificationState);
@@ -178,7 +165,7 @@ export default function ShadowChatAppScreen() {
       window.location.assign(${serializedUrl});
       true;
     `);
-  }, []);
+  }, [isAllowedAppUrl]);
 
   useEffect(
     () => subscribeToNativeNotificationRoutes(navigateInsideApp),
@@ -197,67 +184,21 @@ export default function ShadowChatAppScreen() {
     return () => subscription.remove();
   }, [canGoBack]);
 
-  const syncNativeSession = useCallback(async (
-    nextSession: {
-      accessToken: string;
-      refreshToken: string;
-      userId: string;
-    } | null
-  ): Promise<Session | null> => {
-    const prior = authSyncRef.current ?? Promise.resolve();
-    const sync = prior.catch(() => undefined).then(async () => {
-      const client = getSupabase();
-      const { data } = await runNotificationStage({
-        stage: 'syncing_session',
-        operation: () => client.auth.getSession(),
-      });
-      const current = data.session;
-
-      if (!nextSession) {
-        if (current) {
-          const { error } = await runNotificationStage({
-            stage: 'syncing_session',
-            operation: () => client.auth.signOut({ scope: 'local' }),
-          });
-          if (error) throw error;
-        }
-        setNativeUserId(null);
-        return null;
-      }
-
-      let synchronizedSession = current;
-      if (!sameSession(current, nextSession)) {
-        const { data: sessionData, error } = await runNotificationStage({
-          stage: 'syncing_session',
-          operation: () => client.auth.setSession({
-            access_token: nextSession.accessToken,
-            refresh_token: nextSession.refreshToken,
-          }),
-        });
-        if (error) throw error;
-        if (sessionData.session?.user.id !== nextSession.userId) {
-          throw new Error('The native session did not match the signed-in account.');
-        }
-        synchronizedSession = sessionData.session;
-      }
-
-      if (!synchronizedSession?.user) {
-        throw new Error('The signed-in session did not reach the native app.');
-      }
-      setNativeUserId(nextSession.userId);
-      setBridgeError(null);
-      return synchronizedSession;
-    });
-
-    authSyncRef.current = sync;
-    try {
-      return await sync;
-    } finally {
-      if (authSyncRef.current === sync) authSyncRef.current = null;
-    }
-  }, []);
+  const syncNativeSession=useCallback(async(nextSession:{accessToken:string;refreshToken:string;userId:string}|null):Promise<Session|null>=>{
+    const client=getSupabase(context);
+    let accepted:boolean;
+    try{accepted=await runCommunityOperation(context,()=>communityController!.runSession(context,APP_ORIGIN,nextSession,{
+      getUser:async token=>{const {data,error}=await runNotificationStage({stage:'syncing_session',operation:()=>client.auth.getUser(token)});if(error||!data.user)throw new Error('Account verification failed.');return {id:data.user.id};},
+      setSession:async value=>{const {data,error}=await runNotificationStage({stage:'syncing_session',operation:()=>client.auth.setSession({access_token:value.accessToken,refresh_token:value.refreshToken})});if(error||!data.session)throw new Error('Session synchronization failed.');return {id:data.session.user.id};},
+      clearSession:reason=>resetCommunityMemory(context,reason!=='signout'),
+    }));}finally{announceCommunityChange();}
+    if(!accepted||!isCurrentCommunity(context))return null;
+    setNativeUserId(nextSession?.userId??null);setBridgeError(null);announceCommunityChange();
+    return nextSession ? (await client.auth.getSession()).data.session : null;
+  },[APP_ORIGIN,context]);
 
   const prepareEnrollmentChallenge = useCallback(async (requestId: string) => {
+    await settleNativeNotificationEnrollmentAttempt();
     const challenges = enrollmentChallengesRef.current;
     let pending = challenges.get(requestId);
     if (!pending) {
@@ -307,15 +248,17 @@ export default function ShadowChatAppScreen() {
       }, 5 * 60_000);
     }
     const challenge = await pending;
+    if(!isCurrentCommunity(context))return;
     publishNativeNotificationEnrollmentChallenge(webViewRef.current, {
       requestId,
       installationKey: challenge.installationKey,
       challenge: challenge.challenge,
       credentialChallenge: challenge.credentialChallenge,
     });
-  }, []);
+  }, [context]);
 
   const processNativeMessage = useCallback((message: NativeWebMessage) => {
+    if(!isCurrentCommunity(context))return;
     if (message.type === 'notifications_enrollment_prepare') {
       void prepareEnrollmentChallenge(message.requestId).catch(caught => {
         const messageText = caught instanceof Error
@@ -473,6 +416,7 @@ export default function ShadowChatAppScreen() {
       }
     });
   }, [
+    context,
     nativeNotifications,
     notificationState,
     prepareEnrollmentChallenge,
@@ -480,6 +424,14 @@ export default function ShadowChatAppScreen() {
     publishTrackedNotificationState,
     syncNativeSession,
   ]);
+
+  useEffect(()=>addCommunityCleanup(context,async()=>{
+    clipboardBridge.reset();
+    if(pendingSessionLossRef.current){clearTimeout(pendingSessionLossRef.current);pendingSessionLossRef.current=null;}
+    commandQueueRef.current?.cancel();notificationCommandQueueRef.current?.cancel();
+    await Promise.all([commandQueueRef.current?.drain(),notificationCommandQueueRef.current?.drain()]);
+    enrollmentChallengesRef.current.clear();
+  }),[clipboardBridge,context]);
 
   useEffect(() => () => {
     if (pendingSessionLossRef.current) {
@@ -489,11 +441,11 @@ export default function ShadowChatAppScreen() {
   }, []);
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    if (!isAllowedAppUrl(event.nativeEvent.url)) return;
+    if (!communityController?.acceptsBridge(context,event.nativeEvent.url)) return;
     if (clipboardBridge.handle(event.nativeEvent.data, event.nativeEvent.url)) return;
     const message = parseNativeWebMessage(event.nativeEvent.data);
     if (message) processNativeMessage(message);
-  }, [clipboardBridge, processNativeMessage]);
+  }, [clipboardBridge, context, processNativeMessage]);
 
   const handleNavigationChange = useCallback((navigation: WebViewNavigation) => {
     setCanGoBack(navigation.canGoBack);
@@ -510,7 +462,7 @@ export default function ShadowChatAppScreen() {
       void Linking.openURL(request.url);
     }
     return false;
-  }, []);
+  }, [isAllowedAppUrl]);
 
   const showNotificationPrompt =
     Boolean(nativeUserId) &&
@@ -523,6 +475,7 @@ export default function ShadowChatAppScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
+      {!nativeUserId && appRuntime.streamlined ? <Pressable accessibilityRole="button" accessibilityLabel="Change community" onPress={requestChooser} style={{minHeight:48,justifyContent:'center',paddingHorizontal:16}}><Text style={{color:'#E9C766'}}>Change community{context.community.id==='demo'?' · Demo community':''}</Text></Pressable>:null}
       <WebView
         key={reloadKey}
         ref={webViewRef}
@@ -562,7 +515,9 @@ export default function ShadowChatAppScreen() {
         onLoadStart={() => {
           clipboardBridge.reset();
           setWebReady(false);
+          setLoadProgress(undefined);
         }}
+        onLoadProgress={(event) => setLoadProgress(event.nativeEvent.progress)}
         onMessage={(event) => {
           void handleMessage(event);
         }}
@@ -571,7 +526,7 @@ export default function ShadowChatAppScreen() {
         originWhitelist={['https://*', 'about:blank']}
         pullToRefreshEnabled={false}
         setSupportMultipleWindows={false}
-        sharedCookiesEnabled
+        sharedCookiesEnabled={!appRuntime.streamlined}
         source={{
           uri: APP_URL,
           headers: {
@@ -581,16 +536,11 @@ export default function ShadowChatAppScreen() {
         }}
         startInLoadingState
         style={styles.webView}
-        thirdPartyCookiesEnabled
+        thirdPartyCookiesEnabled={!appRuntime.streamlined}
         renderLoading={() => (
-          <View style={[styles.loadingLayer, appRuntime.streamlined && styles.streamlinedLoadingLayer]} accessibilityRole="progressbar" accessibilityLabel="Opening ShadoChat">
+          <View style={[styles.loadingLayer, appRuntime.streamlined && styles.streamlinedLoadingLayer]}>
             {appRuntime.streamlined ? (
-              <>
-                <Image source={NATIVE_LOADING_MARK} style={styles.loadingMark} accessible={false} />
-                <Text style={styles.loadingBrand}>ShadoChat</Text>
-                <View style={styles.loadingRule} />
-                <Text style={styles.loadingText}>{'Opening your community\u2026'}</Text>
-              </>
+              <NativeLaunchLoader stage="Loading community page" progress={loadProgress} />
             ) : (
               <>
                 <ActivityIndicator color="#E9C766" size="large" />
@@ -635,8 +585,7 @@ export default function ShadowChatAppScreen() {
                   : 'Turn on the full ShadoChat experience'}
               </Text>
               <Text style={styles.promptBody}>
-                Get rich messages, ShadowPin previews, game turns, custom
-                sounds, badges, and exact tap-through destinations.
+                {appRuntime.streamlined ? 'Get alerts, custom sounds, badges, and exact tap-through destinations. New alerts use private lock-screen text.' : 'Get rich messages, ShadowPin previews, game turns, custom sounds, badges, and exact tap-through destinations.'}
               </Text>
               {bridgeError || nativeNotifications.error ? (
                 <Text selectable style={styles.inlineError}>
@@ -724,21 +673,6 @@ const styles = StyleSheet.create({
   },
   streamlinedLoadingLayer: {
     backgroundColor: '#0d0f10',
-  },
-  loadingMark: {
-    width: 96,
-    height: 96,
-  },
-  loadingBrand: {
-    color: '#f1f0ea',
-    fontSize: 26,
-    fontWeight: '600',
-    letterSpacing: 0.4,
-  },
-  loadingRule: {
-    width: 32,
-    height: 2,
-    backgroundColor: 'rgba(233, 199, 102, 0.45)',
   },
   loadingText: {
     color: '#A69B82',

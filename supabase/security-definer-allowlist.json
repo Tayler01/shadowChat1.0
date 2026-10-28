@@ -1,6 +1,6 @@
 {
-  "reviewed_on": "2026-10-23",
-  "expected_total_security_definers": 158,
+  "reviewed_on": "2026-10-28",
+  "expected_total_security_definers": 161,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
     "private.can_operator_read_moderation_evidence(uuid,uuid)",
@@ -135,9 +135,12 @@
   "anon_signatures": [
     "is_username_available(text)",
     "redeem_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,text,text,text,text,integer,text)",
+    "redeem_scoped_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,integer,text,text,text,text,integer,text)",
     "register_native_notification_token_by_credential_v2(uuid,text,text)",
     "revoke_notification_installation_by_credential_v2(uuid,text)",
-    "set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)"
+    "revoke_notification_installation_with_proof_v1(uuid,uuid,text)",
+    "set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)",
+    "settle_native_notification_enrollment_attempt_v1(uuid,uuid,text,text,text,text)"
   ],
   "internal_signatures": [
     "acquire_native_notification_worker_v2(text)",
@@ -504,6 +507,30 @@
     }
   ],
   "review_notes": [
+    {
+      "scope": "pending_native_enrollment_attempt_settlement",
+      "signatures": [
+        "settle_native_notification_enrollment_attempt_v1(uuid,uuid,text,text,text,text)"
+      ],
+      "justification": "This anonymous capability settles only the supplied pending ticket attempt. It locks installation key then ticket in the same order as redemption. A known matching ticket secret must also match canonical owner, installation key, request, verifier and credential hashes before cancellation. A missing/pruned ticket or rotated secret establishes only that this exact old attempt cannot redeem, never that an unknown credential was revoked. An exact matching active new credential is revoked through the separately guarded proof RPC; a previous valid native credential must be retained and revoked independently. Final cancellation invariant failure rolls back writes. No PUBLIC, authenticated or service_role grant is added.",
+      "reviewed_on": "2026-10-28"
+    },
+    {
+      "scope": "idempotent_exact_credential_native_revocation",
+      "signatures": [
+        "revoke_notification_installation_with_proof_v1(uuid,uuid,text)"
+      ],
+      "justification": "Anonymous possession proof requires the exact user, installation key and SHA-256 credential hash, including a previously revoked credential. It serializes with enrollment, token refresh, foreground updates and legacy revocation on the existing per-key advisory lock before credential resolution, locks matched installation/credential rows, rejects any different active same-key registration and atomically revokes the exact generation plus every provider token. A verified repeated revoke returns true; missing, malformed, wrong or replaced credentials return false. A failed final invariant raises and rolls back writes. Existing lifecycle signatures, grants and return semantics stay unchanged, including legacy false-after-revoked; only serialization changes. No PUBLIC, authenticated or service_role execute grant is added.",
+      "reviewed_on": "2026-10-28"
+    },
+    {
+      "scope": "scoped_native_notification_transport_capability",
+      "signatures": [
+        "redeem_scoped_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,integer,text,text,text,text,integer,text)"
+      ],
+      "justification": "The explicit version-1 transport capability requires a strict numeric build of at least 22 and delegates authentication to the existing single-use ticket/verifier/credential redemption in the same transaction. The capability update binds the canonical returned user and installation, supplied installation key, platform, raw build and unrevoked row. Failure rolls back all enrollment writes. Anonymous execution only; no PUBLIC, authenticated or service_role grant. Local PostgreSQL tests verify ACLs, single-use identity binding, rollback and clearing on legacy re-enrollment. Capability declaration does not authorize a recipient or prove an app edition.",
+      "reviewed_on": "2026-10-28"
+    },
     {
       "scope": "existing_native_notification_capabilities",
       "signatures": [

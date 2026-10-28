@@ -12,7 +12,13 @@
       "env": {
         "SHADOWCHAT_APP_EDITION": "streamlined",
         "SHADOWCHAT_STREAMLINED_WEB_ORIGIN": "https://shadowchat-streamlined.netlify.app",
-        "SHADOWCHAT_IOS_BUILD_NUMBER": "21"
+        "SHADOWCHAT_IOS_BUILD_NUMBER": "22",
+        "SHADOWCHAT_DEMO_COMMUNITY_ENABLED": "true",
+        "SHADOWCHAT_DEMO_WEB_ORIGIN": "https://shadowchat-review-demo.netlify.app",
+        "SHADOWCHAT_DEMO_PROJECT_REF": "lzmbwrbvtugqnmuefdrm",
+        "EXPO_PUBLIC_DEMO_SUPABASE_URL": "https://lzmbwrbvtugqnmuefdrm.supabase.co",
+        "EXPO_PUBLIC_DEMO_SUPABASE_KEY": "sb_publishable_h-nPlfvK2mq9avGohB1kpQ__6MrSX9f",
+        "EXPO_PUBLIC_PRIVATE_REALTIME_ENABLED": "true"
       }
     },
     "development": {
