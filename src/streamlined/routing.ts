@@ -2,7 +2,7 @@ import { getLocationStateFromUrl } from '../lib/appRouting'
 import type { AppView } from '../types/navigation'
 
 export const STREAMLINED_VIEWS: readonly AppView[] = ['chat', 'dms', 'pins', 'settings', 'active-users', 'discover']
-const routeKeys = ['conversation', 'message', 'thread', 'pin', 'comment', 'panel', 'feed', 'circle', 'section', 'settingsSection', 'experience', 'item']
+const routeKeys = ['conversation', 'message', 'thread', 'pin', 'comment', 'panel', 'feed', 'circle', 'section', 'settingsSection', 'experience', 'item', 'q', 'scope']
 
 export function normalizeStreamlinedUrl(input: URL): URL {
   const url = new URL(input)
@@ -24,5 +24,13 @@ export function streamlinedViewUrl(input: URL, view: AppView): URL {
   const url = new URL(input)
   routeKeys.forEach(key => url.searchParams.delete(key))
   url.searchParams.set('view', STREAMLINED_VIEWS.includes(view) ? view : 'chat')
+  return url
+}
+
+export function streamlinedSearchUrl(input: URL, query: string, scope: 'messages' | 'all'): URL {
+  const url = streamlinedViewUrl(input, 'discover')
+  const trimmedQuery = query.trim()
+  if (trimmedQuery) url.searchParams.set('q', trimmedQuery)
+  url.searchParams.set('scope', scope)
   return url
 }

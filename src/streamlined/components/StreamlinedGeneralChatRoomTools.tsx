@@ -1,90 +1,36 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { ActiveUsersButton } from '../../../apps/streamlined/src-overrides/components/chat/ActiveUsersButton'
+import { useMemo, useState } from 'react'
+import { Search, SearchCheck } from 'lucide-react'
 import { PinnedMessagesButton } from '../../components/chat/PinnedMessagesButton'
-import { GlobalSearchButton } from '../../components/search/GlobalSearchButton'
-import { useOptionalClientReset } from '../../hooks/ClientResetContext'
 import { useOptionalMessages } from '../../../apps/streamlined/src-overrides/hooks/MessagesContext'
-import type { AppView } from '../../types/navigation'
-
-const ROOM_TOOLS_ID = 'general-chat-room-tools'
 
 interface GeneralChatRoomToolsProps {
-  onViewChange: (view: AppView) => void
+  onSearch: (query: string, scope: 'messages' | 'all') => void
 }
 
-export function GeneralChatRoomTools({ onViewChange }: GeneralChatRoomToolsProps) {
+/** Revealed by scrolling toward older chat; uses the existing discovery search. */
+export function GeneralChatRoomTools({ onSearch }: GeneralChatRoomToolsProps) {
   const messagesContext = useOptionalMessages()
-  const { status: resetStatus } = useOptionalClientReset()
-  const [expanded, setExpanded] = useState(false)
-  const toggleRef = useRef<HTMLButtonElement>(null)
+  const [query, setQuery] = useState('')
   const pinnedMessages = useMemo(
     () => (messagesContext?.messages || []).filter(message => message.pinned),
     [messagesContext?.messages]
   )
 
-  useEffect(() => {
-    if (!expanded) return
-
-    const collapseForKeyboard = () => {
-      if (document.documentElement.dataset.shadowchatKeyboard === 'open') {
-        setExpanded(false)
-      }
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return
-      setExpanded(false)
-      window.requestAnimationFrame(() => toggleRef.current?.focus())
-    }
-    const keyboardObserver = new MutationObserver(collapseForKeyboard)
-
-    document.addEventListener('keydown', handleKeyDown)
-    keyboardObserver.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-shadowchat-keyboard'],
-    })
-    collapseForKeyboard()
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown)
-      keyboardObserver.disconnect()
-    }
-  }, [expanded])
-
   return (
-    <div className="relative isolate flex h-11 shrink-0 items-center">
-      {expanded && (
-        <div
-          id={ROOM_TOOLS_ID}
-          role="group"
-          aria-label="General Chat tools"
-          className="room-tools-inline-rail absolute right-[calc(100%+0.2rem)] top-1/2 z-20 flex h-11 w-max max-w-[calc(100vw-8rem)] -translate-y-1/2 items-center gap-1 overflow-hidden rounded-l-full bg-[var(--bg-panel-strong)] pl-2 pr-1 shadow-[-12px_0_18px_rgba(0,0,0,0.18)] backdrop-blur-xl [&>button]:min-h-11 [&>button]:min-w-11"
-        >
-          <GlobalSearchButton onOpen={() => onViewChange('discover')} />
-          <ActiveUsersButton
-            resetStatus={resetStatus}
-            showPresenceDot={false}
-            onOpen={() => onViewChange('active-users')}
-          />
-          <PinnedMessagesButton
-            messages={pinnedMessages}
-            onUnpin={messagesContext?.togglePin ?? (async () => {})}
-            onToggleReaction={messagesContext?.toggleReaction ?? (async () => {})}
-          />
-        </div>
-      )}
-
-      <button
-        ref={toggleRef}
-        type="button"
-        onClick={() => setExpanded(value => !value)}
-        className="room-tools-control inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--text-secondary)] transition-[background-color,color,transform] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--theme-accent-readable)] active:scale-95"
-        aria-label={expanded ? 'Collapse General Chat tools' : 'Expand General Chat tools'}
-        aria-controls={ROOM_TOOLS_ID}
-        aria-expanded={expanded}
-      >
-        {expanded ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-      </button>
+    <div role="search" aria-label="Group chat search" className="border-b border-[var(--border-panel)] bg-[var(--bg-shell)] px-3 pb-1.5 pt-2 shadow-[0_8px_18px_rgba(0,0,0,0.16)]">
+      <form className="flex min-w-0 items-center gap-2" onSubmit={event => { event.preventDefault(); onSearch(query, 'messages') }}>
+        <label htmlFor="streamlined-chat-search" className="sr-only">Search chat messages</label>
+        <input id="streamlined-chat-search" type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search chat messages" enterKeyHint="search" className="obsidian-input h-11 min-w-0 flex-1 rounded-full px-4 text-base" />
+        <button type="submit" aria-label="Search messages" className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] text-[var(--theme-accent-readable)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"><Search className="h-5 w-5" aria-hidden="true" /></button>
+      </form>
+      <div role="group" aria-label="General Chat tools" className="mt-1 flex min-h-11 items-center justify-between gap-2">
+        <button type="button" onClick={() => onSearch(query, 'all')} className="inline-flex min-h-11 items-center gap-2 rounded-full px-2 text-xs text-[var(--text-secondary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)]"><SearchCheck className="h-4 w-4" aria-hidden="true" />Full search & saved</button>
+        <PinnedMessagesButton
+          messages={pinnedMessages}
+          onUnpin={messagesContext?.togglePin ?? (async () => {})}
+          onToggleReaction={messagesContext?.toggleReaction ?? (async () => {})}
+        />
+      </div>
     </div>
   )
 }

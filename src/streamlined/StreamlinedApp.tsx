@@ -14,9 +14,7 @@ import { useChannelBanExpirySweep } from '../hooks/useChannelBanExpirySweep'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { useStreamlinedViewport } from './useStreamlinedViewport'
 import { MobileNav } from './components/StreamlinedMobileNav'
-import { MobileAppHeader } from './components/StreamlinedMobileAppHeader'
-import { GeneralChatRoomTools } from './components/StreamlinedGeneralChatRoomTools'
-import { normalizeStreamlinedUrl, readStreamlinedLocation, streamlinedViewUrl } from './routing'
+import { normalizeStreamlinedUrl, readStreamlinedLocation, streamlinedSearchUrl, streamlinedViewUrl } from './routing'
 import {
   resolveChatThreadRouteMutation, resolveDMRouteMutation, resolvePinRouteMutation,
   resolvePinFeedModeMutation, resolvePinCircleFilterMutation, resolveInnerCircleRouteMutation,
@@ -38,7 +36,7 @@ const ActiveUsersView = lazy(() => import('../components/chat/ActiveUsersView').
 const Search = lazy(() => import('../../apps/streamlined/src-overrides/features/discovery/UniversalDiscoveryDialog').then(m => ({ default: m.UniversalDiscoveryView })))
 
 type Mutation = { method: 'back' | 'back-two' } | { method: 'push' | 'replace'; url: URL; layer?: string | null } | null
-const desktopTabs = [{ view: 'chat', label: 'Group chat' }, { view: 'dms', label: 'Direct messages' }, { view: 'pins', label: 'ShadowPin' }, { view: 'settings', label: 'Settings' }] as const
+const desktopTabs = [{ view: 'chat', label: 'Group chat' }, { view: 'dms', label: 'Direct messages' }, { view: 'active-users', label: 'Active users' }, { view: 'pins', label: 'ShadowPin' }, { view: 'settings', label: 'Settings' }] as const
 const readLocation = () => readStreamlinedLocation(new URL(window.location.href))
 
 function LoadingView() {
@@ -112,6 +110,9 @@ function StreamlinedShell() {
   const navigate = useCallback((view: AppView) => {
     applyMutation({ method: 'push', url: streamlinedViewUrl(new URL(window.location.href), view) })
   }, [applyMutation])
+  const search = useCallback((query: string, scope: 'messages' | 'all') => {
+    applyMutation({ method: 'push', url: streamlinedSearchUrl(new URL(window.location.href), query, scope) })
+  }, [applyMutation])
   const routeChat = useCallback((action: ChatThreadRouteAction, threadRootId?: string, targetMessageId?: string) => {
     applyMutation(resolveChatThreadRouteMutation({ currentUrl: new URL(window.location.href), currentLayer: window.history.state?.shadowchatLayer === 'chat-thread' ? 'chat-thread' : null, action, threadRootId, targetMessageId }))
   }, [applyMutation])
@@ -140,9 +141,8 @@ function StreamlinedShell() {
         <nav>{desktopTabs.map(tab => <button key={tab.view} type="button" aria-current={route.view === tab.view ? 'page' : undefined} onClick={() => navigate(tab.view)}>{tab.label}</button>)}</nav>
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {route.view === 'chat' && !isDesktop && <MobileAppHeader currentView="chat" onViewChange={navigate} title="Group chat" logo collapseOnKeyboard showSearch={false} actions={<GeneralChatRoomTools onViewChange={navigate} />} />}
         <Suspense fallback={<LoadingView />}>
-          {route.view === 'chat' && <ChatView currentView="chat" onViewChange={navigate} initialMessageId={route.message ?? undefined} initialThreadId={route.thread ?? undefined} onThreadRoute={routeChat} />}
+          {route.view === 'chat' && <ChatView currentView="chat" onViewChange={navigate} onSearch={search} initialMessageId={route.message ?? undefined} initialThreadId={route.thread ?? undefined} onThreadRoute={routeChat} />}
           {route.view === 'dms' && <DirectMessagesView currentView="dms" onViewChange={navigate} onToggleSidebar={() => navigate('chat')} initialConversation={route.conversation ?? undefined} initialMessageId={route.message ?? undefined} initialPanel={route.dmPanel} initialConnectionsSection={route.dmConnectionsSection} initialCircleId={route.dmCircle ?? undefined} onRoute={routeDM} onConnectionsRoute={routeCircles} />}
           {route.view === 'pins' && <ShadowPin currentView="pins" onViewChange={navigate} initialImageId={route.pin ?? undefined} initialCommentId={route.comment ?? undefined} initialPanel={route.pinPanel ?? undefined} initialFeedMode={route.pinFeed ?? undefined} initialCircleId={route.pinCircle ?? undefined} onPinRoute={routePin} onFeedModeChange={changeFeed} onCircleChange={changeCircle} />}
           {route.view === 'settings' && <Settings currentView="settings" onViewChange={navigate} fullAppUrl="https://shadochat.online" privacyUrl={import.meta.env.VITE_PRIVACY_POLICY_URL} termsUrl={import.meta.env.VITE_TERMS_URL} />}

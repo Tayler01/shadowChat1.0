@@ -1,7 +1,6 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState } from 'react'
 import { Accessibility, Bell, ChevronRight, ExternalLink, RotateCcw, Shield, ShieldAlert, UserRound } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { MobileAppHeader } from '../components/layout/MobileAppHeader'
 import { NotificationSetupModal } from '../components/settings/NotificationSetupModal'
 import { Button } from '../components/ui/Button'
 import { LoadingSpinner } from '../components/ui/LoadingSpinner'
@@ -280,7 +279,7 @@ function OperatorToolsLink({ fullAppUrl }: { fullAppUrl: string }) {
   </section>
 }
 
-export function StreamlinedSettings({ currentView, onViewChange, fullAppUrl, privacyUrl = '/?legal=privacy', termsUrl = '/?legal=terms' }: StreamlinedSettingsProps) {
+export function StreamlinedSettings({ fullAppUrl, privacyUrl = '/?legal=privacy', termsUrl = '/?legal=terms' }: StreamlinedSettingsProps) {
   const [section, setSection] = useState<SettingsSection | null>(getInitialSettingsSection)
   const scrollRef = useRef<HTMLDivElement>(null)
   const activeSection = sections.find(item => item.id === section)
@@ -313,10 +312,14 @@ export function StreamlinedSettings({ currentView, onViewChange, fullAppUrl, pri
     if (scrollRef.current) scrollRef.current.scrollTop = 0
   }, [section])
 
-  return <div className="theme-app-surface flex h-full min-h-0 flex-col text-sm text-[var(--text-primary)]">
-    <MobileAppHeader currentView={currentView} onViewChange={onViewChange} title={activeSection?.title ?? 'Settings'} onBack={() => section ? setSection(null) : onViewChange('chat')} backLabel={section ? 'Back to settings' : 'Back to group chat'} showSearch={false} showSettings={false} actions={section === 'comfort' ? <button type="button" onClick={() => window.dispatchEvent(new Event(COMFORT_RESET_EVENT))} className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[var(--theme-accent-readable)]" aria-label="Reset comfort settings"><RotateCcw className="h-5 w-5" /></button> : undefined} />
+  return <div data-streamlined-settings="true" className="theme-app-surface flex h-full min-h-0 flex-col text-sm text-[var(--text-primary)]">
+    <h1 className="sr-only">{activeSection?.title ?? 'Settings'}</h1>
     <div ref={scrollRef} className="streamlined-settings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-5">
       <div className="mx-auto w-full max-w-3xl">
+        {section && <div className="sticky top-0 z-10 mb-2 flex items-center justify-between gap-3 bg-[var(--bg-app)]">
+          <button type="button" onClick={() => setSection(null)} className="inline-flex min-h-11 items-center rounded-full px-2 text-sm text-[var(--theme-accent-readable)]">Back to settings</button>
+          {section === 'comfort' && <button type="button" onClick={() => window.dispatchEvent(new Event(COMFORT_RESET_EVENT))} className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[var(--theme-accent-readable)]" aria-label="Reset comfort settings"><RotateCcw className="h-5 w-5" aria-hidden="true" /></button>}
+        </div>}
         {!section ? <div className="space-y-2">
           {sections.map(item => <button key={item.id} type="button" onClick={() => setSection(item.id)} className="glass-panel flex min-h-20 w-full items-center gap-3 rounded-[var(--radius-lg)] p-4 text-left transition-colors hover:border-[var(--border-glow)]">
             <item.icon className="h-5 w-5 shrink-0 text-[var(--theme-accent-readable)]" aria-hidden="true" />

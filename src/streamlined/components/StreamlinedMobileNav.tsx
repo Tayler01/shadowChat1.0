@@ -1,6 +1,8 @@
 import { Images, MessageSquare, Settings, Users } from 'lucide-react'
 import { useAppBadgeState } from '../../hooks/useAppBadgeState'
 import { useDirectMessages } from '../../../apps/streamlined/src-overrides/hooks/useDirectMessages'
+import { ActiveUsersButton } from '../../../apps/streamlined/src-overrides/components/chat/ActiveUsersButton'
+import { useOptionalClientReset } from '../../hooks/ClientResetContext'
 import { cn } from '../../lib/utils'
 import { openSettingsMain } from '../../lib/settingsNavigation'
 import type { AppView } from '../../types/navigation'
@@ -25,10 +27,12 @@ export function MobileNav({
 }: MobileNavProps) {
   const { conversations } = useDirectMessages()
   const badgeState = useAppBadgeState()
+  const { status: resetStatus } = useOptionalClientReset()
   const dmUnread = conversations.reduce((sum, conversation) => sum + (conversation.unread_count || 0), 0)
   const items = [
     { id: 'chat' as const, icon: MessageSquare, label: 'Chat', badge: badgeState.group },
     { id: 'dms' as const, icon: Users, label: 'DMs', badge: Math.max(dmUnread, badgeState.dm) },
+    { id: 'active-users' as const, icon: Users, label: 'Active', badge: 0 },
     { id: 'pins' as const, icon: Images, label: 'ShadowPin', badge: badgeState.shadow_pin },
     { id: 'settings' as const, icon: Settings, label: 'Settings', badge: 0 },
   ]
@@ -53,9 +57,16 @@ export function MobileNav({
       aria-label="Primary navigation"
       data-streamlined-navigation="true"
     >
-      <ul className="grid h-[var(--shadowchat-mobile-nav-row-height)] grid-cols-4 px-1" aria-label="Main navigation">
+      <ul className="grid h-[var(--shadowchat-mobile-nav-row-height)] grid-cols-5 px-1" aria-label="Main navigation">
         {items.map(item => (
           <li key={item.id} className="relative min-w-0">
+            {item.id === 'active-users' ? <ActiveUsersButton
+              variant="nav"
+              active={currentView === 'active-users'}
+              resetStatus={resetStatus}
+              showPresenceDot={false}
+              onOpen={() => changeView('active-users')}
+            /> : (
             <button
               type="button"
               onClick={() => changeView(item.id)}
@@ -76,6 +87,7 @@ export function MobileNav({
               </span>
               <span>{item.label}</span>
             </button>
+            )}
           </li>
         ))}
       </ul>

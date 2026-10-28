@@ -1,3 +1,27 @@
+## October 28 streamlined phone navigation
+
+- Physical TestFlight feedback requested no Group Chat/Settings header or root
+  back arrow, Active Users in the bottom bar, and search revealed toward older
+  messages. These changes are isolated to the streamlined shell/overrides.
+- Five equal navigation items retain unread counts and one connection light.
+  Search preserves an active query/focus and opens the existing message or full
+  discovery routes; pinned-message controls and nested navigation remain.
+- The extra bottom divider lines are retained at the user's request. Their
+  spacer is reduced from an artificial 1.1rem minimum to 0.3rem when no browser
+  safe inset is needed. The native wrapper continues to own its OS safe area;
+  the web edition retains actual safe-area insets without duplicating them.
+- Lint, both typechecks, full build and 18 focused tests passed. Phone WebKit and
+  Chromium local acceptance covers navigation, search, Settings, equal button
+  geometry and the divider spacer. Evidence is under
+  `output/release-evidence/resume-20261028/phone-layout-local-qa-attempt3.json`.
+  Earlier harness failures and the stale-source attempt are retained separately.
+- Keyboard/scroll and native-marker checks are browser simulations. They do
+  not prove physical iPhone keyboard, touch or OS safe-area behavior. No messages
+  were authored; both runs revoked their two sessions and verified cleanup.
+  Final opaque-search-panel verification also passed in both engines, recorded
+  in `output/release-evidence/resume-20261028/search-opacity-local-qa.json`.
+  Live publication and physical-device verification remain separate.
+
 ## October 28 streamlined DM recovery
 
 - Published source `913c8fb1` passed the full edition on WebKit/Chromium and the

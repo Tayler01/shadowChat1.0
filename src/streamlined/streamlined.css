@@ -4,6 +4,22 @@
 .streamlined-shell [data-mobile-chat-footer='true'] { background: var(--bg-shell); }
 .streamlined-desktop-nav { display: none; }
 @media (max-width: 767px) {
+  /* The browser owns its real safe inset; don't add the full app's artificial
+     home-button buffer underneath this compact navigation. */
+  .streamlined-shell {
+    --streamlined-top-safe-area: env(safe-area-inset-top, 0px);
+    --shadowchat-mobile-nav-home-clearance: env(safe-area-inset-bottom, 0px);
+    --shadowchat-mobile-nav-home-buffer: 0px;
+    --shadowchat-mobile-nav-home-spacer-height: max(var(--shadowchat-mobile-nav-home-clearance), 0.3rem);
+  }
+  /* The native WebView already sits inside a bottom SafeAreaView. */
+  html[data-shadowchat-native-app='true'] .streamlined-shell {
+    --streamlined-top-safe-area: 0px;
+    --shadowchat-mobile-nav-home-clearance: 0px;
+  }
+  .streamlined-shell [data-streamlined-chat='true'],
+  .streamlined-shell [data-streamlined-settings='true'] { padding-top: var(--streamlined-top-safe-area); }
+  .streamlined-shell [data-streamlined-chat-search='true'] { top: var(--streamlined-top-safe-area); }
   .streamlined-settings-scroll { padding-bottom: calc(var(--shadowchat-mobile-nav-row-height, 4.15rem) + var(--shadowchat-mobile-nav-home-spacer-height, 1.1rem) + 1rem); }
 }
 @media (min-width: 768px) {

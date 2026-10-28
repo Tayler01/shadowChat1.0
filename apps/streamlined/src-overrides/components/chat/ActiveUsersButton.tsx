@@ -28,7 +28,7 @@ export function ActiveUsersButton({
       className={variant === 'nav'
         ? `shadowchat-mobile-nav-button flex h-full min-h-11 w-full flex-col items-center justify-center rounded-[var(--radius-md)] px-0.5 py-1.5 text-[0.625rem] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--theme-accent)] ${active ? 'bg-[var(--nav-active-bg)] text-[var(--theme-accent-readable)] shadow-[var(--shadow-accent-soft)]' : 'text-[var(--text-muted)]'}`
         : 'inline-flex min-h-7 items-center gap-1 rounded-full border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] px-2 py-0.5 text-[11px] text-[var(--text-muted)] transition-colors hover:border-[rgba(215,170,70,0.28)] hover:bg-[rgba(215,170,70,0.08)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(215,170,70,0.28)] sm:min-h-8 sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-xs'}
-      aria-label={`${activeUsers.length} active users`}
+      aria-label={`${activeUsers.length} active users${resetStatus === 'resetting' ? ', reconnecting' : resetStatus === 'error' ? ', connection issue' : ''}`}
       aria-current={active ? 'page' : undefined}
     >
       {variant === 'nav' ? (
@@ -36,6 +36,7 @@ export function ActiveUsersButton({
           <span className="relative mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-[var(--nav-icon-bg)]">
             <Users className="h-[1.15rem] w-[1.15rem]" aria-hidden="true" />
             {showPresenceDot && <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[var(--bg-panel-strong)] bg-[#22c55e] shadow-[0_0_8px_rgba(34,197,94,0.7)]" aria-hidden="true" />}
+            {!showPresenceDot && <span className="absolute bottom-0 right-0 rounded-full bg-[var(--bg-panel-strong)] p-0.5 [&>div]:ml-0" aria-hidden="true"><ClientResetIndicator status={resetStatus} /></span>}
             <span className="theme-unread-badge absolute -right-1 -top-1 rounded-full px-1 text-[0.625rem] leading-none" aria-hidden="true">
               {countLabel}
             </span>

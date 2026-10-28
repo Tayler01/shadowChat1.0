@@ -70,6 +70,13 @@ test('restricted account access permits leaving or deleting without profile uplo
   expect(deleteAccount).not.toHaveBeenCalled()
 })
 
+test('main settings has no app header or redundant back navigation', () => {
+  const { container } = render(<StreamlinedSettings currentView="settings" onViewChange={onViewChange} />)
+  expect(container.querySelector('header')).toBeNull()
+  expect(screen.getByRole('heading', { name: 'Settings' })).toHaveClass('sr-only')
+  expect(screen.queryByRole('button', { name: /Back to/ })).not.toBeInTheDocument()
+})
+
 test('opens private report history and subscribes only to this member updates', async () => {
   render(<StreamlinedSettings currentView="settings" onViewChange={onViewChange} fullAppUrl="https://shadochat.online" />)
   fireEvent.click(screen.getByRole('button', { name: /^Safety reports/i }))

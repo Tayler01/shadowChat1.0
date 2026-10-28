@@ -5,7 +5,7 @@ import { MessageList } from '../../../../../src/components/chat/MessageList'
 import { MessageInput } from './MessageInput'
 import { MessageOutboxStorageError } from '../../lib/localMessageOutbox'
 import { MobileChatFooter } from '../layout/MobileChatFooter'
-import { MobileAppHeader } from '../../../../../src/components/layout/MobileAppHeader'
+import { GeneralChatRoomTools } from '../../../../../src/streamlined/components/StreamlinedGeneralChatRoomTools'
 import { getBlockedActionMessage } from '../../../../../src/lib/moderation'
 import { showActionErrorToast } from '../../../../../src/lib/toastNotifications'
 import { resolveGeneralChatThreadId, type ChatMessageType } from '../../lib/supabase'
@@ -15,10 +15,6 @@ import { useIsDesktop } from '../../../../../src/hooks/useIsDesktop'
 import type { ChatThreadRouteAction } from '../../../../../src/lib/appRouting'
 import { captureMessageScrollAnchor, restoreMessageScrollAnchor, type MessageScrollAnchor } from '../../../../../src/lib/messageScrollAnchor'
 
-const LazyGeneralChatRoomTools = lazy(() => import('../../../../../src/components/chat/GeneralChatRoomTools').then(module => ({
-  default: module.GeneralChatRoomTools,
-})))
-
 const LazyGeneralChatThreadSheet = lazy(() => import('../../../../../src/features/general-chat-threads').then(module => ({
   default: module.GeneralChatThreadSheet,
 })))
@@ -26,6 +22,7 @@ const LazyGeneralChatThreadSheet = lazy(() => import('../../../../../src/feature
 interface ChatViewProps {
   currentView: AppView
   onViewChange: (view: AppView) => void
+  onSearch: (query: string, scope: 'messages' | 'all') => void
   initialMessageId?: string
   initialThreadId?: string
   onThreadRoute?: (action: ChatThreadRouteAction, threadRootId?: string, targetMessageId?: string) => void
@@ -34,6 +31,7 @@ interface ChatViewProps {
 export const ChatView: React.FC<ChatViewProps> = ({
   currentView,
   onViewChange,
+  onSearch,
   initialMessageId,
   initialThreadId,
   onThreadRoute,
@@ -54,6 +52,28 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const [localThreadId, setLocalThreadId] = useState<string | null>(initialThreadId ?? null)
   const activeThreadId = initialThreadId ?? localThreadId
   const loungeScrollTopRef = useRef<MessageScrollAnchor | null>(null)
+  const [searchVisible, setSearchVisible] = useState(false)
+  const searchRef = useRef<HTMLDivElement>(null)
+  const scrollPositionRef = useRef<number | null>(null)
+  const scrollTravelRef = useRef(0)
+  const touchStartYRef = useRef<number | null>(null)
+
+  const isMessageScrollTarget = (target: EventTarget) => target instanceof Element && Boolean(target.closest('[data-testid="message-scroll"]'))
+
+  const handleChatScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const target = event.target
+    if (!(target instanceof HTMLElement) || target.dataset.testid !== 'message-scroll') return
+    const previous = scrollPositionRef.current
+    scrollPositionRef.current = Math.max(0, target.scrollTop)
+    if (previous === null) return
+    const delta = target.scrollTop - previous
+    if (!delta) return
+    // Accumulate small finger/trackpad movements, resetting when direction changes.
+    scrollTravelRef.current = Math.sign(delta) === Math.sign(scrollTravelRef.current)
+      ? scrollTravelRef.current + delta : delta
+    if (scrollTravelRef.current <= -16) setSearchVisible(true)
+    if (scrollTravelRef.current >= 24 && !searchRef.current?.contains(document.activeElement) && !searchRef.current?.querySelector('input')?.value.trim()) setSearchVisible(false)
+  }, [])
 
   const captureLoungeScroll = useCallback(() => {
     const scroll = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
@@ -130,21 +150,23 @@ export const ChatView: React.FC<ChatViewProps> = ({
   }
 
   return (
-    <div className="theme-app-surface flex h-full min-h-0 flex-col text-sm">
-      <MobileAppHeader
-        currentView={currentView}
-        onViewChange={onViewChange}
-        title="Lounge"
-        srTitle="General Chat"
-        logo
-        collapseOnKeyboard
-        actions={isDesktop ? (
-          <Suspense fallback={null}>
-            <LazyGeneralChatRoomTools onViewChange={onViewChange} />
-          </Suspense>
-        ) : null}
-        className="hidden md:flex"
-      />
+    <div data-streamlined-chat="true" className="theme-app-surface relative flex h-full min-h-0 flex-col text-sm" onScrollCapture={handleChatScroll}
+      onWheelCapture={event => { if (event.deltaY < 0 && isMessageScrollTarget(event.target)) setSearchVisible(true) }}
+      onTouchStartCapture={event => { touchStartYRef.current = isMessageScrollTarget(event.target) ? event.touches[0]?.clientY ?? null : null }}
+      onTouchMoveCapture={event => {
+        const touchY = event.touches[0]?.clientY
+        if (touchY !== undefined && touchStartYRef.current !== null && touchY - touchStartYRef.current >= 16) setSearchVisible(true)
+      }}
+      onTouchEndCapture={() => { touchStartYRef.current = null }}
+    >
+      <h1 className="sr-only">Group chat</h1>
+      <button type="button" className="sr-only focus:not-sr-only focus:min-h-11" onClick={() => {
+        setSearchVisible(true)
+        window.requestAnimationFrame(() => searchRef.current?.querySelector('input')?.focus())
+      }}>Search group chat</button>
+      <div ref={searchRef} data-streamlined-chat-search="true" hidden={Boolean(activeThreadId) || (!isDesktop && !searchVisible)} className={isDesktop ? 'shrink-0' : 'absolute inset-x-0 top-0 z-20'}>
+        <GeneralChatRoomTools onSearch={onSearch} />
+      </div>
 
       {/* Messages */}
       <MessageList
