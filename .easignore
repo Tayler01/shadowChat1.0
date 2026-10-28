@@ -3,7 +3,7 @@
 # standalone mobile application is uploaded to the cloud builder.
 /.agents/
 /.codex/
-/.git/
+/.git
 /.github/
 /.netlify/
 /.playwright-cli/
