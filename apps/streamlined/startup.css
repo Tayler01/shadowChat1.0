@@ -1,0 +1,22 @@
+/* Available before JavaScript: matches the native and authenticated loaders. */
+.streamlined-loading {
+  box-sizing: border-box;
+  display: flex;
+  flex: 1;
+  min-height: 12rem;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  background: var(--bg-shell, #0d0f10);
+  color: var(--text-primary, #f1f0ea);
+  font-family: inherit;
+  text-align: center;
+}
+.streamlined-loading--fullscreen { min-height: 100dvh; }
+.streamlined-loading__content { width: 100%; max-width: 22rem; }
+.streamlined-loading__mark { display: block; width: 6rem; height: 6rem; margin: 0 auto 1.25rem; object-fit: contain; }
+.streamlined-loading__name { margin: 0; font-size: 1.625rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.025em; }
+.streamlined-loading__rule { display: block; width: 2rem; height: 2px; margin: 1.25rem auto; border-radius: 2px; background: var(--theme-accent-readable, #e9c766); }
+.streamlined-loading__message { margin: 0; color: var(--text-muted, #b2afa3); font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
+/* No spinner, shimmer or timed minimum: startup follows the actual load. */
+html:has(#streamlined-document-startup), body:has(#streamlined-document-startup) { margin: 0; background: #0d0f10; font-family: system-ui, -apple-system, sans-serif; }

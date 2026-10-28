@@ -54,26 +54,73 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const loungeScrollTopRef = useRef<MessageScrollAnchor | null>(null)
   const [searchVisible, setSearchVisible] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
-  const scrollPositionRef = useRef<number | null>(null)
-  const scrollTravelRef = useRef(0)
-  const touchStartYRef = useRef<number | null>(null)
+  const touchGestureRef = useRef<{ id: number; x: number; y: number; vertical: boolean; travel: number } | null>(null)
+  const wheelGestureRef = useRef({ travel: 0, lastAt: 0 })
 
-  const isMessageScrollTarget = (target: EventTarget) => target instanceof Element && Boolean(target.closest('[data-testid="message-scroll"]'))
+  const isMessageScrollTarget = (target: EventTarget) => {
+    if (!(target instanceof Element)) return false
+    const scroll = target.closest('[data-testid="message-scroll"]')
+    if (!scroll) return false
+    for (let child: Element | null = target; child && child !== scroll; child = child.parentElement) {
+      const style = window.getComputedStyle(child)
+      if (/(auto|scroll|overlay)/.test(style.overflowY || style.overflow) && child.scrollHeight > child.clientHeight) return false
+    }
+    return true
+  }
 
-  const handleChatScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    const target = event.target
-    if (!(target instanceof HTMLElement) || target.dataset.testid !== 'message-scroll') return
-    const previous = scrollPositionRef.current
-    scrollPositionRef.current = Math.max(0, target.scrollTop)
-    if (previous === null) return
-    const delta = target.scrollTop - previous
-    if (!delta) return
-    // Accumulate small finger/trackpad movements, resetting when direction changes.
-    scrollTravelRef.current = Math.sign(delta) === Math.sign(scrollTravelRef.current)
-      ? scrollTravelRef.current + delta : delta
-    if (scrollTravelRef.current <= -16) setSearchVisible(true)
-    if (scrollTravelRef.current >= 24 && !searchRef.current?.contains(document.activeElement) && !searchRef.current?.querySelector('input')?.value.trim()) setSearchVisible(false)
+  const advanceSearchGesture = useCallback((previous: number, deltaY: number) => {
+    if (!deltaY) return previous
+    const travel = previous * deltaY < 0 ? deltaY : previous + deltaY
+    if (travel >= 16) {
+      setSearchVisible(true)
+      return 0
+    }
+    if (travel <= -24) {
+      if (!searchRef.current?.contains(document.activeElement) && !searchRef.current?.querySelector('input')?.value.trim()) setSearchVisible(false)
+      return 0
+    }
+    return travel
   }, [])
+
+  const endTouchGesture = () => { touchGestureRef.current = null }
+
+  // Visibility follows finger/wheel intent, never scrollTop: Safari elastic
+  // rebound, inertial settling, and restored message anchors all emit scroll.
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    wheelGestureRef.current.travel = 0
+    const touch = event.touches[0]
+    touchGestureRef.current = event.touches.length === 1 && touch && isMessageScrollTarget(event.target)
+      ? { id: touch.identifier, x: touch.clientX, y: touch.clientY, vertical: false, travel: 0 }
+      : null
+  }
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    const gesture = touchGestureRef.current
+    if (!gesture) return
+    const touch = Array.from(event.touches).find(item => item.identifier === gesture.id)
+    if (event.touches.length !== 1 || !touch) { endTouchGesture(); return }
+    const deltaX = touch.clientX - gesture.x
+    const deltaY = touch.clientY - gesture.y
+    if (!gesture.vertical) {
+      if (Math.max(Math.abs(deltaX), Math.abs(deltaY)) < 8) return
+      // Horizontal message/radial gestures and pinch zoom do not open search.
+      if (Math.abs(deltaX) > Math.abs(deltaY)) { endTouchGesture(); return }
+      gesture.vertical = true
+    }
+    gesture.x = touch.clientX
+    gesture.y = touch.clientY
+    gesture.travel = advanceSearchGesture(gesture.travel, deltaY)
+  }
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    if (event.ctrlKey || !isMessageScrollTarget(event.target) || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return
+    const now = performance.now()
+    const gesture = wheelGestureRef.current
+    if (now - gesture.lastAt > 180) gesture.travel = 0
+    gesture.lastAt = now
+    const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? event.currentTarget.clientHeight : 1
+    gesture.travel = advanceSearchGesture(gesture.travel, -event.deltaY * unit)
+  }
 
   const captureLoungeScroll = useCallback(() => {
     const scroll = document.querySelector<HTMLElement>('[data-testid="message-scroll"]')
@@ -150,14 +197,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
   }
 
   return (
-    <div data-streamlined-chat="true" className="theme-app-surface relative flex h-full min-h-0 flex-col text-sm" onScrollCapture={handleChatScroll}
-      onWheelCapture={event => { if (event.deltaY < 0 && isMessageScrollTarget(event.target)) setSearchVisible(true) }}
-      onTouchStartCapture={event => { touchStartYRef.current = isMessageScrollTarget(event.target) ? event.touches[0]?.clientY ?? null : null }}
-      onTouchMoveCapture={event => {
-        const touchY = event.touches[0]?.clientY
-        if (touchY !== undefined && touchStartYRef.current !== null && touchY - touchStartYRef.current >= 16) setSearchVisible(true)
-      }}
-      onTouchEndCapture={() => { touchStartYRef.current = null }}
+    <div data-streamlined-chat="true" className="theme-app-surface relative flex h-full min-h-0 flex-col text-sm"
+      onWheelCapture={handleWheel}
+      onTouchStartCapture={handleTouchStart}
+      onTouchMoveCapture={handleTouchMove}
+      onTouchEndCapture={endTouchGesture}
+      onTouchCancelCapture={endTouchGesture}
     >
       <h1 className="sr-only">Group chat</h1>
       <button type="button" className="sr-only focus:not-sr-only focus:min-h-11" onClick={() => {

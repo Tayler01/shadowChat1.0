@@ -11,6 +11,7 @@ import React, {
 import {
   ActivityIndicator,
   BackHandler,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -46,6 +47,9 @@ import {
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { appRuntime } from '@/lib/appRuntime';
 
+// Metro resolves bundled image assets through a static require.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const NATIVE_LOADING_MARK = require('../../assets/images/shado-round-mark.png');
 const APP_ORIGIN = appRuntime.origin;
 const APP_URL = getNotificationWebUrl('/?nativeApp=1&nativeBridge=3');
 const NATIVE_BOOTSTRAP_SCRIPT = `
@@ -579,9 +583,20 @@ export default function ShadowChatAppScreen() {
         style={styles.webView}
         thirdPartyCookiesEnabled
         renderLoading={() => (
-          <View style={styles.loadingLayer}>
-            <ActivityIndicator color="#E9C766" size="large" />
-            <Text style={styles.loadingText}>Opening ShadoChat</Text>
+          <View style={[styles.loadingLayer, appRuntime.streamlined && styles.streamlinedLoadingLayer]} accessibilityRole="progressbar" accessibilityLabel="Opening ShadoChat">
+            {appRuntime.streamlined ? (
+              <>
+                <Image source={NATIVE_LOADING_MARK} style={styles.loadingMark} accessible={false} />
+                <Text style={styles.loadingBrand}>ShadoChat</Text>
+                <View style={styles.loadingRule} />
+                <Text style={styles.loadingText}>{'Opening your community\u2026'}</Text>
+              </>
+            ) : (
+              <>
+                <ActivityIndicator color="#E9C766" size="large" />
+                <Text style={styles.loadingText}>Opening ShadoChat</Text>
+              </>
+            )}
           </View>
         )}
       />
@@ -706,6 +721,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 14,
     backgroundColor: '#050505',
+  },
+  streamlinedLoadingLayer: {
+    backgroundColor: '#0d0f10',
+  },
+  loadingMark: {
+    width: 96,
+    height: 96,
+  },
+  loadingBrand: {
+    color: '#f1f0ea',
+    fontSize: 26,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  loadingRule: {
+    width: 32,
+    height: 2,
+    backgroundColor: 'rgba(233, 199, 102, 0.45)',
   },
   loadingText: {
     color: '#A69B82',

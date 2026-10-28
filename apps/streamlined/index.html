@@ -12,10 +12,21 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>ShadowChat · Streamlined</title>
+    <link rel="stylesheet" href="./startup.css" />
+    <link rel="preload" as="image" href="../../src/streamlined/assets/shado-round-mark.webp" />
     <script src="/comfort-bootstrap.js"></script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="streamlined-document-startup" class="streamlined-loading streamlined-loading--fullscreen" role="status" aria-live="polite" aria-busy="true">
+        <div class="streamlined-loading__content">
+          <img src="../../src/streamlined/assets/shado-round-mark.webp" alt="" width="96" height="96" class="streamlined-loading__mark" />
+          <p class="streamlined-loading__name">ShadoChat</p>
+          <span class="streamlined-loading__rule" aria-hidden="true"></span>
+          <p class="streamlined-loading__message">Opening your community…</p>
+        </div>
+      </div>
+    </div>
     <script type="module" src="./main.ts"></script>
   </body>
 </html>

@@ -14,7 +14,7 @@ localPreviewMarker.content = 'enabled'
 const receipt: StreamlinedMembershipAcknowledgement = { userId: 'member-1', policyVersion: '2026-10-22.2', adultDeclared: true, termsAccepted: true, privacyAcknowledged: true, acceptedAt: '2026-10-22T20:00:00Z' }
 const read = jest.mocked(getStreamlinedMembershipAcknowledgement)
 const accept = jest.mocked(acceptStreamlinedMembership)
-const setMember = (id: string | null) => jest.mocked(useAuth).mockReturnValue({ user: id ? { id } : null, signOut } as unknown as ReturnType<typeof useAuth>)
+const setMember = (id: string | null, loading = false) => jest.mocked(useAuth).mockReturnValue({ user: id ? { id } : null, loading, signOut } as unknown as ReturnType<typeof useAuth>)
 const preview = (fallback?: React.ReactNode) => <StreamlinedMembershipGate unacceptedContent={fallback}><div>Member content</div></StreamlinedMembershipGate>
 const continueButton = () => screen.getByRole('button', { name: 'Continue to preview' })
 async function acknowledge() {
@@ -44,8 +44,9 @@ test('requires explicit adult/terms/privacy acknowledgement and a confirmed serv
   let finish!: (value: StreamlinedMembershipAcknowledgement) => void
   accept.mockReturnValue(new Promise(resolve => { finish = resolve }))
   render(preview())
-  expect(continueButton()).toBeDisabled()
+  expect(screen.queryByRole('radio', { name: 'I am 18 or older' })).not.toBeInTheDocument()
   await waitFor(() => expect(screen.getByRole('radio', { name: 'I am 18 or older' })).toBeEnabled())
+  expect(continueButton()).toBeDisabled()
   fireEvent.click(screen.getByRole('link', { name: 'Terms of use' }))
   expect(screen.getByRole('checkbox', { name: /I agree to the Terms of use/ })).not.toBeChecked()
   fireEvent.submit(continueButton().closest('form')!)
@@ -78,7 +79,7 @@ test('reads the server across mounts and isolates account changes', async () => 
   view.rerender(preview())
   expect(screen.queryByText('Member content')).not.toBeInTheDocument()
   await waitFor(() => expect(read).toHaveBeenLastCalledWith('member-2'))
-  expect(continueButton()).toBeDisabled()
+  expect(await screen.findByRole('button', { name: 'Continue to preview' })).toBeDisabled()
 })
 
 test('ignores browser-only acceptance', async () => {
@@ -196,4 +197,101 @@ test('local feature preview does not open while authentication is still loading'
   render(preview())
   await act(async () => {})
   expect(screen.queryByText('Member content')).not.toBeInTheDocument()
+  expect(read).not.toHaveBeenCalled()
+})
+
+test('an accepted member sees only loading while the authoritative receipt restores on each launch', async () => {
+  read.mockResolvedValueOnce(receipt)
+  const first = render(preview())
+  expect(await screen.findByText('Member content')).toBeInTheDocument()
+  first.unmount()
+  let finish!: (value: StreamlinedMembershipAcknowledgement) => void
+  read.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(preview())
+  expect(screen.getByText('Checking your membership…')).toBeInTheDocument()
+  expect(screen.queryByText('Before you continue')).not.toBeInTheDocument()
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  expect(screen.queryByText('Member content')).not.toBeInTheDocument()
+  await act(async () => finish(receipt))
+  expect(screen.getByText('Member content')).toBeInTheDocument()
+  expect(screen.queryByText('Before you continue')).not.toBeInTheDocument()
+  expect(read).toHaveBeenCalledTimes(2)
+  expect(accept).not.toHaveBeenCalled()
+})
+
+test('first-time consent appears only after the server confirms the account has no acknowledgement', async () => {
+  let finish!: (value: null) => void
+  read.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(preview())
+  expect(screen.getByText('Checking your membership…')).toBeInTheDocument()
+  expect(screen.queryByText('Before you continue')).not.toBeInTheDocument()
+  expect(screen.queryByText('Member content')).not.toBeInTheDocument()
+  await act(async () => finish(null))
+  expect(screen.getByText('Before you continue')).toBeInTheDocument()
+  expect(continueButton()).toBeDisabled()
+  expect(screen.queryByText('Member content')).not.toBeInTheDocument()
+})
+
+test('slow authentication restore never queries or displays consent for an unsettled account', async () => {
+  setMember('member-1', true)
+  const view = render(preview())
+  expect(screen.getByText('Checking your membership…')).toBeInTheDocument()
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  expect(read).not.toHaveBeenCalled()
+  setMember('member-2')
+  read.mockResolvedValueOnce({ ...receipt, userId: 'member-2' })
+  view.rerender(preview())
+  expect(await screen.findByText('Member content')).toBeInTheDocument()
+  expect(read).toHaveBeenCalledTimes(1)
+  expect(read).toHaveBeenCalledWith('member-2')
+})
+
+test('changing accounts immediately hides accepted content and waits for the new account receipt', async () => {
+  read.mockResolvedValueOnce(receipt)
+  const view = render(preview())
+  expect(await screen.findByText('Member content')).toBeInTheDocument()
+  let finish!: (value: null) => void
+  read.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  setMember('member-2')
+  view.rerender(preview())
+  expect(screen.getByText('Checking your membership…')).toBeInTheDocument()
+  expect(screen.queryByText('Member content')).not.toBeInTheDocument()
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  await act(async () => finish(null))
+  expect(screen.getByRole('radio', { name: 'I am 18 or older' })).not.toBeChecked()
+  expect(continueButton()).toBeDisabled()
+})
+
+test('a stale previous-account result cannot end the new account loading state', async () => {
+  let finishOld!: (value: StreamlinedMembershipAcknowledgement) => void
+  let finishNew!: (value: null) => void
+  read.mockReturnValueOnce(new Promise(resolve => { finishOld = resolve }))
+    .mockReturnValueOnce(new Promise(resolve => { finishNew = resolve }))
+  const view = render(preview())
+  setMember('member-2')
+  view.rerender(preview())
+  await act(async () => finishOld(receipt))
+  expect(screen.getByText('Checking your membership…')).toBeInTheDocument()
+  expect(screen.queryByText('Member content')).not.toBeInTheDocument()
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  await act(async () => finishNew(null))
+  expect(screen.getByText('Before you continue')).toBeInTheDocument()
+})
+
+test('read errors do not imply consent is missing and retry returns to loading without exposing content', async () => {
+  let finish!: (value: StreamlinedMembershipAcknowledgement) => void
+  read.mockRejectedValueOnce(new Error('Receipt service unavailable'))
+    .mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(preview())
+  expect(await screen.findByRole('alert')).toHaveTextContent('Receipt service unavailable')
+  expect(screen.queryByText('Before you continue')).not.toBeInTheDocument()
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  expect(screen.queryByText('Member content')).not.toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Manage or delete my account' })).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry membership check' }))
+  expect(screen.getByText('Checking your membership…')).toBeInTheDocument()
+  expect(screen.queryByRole('radio')).not.toBeInTheDocument()
+  await act(async () => finish(receipt))
+  expect(screen.getByText('Member content')).toBeInTheDocument()
+  expect(accept).not.toHaveBeenCalled()
 })

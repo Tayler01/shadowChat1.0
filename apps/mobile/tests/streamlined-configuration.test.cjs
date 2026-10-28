@@ -60,7 +60,7 @@ test('the store build profile resolves the reviewed streamlined build and origin
   assert.equal(build.streamlined.environment, 'production');
   withEnv(build.streamlined.env, () => {
     const config = configure({ config: {} });
-    assert.equal(config.ios.buildNumber, '20');
+    assert.equal(config.ios.buildNumber, '21');
     assert.equal(config.extra.appEdition, 'streamlined');
     assert.equal(config.extra.webAppUrl, origin);
     assert.equal(config.ios.bundleIdentifier, expo.ios.bundleIdentifier);

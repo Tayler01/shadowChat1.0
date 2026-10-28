@@ -14,6 +14,7 @@ import { useChannelBanExpirySweep } from '../hooks/useChannelBanExpirySweep'
 import { useIsDesktop } from '../hooks/useIsDesktop'
 import { useStreamlinedViewport } from './useStreamlinedViewport'
 import { MobileNav } from './components/StreamlinedMobileNav'
+import { StreamlinedLoadingView } from './components/StreamlinedLoadingView'
 import { normalizeStreamlinedUrl, readStreamlinedLocation, streamlinedSearchUrl, streamlinedViewUrl } from './routing'
 import {
   resolveChatThreadRouteMutation, resolveDMRouteMutation, resolvePinRouteMutation,
@@ -39,8 +40,8 @@ type Mutation = { method: 'back' | 'back-two' } | { method: 'push' | 'replace'; 
 const desktopTabs = [{ view: 'chat', label: 'Group chat' }, { view: 'dms', label: 'Direct messages' }, { view: 'active-users', label: 'Active users' }, { view: 'pins', label: 'ShadowPin' }, { view: 'settings', label: 'Settings' }] as const
 const readLocation = () => readStreamlinedLocation(new URL(window.location.href))
 
-function LoadingView() {
-  return <div role="status" className="flex min-h-0 flex-1 items-center justify-center text-sm text-[var(--text-muted)]">Loading…</div>
+function LoadingView({ fullscreen = false }: { fullscreen?: boolean }) {
+  return <StreamlinedLoadingView fullscreen={fullscreen} />
 }
 
 function StreamlinedShell() {
@@ -159,14 +160,14 @@ export default function StreamlinedApp() {
   const params = new URLSearchParams(window.location.search)
   const legal = params.get('legal')
   if (legal === 'privacy' || legal === 'terms' || legal === 'safety' || legal === 'delete-account') {
-    return <Suspense fallback={<LoadingView />}><Policies page={legal} supportEmail={import.meta.env.VITE_SUPPORT_EMAIL || 'support@shadochat.online'} privacyEmail={import.meta.env.VITE_PRIVACY_EMAIL || 'privacy@shadochat.online'} operatorName={import.meta.env.VITE_OPERATOR_NAME} /></Suspense>
+    return <Suspense fallback={<LoadingView fullscreen />}><Policies page={legal} supportEmail={import.meta.env.VITE_SUPPORT_EMAIL || 'support@shadochat.online'} privacyEmail={import.meta.env.VITE_PRIVACY_EMAIL || 'privacy@shadochat.online'} operatorName={import.meta.env.VITE_OPERATOR_NAME} /></Suspense>
   }
   // Pending/failed acknowledgement must not obstruct account deletion. An
   // accepted member instead receives the normal account view and navigation.
   const accountOnly = params.get('view') === 'settings' && params.get('settingsSection') === 'account'
   return <SoundEffectsProvider>
     <AuthGuard>
-      <Suspense fallback={<LoadingView />}>
+      <Suspense fallback={<LoadingView fullscreen />}>
       <MembershipGate unacceptedContent={accountOnly ? <div className="app-viewport overflow-y-auto p-4"><div className="mx-auto max-w-3xl space-y-4"><a className="inline-flex min-h-11 items-center text-[var(--text-gold)]" href="/">Back to ShadowChat</a><h1 className="text-xl font-semibold">Account</h1><AccountSettings allowProfileEditing={false} /></div></div> : undefined}>
       <NotificationCoordinatorProvider>
         <ClientResetProvider>

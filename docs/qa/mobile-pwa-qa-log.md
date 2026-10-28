@@ -1,3 +1,26 @@
+## October 28 startup and search stability
+
+- Streamlined search now responds to intentional touch/wheel movement, not
+  scroll position changes from inertia, elastic bounce or restored anchors.
+  Direction hysteresis, cancellation, nested-scroll exclusion and query/focus
+  protection retain the existing chat and radial interaction paths.
+- Membership acknowledgement distinguishes pending, required, accepted and
+  failed checks. Pending checks show branded loading; the age form appears only
+  after the server confirms no current receipt. Errors retain retry/sign-out
+  and account-deletion access. No consent cache or backend rule changed.
+- Document boot, auth and lazy loading share the approved round mark and quiet
+  obsidian/gold presentation. Native streamlined loading uses the same mark;
+  its store profile advances to build21 without changing the full edition.
+- Lint, full/streamlined types, both web builds, eight search tests, 31 consent
+  tests and native lint/types/tests/iOS bundle export passed. Production-mode
+  local WebKit/Chromium checks passed gestures, ignored bounce/nested scroll,
+  held-JavaScript startup, delayed accepted-receipt restoration and DM reload.
+  Evidence: `output/release-evidence/resume-20261028/gesture-gate-local-qa-attempt4.json`.
+- The acknowledgement write endpoint was blocked during this browser test.
+  Each engine removed its exact test DM and revoked both owned sessions.
+  Gesture/keyboard checks are simulations, not physical iPhone proof. Web
+  publication and native build21 distribution are separate release steps.
+
 ## October 28 streamlined phone navigation
 
 - Physical TestFlight feedback requested no Group Chat/Settings header or root
