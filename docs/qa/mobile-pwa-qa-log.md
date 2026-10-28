@@ -1,3 +1,22 @@
+## October 28 streamlined DM recovery
+
+- Published source `913c8fb1` passed the full edition on WebKit/Chromium and the
+  streamlined edition on WebKit, but streamlined Chromium remained on the DM
+  restoration screen after reload. A later diagnostic succeeded; the original
+  transport stall is not explained by that retry.
+- The streamlined-only repair bounds inbox loading at 12 seconds, exposes Retry,
+  preserves the selected conversation and last successful inbox, and rejects
+  superseded requests and responses from a previous account.
+- Four focused Jest tests pass. Final lint, both app typechecks, full build and
+  streamlined local-preview build pass. Controlled inbox RPC failure on phone
+  WebKit and Chromium showed the error, preserved the route, then restored the
+  actual message and composer after Retry. Timeout behavior is covered by Jest;
+  the browser checks inject immediate failure, not a stalled network request.
+- Evidence: `output/release-evidence/resume-20261028/dm-retry-local-fault-injection.json`.
+  Both runs cleaned their exact DM and locally revoked both test sessions.
+  This is local verification; publication and fresh live acceptance remain
+  separate release steps. The full edition implementation is unchanged.
+
 ## October 26 streamlined pre-rollout phone checks
 
 - Separate loopback feature-preview build at port 4186 passed auth, two-account

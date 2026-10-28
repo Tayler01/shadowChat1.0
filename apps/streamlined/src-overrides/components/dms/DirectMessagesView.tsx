@@ -821,13 +821,15 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     loadNewerMessages,
     setFollowingLatest,
     loading: conversationsLoading,
+    conversationsError,
+    retryConversations,
   } = useDirectMessages()
   const [showNewConversation, setShowNewConversation] = useState(false)
   const { users: allUsers, loading: allUsersLoading } = useAllUsers({ enabled: showNewConversation })
   const currentConv = conversations.find(c => c.id === currentConversation)
   const selectedConversationMissing = Boolean(currentConversation && !currentConv)
   const showInboxLoading = conversationsLoading && conversations.length === 0
-  const showInboxEmpty = !conversationsLoading && conversations.length === 0
+  const showInboxEmpty = !conversationsLoading && !conversationsError && conversations.length === 0
   const selectedThreadLoaded = Boolean(currentConversation && messagesConversationId === currentConversation)
   const showThreadInitialLoading = !currentConv?.is_blocked && (!selectedThreadLoaded || messagesLoading) && messages.length === 0
   const showThreadEmpty = selectedThreadLoaded && !messagesLoading && messages.length === 0 && !loadingMore && !currentConv?.is_blocked
@@ -966,12 +968,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
   }, [currentConversation, initialConversation, isDesktop, setCurrentConversation])
 
   useEffect(() => {
-    if (isDesktop || conversationsLoading || !selectedConversationMissing) {
+    if (isDesktop || conversationsLoading || conversationsError || !selectedConversationMissing) {
       return
     }
 
     setCurrentConversation(null)
-  }, [conversationsLoading, isDesktop, selectedConversationMissing, setCurrentConversation])
+  }, [conversationsLoading, conversationsError, isDesktop, selectedConversationMissing, setCurrentConversation])
 
   useEffect(() => {
     if (!isDesktop || initialConversation || currentConversation || conversations.length === 0) {
@@ -1490,6 +1492,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                 connectionRequestCount={connectionSummary.incomingCount}
                 onStartConversation={() => setShowNewConversation(true)}
               />
+              {conversationsError && (
+                <div className="p-4 text-center text-[var(--text-muted)]" role="alert">
+                  <p className="text-sm">Could not load direct messages. Please try again.</p>
+                  <Button type="button" size="sm" className="mt-3" onClick={() => void retryConversations()}>Retry</Button>
+                </div>
+              )}
               {showInboxLoading ? (
                 <div className="p-6 text-center text-[var(--text-muted)]">
                   <LoadingSpinner size="md" className="mx-auto mb-3" />
@@ -1502,7 +1510,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                   <p className="text-sm text-[var(--text-primary)]">No conversations yet</p>
                   <p className="mt-1 text-xs">Start a private chat to build your inbox.</p>
                 </div>
-              ) : hub.items.length === 0 ? (
+              ) : conversationsError && conversations.length === 0 ? null : hub.items.length === 0 ? (
                 <div className="px-6 py-10 text-center text-[var(--text-muted)]" role="status">
                   <Search className="mx-auto mb-3 h-8 w-8 opacity-50" />
                   <p className="text-sm font-medium text-[var(--text-primary)]">No matching conversations</p>
@@ -1824,6 +1832,12 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
                     <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">Restoring direct message</h3>
                     <p className="text-sm">Reconnecting to the inbox after the app resumed.</p>
                   </>
+                ) : conversationsError ? (
+                  <div role="alert">
+                    <h3 className="mb-2 text-lg font-medium text-[var(--text-primary)]">Could not restore direct message</h3>
+                    <p className="text-sm">The inbox did not load. Try again to reopen this conversation.</p>
+                    <Button type="button" size="sm" className="mt-5" onClick={() => void retryConversations()}>Retry</Button>
+                  </div>
                 ) : (
                   <>
                     <MessageSquare className="mx-auto mb-4 h-12 w-12 opacity-50" />

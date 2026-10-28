@@ -4,6 +4,13 @@ This document turns the June 1, 2026 read-only audit into an implementation back
 
 ## October 23 streamlined release preparation
 
+October 28 DM follow-up: published streamlined Chromium exposed an indefinite
+inbox-restoration state. A streamlined-only bounded load/retry repair now passes
+focused tests and both phone-browser fault-injection checks, with account and
+stale-response isolation. Full-app implementation remains unchanged. See the
+October 28 entry in [mobile QA](qa/mobile-pwa-qa-log.md); live publication and
+acceptance are still required before the next backend schema stage.
+
 October 28 update: staged production activation and bounded capture/deletion/
 full-client compatibility checks passed. Separate TestFlight build 19 and the
 streamlined web preview are available. The next explicit two-migration follow-up

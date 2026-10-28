@@ -66,6 +66,8 @@ import {
 interface DirectMessagesContextValue {
   conversations: DMConversation[];
   loading: boolean;
+  conversationsError: boolean;
+  retryConversations: () => Promise<void>;
   currentConversation: string | null;
   setCurrentConversation: React.Dispatch<React.SetStateAction<string | null>>;
   messages: DMMessage[];
@@ -100,6 +102,7 @@ interface DirectMessagesContextValue {
 
 const DirectMessagesContext = createContext<DirectMessagesContextValue | undefined>(undefined);
 const SEND_OPERATION_TIMEOUT_MS = 12000;
+const CONVERSATIONS_TIMEOUT_MS = 12000;
 
 const getDMOutboxScope = (conversationId: string) => `dm:${conversationId}`;
 
@@ -196,11 +199,18 @@ const retrievedDMToMessage = (message: DMRetrievedMessage): DMMessage => ({
 function useProvideDirectMessages(): DirectMessagesContextValue {
   const [conversations, setConversations] = useState<DMConversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [conversationsError, setConversationsError] = useState(false);
   const [currentConversation, setCurrentConversation] = useState<string | null>(null);
   const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const identityRef = useRef(userId);
+  identityRef.current = userId;
+  const [inboxOwner, setInboxOwner] = useState(userId);
+  const previousInboxOwnerRef = useRef(userId);
   const { playMessage } = useSoundEffects();
   const dmMessagesSubscriptionRef = useRef<ReturnType<typeof createRealtimeSubscriptionManager> | null>(null);
   const refreshConversationsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const conversationsRequestRef = useRef(0);
   const activeMessageHandlersRef = useRef<{
     insert: (incoming: Partial<DMMessage>) => void | Promise<void>;
     update: (incoming: Partial<DMMessage>) => void;
@@ -246,15 +256,27 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   };
 
   const refreshConversations = useCallback(async () => {
+    const owner = identityRef.current;
+    if (!owner) return;
+    const request = ++conversationsRequestRef.current;
     try {
-      const convs = await fetchDMConversations();
+      const convs = await withTimeout(fetchDMConversations(), CONVERSATIONS_TIMEOUT_MS, 'Direct message inbox timed out');
+      if (request !== conversationsRequestRef.current || owner !== identityRef.current) return;
       setConversations(convs);
+      setConversationsError(false);
     } catch {
       // Keep the last known inbox during transient resume/network failures.
+      if (request === conversationsRequestRef.current && owner === identityRef.current) setConversationsError(true);
     } finally {
-      setLoading(false);
+      if (request === conversationsRequestRef.current && owner === identityRef.current) setLoading(false);
     }
   }, []);
+
+  const retryConversations = useCallback(async () => {
+    setLoading(true);
+    setConversationsError(false);
+    await refreshConversations();
+  }, [refreshConversations]);
 
   const refreshConversationsDebounced = useCallback((delay = 250) => {
     if (refreshConversationsTimerRef.current) {
@@ -269,6 +291,7 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
   useEffect(() => {
     return () => {
+      conversationsRequestRef.current += 1;
       if (refreshConversationsTimerRef.current) {
         clearTimeout(refreshConversationsTimerRef.current);
       }
@@ -289,10 +312,17 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 
   // Fetch conversations
   useEffect(() => {
-    if (!user) return;
-
-    void refreshConversations();
-  }, [refreshConversations, user]);
+    conversationsRequestRef.current += 1;
+    if (previousInboxOwnerRef.current !== userId) {
+      previousInboxOwnerRef.current = userId;
+      setInboxOwner(userId);
+      setConversations([]);
+      setCurrentConversation(null);
+      setConversationsError(false);
+      setLoading(Boolean(userId));
+    }
+    if (userId) void refreshConversations();
+  }, [refreshConversations, userId]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !user) return;
@@ -567,9 +597,11 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
   }, [hasNewer, messages, refreshConversationsDebounced, user?.id]);
 
   return {
-    conversations,
+    conversations: inboxOwner === userId ? conversations : [],
     loading,
-    currentConversation,
+    conversationsError,
+    retryConversations,
+    currentConversation: inboxOwner === userId ? currentConversation : null,
     setCurrentConversation,
     messages,
     messagesConversationId,
