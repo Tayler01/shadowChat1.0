@@ -1,5 +1,22 @@
 # Real-Device Mobile Validation
 
+## October 28 streamlined iPhone build 22
+
+- The user confirmed TestFlight 1.0.0 (22) after a full close and reopen:
+  the earliest launch shows the ShadoChat logo, the following loading screen
+  is branded and shows progress, and the existing member account signs in
+  normally. This is physical-device confirmation; the exact iPhone model and
+  iOS version were not supplied.
+- Apple processed build `7fcc54c1-ca55-4fdd-bc37-f0b357e81efa` as VALID and it is
+  assigned to the existing internal test group. EAS build
+  `8eb2edc1-2854-41c5-a80f-1d6b07626c08` uses native source `591093f631df`.
+- The user subsequently confirmed signing out, selecting Demo, signing in as
+  the ordinary reviewer, and seeing only synthetic chats and ShadowPin content.
+  The repeated identical reply is one confirmation, not two independent tests.
+- Notification delivery/taps, media permissions, and the remaining live-message
+  regressions are not covered by these device confirmations. App Review
+  submission and public release remain outstanding.
+
 ## October 5 Checkers selection, music and frame pacing
 
 - User reports AI works in light iPhone testing, but reselection sometimes locks,

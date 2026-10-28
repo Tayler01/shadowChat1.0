@@ -1,3 +1,8 @@
+import { useConversationMessages as useStreamlinedConversationMessages } from '../apps/streamlined/src-overrides/hooks/useDirectMessages';
+jest.mock('../apps/streamlined/src-overrides/hooks/useAuth', () => jest.requireMock('../src/hooks/useAuth'));
+jest.mock('../apps/streamlined/src-overrides/lib/supabase', () => jest.requireMock('../src/lib/supabase'));
+jest.mock('../apps/streamlined/src-overrides/lib/localMessageOutbox', () => jest.requireActual('../src/lib/localMessageOutbox'));
+import { StrictMode, type ReactNode } from 'react';
 import { renderHook, act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { useDirectMessages, DirectMessagesProvider } from '../src/hooks/useDirectMessages';
 import { useAuth } from '../src/hooks/useAuth';
@@ -18,7 +23,7 @@ import {
 import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
 import { DirectMessagesView } from '../src/components/dms/DirectMessagesView';
 import { triggerDMPushNotification } from '../src/lib/push';
-import { getDMMessageWindow } from '../src/lib/dmConversationRetrieval';
+import { getDMMessageWindow, getDMReadWindow } from '../src/lib/dmConversationRetrieval';
 
 const mockPlayMessage = jest.fn();
 
@@ -61,6 +66,7 @@ jest.mock('../src/lib/realtimeRecovery', () => ({
 }));
 jest.mock('../src/lib/dmConversationRetrieval', () => ({
   getDMMessageWindow: jest.fn(),
+  getDMReadWindow: jest.fn(),
 }));
 jest.mock('../src/config', () => ({
   MESSAGE_FETCH_LIMIT: 40,
@@ -441,6 +447,113 @@ test.each(['u1', 'u2'])('preserves a manually owned DM window for an unseen real
   expect(result.current.hasNewer).toBe(false);
   expect(result.current.messages.some(message => message.id === incoming.id)).toBe(true);
   expect(result.current.messages).toHaveLength(200);
+});
+
+const windowRaceStrictWrapper = ({ children }: { children: ReactNode }) => <StrictMode>{children}</StrictMode>;
+
+const windowRaceSender = { id: 'u2', username: 'bob', display_name: 'Bob', status: 'online' as const, status_message: '', color: 'gold', last_active: '2026-04-21T12:00:00.000Z', created_at: '2026-04-21T12:00:00.000Z', updated_at: '2026-04-21T12:00:00.000Z' };
+
+describe.each([['full', dmModule.useConversationMessages], ['streamlined', useStreamlinedConversationMessages]] as const)('%s deferred DM window reconciliation', (_edition, useEditionConversationMessages) => {
+test.each([
+  ['read', false], ['target', false], ['read', true], ['target', true],
+] as const)('keeps post-request DM changes inside a delayed %s window (historical=%s)', async (kind, historical) => {
+  const old = { id: 'old-row', conversation_id: 'conv1', sender_id: 'u2', content: 'old', message_type: 'text' as const, created_at: '2026-04-21T12:00:00.000Z', updated_at: '2026-04-21T12:00:00.000Z', reactions: {}, sender: windowRaceSender };
+  const outside = { ...old, id: 'outside-requested-window', created_at: '2026-04-21T11:59:00.000Z' };
+  const removed = { ...old, id: 'deleted-after-request', created_at: '2026-04-21T12:00:30.000Z' };
+  const incoming = { ...old, id: 'arrived-after-window-request', content: 'live', created_at: '2026-04-21T12:01:00.000Z' };
+  const query = createQuery({ limit: jest.fn().mockResolvedValue({ data: [removed, old, outside], error: null }), maybeSingle: jest.fn().mockResolvedValue({ data: incoming, error: null }) });
+  workingClient.from.mockReturnValue(query as any);
+  const deferred = createDeferred<any>();
+  ((kind === 'read' ? getDMReadWindow : getDMMessageWindow) as jest.Mock).mockReturnValueOnce(deferred.promise);
+  const { result } = renderHook(() => useEditionConversationMessages('conv1'), { wrapper: windowRaceStrictWrapper });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  let pending!: Promise<boolean>;
+  act(() => { pending = kind === 'read' ? result.current.loadReadWindow() : result.current.loadMessageWindow(old.id); });
+  await act(async () => { await result.current.handleRealtimeInsert(incoming); });
+  expect(result.current.messages.some(message => message.id === incoming.id)).toBe(true);
+  act(() => {
+    result.current.handleRealtimeUpdate({ ...old, content: 'edited after request' });
+    result.current.handleRealtimeUpdate({ ...outside, content: 'outside edit must stay outside' });
+    result.current.handleRealtimeDelete(removed);
+  });
+  await act(async () => {
+    deferred.resolve({ messages: [old, removed].map(message => ({ id: message.id, conversationId: 'conv1', senderId: 'u2', content: message.content, messageType: 'text', createdAt: message.created_at, updatedAt: message.updated_at, reactions: {}, sender: message.sender })), hasOlder: true, hasNewer: historical, targetStatus: 'resolved' });
+    await pending;
+  });
+  expect(result.current.messages.map(message => message.id)).toEqual(historical ? [old.id] : [old.id, incoming.id]);
+  expect(result.current.messages[0].content).toBe('edited after request');
+  expect(result.current.hasNewer).toBe(historical);
+});
+
+test.each([false, true])('reconciles a deferred read-restoration arrival against the returned snapshot (included=%s)', async (included) => {
+  const old = { id: 'old-row', conversation_id: 'conv1', sender_id: 'u2', content: 'old', message_type: 'text' as const, created_at: '2026-04-21T12:00:00.000Z', reactions: {}, sender: windowRaceSender };
+  const incoming = { ...old, id: 'deferred-arrival', created_at: '2026-04-21T12:01:00.000Z' };
+  let hydration = incoming;
+  workingClient.from.mockReturnValue(createQuery({ limit: jest.fn().mockResolvedValue({ data: [old], error: null }), maybeSingle: jest.fn(() => Promise.resolve({ data: hydration, error: null })) }) as any);
+  const deferred = createDeferred<any>();
+  (getDMReadWindow as jest.Mock).mockReturnValueOnce(deferred.promise);
+  const { result } = renderHook(() => useEditionConversationMessages('conv1'), { wrapper: windowRaceStrictWrapper });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  let pending!: Promise<boolean>;
+  act(() => { result.current.setFollowingLatest(false); pending = result.current.loadReadWindow(); });
+  await act(async () => { await result.current.handleRealtimeInsert(incoming); });
+  expect(result.current.hasNewer).toBe(true);
+  await act(async () => {
+    deferred.resolve({ messages: (included ? [old, incoming] : [old]).map(message => ({ id: message.id, conversationId: 'conv1', senderId: 'u2', content: message.content, messageType: 'text', createdAt: message.created_at, updatedAt: message.created_at, reactions: {}, sender: message.sender })), hasOlder: false, hasNewer: false });
+    await pending;
+    if (included) {
+      result.current.setFollowingLatest(true);
+      hydration = { ...incoming, id: 'immediate-next-arrival', created_at: '2026-04-21T12:02:00.000Z' };
+      await result.current.handleRealtimeInsert(hydration);
+    }
+  });
+  expect(result.current.messages.map(message => message.id)).toEqual(included ? [old.id, incoming.id, 'immediate-next-arrival'] : [old.id]);
+  expect(result.current.hasNewer).toBe(!included);
+});
+
+test.each([
+  ['read', 'conversation'], ['target', 'conversation'], ['read', 'account'], ['target', 'account'],
+] as const)('ignores a delayed %s window after the %s changes', async (kind, scope) => {
+  workingClient.from.mockReturnValue(createQuery({ limit: jest.fn().mockResolvedValue({ data: [], error: null }) }) as any);
+  const deferred = createDeferred<any>();
+  ((kind === 'read' ? getDMReadWindow : getDMMessageWindow) as jest.Mock).mockReturnValueOnce(deferred.promise);
+  const { result, rerender } = renderHook(({ conversation }) => useEditionConversationMessages(conversation), { initialProps: { conversation: 'conv1' }, wrapper: windowRaceStrictWrapper });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  let pending!: Promise<boolean>;
+  act(() => { pending = kind === 'read' ? result.current.loadReadWindow() : result.current.loadMessageWindow('old-target'); });
+  if (scope === 'account') (useAuth as jest.Mock).mockReturnValue({ user: { id: 'different-account' } });
+  rerender({ conversation: scope === 'conversation' ? 'conv2' : 'conv1' });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  await act(async () => {
+    deferred.resolve({ messages: [{ id: 'old-target', conversationId: 'conv1', senderId: 'u2', content: 'stale scope', messageType: 'text', createdAt: '2026-04-21T12:00:00.000Z', reactions: {} }], hasOlder: false, hasNewer: false, targetStatus: 'resolved' });
+    await expect(pending).resolves.toBe(false);
+  });
+  expect(result.current.messages).toEqual([]);
+});
+
+test('keeps older-history availability when realtime reconciliation trims a restored window', async () => {
+  const old = { id: 'old-row', conversation_id: 'conv1', sender_id: 'u2', content: 'old', message_type: 'text' as const, created_at: '2026-04-21T12:00:00.000Z', reactions: {}, sender: windowRaceSender };
+  let hydration = old;
+  workingClient.from.mockReturnValue(createQuery({ limit: jest.fn().mockResolvedValue({ data: [old], error: null }), maybeSingle: jest.fn(() => Promise.resolve({ data: hydration, error: null })) }) as any);
+  const deferred = createDeferred<any>();
+  (getDMReadWindow as jest.Mock).mockReturnValueOnce(deferred.promise);
+  const { result } = renderHook(() => useEditionConversationMessages('conv1'), { wrapper: windowRaceStrictWrapper });
+  await waitFor(() => expect(result.current.loading).toBe(false));
+  let pending!: Promise<boolean>;
+  act(() => { pending = result.current.loadReadWindow(); });
+  for (let index = 1; index <= 201; index += 1) {
+    hydration = { ...old, id: `arrival-${index}`, created_at: new Date(Date.UTC(2026, 3, 21, 12, 0, index)).toISOString() };
+    await act(async () => { await result.current.handleRealtimeInsert(hydration); });
+  }
+  await act(async () => {
+    deferred.resolve({ messages: [{ id: old.id, conversationId: 'conv1', senderId: 'u2', content: old.content, messageType: 'text', createdAt: old.created_at, updatedAt: old.created_at, reactions: {}, sender: old.sender }], hasOlder: false, hasNewer: false });
+    await pending;
+  });
+  expect(result.current.messages).toHaveLength(200);
+  expect(result.current.messages[result.current.messages.length - 1]?.id).toBe('arrival-201');
+  expect(result.current.hasMore).toBe(true);
+});
+
 });
 
 test('loads an authoritative historical message window without falling back when missing', async () => {

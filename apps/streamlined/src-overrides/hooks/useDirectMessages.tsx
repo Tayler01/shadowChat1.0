@@ -127,6 +127,46 @@ const mergeDMMessagesByStableKey = (items: DMMessage[]) => sortDMMessagesByCreat
   items.reduce<DMMessage[]>((acc, message) => upsertMessageIntoState(acc, message), [])
 );
 
+type DMRealtimeChange = { revision: number; deleted: boolean; deferredKey?: Pick<DMMessage, 'id' | 'created_at'> };
+
+// A read/target window can resolve after Realtime has already changed its rows.
+// Keep those changes only within that window; a historical request still owns
+// its upper boundary and must not pull the reader forward to newer messages.
+const reconcileDMWindowSnapshot = (
+  snapshot: DMMessage[], previous: DMMessage[], changes: Map<string, DMRealtimeChange>,
+  snapshotRevision: number, hasOlder: boolean, hasNewer: boolean
+) => {
+  const ordered = sortDMMessagesByCreatedAt(snapshot);
+  const oldest = ordered[0];
+  const newest = ordered[ordered.length - 1];
+  let merged = [...snapshot, ...previous.filter(message => !isServerDMCursorMessage(message))];
+  for (const [id, change] of changes) {
+    if (change.revision <= snapshotRevision) continue;
+    if (change.deleted) {
+      merged = merged.filter(message => message.id !== id);
+      continue;
+    }
+    const current = previous.find(message => message.id === id);
+    if (!current) continue;
+    const inSnapshot = snapshot.some(message => message.id === id);
+    if (!inSnapshot && (
+      hasOlder && (!oldest || compareMessageKey(current, oldest) < 0) ||
+      hasNewer && (!newest || compareMessageKey(current, newest) > 0)
+    )) continue;
+    merged = upsertMessageIntoState(merged, current);
+  }
+  return boundDMMessagesForWindow(merged, 'latest');
+};
+
+const hasDeferredDMNewer = (snapshot: DMMessage[], changes: Map<string, DMRealtimeChange>, snapshotRevision: number) => {
+  const newest = sortDMMessagesByCreatedAt(snapshot).slice(-1)[0];
+  return [...changes.values()].some(change =>
+    change.revision > snapshotRevision && !change.deleted && change.deferredKey &&
+    !snapshot.some(message => message.id === change.deferredKey?.id) &&
+    (!newest || compareMessageKey(change.deferredKey, newest) > 0)
+  );
+};
+
 export const MAX_DM_SERVER_MESSAGE_WINDOW = 200;
 
 export const boundDMMessagesForWindow = (
@@ -628,13 +668,27 @@ function useProvideDirectMessages(): DirectMessagesContextValue {
 }
 
 export function useConversationMessages(conversationId: string | null) {
-  const [messages, setMessages] = useState<DMMessage[]>([]);
+  const [windowState, setWindowState] = useState({ messages: [] as DMMessage[], hasMore: true, hasNewer: false });
+  const { messages, hasMore, hasNewer } = windowState;
+  const setMessages = useCallback((action: React.SetStateAction<DMMessage[]>) => {
+    setWindowState(previous => {
+      const next = typeof action === 'function' ? action(previous.messages) : action;
+      return next === previous.messages ? previous : { ...previous, messages: next };
+    });
+  }, []);
+  const setHasMore = useCallback((action: React.SetStateAction<boolean>) => {
+    setWindowState(previous => {
+      const next = typeof action === 'function' ? action(previous.hasMore) : action;
+      return next === previous.hasMore ? previous : { ...previous, hasMore: next };
+    });
+  }, []);
+  const setHasNewerState = useCallback((value: boolean) => {
+    setWindowState(previous => value === previous.hasNewer ? previous : { ...previous, hasNewer: value });
+  }, []);
   const [loadedConversationId, setLoadedConversationId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [hasNewer, setHasNewerState] = useState(false);
   const { user, profile } = useAuth();
   const clientResetRef = useRef<() => Promise<void>>();
   const activeConversationIdRef = useRef<string | null>(conversationId);
@@ -648,7 +702,7 @@ export function useConversationMessages(conversationId: string | null) {
   const sendScopeEpochRef = useRef({ key: sendScopeKey, version: 0 });
   if (sendScopeEpochRef.current.key !== sendScopeKey) sendScopeEpochRef.current = { key: sendScopeKey, version: sendScopeEpochRef.current.version + 1 };
   const messageRevisionRef = useRef(0);
-  const messageChangesRef = useRef(new Map<string, { revision: number; deleted: boolean }>());
+  const messageChangesRef = useRef(new Map<string, DMRealtimeChange>());
   const latestMessagesRef = useRef<DMMessage[]>([]);
   const hydrationFetchesRef = useRef<Map<string, Promise<DMMessage | null>>>(new Map());
   const followingLatestRef = useRef(true);
@@ -656,7 +710,7 @@ export function useConversationMessages(conversationId: string | null) {
   const updateHasNewer = useCallback((value: boolean) => {
     hasNewerRef.current = value;
     setHasNewerState(value);
-  }, []);
+  }, [setHasNewerState]);
 
   useEffect(() => {
     activeConversationIdRef.current = conversationId;
@@ -680,7 +734,7 @@ export function useConversationMessages(conversationId: string | null) {
       (acc, entry) => upsertMessageIntoState(acc, localOutboxEntryToDMMessage(entry, conversationId, profile ?? user)),
       prev
     )));
-  }, [conversationId, profile, user]);
+  }, [conversationId, profile, setMessages, user]);
 
   const insertConversationMessage = useCallback(
     async (
@@ -853,7 +907,7 @@ export function useConversationMessages(conversationId: string | null) {
       return;
     }
     await clientResetRef.current?.();
-  }, []);
+  }, [setMessages]);
 
   const setFollowingLatest = useCallback((following: boolean) => { followingLatestRef.current = following; }, []);
 
@@ -962,7 +1016,7 @@ export function useConversationMessages(conversationId: string | null) {
         clientResetRef.current = undefined;
       }
     };
-  }, [conversationId, updateHasNewer, user]);
+  }, [conversationId, setHasMore, setMessages, updateHasNewer, user]);
 
   useEffect(() => {
     hydrateLocalOutboxMessages();
@@ -1008,7 +1062,7 @@ export function useConversationMessages(conversationId: string | null) {
     } finally {
       if (activeConversationIdRef.current === conversationId && requestId === fetchRequestIdRef.current) setLoadingMore(false);
     }
-  }, [loadingMore, hasMore, conversationId, messages, updateHasNewer]);
+  }, [loadingMore, hasMore, conversationId, messages, setMessages, setHasMore, updateHasNewer]);
 
   const handleRealtimeInsert = useCallback(async (incoming: Partial<DMMessage>) => {
     const activeConversationId = activeConversationIdRef.current;
@@ -1022,9 +1076,13 @@ export function useConversationMessages(conversationId: string | null) {
     const message = await hydrateConversationMessage(incoming.id);
     if (!message || activeConversationIdRef.current !== incoming.conversation_id) return;
     const exists = findMatchingMessageIndex(latestMessagesRef.current, message) >= 0;
-    if (hasNewerRef.current && !exists) return;
+    if (hasNewerRef.current && !exists) {
+      messageChangesRef.current.set(message.id, { revision: ++messageRevisionRef.current, deleted: false, deferredKey: { id: message.id, created_at: message.created_at } });
+      return;
+    }
     const newest = latestMessagesRef.current.filter(isServerDMCursorMessage).slice(-1)[0];
     if (!followingLatestRef.current && !exists && (!newest || compareMessageKey(message, newest) > 0)) {
+      messageChangesRef.current.set(message.id, { revision: ++messageRevisionRef.current, deleted: false, deferredKey: { id: message.id, created_at: message.created_at } });
       updateHasNewer(true);
       return;
     }
@@ -1039,7 +1097,7 @@ export function useConversationMessages(conversationId: string | null) {
         delivery_status: 'sent',
       },
     ], 'latest').messages);
-  }, [hydrateConversationMessage, updateHasNewer]);
+  }, [hydrateConversationMessage, setMessages, updateHasNewer]);
 
   const handleRealtimeUpdate = useCallback((incoming: Partial<DMMessage>) => {
     if (
@@ -1047,7 +1105,7 @@ export function useConversationMessages(conversationId: string | null) {
       !incoming.conversation_id ||
       activeConversationIdRef.current !== incoming.conversation_id
     ) return;
-    messageChangesRef.current.set(incoming.id, { revision: ++messageRevisionRef.current, deleted: false });
+    messageChangesRef.current.set(incoming.id, { ...messageChangesRef.current.get(incoming.id), revision: ++messageRevisionRef.current, deleted: false });
 
     setMessages(prev => {
       const existing = prev.find(message => message.id === incoming.id);
@@ -1056,18 +1114,19 @@ export function useConversationMessages(conversationId: string | null) {
       const merged = mergeRealtimeMessageUpdate(existing, incoming, { sender: existing.sender });
       return merged ? upsertMessageIntoState(prev, merged) : prev;
     });
-  }, []);
+  }, [setMessages]);
 
   const handleRealtimeDelete = useCallback((removed: Partial<DMMessage>) => {
     if (!removed.id) return;
     messageChangesRef.current.set(removed.id, { revision: ++messageRevisionRef.current, deleted: true });
 
     setMessages(prev => prev.filter(message => message.id !== removed.id));
-  }, []);
+  }, [setMessages]);
 
   const loadMessageWindow = useCallback(async (messageId: string) => {
     if (!conversationId) return false;
     const requestedConversationId = conversationId;
+    const snapshotRevision = messageRevisionRef.current;
     const requestId = ++fetchRequestIdRef.current;
     setLoadingMore(true);
     try {
@@ -1105,38 +1164,49 @@ export function useConversationMessages(conversationId: string | null) {
         sender: message.sender,
       } as DMMessage));
 
-      setMessages(previous => {
-        const local = previous.filter(message => !isServerDMCursorMessage(message));
-        return boundDMMessagesForWindow([...windowMessages, ...local], 'latest').messages;
+      const changes = new Map(messageChangesRef.current);
+      const nextHasNewer = result.hasNewer || hasDeferredDMNewer(windowMessages, changes, snapshotRevision);
+      // Match the event callback guard synchronously, outside React's replayable
+      // updater; the same value commits with messages/pagination atomically.
+      hasNewerRef.current = nextHasNewer;
+      setWindowState(previous => {
+        const reconciled = reconcileDMWindowSnapshot(
+          windowMessages, previous.messages, changes, snapshotRevision, result.hasOlder, result.hasNewer
+        );
+        return { messages: reconciled.messages, hasMore: result.hasOlder || reconciled.trimmed, hasNewer: nextHasNewer };
       });
       setLoadedConversationId(requestedConversationId);
-      setHasMore(result.hasOlder);
-      updateHasNewer(result.hasNewer);
       return true;
     } finally {
       if (activeConversationIdRef.current === conversationId && requestId === fetchRequestIdRef.current) setLoadingMore(false);
     }
-  }, [conversationId, updateHasNewer]);
+  }, [conversationId]);
 
   const loadReadWindow = useCallback(async () => {
     if (!conversationId) return false;
     const scope = conversationId;
+    const snapshotRevision = messageRevisionRef.current;
     const requestId = ++fetchRequestIdRef.current;
     setLoadingMore(true);
     try {
       const result = await getDMReadWindow(scope, { readAnchor: true, limit: 60 });
       if (activeConversationIdRef.current !== scope || fetchRequestIdRef.current !== requestId) return false;
-      setMessages(previous => boundDMMessagesForWindow([
-        ...result.messages.map(retrievedDMToMessage), ...previous.filter(message => !isServerDMCursorMessage(message)),
-      ], 'latest').messages);
-      setHasMore(result.hasOlder);
-      updateHasNewer(result.hasNewer);
+      const snapshot = result.messages.map(retrievedDMToMessage);
+      const changes = new Map(messageChangesRef.current);
+      const nextHasNewer = result.hasNewer || hasDeferredDMNewer(snapshot, changes, snapshotRevision);
+      hasNewerRef.current = nextHasNewer;
+      setWindowState(previous => {
+        const reconciled = reconcileDMWindowSnapshot(
+          snapshot, previous.messages, changes, snapshotRevision, result.hasOlder, result.hasNewer
+        );
+        return { messages: reconciled.messages, hasMore: result.hasOlder || reconciled.trimmed, hasNewer: nextHasNewer };
+      });
       setLoadedConversationId(scope);
       return true;
     } finally {
       if (activeConversationIdRef.current === scope && fetchRequestIdRef.current === requestId) setLoadingMore(false);
     }
-  }, [conversationId, updateHasNewer]);
+  }, [conversationId]);
 
   const loadNewerMessages = useCallback(async () => {
     if (!conversationId || loadingMore || !hasNewerRef.current) return;
@@ -1153,7 +1223,7 @@ export function useConversationMessages(conversationId: string | null) {
     } finally {
       if (activeConversationIdRef.current === scope) setLoadingMore(false);
     }
-  }, [conversationId, loadingMore, updateHasNewer]);
+  }, [conversationId, loadingMore, setHasMore, setMessages, updateHasNewer]);
 
   const sendMessage = useCallback(
     async (
@@ -1317,7 +1387,7 @@ export function useConversationMessages(conversationId: string | null) {
         pendingIntentsRef.current.delete(intentKey);
         setSending([...pendingIntentsRef.current.values()].includes(`${activeUserIdRef.current}:${activeConversationIdRef.current}`));
       }
-    }, [user, conversationId, insertConversationMessage, profile]);
+    }, [user, conversationId, profile, setMessages, insertConversationMessage]);
 
   const retryFailedMessage = useCallback(async (messageId: string) => {
     const failedMessage = latestMessagesRef.current.find(message =>
@@ -1356,7 +1426,7 @@ export function useConversationMessages(conversationId: string | null) {
       message.id !== messageId &&
       message.client_message_id !== messageId
     )));
-  }, [conversationId]);
+  }, [conversationId, setMessages]);
 
   const editMessage = useCallback(async (messageId: string, content: string) => {
     if (!user || !conversationId || !content.trim()) return;
@@ -1377,7 +1447,7 @@ export function useConversationMessages(conversationId: string | null) {
         ? { ...message, content: content.trim(), edited_at: editedAt }
         : message
     )));
-  }, [conversationId, user]);
+  }, [conversationId, setMessages, user]);
 
   const deleteMessage = useCallback(async (messageId: string) => {
     if (!user || !conversationId) return;
@@ -1393,7 +1463,7 @@ export function useConversationMessages(conversationId: string | null) {
     if (error) throw error;
 
     setMessages(prev => prev.filter(message => message.id !== messageId));
-  }, [conversationId, user]);
+  }, [conversationId, setMessages, user]);
 
   const toggleReaction = useCallback(async (messageId: string, emoji: string) => {
     if (!user || !conversationId) return;
@@ -1423,7 +1493,7 @@ export function useConversationMessages(conversationId: string | null) {
     if (message && activeConversationIdRef.current === conversationId) {
       setMessages(prev => prev.map(existing => existing.id === message.id ? message : existing));
     }
-  }, [conversationId, fetchConversationMessage, user]);
+  }, [conversationId, fetchConversationMessage, setMessages, user]);
 
   return {
     messages,
