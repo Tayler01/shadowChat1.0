@@ -44,9 +44,12 @@ test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', 
   assert.deepEqual(contract.anon_signatures, [
     'is_username_available(text)',
     'redeem_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,text,text,text,text,integer,text)',
+    'redeem_scoped_native_notification_enrollment_ticket_v2(text,text,uuid,text,text,text,integer,text,text,text,text,integer,text)',
     'register_native_notification_token_by_credential_v2(uuid,text,text)',
     'revoke_notification_installation_by_credential_v2(uuid,text)',
+    'revoke_notification_installation_with_proof_v1(uuid,uuid,text)',
     'set_notification_installation_foreground_by_credential_v2(uuid,text,timestamp with time zone)',
+    'settle_native_notification_enrollment_attempt_v1(uuid,uuid,text,text,text,text)',
   ])
   assert.ok(contract.internal_signatures.includes('register_my_native_notification_token_v2(uuid,text,text,text)'))
   assert.deepEqual(

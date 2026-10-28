@@ -56,6 +56,7 @@ test('scoped enrollment and retry-safe revocation preserve identity, rollback an
     await db.exec(await sql('20261028215545_scoped_native_notification_community_capability.sql'))
     await db.exec(await sql('20261028220830_idempotent_native_notification_revocation_proof.sql'))
     await db.exec(await sql('20261028222221_settle_pending_native_notification_enrollment_attempt.sql'))
+    await db.exec(await sql('20261028225511_settle_pending_enrollment_lint_alignment.sql'))
 
     const grants = (await db.query(`select has_function_privilege('anon',$1,'execute') as anon,
       has_function_privilege('authenticated',$1,'execute') as member,

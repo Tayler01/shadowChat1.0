@@ -29,6 +29,7 @@ const nativeAppSource = readFileSync(
   'utf8',
 )
 const nativeRuntimeSource = readFileSync(join(mobileRoot, 'src', 'lib', 'appRuntime.ts'), 'utf8')
+const nativeCommunityBindingsSource = readFileSync(join(mobileRoot, 'src', 'community', 'communityBindings.ts'), 'utf8')
 const nativeSupabaseSource = readFileSync(
   join(mobileRoot, 'src', 'lib', 'supabase.ts'),
   'utf8',
@@ -235,12 +236,13 @@ test('signed mobile client contains the full production app and ticketed native 
   assert.match(nativeAppSource, /from 'react-native-webview'/)
   assert.equal(FULL_APP_ORIGIN, 'https://shadochat.online')
   assert.equal(resolveAppConfiguration(appConfig.expo.extra).origin, FULL_APP_ORIGIN)
-  assert.match(nativeRuntimeSource, /resolveAppConfiguration\(Constants\.expoConfig\?\.extra\)/)
+  assert.match(nativeCommunityBindingsSource, /resolveAppConfiguration\(Constants\.expoConfig\?\.extra\)/)
+  assert.match(nativeRuntimeSource, /activeCommunity\(\)\?\.community\.origin\s*\?\?\s*baseAppRuntime\.origin/)
   assert.match(nativeAppSource, /import \{ appRuntime \} from '@\/lib\/appRuntime'/)
-  assert.match(nativeAppSource, /const APP_ORIGIN = appRuntime\.origin/)
+  assert.match(nativeAppSource, /const APP_ORIGIN\s*=\s*context\.community\.origin/)
   assert.throws(() => resolveAppConfiguration({ webAppUrl: 'https://shadochat.online/other' }))
   assert.throws(() => resolveAppConfiguration({ webAppUrl: 'http://shadochat.online' }))
-  assert.match(nativeAppSource, /new URL\(value\)\.origin === APP_ORIGIN/)
+  assert.match(nativeAppSource, /communityController\?\.acceptsBridge\(context,\s*event\.nativeEvent\.url\)/)
   assert.doesNotMatch(nativeAppSource, /sb-shsqqouecvdoifzufkqm-auth-token/)
   assert.doesNotMatch(nativeAppSource, /publishWebSession/)
   assert.doesNotMatch(nativeAppSource, /window\.setInterval\(publishWebSession/)
@@ -284,10 +286,10 @@ test('signed mobile client contains the full production app and ticketed native 
   assert.match(nativeBridgeSource, /publishNativeNotificationRoute/)
   assert.match(nativeBridgeSource, /requestId: string \| null/)
   assert.match(nativeAppSource, /createSerializedCommandQueue/)
-  assert.match(nativeAppSource, /stage: 'syncing_session'/)
+  assert.match(nativeAppSource, /stage:\s*'syncing_session'/)
   assert.match(nativeSupabaseSource, /autoRefreshToken: false/)
   assert.match(nativeSupabaseSource, /persistSession: false/)
-  assert.match(nativeSupabaseSource, /deleteItemAsync\(LEGACY_NATIVE_AUTH_STORAGE_KEY\)/)
+  assert.match(nativeSupabaseSource, /deleteItemAsync\('shadowchat-mobile-auth'\)/)
   assert.doesNotMatch(nativeSupabaseSource, /autoRefreshToken: true/)
   assert.doesNotMatch(nativeSupabaseSource, /persistSession: true/)
   assert.match(
