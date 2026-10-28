@@ -2,6 +2,23 @@
 
 ## October 28 production and testing checkpoint
 
+Live invitation enforcement rejected seven direct signup bypass attempts; all
+fixtures were cleaned. Email confirmation and leaked-password screening remain
+enabled. New and reset passwords now require 12 characters, while existing
+password login is unchanged. The streamlined host's confirmation/recovery
+callbacks were added without removing the full app's redirects. Both editions'
+forms have matching validation. A valid invite and reuse denial passed a rolled
+back hook check; real inbox confirmation/recovery remains a separate check.
+
+The private operator inventory contains all 26 accounts. It flags two with no
+observed activity for 30–89 days, 13 for at least 90 days, and one with no confirmed
+usage. Flags combine app and Auth telemetry and are not deletion decisions.
+All 27 identified disposable fixture accounts are absent. The two retained QA
+accounts are ordinary members; 441 accumulated sessions were revoked and their
+local credential artifacts were secured. Reports and credentials remain outside
+the repository. The smoke harness now redacts account secrets and cleans up its
+own sessions without signing out unrelated members.
+
 The staged backend activation from `bea0e0bb` is complete. Production checks
 verified safe profile projections, automatic report-evidence capture and both
 modern and legacy account deletion, including denial of stale-session writes.
@@ -33,7 +50,9 @@ stage order are recorded in `supabase/backend-privacy-followup.json`. Publish
 compatible handlers and both clients with privacy flags off before applying
 this pair; do not rerun or modify the historical activation plan.
 
-Build 20 preparation advances only the streamlined native profile. Its shared
+Signed build 20 has finished and its IPA has been inspected; upload and Apple
+processing are tracked separately in the release evidence. It advances only
+the streamlined native profile. Its shared
 TypeScript notification parser accepts signed-media envelopes before routing;
 the streamlined Swift extension deliberately remains media-free. Public App
 Review has not been submitted. Final private-media/Realtime enforcement,

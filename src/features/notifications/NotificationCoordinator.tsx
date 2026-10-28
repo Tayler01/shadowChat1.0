@@ -48,7 +48,6 @@ import {
   type NotificationEventRecord,
   type NotificationPresentation,
 } from './notificationModel'
-import { NotificationBannerV2 } from './NotificationBannerV2'
 import {
   buildNotificationEnvelopeV2,
   getNotificationTypePolicyV2,
@@ -63,6 +62,10 @@ import {
 const PREFERENCES_REFRESH_MS = 30_000
 const MAX_QUEUED_PRESENTATIONS = 4
 const GROUP_WINDOW_MS = 4_000
+
+const NotificationBannerV2 = lazy(() =>
+  import('./NotificationBannerV2').then(module => ({ default: module.NotificationBannerV2 }))
+)
 
 const PublicProfileDialog = lazy(() =>
   import('../../components/profile/PublicProfileDialog').then(module => ({
@@ -545,14 +548,16 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
           aria-live="off"
           data-testid="notification-coordinator-tray"
         >
-          <NotificationBannerV2
-            envelope={queue[0].envelope}
-            desktop={isDesktop}
-            queuedCount={Math.max(0, queue.length - 1)}
-            onDismiss={dismissEvent}
-            onOpen={openPresentation}
-            onOpenProfile={profileId => void openProfile(profileId)}
-          />
+          <Suspense fallback={null}>
+            <NotificationBannerV2
+              envelope={queue[0].envelope}
+              desktop={isDesktop}
+              queuedCount={Math.max(0, queue.length - 1)}
+              onDismiss={dismissEvent}
+              onOpen={openPresentation}
+              onOpenProfile={profileId => void openProfile(profileId)}
+            />
+          </Suspense>
         </div>
       )}
       {selectedProfile && (

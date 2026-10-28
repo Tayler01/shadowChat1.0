@@ -182,14 +182,14 @@ export function LoginForm() {
       newErrors.username = 'Username must be at least 3 characters';
     }
     if (!formData.email.trim()) newErrors.email = 'Email is required';
-    if (formData.password.length < 6) newErrors.password = 'Password must be at least 6 characters';
+    if (formData.password.length < 12) newErrors.password = 'Password must be at least 12 characters';
     return newErrors;
   };
 
   const validateResetPassword = () => {
     const newErrors: Record<string, string> = {};
-    if (formData.resetPassword.length < 6) {
-      newErrors.resetPassword = 'Password must be at least 6 characters';
+    if (formData.resetPassword.length < 12) {
+      newErrors.resetPassword = 'Password must be at least 12 characters';
     }
     if (formData.resetPasswordConfirm !== formData.resetPassword) {
       newErrors.resetPasswordConfirm = 'Passwords must match';
@@ -482,7 +482,7 @@ export function LoginForm() {
                     value={formData.password}
                     onChange={handleInputChange}
                     error={errors.password}
-                    placeholder="Enter your password"
+                    placeholder={view === 'login' ? 'Enter your password' : 'At least 12 characters'}
                     required
                   />
                   <button
@@ -507,7 +507,7 @@ export function LoginForm() {
                       value={formData.resetPassword}
                       onChange={handleInputChange}
                       error={errors.resetPassword}
-                      placeholder="Enter a new password"
+                      placeholder="At least 12 characters"
                       required
                     />
                     <button

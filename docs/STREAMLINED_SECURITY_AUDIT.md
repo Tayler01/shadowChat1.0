@@ -2,6 +2,27 @@
 
 ## October 28 verified checkpoint
 
+Live signup checks rejected missing, invalid, expired, exhausted, revoked and
+wrong-email invitations, plus forged administrator metadata. Email confirmation,
+the Auth hook and leaked-password screening are enabled; anonymous signups are
+disabled. Only the new/reset password minimum (12) and additive streamlined
+callback allowlist were changed. Existing login credentials remain valid.
+Positive invite/reuse validation used a rolled-back operator hook invocation;
+it does not prove SMTP confirmation delivery.
+
+All 27 known disposable fixture accounts are absent. The two retained ordinary
+QA accounts had 441 accumulated sessions revoked; old refresh tokens failed,
+new login succeeded, and verification sessions were signed out. Already-issued
+access JWTs retain their natural expiry limitation. The private 26-account
+inventory flags inactivity without deleting real members. Generated credential
+fields and owned auth-storage entries were removed from 196 and 81 local ignored
+artifacts respectively, with hash receipts and restricted permissions. The smoke
+runner now allowlists account metadata and locally revokes its own new sessions.
+Live WebKit authentication against the streamlined site verified two captured
+sessions were locally revoked, no test content remained, and the run-owned
+persistent browser profile was removed. Existing profiles were not reused or
+deleted. Thirteen focused harness tests and 15 auth/notification tests pass.
+
 Production activation completed from `bea0e0bb` with 264 migrations. Safe profile
 fingerprints match; private identity columns remain denied. Actual automatic
 evidence capture passed four checks, and modern/legacy deletion passed five,
@@ -29,7 +50,8 @@ deepmerge adaptation for GHSA-gcqx-w48m-w2h4. The raw native audit still reports
 the previously mitigated node-forge advisory; the release verifier checks its
 exact installed backport and exploit regressions. No advisory allowlist was
 expanded. Native lint/typecheck, 25 tests and the release audit pass. This is
-local preparation, not a signed build 20 or physical-device result.
+local validation. Signed build 20 subsequently finished and its IPA inspection
+passed; Apple processing and physical-device acceptance remain distinct gates.
 
 The separate site and TestFlight build 19 are available. Global private Storage,
 Bunny and Realtime cutover remains held. See

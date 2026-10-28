@@ -1,3 +1,4 @@
+import { createOwnedSmokeProfile, createSmokeSessionCleanup, redactSmokeAccounts, removeOwnedSmokeProfile } from './smoke-session-cleanup.mjs'
 import { chromium, webkit, devices } from 'playwright'
 import { createClient } from '@supabase/supabase-js'
 import { execFileSync, spawn } from 'node:child_process'
@@ -65,11 +66,16 @@ const runState = {
   },
 }
 
+runState.sessionCleanup = createSmokeSessionCleanup({
+  supabaseUrl: getEnvValue(config.envValues, ['SUPABASE_URL', 'VITE_SUPABASE_URL']),
+})
+
 let previewServer = null
 let browser = null
 let desktopA = null
 let desktopB = null
 let mobileA = null
+let persistentProfileClosed = true
 
 try {
   logLine(`Artifacts: ${artifactDir}`)
@@ -94,7 +100,7 @@ try {
 
   await writeJson(path.join(artifactDir, 'accounts.json'), {
     accountMode: config.accountMode,
-    accounts,
+    accounts: redactSmokeAccounts(accounts),
   })
 
   for (const scenarioName of config.scenarios) {
@@ -173,11 +179,22 @@ try {
     storage: Object.fromEntries([...runState.artifacts.storage].map(([bucket, paths]) => [bucket, [...paths]])),
     untrackedInserts: runState.artifacts.untrackedInserts,
   })
+  await runState.sessionCleanup.drain()
   await closeSession(mobileA)
-  await closeSession(desktopB)
+  persistentProfileClosed = await closeSession(desktopB || { context: runState.persistentContext })
   await closeSession(desktopA)
   if (browser) {
     await browser.close().catch(() => {})
+  }
+  if (runState.ownedProfile) {
+    try {
+      if (!persistentProfileClosed) throw new Error('Persistent browser context did not close')
+      await removeOwnedSmokeProfile(runState.ownedProfile)
+    } catch (profileError) {
+      runState.summary.status = 'failed'
+      runState.summary.profileCleanupError = serializeError(profileError)
+      process.exitCode = 1
+    }
   }
   try {
     await cleanupSmokeRunData(runState, [
@@ -195,6 +212,12 @@ try {
     )
     process.exitCode = 1
   }
+  runState.summary.sessionCleanup = await runState.sessionCleanup.cleanup()
+  if (!runState.summary.sessionCleanup.verified) {
+    runState.summary.status = 'failed'
+    process.exitCode = 1
+  }
+  await writeJson(resultPath, runState.summary)
   if (previewServer?.cleanup) {
     await previewServer.cleanup()
   }
@@ -814,15 +837,15 @@ async function createDesktopSession(browserInstance, state, account, folderName,
   const device = primarySessionDevice(state.config)
 
   if (options.persistent) {
-    const profileDir = path.join(state.artifactDir, 'profiles', folderName)
-    await mkdir(profileDir, { recursive: true })
-    context = await browserType.launchPersistentContext(profileDir, {
+    state.ownedProfile = await createOwnedSmokeProfile(state.repoRoot, state.artifactDir)
+    context = await browserType.launchPersistentContext(state.ownedProfile.directory, {
       headless: state.config.headless,
       slowMo: state.config.slowMo,
       ...device,
       serviceWorkers: 'block',
       ignoreHTTPSErrors: true,
     })
+    state.persistentContext = context
   } else {
     context = await browserInstance.newContext({
       ...device,
@@ -832,6 +855,7 @@ async function createDesktopSession(browserInstance, state, account, folderName,
   }
 
   trackSmokeArtifacts(context, state)
+  state.sessionCleanup.trackContext(context, account)
   await installBrowserMocks(context)
   const page = context.pages()[0] || await context.newPage()
   attachDiagnostics(page, path.join(state.logsDir, `${folderName}.log`), folderName)
@@ -843,6 +867,7 @@ async function createDesktopSession(browserInstance, state, account, folderName,
     await writeJson(path.join(state.artifactDir, `${folderName}-auth-failure.json`), {
       url: page.url(), text: (await page.locator('body').innerText()).slice(0, 2000),
     })
+    await state.sessionCleanup.drain()
     await context.close()
     throw error
   }
@@ -857,20 +882,19 @@ async function createDesktopSession(browserInstance, state, account, folderName,
 }
 
 async function refreshMobileSession(browserInstance, state, account, existingSession) {
+  await state.sessionCleanup.drain()
   await closeSession(existingSession)
 
-  const storageStateDir = path.join(state.artifactDir, 'storage')
-  const storageStatePath = path.join(storageStateDir, `${account.label}.json`)
-  await mkdir(storageStateDir, { recursive: true })
-  await writeStorageState(browserInstance, state, account, storageStatePath)
+  const storageState = await writeStorageState(browserInstance, state, account)
 
   const context = await browserInstance.newContext({
     ...devices[state.config.phone === 'android' ? 'Pixel 7' : 'iPhone 13'],
-    storageState: storageStatePath,
+    storageState,
     serviceWorkers: 'block',
     ignoreHTTPSErrors: true,
   })
   trackSmokeArtifacts(context, state)
+  state.sessionCleanup.trackContext(context, account)
   await installBrowserMocks(context)
   const page = await context.newPage()
   attachDiagnostics(page, path.join(state.logsDir, 'mobile-account-1.log'), 'mobile-account-1')
@@ -882,6 +906,7 @@ async function refreshMobileSession(browserInstance, state, account, existingSes
     await writeJson(path.join(state.artifactDir, 'mobile-storage-restore-failure.json'), {
       url: page.url(), text: (await page.locator('body').innerText()).slice(0, 4000),
     })
+    await state.sessionCleanup.drain()
     await context.close()
     throw error
   }
@@ -894,12 +919,13 @@ async function refreshMobileSession(browserInstance, state, account, existingSes
   }
 }
 
-async function writeStorageState(browserInstance, state, account, storageStatePath) {
+async function writeStorageState(browserInstance, state, account) {
   const scratchContext = await browserInstance.newContext({
     ...primarySessionDevice(state.config),
     serviceWorkers: 'block',
     ignoreHTTPSErrors: true,
   })
+  state.sessionCleanup.trackContext(scratchContext, account)
   await installBrowserMocks(scratchContext)
   const scratchPage = await scratchContext.newPage()
   attachDiagnostics(scratchPage, path.join(state.logsDir, `${account.label}-storage.log`), `${account.label}-storage`)
@@ -909,8 +935,9 @@ async function writeStorageState(browserInstance, state, account, storageStatePa
       ...account,
       strategy: 'signin',
     }, `${account.label}-storage`)
-    await scratchContext.storageState({ path: storageStatePath })
+    return await scratchContext.storageState()
   } finally {
+    await state.sessionCleanup.drain()
     await scratchContext.close().catch(() => {})
   }
 }
@@ -1969,10 +1996,15 @@ async function stopChildProcess(child) {
 
 async function closeSession(session) {
   if (!session?.context) {
-    return
+    return true
   }
 
-  await session.context.close().catch(() => {})
+  try {
+    await session.context.close()
+    return true
+  } catch {
+    return false
+  }
 }
 
 function serializeError(error) {
