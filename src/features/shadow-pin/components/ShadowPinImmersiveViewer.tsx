@@ -1,3 +1,7 @@
+import { PrivateMediaImage } from '../../../components/ui/PrivateMediaImage'
+import { PrivateMediaLink } from '../../../components/ui/PrivateMediaLink'
+import { usePrivateMediaUrl } from '../../../hooks/usePrivateMediaUrl'
+import { resolvePrivateMediaUrl, subscribePrivateMediaInvalidation } from '../../../lib/privateMediaUrls'
 import {
   ChevronDown,
   ChevronLeft,
@@ -146,6 +150,7 @@ export function ShadowPinImmersiveViewer({
   const { isReducedMotion: reducedMotion, shouldAutoplayMedia } = useComfortPreferences()
   const activeIndex = getViewerIndex(images, activeImageId)
   const activeImage = activeIndex >= 0 ? images[activeIndex] : null
+  const activeTransitionUrl = usePrivateMediaUrl(activeImage ? getTransitionUrl(activeImage) : undefined)
   const previousImage = getViewerNeighbor(images, activeImageId, -1)
   const nextImage = getViewerNeighbor(images, activeImageId, 1)
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -172,6 +177,11 @@ export function ShadowPinImmersiveViewer({
   const openedIdsRef = useRef(new Set<string>())
   const requestedMoreRef = useRef<string | null>(null)
   const preloadedImagesRef = useRef(new Map<string, HTMLImageElement>())
+
+  useEffect(() => subscribePrivateMediaInvalidation(() => {
+    preloadedImagesRef.current.forEach(image => image.removeAttribute('src'))
+    preloadedImagesRef.current.clear()
+  }), [])
 
   const updateDragX = useCallback((value: number, immediate = false) => {
     dragXRef.current = value
@@ -313,6 +323,9 @@ export function ShadowPinImmersiveViewer({
 
   useEffect(() => {
     if (!activeImage) return
+    let disposed = false
+    const pendingUrls = new Set<string>()
+    const preloadedImages = preloadedImagesRef.current
     const posterUrls = [
       images[activeIndex - 2],
       previousImage,
@@ -327,15 +340,25 @@ export function ShadowPinImmersiveViewer({
       const preload = new Image()
       preload.decoding = 'async'
       preloadedImagesRef.current.set(url, preload)
-      preload.src = url
-      if (typeof preload.decode === 'function') {
-        void preload.decode().catch(() => undefined)
-      }
+      pendingUrls.add(url)
+      void resolvePrivateMediaUrl(url).then(resolvedUrl => {
+        pendingUrls.delete(url)
+        if (disposed || preloadedImagesRef.current.get(url) !== preload) return
+        preload.src = resolvedUrl
+        if (typeof preload.decode === 'function') void preload.decode().catch(() => undefined)
+      }).catch(() => {
+        pendingUrls.delete(url)
+        if (preloadedImagesRef.current.get(url) === preload) preloadedImagesRef.current.delete(url)
+      })
     })
     while (preloadedImagesRef.current.size > 8) {
       const oldestUrl = preloadedImagesRef.current.keys().next().value as string | undefined
       if (!oldestUrl) break
       preloadedImagesRef.current.delete(oldestUrl)
+    }
+    return () => {
+      disposed = true
+      pendingUrls.forEach(url => preloadedImages.delete(url))
     }
   }, [activeImage, activeIndex, getTransitionUrl, images, nextImage, previousImage])
 
@@ -575,7 +598,7 @@ export function ShadowPinImmersiveViewer({
           data-testid="shadow-pin-theater-media-stage"
         >
           {previousImage && (
-            <img
+            <PrivateMediaImage
               src={getTransitionUrl(previousImage)}
               alt=""
               aria-hidden="true"
@@ -586,7 +609,7 @@ export function ShadowPinImmersiveViewer({
             />
           )}
           {nextImage && (
-            <img
+            <PrivateMediaImage
               src={getTransitionUrl(nextImage)}
               alt=""
               aria-hidden="true"
@@ -613,7 +636,7 @@ export function ShadowPinImmersiveViewer({
             </div>
           ) : activeImage ? (
             commentsOpen ? (
-              <img
+              <PrivateMediaImage
                 src={getPosterUrl(activeImage)}
                 alt=""
                 aria-hidden="true"
@@ -623,7 +646,7 @@ export function ShadowPinImmersiveViewer({
             ) : externalConsentRequired && !externalConsentGranted ? (
               <div className="relative flex h-full w-full items-center justify-center overflow-hidden" data-viewer-no-swipe>
                 {getPosterUrl(activeImage) && (
-                  <img
+                  <PrivateMediaImage
                     src={getPosterUrl(activeImage)}
                     alt={activeImage.title}
                     className="absolute inset-0 h-full w-full object-contain opacity-60"
@@ -649,7 +672,7 @@ export function ShadowPinImmersiveViewer({
               <div
                 key={activeImage.id}
                 className="h-full w-full bg-contain bg-center bg-no-repeat"
-                style={{ backgroundImage: getTransitionUrl(activeImage) ? `url(${JSON.stringify(getTransitionUrl(activeImage))})` : undefined }}
+                style={{ backgroundImage: activeTransitionUrl ? `url(${JSON.stringify(activeTransitionUrl)})` : undefined }}
               >
                 {renderActiveMedia(activeImage, {
                   muted,
@@ -669,7 +692,7 @@ export function ShadowPinImmersiveViewer({
           )}
           </div>
           {handoffImage && (
-            <img
+            <PrivateMediaImage
               src={getTransitionUrl(handoffImage)}
               alt=""
               aria-hidden="true"
@@ -821,9 +844,9 @@ export function ShadowPinImmersiveViewer({
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-white/45">
                     <time dateTime={activeImage.created_at}>{new Date(activeImage.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>
                     {getSourceUrl(activeImage) && (
-                      <a href={getSourceUrl(activeImage) || undefined} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-white/75 hover:bg-white/10">
+                      <PrivateMediaLink href={getSourceUrl(activeImage) || undefined} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-white/75 hover:bg-white/10">
                         <ExternalLink className="h-4 w-4" /> Open source
-                      </a>
+                      </PrivateMediaLink>
                     )}
                   </div>
                 </div>

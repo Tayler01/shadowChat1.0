@@ -1,3 +1,4 @@
+import { isContentPolicyRejection, normalizeContentPolicyError, normalizeContentPolicyFunctionError } from '../../../lib/contentPolicy'
 import { ensureSession, getSessionWithTimeout, getWorkingClient } from '../../../lib/supabase'
 import type { ShadowPinCreatorValues } from './creatorModel'
 import { inferCreatorSourceKind } from './creatorModel'
@@ -224,12 +225,12 @@ export async function publishCreatorDraft(
     target_publish_idempotency_key: draft.publishIdempotencyKey,
   })
   let { data, error } = await finalize()
-  if (error) {
+  if (error && !isContentPolicyRejection(error)) {
     const retry = await finalize()
     data = retry.data
     error = retry.error
   }
-  if (error) throw error
+  if (error) throw normalizeContentPolicyError(error)
   const result = normalizeCreatorPublishResult(data)
   if (asset) {
     try {
@@ -299,7 +300,10 @@ const callNetlifyMediaRaw = async (body: UnknownRecord, signal?: AbortSignal) =>
     response = await call(await accessToken(true))
   }
   const data = await response.json().catch(() => null)
-  if (!response.ok || data?.error) throw new Error(data?.error || 'Unable to process draft media.')
+  if (!response.ok || data?.error) {
+    const failure = { code: data?.code, message: data?.error }
+    throw isContentPolicyRejection(failure) ? normalizeContentPolicyError(failure) : new Error(data?.error || 'Unable to process draft media.')
+  }
   return data as UnknownRecord
 }
 
@@ -310,8 +314,11 @@ const callNetlifyMedia = async (body: UnknownRecord, signal?: AbortSignal) => {
 const callVideoFunction = async (body: UnknownRecord) => {
   const client = await getWorkingClient()
   const { data, error } = await client.functions.invoke(VIDEO_FUNCTION, { body })
-  if (error) throw error
-  if (data?.error) throw new Error(data.error)
+  if (error) throw await normalizeContentPolicyFunctionError(error)
+  if (data?.error) {
+    const failure = { code: data.code, message: data.error }
+    throw isContentPolicyRejection(failure) ? normalizeContentPolicyError(failure) : new Error(data.error)
+  }
   return data as UnknownRecord
 }
 

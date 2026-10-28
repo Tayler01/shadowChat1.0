@@ -1,3 +1,4 @@
+import { getPrivateNotificationPinMedia, NotificationMediaAccessDeniedError, shouldIncludeNotificationMedia } from '../_shared/notification-private-media.ts'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
 import {
@@ -8,6 +9,16 @@ import {
   type NotificationPreviewMode,
 } from '../_shared/notification-envelope-v2.ts'
 import { getNotificationSuppressionReason } from '../_shared/notification-delivery.ts'
+
+const privateNotificationMediaEnabled = () => Deno.env.get('PRIVATE_NOTIFICATION_MEDIA_ENABLED') === 'true'
+const notificationMediaSigningConfig = () => ({
+  projectUrl: Deno.env.get('SUPABASE_URL') || '',
+  bunny: {
+    libraryId: Deno.env.get('BUNNY_STREAM_LIBRARY_ID') || '',
+    pullZoneUrl: Deno.env.get('BUNNY_STREAM_PULL_ZONE_URL') || Deno.env.get('BUNNY_STREAM_CDN_BASE_URL') || '',
+    tokenSecurityKey: Deno.env.get('BUNNY_STREAM_TOKEN_SECURITY_KEY') || '',
+  },
+})
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -261,7 +272,7 @@ export const createExpoTransport = (
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   })
 
 const getAdminClient = (signal?: AbortSignal) => {
@@ -350,8 +361,12 @@ const getActor = async (
 const getMedia = async (
   supabase: ReturnType<typeof getAdminClient>,
   mediaRef: Record<string, unknown> | null,
+  recipient: { eventId: string; userId: string },
 ): Promise<NotificationMediaV2> => {
   if (mediaRef?.kind !== 'shadow_pin' || typeof mediaRef.image_id !== 'string') return null
+  if (privateNotificationMediaEnabled()) {
+    return getPrivateNotificationPinMedia(supabase, { ...recipient, imageId: mediaRef.image_id }, notificationMediaSigningConfig())
+  }
   const { data, error } = await supabase
     .from('shadow_pin_images')
     .select('title, thumbnail_url, medium_url, image_url, image_content_type')
@@ -712,6 +727,20 @@ const processClaim = async (
   }
 
   const envelope = envelopeResult.data as NotificationEnvelopeV2Row
+  let privateMedia: NotificationMediaV2 = null
+  if (privateNotificationMediaEnabled() && ['shadow_pin_post','shadow_pin_comment','shadow_pin_reply'].includes(event.type)) {
+    try {
+      privateMedia = await getPrivateNotificationPinMedia(supabase, {
+        eventId: claim.event_id, userId: claim.user_id,
+        imageId: event.type === 'shadow_pin_post' ? event.entity_id : undefined,
+        includeMedia: shouldIncludeNotificationMedia(preferences),
+      }, notificationMediaSigningConfig())
+    } catch (error) {
+      if (!(error instanceof NotificationMediaAccessDeniedError)) throw error
+      await completeOutbox(supabase, claim, 'cancelled', error.message)
+      return { delivered: false, cancelled: true }
+    }
+  }
   const [
     actor,
     media,
@@ -720,7 +749,7 @@ const processClaim = async (
     badge,
   ] = await Promise.all([
     getActor(supabase, event.actor_id),
-    getMedia(supabase, envelope.media_ref),
+    privateNotificationMediaEnabled() ? Promise.resolve(privateMedia) : getMedia(supabase, envelope.media_ref, { eventId: claim.event_id, userId: claim.user_id }),
     supabase
       .from('notification_event_presentation_preferences')
       .select('sound_id')

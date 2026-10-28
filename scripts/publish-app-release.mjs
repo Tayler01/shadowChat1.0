@@ -571,6 +571,7 @@ async function broadcastAppRelease(supabaseUrl, serviceRoleKey, row) {
         {
           topic: APP_RELEASE_BROADCAST_TOPIC,
           event: APP_RELEASE_BROADCAST_EVENT,
+          private: firstEnv('APP_RELEASE_PRIVATE_REALTIME_ENABLED', 'VITE_PRIVATE_REALTIME_ENABLED') === 'true',
           payload,
         },
       ],

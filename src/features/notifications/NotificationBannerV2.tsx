@@ -1,3 +1,4 @@
+import { PrivateMediaImage } from '../../components/ui/PrivateMediaImage'
 import {
   Bell,
   Gamepad2,
@@ -159,7 +160,7 @@ export function NotificationBannerV2({
               className="relative h-12 w-12 overflow-hidden rounded-[var(--radius-sm)] border border-[var(--border-subtle)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-glow)]"
               aria-label={`${actionLabel}: ${content.media.alt || content.title}`}
             >
-              <img
+              <PrivateMediaImage
                 src={content.media.thumbnailUrl}
                 alt=""
                 className="h-full w-full object-cover"

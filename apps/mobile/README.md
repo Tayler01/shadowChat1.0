@@ -15,7 +15,7 @@ token registration, foreground arbitration, rich presentation, actions,
 badges, custom sounds, and exact notification routing.
 
 The separate `streamlined` EAS build profile uses the same signed application
-identity with build number `19` and the dedicated
+identity with build number `20` and the dedicated
 `https://shadowchat-streamlined.netlify.app` origin. The default production
 profile still selects the full app and its existing build number `17`.
 Both editions use the configured origin consistently for navigation, clipboard
@@ -174,9 +174,17 @@ while failing unless the installed mitigation and regression tests pass.
 Build the streamlined edition with `eas build --platform ios --profile
 streamlined`. Its profile supplies the edition, dedicated HTTPS origin and
 build number. `app.config.js` fails closed for a missing origin, the full-app
-origin, paths/credentials in the URL, or a reused build number below `18`.
+origin, paths/credentials in the URL, or a reused build number below `20`.
 The EAS production environment must supply the public Supabase URL and anon key.
 Do not put service-role keys or signing secrets in Expo public configuration.
+
+Build 20 accepts signed Storage media references in the shared notification
+envelope parser so routing and mark-read do not lose otherwise valid envelopes.
+The streamlined Swift extension still uses `NotificationService.streamlined.swift`:
+it intentionally clears attachments and does not download media. Changes to the
+separate full-app extension do not add image previews to the streamlined build.
+The native dependency set also includes a narrowly patched, integrity-tested
+CommonJS deepmerge adaptation; see `vendor/deepmerge-safe-cjs/README.md`.
 
 Run signed builds from the clean `main` checkout after confirming it matches
 `origin/main`. On Windows, starting EAS from a linked Git worktree can cause the

@@ -69,11 +69,11 @@ export const upsertLocalOutboxEntry = (scope: string, entry: LocalMessageOutboxE
   return normalized
 }
 
-export const removeLocalOutboxEntry = (scope: string, clientMessageId: string) => {
+export const removeLocalOutboxEntry = (scope: string, clientMessageId: string, senderId?: string) => {
   const entries = loadLocalOutboxEntries(scope)
   saveLocalOutboxEntries(
     scope,
-    entries.filter(entry => entry.clientMessageId !== clientMessageId && entry.id !== clientMessageId)
+    entries.filter(entry => (senderId && entry.senderId !== senderId) || (entry.clientMessageId !== clientMessageId && entry.id !== clientMessageId))
   )
 }
 

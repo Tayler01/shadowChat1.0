@@ -1,3 +1,4 @@
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Camera, Edit3, Ghost, Minus, Plus, RotateCcw, Save, X, Menu } from 'lucide-react'
@@ -229,7 +230,7 @@ function AvatarCropDialog({ state, saving, onCancel, onSave }: AvatarCropDialogP
               onPointerUp={clearPointer}
               onPointerCancel={clearPointer}
             >
-              <img
+              <PrivateMediaImage
                 src={state.url}
                 alt="Avatar preview"
                 draggable={false}
@@ -440,7 +441,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ onToggleSidebar, embed
         {/* Banner */}
         <div className="h-32 relative">
           {bannerSrc ? (
-            <img src={bannerSrc} alt="Banner" loading="eager" decoding="async" className="w-full h-full object-cover" />
+            <PrivateMediaImage src={bannerSrc} alt="Banner" loading="eager" decoding="async" className="w-full h-full object-cover" />
           ) : (
             <div className="h-full w-full bg-[radial-gradient(circle_at_top_left,rgba(255,240,184,0.18),transparent_26%),linear-gradient(135deg,#17191c,#0f1112_58%,#34250c)]" />
           )}

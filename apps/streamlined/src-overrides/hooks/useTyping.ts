@@ -1,3 +1,5 @@
+import { PRIVATE_REALTIME_ENABLED } from '../../../../src/lib/privateRealtimeChannels'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { getRealtimeClient, getWorkingClient } from '../lib/supabase'
@@ -16,13 +18,192 @@ export interface TypingUser {
   presence_visibility?: PresenceVisibility | null
 }
 
+const useLegacyTyping = (channelName: string = 'general') => {
+  const { user } = useAuth()
+  const userId = user?.id
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([])
+  const [isTyping, setIsTyping] = useState(false)
+  const isTypingRef = useRef(false)
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const clientRef = useRef<SupabaseClient | null>(null)
+  const subscribeRef = useRef<(() => Promise<RealtimeChannel | null>) | null>(null)
+
+  const resetTypingChannel = useCallback(async () => {
+    const activeChannel = channelRef.current
+    if (activeChannel && clientRef.current?.removeChannel) {
+      try {
+        clientRef.current.removeChannel(activeChannel)
+      } catch {
+        // ignore channel cleanup failures
+      }
+    }
+
+    channelRef.current = null
+    setTypingUsers([])
+
+    if (subscribeRef.current) {
+      channelRef.current = await subscribeRef.current().catch(() => null)
+    }
+  }, [])
+
+  useRealtimeRecovery(() => {
+    void resetTypingChannel()
+  })
+
+  useEffect(() => {
+    let channel: RealtimeChannel | null = null;
+
+    const setupChannel = async (): Promise<RealtimeChannel | null> => {
+      const client = await getWorkingClient().catch(() => getRealtimeClient());
+      if (!client?.channel) return null;
+      clientRef.current = client;
+      channel = client.channel(`typing:${channelName}`);
+      channelRef.current = channel;
+
+      // Listen for typing events
+      channel?.on('broadcast', { event: 'typing' }, (payload) => {
+        const { user: typingUser, typing } = payload.payload
+
+        // Ignore events from the current user
+        if (typingUser.id === userId) return
+
+        setTypingUsers(prev => {
+          if (typing) {
+            // Add user to typing list if not already there
+            if (!prev.find(u => u.id === typingUser.id)) {
+              return [...prev, typingUser]
+            }
+            return prev
+          } else {
+            // Remove user from typing list
+            return prev.filter(u => u.id !== typingUser.id)
+          }
+        })
+
+        // Auto-remove typing users after 3 seconds of inactivity
+        if (typing) {
+          setTimeout(() => {
+            setTypingUsers(prev => prev.filter(u => u.id !== typingUser.id))
+          }, 3000)
+        }
+      })
+      .subscribe((status: string) => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          void runRealtimeRecovery('channel-error')
+        }
+      })
+
+      return channel
+    };
+
+    subscribeRef.current = setupChannel;
+    setupChannel();
+
+    return () => {
+      subscribeRef.current = null;
+      if (channel && clientRef.current) {
+        clientRef.current.removeChannel(channel);
+      }
+    }
+  }, [channelName, userId])
+
+  const stopTyping = useCallback(async () => {
+    if (!isTypingRef.current || !user) return
+
+    try {
+      isTypingRef.current = false
+      setIsTyping(false)
+
+      // Broadcast typing stop using current user info
+      await channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          user: {
+            id: user.id,
+            username: user.username,
+            display_name: user.display_name,
+            admin_role: user.admin_role,
+            presence_visibility: user.presence_visibility,
+          },
+          typing: false
+        }
+      })
+
+      // Clear timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+        typingTimeoutRef.current = undefined
+      }
+    } catch {
+    }
+  }, [user])
+
+  const startTyping = useCallback(async () => {
+    if (!user) return
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+
+    // Auto-stop typing after 2 seconds of inactivity. Refresh this on each keystroke
+    // without rebroadcasting "typing: true" while the user is already typing.
+    typingTimeoutRef.current = setTimeout(() => {
+      void stopTyping()
+    }, 2000)
+
+    if (isTypingRef.current) return
+
+    try {
+      isTypingRef.current = true
+      setIsTyping(true)
+
+      // Broadcast typing start using current user info
+      await channelRef.current?.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: {
+          user: {
+            id: user.id,
+            username: user.username,
+            display_name: user.display_name,
+            admin_role: user.admin_role,
+            presence_visibility: user.presence_visibility,
+          },
+          typing: true
+        }
+      })
+
+    } catch {
+    }
+  }, [user, stopTyping])
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      isTypingRef.current = false
+    }
+  }, [])
+
+  return {
+    typingUsers,
+    isTyping,
+    startTyping,
+    stopTyping
+  }
+}
+
 const TYPING_REFRESH_MS = 2000
 const TYPING_TTL_MS = 6000
 const TYPING_READ_DEBOUNCE_MS = 150
 const UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 const VALID_SCOPE = new RegExp(`^(?:general|dm-${UUID}|general-thread:${UUID})$`, 'i')
 
-export const useTyping = (channelName: string = 'general') => {
+const useAuthorizedTyping = (channelName: string = 'general') => {
   const { user } = useAuth()
   const userId = user?.id
   const scopeKey = VALID_SCOPE.test(channelName) ? channelName.toLowerCase() : null
@@ -186,3 +367,6 @@ export const useTyping = (channelName: string = 'general') => {
 
   return { typingUsers: displayScopeRef.current === scope ? typingUsers : [], isTyping, startTyping, stopTyping }
 }
+
+// Build-time selection preserves the legacy transport until coordinated private cutover.
+export const useTyping = PRIVATE_REALTIME_ENABLED ? useAuthorizedTyping : useLegacyTyping

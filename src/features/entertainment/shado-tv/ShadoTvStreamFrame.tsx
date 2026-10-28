@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pause, Play } from 'lucide-react'
+import { usePrivateMediaUrl } from '../../../hooks/usePrivateMediaUrl'
+import { PrivateMediaVideo } from '../../../components/ui/PrivateMediaPlayer'
 import type { ShadoTvCaptionTrack, ShadoTvVideo, ShadoTvWatchEventType } from './data'
 import {
   getShadoTvPremiereOffset,
@@ -109,7 +111,9 @@ export function ShadoTvStreamFrame({
   const [playing, setPlaying] = useState(false)
   const premiereOffset = video ? getShadoTvPremiereOffset(video) : null
   const premiereMode = premiereOffset != null
-  const embedUrl = useMemo(() => buildEmbedUrl(src, video, captions), [captions, src, video])
+  const signedSource = usePrivateMediaUrl(src)
+  const embedUrl = useMemo(() => signedSource ? buildEmbedUrl(signedSource, video, captions) : undefined, [captions, signedSource, video])
+  const playbackRef = useRef({ source: src, position: resumeAt, playing: false, observed: false })
 
   const emit = useCallback((
     type: ShadoTvWatchEventType,
@@ -148,7 +152,8 @@ export function ShadoTvStreamFrame({
 
   useEffect(() => {
     const iframe = iframeRef.current
-    if (!iframe || !isBunnyEmbed(src)) return
+    if (!iframe || !embedUrl || !isBunnyEmbed(src)) return
+    if (playbackRef.current.source !== src) playbackRef.current = { source: src, position: resumeAt, playing: false, observed: false }
     let cancelled = false
     let player: BunnyPlayer | null = null
 
@@ -176,22 +181,32 @@ export function ShadoTvStreamFrame({
       const onReady = () => {
         const expected = video ? getShadoTvPremiereOffset(video) : null
         if (expected != null) player?.setCurrentTime?.(expected)
-        else if (resumeAt > 0) player?.setCurrentTime?.(resumeAt)
+        else if (playbackRef.current.position > 0) player?.setCurrentTime?.(playbackRef.current.position)
+        if (playbackRef.current.observed) {
+          if (playbackRef.current.playing) player?.play?.()
+          else player?.pause?.()
+        }
       }
       const onPlay = () => {
+        playbackRef.current.playing = true
+        playbackRef.current.observed = true
         setPlaying(true)
         readPosition(emitPlay)
       }
       const onPause = () => {
+        playbackRef.current.playing = false
+        playbackRef.current.observed = true
         setPlaying(false)
         readPosition((position, duration) => emit('pause', position, duration))
       }
       const onEnded = () => {
+        playbackRef.current.playing = false
         setPlaying(false)
         readPosition((position, duration) => emit('complete', position, duration))
       }
       const onTimeUpdate = (payload?: BunnyTimeUpdate) => {
         const position = Number(payload?.seconds ?? 0)
+        playbackRef.current.position = position
         const duration = Number(payload?.duration ?? 0) || null
         if (video && getShadoTvPremiereOffset(video) != null) syncPremiere()
         if (shouldRecordShadoTvProgress(lastProgressRef.current, position)) {
@@ -212,7 +227,7 @@ export function ShadoTvStreamFrame({
       cancelled = true
       player?.off?.()
     }
-  }, [emit, emitPlay, resumeAt, src, video])
+  }, [embedUrl, emit, emitPlay, resumeAt, src, video])
 
   if (!isDirectVideoUrl(src)) {
     return (
@@ -245,7 +260,7 @@ export function ShadoTvStreamFrame({
 
   return (
     <>
-      <video
+      <PrivateMediaVideo
         ref={videoRef}
         src={src}
         title={title}
@@ -289,7 +304,7 @@ export function ShadoTvStreamFrame({
             default={track.isDefault}
           />
         ))}
-      </video>
+      </PrivateMediaVideo>
 
       {premiereMode && (
         <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-3 rounded-full border border-[#9a6a43]/40 bg-black/80 p-1.5 pl-3 shadow-lg">

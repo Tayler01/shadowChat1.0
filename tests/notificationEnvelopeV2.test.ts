@@ -378,3 +378,38 @@ describe('notification envelope v2', () => {
     ]))
   })
 })
+
+describe('private Storage delivery compatibility', () => {
+  const signedObject = 'https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/object/sign/shadow-pin/owner/poster.webp?token=fixture-signature&download=poster.webp'
+  const signedTransform = 'https://shsqqouecvdoifzufkqm.supabase.co/storage/v1/render/image/sign/shadow-pin/owner/poster.webp?token=fixture-signature&width=200&resize=cover'
+  const normalizers = [normalizeNotificationMediaUrl, normalizeNotificationDeliveryMediaUrl, normalizeNativeNotificationMediaUrl]
+
+  test.each([signedObject,signedTransform])('preserves signed URL and transforms across web, Edge and native: %s', url => {
+    for (const normalize of normalizers) expect(normalize(url)).toBe(url)
+  })
+  test.each([
+    signedObject.replace('?token=fixture-signature&download=poster.webp',''),
+    signedObject.replace('token=fixture-signature','token='),
+    signedObject.replace('shsqqouecvdoifzufkqm.supabase.co','attacker.example'),
+    signedObject.replace('https://','http://'),
+    signedObject.replace('https://','https://user:password@'),
+    signedObject.replace('/storage/v1/object/sign/','/functions/v1/'),
+  ])('rejects malformed or foreign signed media: %s', url => {
+    for (const normalize of normalizers) expect(normalize(url)).toBeNull()
+  })
+  test('signing changes only thumbnail URL and preserves the full delivery envelope', () => {
+    const source=event({type:'shadow_pin_post',category:'shadow_pin'})
+    const row={event_id:source.id,user_id:source.user_id,category_key:'shadow_pin',title:'JJ shared a ShadowPin',body:'Night flight',private_title:'New ShadowChat notification',private_body:'Open ShadowChat to view it.',actor_id:source.actor_id,route:'/?view=pins&pin=33333333-3333-4333-8333-333333333333',group_key:`pin:${source.entity_id}`,priority:'normal' as const,action_keys:['open','mark_read'],sound_id:'pin_shutter',android_channel_key:'social_v1',badge_category:'shadow_pin',media_ref:{kind:'shadow_pin',image_id:source.entity_id},created_at:source.created_at,expires_at:source.presentation_expires_at}
+    const options={previewMode:'full' as const,eventType:source.type,entityId:source.entity_id,actor:{id:source.actor_id!,label:'JJ',avatarUrl:`${notificationMediaBase}/avatars/jj.jpg`},media:{kind:'image' as const,thumbnailUrl:`${notificationMediaBase}/shadow-pin/pin.jpg`,alt:'Night flight'}}
+    const before=buildNotificationDeliveryEnvelopeV2(row,options)
+    const after=buildNotificationDeliveryEnvelopeV2(row,{...options,media:{...options.media,thumbnailUrl:signedTransform}})
+    expect(after).toEqual({...before,media:{...before.media,thumbnailUrl:signedTransform}})
+    expect(isNotificationEnvelopeV2(after)).toBe(true)
+    expect(parseNotificationEnvelopeV2(after)?.media?.thumbnailUrl).toBe(signedTransform)
+    for(const previewMode of ['sender_only','private'] as const){
+      const redacted=buildNotificationDeliveryEnvelopeV2(row,{...options,previewMode,media:{...options.media,thumbnailUrl:signedObject}})
+      expect(redacted.media).toBeNull()
+      expect(JSON.stringify(redacted)).not.toContain('fixture-signature')
+    }
+  })
+})

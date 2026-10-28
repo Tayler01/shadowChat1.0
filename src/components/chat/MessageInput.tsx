@@ -1,3 +1,5 @@
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
+import { isContentPolicyRejection } from '../../lib/contentPolicy'
 import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { BellRing, ChevronDown, Film, Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
@@ -509,6 +511,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       }
     } catch (err) {
       if (!stillInScope()) return
+      // A rejected send has no committed recipient message. Restore only the
+      // unchanged cleared composer; never overwrite a newer draft or scope.
+      if (isContentPolicyRejection(err) && composerEditVersionRef.current === editVersion && messageRef.current === '') {
+        messageRef.current = currentMessage
+        setMessage(currentMessage)
+        setDraft(currentMessage)
+      }
       console.error(err)
       const message =
         err instanceof Error && err.message
@@ -534,6 +543,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     stopTyping,
     staged.items.length,
     sendStagedAttachments,
+    setDraft,
     keyboard.focusIntentRef,
   ])
 
@@ -895,7 +905,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           <div className="flex items-start justify-between gap-2">
             <div className="flex min-w-0 flex-1 items-start gap-2">
               {replyingTo.messageType === 'image' && replyingTo.fileUrl && (
-                <img
+                <PrivateMediaImage
                   src={getImageMessageDisplaySrc(replyingTo.fileUrl, replyingTo.thumbnailUrl)}
                   alt=""
                   loading="lazy"

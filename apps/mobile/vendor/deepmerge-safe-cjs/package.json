@@ -1,0 +1,11 @@
+{
+  "name": "@shadowchat/deepmerge-safe-cjs",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Audited CJS deepmerge 4.3.1 adaptation with unconditional prototype-key guards",
+  "license": "MIT",
+  "type": "commonjs",
+  "main": "index.cjs",
+  "types": "index.d.ts",
+  "sideEffects": false
+}

@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from 'https://deno.land/std@0.168.0/testing/asserts.ts'
-import { authorizeBunnyMediaSource, type BunnyAccessStore, type BunnyVisibleReference } from './bunny-media-access.ts'
+import { authorizeBunnyMediaSource, ownedBunnyDraftReferences, type BunnyDraftAsset, type BunnyCreatorDraft, type BunnyAccessStore, type BunnyVisibleReference } from './bunny-media-access.ts'
 
 const asset = '10000000-0000-0000-0000-000000000001'
 const config = { libraryId: '123', pullZoneUrl: 'https://private.b-cdn.net', tokenSecurityKey: 'fixture-only-security-key', nowSeconds: 1000 }
@@ -50,4 +50,40 @@ Deno.test('external libraries are explicitly unmanaged; malformed own paths fail
 })
 Deno.test('database failures do not become an external-public fallback', async () => {
   await assertRejects(() => authorizeBunnyMediaSource(source, config, store({ trustedReferences: async () => { throw new Error('offline') } })), Error, 'offline')
+})
+
+
+const draftAsset: BunnyDraftAsset = { id: 'draft-asset', draft_id: 'draft', creator_id: 'owner', provider: 'bunny_stream', asset_kind: 'video',
+  provider_asset_id: asset, state: 'ready', deleted_at: null, final_image_url: source.replace('play_720p.mp4','thumbnail.jpg'),
+  final_thumbnail_url: null, final_medium_url: null, video_preview_url: null, video_playback_url: source, video_hls_url: null, video_embed_url: null }
+const draft: BunnyCreatorDraft = { id: 'draft', creator_id: 'owner', active_asset_id: 'draft-asset', state: 'ready' }
+const draftStore = (assets: BunnyDraftAsset[] = [draftAsset], drafts: BunnyCreatorDraft[] = [draft]): BunnyAccessStore => store({
+  visibleReferences: async id => ownedBunnyDraftReferences('owner', id, assets, drafts),
+  trustedReferences: async reference => reference.sourceType === 'shadow_pin_draft_asset' && reference.id === 'draft-asset'
+    ? [{library_id:'123',asset_id:asset,owner_id:'owner'}] : [],
+})
+Deno.test('active owner draft signs its persisted poster and preview with trusted draft provenance', async () => {
+  for (const target of [source, draftAsset.final_image_url!]) {
+    const result = await authorizeBunnyMediaSource(target, config, draftStore())
+    assertEquals(result.managed, true)
+    if (result.managed) assertEquals(result.expiresAt, 1_300_000)
+  }
+})
+for (const [reason, patch] of Object.entries({ otherOwner:{creator_id:'other'}, deleted:{deleted_at:'2026-10-28'}, superseded:{state:'superseded'}, failed:{state:'failed'}, foreignProvider:{provider:'youtube'}, foreignAsset:{provider_asset_id:'20000000-0000-0000-0000-000000000001'}, image:{asset_kind:'image'}, unrelatedDraft:{draft_id:'other'} })) {
+  Deno.test('draft signing denies '+reason, async () => {
+    await assertRejects(() => authorizeBunnyMediaSource(source,config,draftStore([{...draftAsset,...patch}])),Error,'unavailable')
+  })
+}
+for (const [reason, patch] of Object.entries({ otherOwner:{creator_id:'other'}, inactive:{active_asset_id:'other'}, abandoned:{state:'abandoned'}, published:{state:'published'} })) {
+  Deno.test('draft signing denies parent '+reason, async () => {
+    await assertRejects(() => authorizeBunnyMediaSource(source,config,draftStore([draftAsset],[{...draft,...patch}])),Error,'unavailable')
+  })
+}
+Deno.test('RLS-hidden draft or parent and absent provenance fail closed', async () => {
+  for(const target of [draftStore([]),draftStore([draftAsset],[]),{...draftStore(),trustedReferences:async()=>[]}]) {
+    await assertRejects(() => authorizeBunnyMediaSource(source,config,target),Error,'unavailable')
+  }
+})
+Deno.test('draft ownership never permits an unlisted provider filename', async () => {
+  await assertRejects(() => authorizeBunnyMediaSource(source.replace('play_720p.mp4','original.mp4'),config,draftStore()),Error,'unavailable')
 })

@@ -22,6 +22,9 @@ import { getDMMessageWindow } from '../src/lib/dmConversationRetrieval';
 
 const mockPlayMessage = jest.fn();
 
+const mockPrepareMessageMedia = jest.fn();
+jest.mock('../src/lib/privateMediaUrls', () => ({ PRIVATE_MEDIA_ENABLED: false }));
+jest.mock('../src/lib/privateMediaCopies', () => ({ prepareMessageMedia: (...args: unknown[]) => mockPrepareMessageMedia(...args) }));
 jest.mock('../src/hooks/useAuth');
 jest.mock('../src/hooks/useRealtimeRecovery', () => ({
   useRealtimeRecovery: jest.fn(),
@@ -129,6 +132,7 @@ const createDeferred = <T,>() => {
 let workingClient: WorkingClient;
 
 beforeEach(() => {
+  (jest.requireMock("../src/lib/privateMediaUrls") as { PRIVATE_MEDIA_ENABLED: boolean }).PRIVATE_MEDIA_ENABLED = false;
   jest.resetAllMocks();
   window.localStorage.clear();
   (useAuth as jest.Mock).mockReturnValue({ user: { id: 'u1' } });
@@ -1705,6 +1709,27 @@ test('sends DM replies with reply_to in the insert payload', async () => {
   });
 });
 
+test('policy-rejected DM retains its local text without reconnect, repeated insert or recipient push', async () => {
+  jest.requireMock('../src/lib/supabase').withTimeout.mockImplementation((promise: Promise<unknown>) => promise)
+  const insertFn = jest.fn(() => ({ select: () => ({ single: () => Promise.resolve({
+    data: null, error: { code: 'PT422', message: 'CONTENT_POLICY_REJECTED', status: 422 },
+  }) }) }))
+  const { result } = renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider })
+  await waitFor(() => expect(result.current.loading).toBe(false))
+  await act(async () => result.current.setCurrentConversation('conv1'))
+  await waitFor(() => expect(result.current.messagesLoading).toBe(false))
+  workingClient.from.mockImplementationOnce(() => createQuery({ insert: insertFn }) as any)
+  jest.mocked(runRealtimeRecovery).mockClear()
+  jest.mocked(triggerDMPushNotification).mockClear()
+  let rejected: unknown
+    await act(async () => { try { await result.current.sendMessage('Rejected DM') } catch (error) { rejected = error } })
+    expect(rejected).toEqual(expect.objectContaining({ message: expect.stringContaining('Edit it and try again') }))
+  expect(insertFn).toHaveBeenCalledTimes(1)
+  expect(runRealtimeRecovery).not.toHaveBeenCalledWith('send-error')
+  expect(triggerDMPushNotification).not.toHaveBeenCalled()
+  expect(result.current.messages).toEqual(expect.arrayContaining([expect.objectContaining({ content: 'Rejected DM', delivery_status: 'failed' })]))
+})
+
 test('hydrates failed DM sends from local storage and retries them with the same client id', async () => {
   const persistedClientMessageId = 'client-offline-1';
   const insertSuccess = jest.fn(() => ({
@@ -1825,3 +1850,29 @@ test('accepts two durable DM intents before the first ack and tracks the remaini
   await act(async () => { second.resolve({ data: makeSent('dm-rapid-two'), error: null }); await sendingSecond })
   expect(result.current.sending).toBe(false)
 })
+
+
+test('private DM retry uses owned prepared media after the first insert fails', async () => {
+  (jest.requireMock("../src/lib/privateMediaUrls") as { PRIVATE_MEDIA_ENABLED: boolean }).PRIVATE_MEDIA_ENABLED = true;
+  jest.requireMock('../src/lib/supabase').withTimeout.mockImplementation((promise: Promise<unknown>) => promise);
+  const original='https://example.supabase.co/storage/v1/object/public/shadow-pin/owner/source.png';
+  const owned='https://example.supabase.co/storage/v1/object/public/chat-uploads/u1/forwarded/dm-private-retry/image.png';
+  const hook=renderHook(() => useDirectMessages(), { wrapper: DirectMessagesProvider });
+  await waitFor(() => expect(hook.result.current.loading).toBe(false));
+  await act(async () => { hook.result.current.setCurrentConversation('conv1'); });
+  await waitFor(() => expect(hook.result.current.messagesLoading).toBe(false));
+  mockPrepareMessageMedia.mockResolvedValue({content:'photo',fileUrl:owned,thumbnailUrl:owned});
+  const response=jest.fn().mockResolvedValueOnce({data:null,error:{code:'42501',message:'temporary insert denied'}})
+    .mockResolvedValueOnce({data:{id:'server-private',conversation_id:'conv1',sender_id:'u1',client_message_id:'dm-private-retry',content:'photo',message_type:'image',file_url:owned,created_at:'2026-10-26T12:00:00Z',updated_at:'2026-10-26T12:00:00Z'},error:null});
+  const insert=jest.fn(() => ({select:()=>({single:response})}));
+  workingClient.from.mockImplementation(()=>createQuery({insert}) as any);
+  await act(async () => {
+    await expect(hook.result.current.sendMessage('photo','image',original,undefined,original,{clientMessageId:'dm-private-retry'})).rejects.toBeDefined();
+  });
+  const saved=JSON.parse(localStorage.getItem('shadowchat:outbox:dm:conv1')!);
+  expect(saved[0]).toMatchObject({clientMessageId:'dm-private-retry',fileUrl:owned,thumbnailUrl:owned});
+  await act(async () => { await hook.result.current.retryFailedMessage('dm-private-retry'); });
+  expect(mockPrepareMessageMedia).toHaveBeenNthCalledWith(2,expect.objectContaining({fileUrl:owned,thumbnailUrl:owned}));
+  expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({file_url:owned,thumbnail_url:owned}));
+  expect(localStorage.getItem('shadowchat:outbox:dm:conv1')).toBeNull();
+});

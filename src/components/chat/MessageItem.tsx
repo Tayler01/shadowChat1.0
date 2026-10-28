@@ -1,3 +1,5 @@
+import { PrivateMediaAudio } from '../ui/PrivateMediaPlayer'
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import {
   Pin,
@@ -155,7 +157,7 @@ function ReplyContextPreview({
               className="shrink-0 rounded-[var(--radius-xs)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
               aria-label="View replied image"
             >
-              <img
+              <PrivateMediaImage
                 src={previewImageSrc}
                 alt=""
                 loading="lazy"
@@ -614,7 +616,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                     </>
                   )}
                   {message.message_type === 'audio' ? (
-                    <audio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
+                    <PrivateMediaAudio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
                   ) : isImageMessage ? (
                     <ChatImageRadialHeart
                       data-chat-media-frame="true"
@@ -631,7 +633,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       onOpen={() => setShowImageModal(true)}
                       onShare={() => setShowShadowPinShare(true)}
                     >
-                      <img
+                      <PrivateMediaImage
                         src={imageMessageSrc}
                         alt="uploaded image"
                         width={CHAT_MEDIA_INTRINSIC_WIDTH}

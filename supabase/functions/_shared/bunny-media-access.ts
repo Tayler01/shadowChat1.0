@@ -68,3 +68,28 @@ export async function authorizeBunnyMediaSource(value: string, config: BunnyAcce
   }
   throw new Error('This video is unavailable or you no longer have access.')
 }
+
+
+export type BunnyDraftAsset = {
+  id: string; draft_id: string; creator_id: string; provider: string; asset_kind: string;
+  provider_asset_id: string | null; state: string; deleted_at: string | null;
+  final_image_url: string | null; final_thumbnail_url: string | null; final_medium_url: string | null;
+  video_preview_url: string | null; video_playback_url: string | null; video_hls_url: string | null; video_embed_url: string | null;
+}
+export type BunnyCreatorDraft = { id: string; creator_id: string; active_asset_id: string | null; state: string }
+
+/** Both row sets must come from the caller's RLS-scoped client. This is only a
+ * canonical-reference filter; authorizeBunnyMediaSource still requires the
+ * service-owned registry to match the draft asset, library and creator. */
+export function ownedBunnyDraftReferences(actorId: string, assetId: string, assets: BunnyDraftAsset[], drafts: BunnyCreatorDraft[]): BunnyVisibleReference[] {
+  const activeDrafts = new Map(drafts.filter(draft => draft.creator_id === actorId && !['published', 'abandoned'].includes(draft.state)).map(draft => [draft.id, draft]))
+  return assets.flatMap(asset => {
+    const draft = activeDrafts.get(asset.draft_id)
+    if (!draft || draft.active_asset_id !== asset.id || asset.creator_id !== actorId || asset.deleted_at !== null
+      || asset.provider !== 'bunny_stream' || asset.asset_kind !== 'video' || asset.provider_asset_id !== assetId
+      || !['uploading', 'processing', 'ready', 'publish_ready'].includes(asset.state)) return []
+    return [{ id: asset.id, ownerId: asset.creator_id, sourceType: 'shadow_pin_draft_asset', assetId,
+      mediaUrls: [asset.final_image_url, asset.final_thumbnail_url, asset.final_medium_url,
+        asset.video_preview_url, asset.video_playback_url, asset.video_hls_url, asset.video_embed_url] }]
+  })
+}

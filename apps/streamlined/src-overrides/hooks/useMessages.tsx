@@ -1,3 +1,4 @@
+import { isContentPolicyRejection, normalizeContentPolicyError } from '../../../../src/lib/contentPolicy'
 import { prepareMessageMedia } from '../../../../src/lib/privateMediaCopies';
 import { PRIVATE_MEDIA_ENABLED } from '../../../../src/lib/privateMediaUrls';
 import { beginChatTiming } from '../../../../src/lib/chatPerformance';
@@ -1378,6 +1379,14 @@ function useProvideMessages(): MessagesContextValue {
             return;
           }
 
+          if (status === 'SUBSCRIBED') {
+            // The initial snapshot can precede the socket join. Reconcile once
+            // joined so inserts in that gap do not wait for a visibility change.
+            // Existing recovery preserves a historical/thread window in place.
+            await refreshVisibleMessages().catch(() => undefined);
+            return;
+          }
+
           if (err) {
             // Handle specific binding mismatch error
             if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
@@ -1444,7 +1453,7 @@ function useProvideMessages(): MessagesContextValue {
       void subscriptionManager?.stop();
       channelRef.current = null;
     };
-  }, [addNewMessage, hydrateMessage, playReaction, refreshThreadSummaries, user]);
+  }, [addNewMessage, hydrateMessage, playReaction, refreshThreadSummaries, refreshVisibleMessages, user]);
 
   const sendMessage = useCallback(async (
     content: string,
@@ -1574,6 +1583,7 @@ function useProvideMessages(): MessagesContextValue {
     try {
       await executeSend();
     } catch (error) {
+      const sendError = normalizeContentPolicyError(error);
       upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
         id: clientMessageId,
         clientMessageId,
@@ -1598,10 +1608,10 @@ function useProvideMessages(): MessagesContextValue {
           },
         }))
       }
-      void runRealtimeRecovery('send-error').catch(() => undefined);
-      if (error instanceof Error) {
-        (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
-        throw error;
+      if (!isContentPolicyRejection(sendError)) void runRealtimeRecovery('send-error').catch(() => undefined);
+      if (sendError instanceof Error) {
+        (sendError as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
+        throw sendError;
       }
       const wrappedError = new Error('Failed to send message') as Error & { optimisticMessageId?: string };
       wrappedError.optimisticMessageId = clientMessageId;
@@ -1675,7 +1685,7 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        throw error;
+        throw normalizeContentPolicyError(error);
       }
 
       // Optimistically update local state
@@ -1686,7 +1696,7 @@ function useProvideMessages(): MessagesContextValue {
       );
 
     } catch (error) {
-      throw error;
+      throw normalizeContentPolicyError(error);
     }
   }, [user]);
 

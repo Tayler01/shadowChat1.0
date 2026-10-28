@@ -1,3 +1,5 @@
+import { PrivateMediaVideo } from '../../../components/ui/PrivateMediaPlayer'
+import { PrivateMediaImage } from '../../../components/ui/PrivateMediaImage'
 import {
   useCallback,
   useEffect,
@@ -161,10 +163,10 @@ function MediaPreview({
   }
 
   if (videoUrl) {
-    return <video src={videoUrl} poster={posterUrl || undefined} controls playsInline preload="metadata" onError={() => setVideoSourceIndex(index => index + 1)} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black object-contain" aria-label={title || 'Draft video preview'} />
+    return <PrivateMediaVideo src={videoUrl} poster={posterUrl || undefined} controls playsInline preload="metadata" onError={() => setVideoSourceIndex(index => index + 1)} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black object-contain" aria-label={title || 'Draft video preview'} />
   }
 
-  return <img src={imageUrl || posterUrl} onError={() => setImageSourceIndex(index => index + 1)} alt={title || 'Draft Pin preview'} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black/30 object-contain" />
+  return <PrivateMediaImage src={imageUrl || posterUrl} onError={() => setImageSourceIndex(index => index + 1)} alt={title || 'Draft Pin preview'} className="aspect-[4/5] max-h-[58dvh] w-full rounded-[var(--radius-lg)] bg-black/30 object-contain" />
 }
 
 export function ShadowPinCreatorStudio({

@@ -1,4 +1,10 @@
+import { PrivateMediaVideo } from '../../components/ui/PrivateMediaPlayer'
+import { PrivateMediaFrame } from '../../components/ui/PrivateMediaFrame'
+import { usePrivateMediaUrl } from '../../hooks/usePrivateMediaUrl'
+import { PrivateMediaImage } from '../../components/ui/PrivateMediaImage'
+import { PrivateMediaLink } from '../../components/ui/PrivateMediaLink'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+
 import './shadow-pin-actions.css'
 import type {
   CSSProperties,
@@ -1319,7 +1325,7 @@ function CategoryCard({
           label={`${category.title} Pin`}
           className="absolute right-2 top-2 z-20"
         />
-        <img
+        <PrivateMediaImage
           src={getCategoryImageUrl(category)}
           alt={category.title}
           loading="lazy"
@@ -1650,7 +1656,7 @@ function CategoryDetailsModal({
   return (
     <div className="fixed inset-0 z-[95] flex items-end justify-center bg-black/68 p-3 backdrop-blur-sm sm:items-center">
       <div className="popup-surface max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-[var(--radius-lg)]">
-        <img src={getCategoryImageUrl(category, 'medium')} alt={category.title} className="aspect-[4/3] w-full object-cover" />
+        <PrivateMediaImage src={getCategoryImageUrl(category, 'medium')} alt={category.title} className="aspect-[4/3] w-full object-cover" />
         <div className="space-y-4 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1962,6 +1968,7 @@ function ImageCard({
   const feedVideoPlayable = videoPin && Boolean(nativeVideoSrc || feedIframeVideoSrc)
   const shouldUseSoundIframeVideo = soundEnabled && image.provider === 'bunny_stream' && !nativeVideoSrc && Boolean(feedIframeVideoSrc)
   const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc) && !shouldUseSoundIframeVideo
+  const nativeVideoReady = Boolean(usePrivateMediaUrl(nativeVideoSrc, { enabled: shouldRenderNativeVideo }))
   const iframeVideoSrc = activeVideo ? feedIframeVideoSrc : ''
   const shouldRenderIframeVideo = videoPin && activeVideo && Boolean(iframeVideoSrc) && (!nativeVideoSrc || shouldUseSoundIframeVideo)
   const handleVideoPlaybackStarted = useCallback(() => onVideoPlaybackStarted(image.id), [image.id, onVideoPlaybackStarted])
@@ -2002,7 +2009,7 @@ function ImageCard({
     const video = videoRef.current
     if (!video) return
 
-    if (!shouldRenderNativeVideo) {
+    if (!shouldRenderNativeVideo || !nativeVideoReady) {
       video.pause()
       return
     }
@@ -2062,7 +2069,7 @@ function ImageCard({
       video.removeEventListener('loadedmetadata', play)
       video.removeEventListener('canplay', play)
     }
-  }, [shouldRenderNativeVideo, soundEnabled, nativeVideoSrc, handleVideoPlaybackStarted, handleVideoPlaybackUnavailable, image])
+  }, [shouldRenderNativeVideo, nativeVideoReady, soundEnabled, nativeVideoSrc, handleVideoPlaybackStarted, handleVideoPlaybackUnavailable, image])
 
   useEffect(() => {
     if (!shouldRenderIframeVideo) return
@@ -2642,7 +2649,7 @@ function ImageCard({
           aria-label={`Open “${image.title}” by ${getDisplayName(image)}, ${videoPin ? 'video' : 'image'}, ${image.heart_count} hearts, ${image.comment_count ?? 0} comments`}
         />
         {shouldRenderIframeVideo ? (
-          <iframe
+          <PrivateMediaFrame
             ref={iframeRef}
             src={iframeVideoSrc}
             title={image.title}
@@ -2657,7 +2664,7 @@ function ImageCard({
             allowFullScreen
           />
         ) : shouldRenderNativeVideo && nativeVideoSrc ? (
-          <video
+          <PrivateMediaVideo
             ref={videoRef}
             src={nativeVideoSrc}
             poster={imageLoadFailed ? undefined : imageSrc}
@@ -2689,7 +2696,7 @@ function ImageCard({
             <ImageIcon className="h-7 w-7" aria-hidden="true" />
           </div>
         ) : (
-          <img
+          <PrivateMediaImage
             src={imageSrc}
             alt={image.title}
             loading="lazy"
@@ -3150,7 +3157,7 @@ function ImageViewerMedia({
   return (
     <div className="relative h-full w-full overflow-hidden bg-black/40" data-viewer-active-media="true">
         {shouldRenderNativeVideo && nativeVideoSrc ? (
-          <video
+          <PrivateMediaVideo
             ref={videoRef}
             src={nativeVideoSrc}
             poster={getPinImageUrl(image, 'medium')}
@@ -3172,7 +3179,7 @@ function ImageViewerMedia({
             }}
           />
         ) : videoPin && iframeSrc ? (
-          <iframe
+          <PrivateMediaFrame
             ref={iframeRef}
             src={iframeSrc}
             title={image.title}
@@ -3187,7 +3194,7 @@ function ImageViewerMedia({
             allowFullScreen
           />
         ) : richEmbedFrameUrl ? (
-          <iframe
+          <PrivateMediaFrame
             key={image.id}
             src={richEmbedFrameUrl}
             title={image.title}
@@ -3201,7 +3208,7 @@ function ImageViewerMedia({
             allowFullScreen
           />
         ) : richEmbedSrcDoc ? (
-          <iframe
+          <PrivateMediaFrame
             key={image.id}
             srcDoc={richEmbedSrcDoc}
             title={image.title}
@@ -3216,7 +3223,7 @@ function ImageViewerMedia({
           />
         ) : videoPin ? (
           <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
-            {!imageFailed && <img
+            {!imageFailed && <PrivateMediaImage
               src={imageSources[imageSourceIndex] || getPinImageUrl(image, 'medium')}
               alt={image.title}
               className="max-h-[58vh] max-w-full rounded-[var(--radius-lg)] object-contain"
@@ -3230,7 +3237,7 @@ function ImageViewerMedia({
             />}
             {imageFailed && <div className="rounded-[var(--radius-xl)] border border-white/10 bg-white/5 p-6 text-sm text-white/65">Video preview unavailable</div>}
             {sourceUrl && (
-              <a
+              <PrivateMediaLink
                 href={sourceUrl}
                 target="_blank"
                 rel="noreferrer"
@@ -3238,7 +3245,7 @@ function ImageViewerMedia({
               >
                 <ExternalLink className="h-4 w-4" />
                 Open source video
-              </a>
+              </PrivateMediaLink>
             )}
           </div>
         ) : (
@@ -3250,7 +3257,7 @@ function ImageViewerMedia({
             </div>
           ) : (
             <ZoomableImageFrame resetKey={image.id} className="h-full w-full" controlsPosition="top" controlsVariant="minimal" onZoomChange={onZoomChange}>
-              <img
+              <PrivateMediaImage
                 src={imageSources[imageSourceIndex] || getPinImageUrl(image, 'medium')}
                 alt={image.title}
                 draggable={false}
@@ -4095,7 +4102,7 @@ function ShadowPinHome({
                       >
                         <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)]">
                           {categoryImageUrl ? (
-                            <img
+                            <PrivateMediaImage
                               src={categoryImageUrl}
                               alt=""
                               loading="lazy"
@@ -4134,7 +4141,7 @@ function ShadowPinHome({
                           role="option"
                         >
                           <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[var(--radius-sm)] border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.06)]">
-                            <img src={getPinImageUrl(image, 'thumb')} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                            <PrivateMediaImage src={getPinImageUrl(image, 'thumb')} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                           </span>
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">{image.title}</span>

@@ -79,6 +79,7 @@ const unexposedRows = query(`
   where n.nspname in (
     'activation_private',
     'connections_private',
+    'content_filter_private',
     'inner_circles_private',
     'member_mutation_private',
     'shado_live_private',
@@ -132,6 +133,7 @@ const [unexposedDefinerSummary] = query(`
   where n.nspname in (
     'activation_private',
     'connections_private',
+    'content_filter_private',
     'inner_circles_private',
     'member_mutation_private',
     'shado_live_private',

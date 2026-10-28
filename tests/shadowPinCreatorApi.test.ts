@@ -70,6 +70,14 @@ describe('ShadowPin Creator Studio API', () => {
     })
   })
 
+  test('keeps a policy-rejected draft unpublished without retrying finalize', async () => {
+    rpc.mockResolvedValue({ data: null, error: { code: 'PT422', message: 'CONTENT_POLICY_REJECTED' } })
+    const draft = normalizeCreatorDraft(rawDraft)
+    await expect(publishCreatorDraft(draft!)).rejects.toMatchObject({ code: 'PT422', contentPolicyRejected: true })
+    expect(rpc).toHaveBeenCalledTimes(1)
+    expect(draft?.state).toBe('publish_ready')
+  })
+
   test('normalizes snake-case, camel-case, array, and nested bundle responses', () => {
     expect(normalizeCreatorDraft(rawDraft)).toMatchObject({
       id: 'draft-1', creatorId: 'user-1', categoryId: 'category-1', revision: 3,

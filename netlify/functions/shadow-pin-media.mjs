@@ -180,6 +180,9 @@ export async function handler(event) {
 
     return json({ error: 'Unsupported ShadowPin media action.' }, 400)
   } catch (error) {
+    if (error?.code === 'PT422' && error.message === 'CONTENT_POLICY_REJECTED') {
+      return json({ code: 'PT422', error: 'CONTENT_POLICY_REJECTED' }, 422)
+    }
     const message = error instanceof Error ? error.message : 'ShadowPin media processing failed.'
     const statusCode = Number(error?.statusCode) || 400
     const response = json({ error: message }, statusCode)

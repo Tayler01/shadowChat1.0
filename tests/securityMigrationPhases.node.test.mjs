@@ -8,6 +8,8 @@ import { installProfileRpcFixtures } from './helpers/profileRpcFixtures.mjs'
 const { PGlite } = await import('@electric-sql/pglite')
 const fixtures = new URL('./fixtures/security-phases/', import.meta.url)
 const manifest = JSON.parse(await readFile(new URL('pre-split-manifest.json', fixtures), 'utf8'))
+const followup = JSON.parse(await readFile(new URL('../supabase/backend-privacy-followup.json', import.meta.url), 'utf8'))
+const canonicalSha = bytes => createHash('sha256').update(Buffer.from(bytes).toString('utf8').replaceAll('\r\n', '\n')).digest('hex')
 // Independently authorized additive compatibility work is applied identically
 // on both sides; this suite detects only accidental changes from phase ordering.
 const companionMigrations = [
@@ -217,7 +219,18 @@ async function definers(db) {
 }
 
 test('foundation and activation preserve the complete pre-split SQL catalog', async context => {
-  const stagedFiles = (await readdir(securityMigrationsUrl)).filter(name => /^202610\d{8}_.*\.sql$/.test(name)).sort()
+  const securityEraFiles = (await readdir(securityMigrationsUrl)).filter(name => /^\d{14}_.*\.sql$/.test(name) && name.slice(0,14) >= '20261000000000').sort()
+  const stagedFiles = securityEraFiles.filter(name => name <= securityActivationName)
+  assert.equal(followup.version,1)
+  assert.equal(followup.projectRef,'shsqqouecvdoifzufkqm')
+  assert.equal(followup.predecessor.activationVersion,securityActivationName.slice(0,14))
+  assert.equal(followup.predecessor.planPath,'supabase/backend-privacy-release.json')
+  assert.equal(followup.predecessor.planSha256,'b6bafa03390dfc2840efcc2eefe71e9999c5daeffae1e32fa80b37746916a774')
+  assert.equal(canonicalSha(await readFile(new URL('../supabase/backend-privacy-release.json',import.meta.url))),followup.predecessor.planSha256,'Original activation plan remains immutable')
+  const followupNames=followup.migrations.map(entry=>{assert.match(entry.path,/^supabase\/migrations\/\d{14}_[a-z0-9_]+\.sql$/);return entry.path.split('/').at(-1)})
+  assert.deepEqual(followupNames,['20261028120650_member_content_filter.sql','20261028121930_notification_private_media_authorization.sql'],'Follow-up is an explicit reviewed pair, never an arbitrary future-migration exception')
+  assert.deepEqual(securityEraFiles.filter(name=>name>securityActivationName),followupNames,'Every migration after activation needs explicit follow-up review')
+  for(const entry of followup.migrations)assert.equal(canonicalSha(await readSql(entry.path.split('/').at(-1))),entry.sha256,`Reviewed follow-up SQL changed: ${entry.path}`)
   const expectedFiles = [...manifest.map(({ name }) => name).filter(name => !name.startsWith('20261022231052_')),
     ...companionMigrations, securityActivationName].sort()
   assert.deepEqual(stagedFiles, expectedFiles, 'Every staged migration is covered and activation remains last')

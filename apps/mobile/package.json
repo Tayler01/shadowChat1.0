@@ -30,7 +30,8 @@
     "react-native-url-polyfill": "^3.0.0",
     "react-native-web": "~0.21.0",
     "react-native-webview": "13.16.1",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "deepmerge": "file:./vendor/shadowchat-deepmerge-safe-cjs-0.0.0.tgz"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
@@ -67,7 +68,8 @@
     "uuid": "11.1.1",
     "@expo/cli": {
       "zod": "4.6.7"
-    }
+    },
+    "deepmerge": "$deepmerge"
   },
   "expo": {
     "doctor": {

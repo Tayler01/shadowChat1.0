@@ -1,3 +1,4 @@
+import { PrivateMediaVideo } from '../ui/PrivateMediaPlayer'
 import React, { useEffect, useRef, useState } from 'react'
 import {
   CHAT_MEDIA_INTRINSIC_HEIGHT,
@@ -64,7 +65,7 @@ export const VideoAttachment: React.FC<VideoAttachmentProps> = ({ url, className
     }
 
     const playIfFocused = () => {
-      if (disposed || !shouldAutoPlayRef.current || document.visibilityState === 'hidden') {
+      if (disposed || !video.getAttribute('src') || !shouldAutoPlayRef.current || document.visibilityState === 'hidden') {
         return
       }
 
@@ -99,20 +100,26 @@ export const VideoAttachment: React.FC<VideoAttachmentProps> = ({ url, className
       playIfFocused()
     }
 
+    const handleSourceReady = () => {
+      if (!hasPreparedAutoplayRef.current) playIfFocused()
+    }
+
     observer.observe(video)
     document.addEventListener('visibilitychange', handleVisibilityChange)
+    video.addEventListener('loadedmetadata', handleSourceReady)
 
     return () => {
       disposed = true
       shouldAutoPlayRef.current = false
       observer.disconnect()
       document.removeEventListener('visibilitychange', handleVisibilityChange)
+      video.removeEventListener('loadedmetadata', handleSourceReady)
       pauseVideo()
     }
   }, [url])
 
   return (
-    <video
+    <PrivateMediaVideo
       ref={videoRef}
       controls
       muted={isMuted}

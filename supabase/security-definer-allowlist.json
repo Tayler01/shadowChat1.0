@@ -86,6 +86,8 @@
     "connections_private.list_my_connections_impl(text,integer,timestamp with time zone,uuid)",
     "connections_private.mutate_connection_impl(uuid,text)",
     "connections_private.remove_connection_on_block()",
+    "content_filter_private.audit_rule_change()",
+    "content_filter_private.guard_member_content()",
     "inner_circles_private.get_my_shadow_pin_circle_feed_window_impl(uuid,uuid)",
     "inner_circles_private.list_my_inner_circle_members_impl(uuid)",
     "inner_circles_private.list_my_inner_circles_impl()",
@@ -545,6 +547,24 @@
     }
   ],
   "schema_usage_contract": [
+    {
+      "schema": "content_filter_private",
+      "role": "anon",
+      "usage": false,
+      "reason": "Safety rules and trigger implementations are not directly accessible to API roles."
+    },
+    {
+      "schema": "content_filter_private",
+      "role": "authenticated",
+      "usage": false,
+      "reason": "Safety rules and trigger implementations are not directly accessible to API roles."
+    },
+    {
+      "schema": "content_filter_private",
+      "role": "service_role",
+      "usage": false,
+      "reason": "Safety rules and trigger implementations are not directly accessible to API roles."
+    },
     {
       "schema": "private",
       "role": "authenticated",

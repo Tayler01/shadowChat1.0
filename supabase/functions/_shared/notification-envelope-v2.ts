@@ -178,7 +178,8 @@ const isApprovedNotificationMediaUrl = (url: URL) => {
     ) &&
     (
       url.pathname.startsWith('/storage/v1/object/public/') ||
-      url.pathname.startsWith('/storage/v1/render/image/public/')
+      url.pathname.startsWith('/storage/v1/render/image/public/') ||
+      ((url.pathname.startsWith('/storage/v1/object/sign/') || url.pathname.startsWith('/storage/v1/render/image/sign/')) && Boolean(url.searchParams.get('token')))
     )
   )
 }

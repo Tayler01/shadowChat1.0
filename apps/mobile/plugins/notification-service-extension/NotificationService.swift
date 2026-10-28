@@ -244,6 +244,12 @@ final class NotificationService: UNNotificationServiceExtension, URLSessionTaskD
        (
          url.path.hasPrefix("/storage/v1/object/public/")
           || url.path.hasPrefix("/storage/v1/render/image/public/")
+          || (
+            (url.path.hasPrefix("/storage/v1/object/sign/") || url.path.hasPrefix("/storage/v1/render/image/sign/"))
+              && URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains(where: {
+                $0.name == "token" && !($0.value ?? "").isEmpty
+              }) == true
+          )
        ) {
       if url.path.hasPrefix("/storage/v1/render/image/public/"),
          var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {

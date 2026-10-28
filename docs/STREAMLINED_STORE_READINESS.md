@@ -1,5 +1,47 @@
 # Streamlined edition: store readiness
 
+## October 28 production and testing checkpoint
+
+The staged backend activation from `bea0e0bb` is complete. Production checks
+verified safe profile projections, automatic report-evidence capture and both
+modern and legacy account deletion, including denial of stale-session writes.
+Synthetic fixtures were removed. The recovery worker completed both manually
+dispatched and scheduled-only interrupted deletions; its five-minute schedule
+is installed. Independent read-only verification corrected the original helper's
+pg_net transaction-timestamp assumption and confirmed scheduled completion and
+cleanup. The original failed receipt is preserved. This is bounded operational
+correlation, not an exact cron-to-HTTP-request identity join. The original
+activation plan and receipts remain immutable.
+
+Build 19 is VALID in App Store Connect and assigned to the existing ShadoChat
+Internal Beta group. The separate preview is live at
+`https://shadowchat-streamlined.netlify.app` (deploy
+`6ae1ea45cc60efb011dbe64c`). The full site remains on original deploy
+`6ac80e75c08a982905141809`; automatic publication remains held. Full-site
+WebKit/Chromium compatibility checks passed. The streamlined preview passed
+Chromium auth/profile/group/DM/back checks and WebKit auth/profile/DM/back;
+an initial WebKit group failure is preserved alongside a successful instrumented
+retry. Its original cause is unproven. Exact test-message cleanup is verified.
+
+The local follow-up adds compatible media/typing consumers, private notification
+authorization, bounded server-side content filtering and native dependency
+remediation. Both chat hooks also reconcile the initial snapshot/socket-join
+gap without resetting historical windows; deterministic tests cover both
+editions. This verified gap is not claimed as the cause of the earlier WebKit
+failure. The follow-up is **not yet deployed**. Its exact two forward migrations and
+stage order are recorded in `supabase/backend-privacy-followup.json`. Publish
+compatible handlers and both clients with privacy flags off before applying
+this pair; do not rerun or modify the historical activation plan.
+
+Build 20 preparation advances only the streamlined native profile. Its shared
+TypeScript notification parser accepts signed-media envelopes before routing;
+the streamlined Swift extension deliberately remains media-free. Public App
+Review has not been submitted. Final private-media/Realtime enforcement,
+physical-device acceptance, final policies, operating retention/monitoring,
+reviewer access and store declarations remain release gates. Evidence is under
+`output/release-evidence/resume-20261028/`; public preview availability is not
+App Store approval.
+
 The [iPhone App Review packet](STREAMLINED_APP_REVIEW_PACKET.md), prepared
 October 26, contains draft listing copy, a reviewer walkthrough, the privacy
 declaration worksheet and the outstanding operator decisions. It does not

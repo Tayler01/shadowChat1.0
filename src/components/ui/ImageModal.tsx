@@ -1,3 +1,4 @@
+import { PrivateMediaImage } from './PrivateMediaImage'
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
@@ -44,7 +45,7 @@ export const ImageModal: React.FC<ImageModalProps> = ({ open, src, alt, onClose 
           <X className="w-5 h-5" />
         </button>
         <ZoomableImageFrame resetKey={src} className="h-full max-h-full w-full max-w-full">
-          <img
+          <PrivateMediaImage
             src={src}
             alt={alt}
             draggable={false}

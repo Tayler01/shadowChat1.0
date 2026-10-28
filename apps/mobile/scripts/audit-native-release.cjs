@@ -4,7 +4,7 @@ const path = require('node:path');
 const { verifyOrApply } = require('./apply-tooling-security.cjs');
 
 const patch = verifyOrApply();
-const regression = spawnSync(process.execPath, ['--test', 'tests/tooling-security.test.cjs'], { cwd: require('node:path').resolve(__dirname, '..'), encoding: 'utf8' });
+const regression = spawnSync(process.execPath, ['--test', 'tests/tooling-security.test.cjs', 'tests/deepmerge-security.test.cjs'], { cwd: require('node:path').resolve(__dirname, '..'), encoding: 'utf8' });
 assert.equal(regression.status, 0, regression.stdout + regression.stderr);
 const npmCli = process.env.npm_execpath || path.resolve(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
 assert.ok(require('node:fs').existsSync(npmCli), 'Run this verifier through npm run audit:release.');

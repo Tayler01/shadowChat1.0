@@ -1,3 +1,5 @@
+import { PrivateMediaAudio } from '../ui/PrivateMediaPlayer'
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -448,7 +450,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
                   className="shrink-0 rounded-[var(--radius-xs)] focus:outline-none focus:ring-2 focus:ring-[rgba(215,170,70,0.32)]"
                   aria-label="View replied image"
                 >
-                  <img
+                  <PrivateMediaImage
                     src={parentPreviewImageSrc}
                     alt=""
                     loading="lazy"
@@ -496,7 +498,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               </div>
             </div>
           ) : message.message_type === 'audio' ? (
-            <audio
+            <PrivateMediaAudio
               controls
               src={message.audio_url}
               aria-label={`Voice message from ${message.sender?.display_name || (isOwn ? 'you' : 'this member')}`}
@@ -513,7 +515,7 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
               onOpen={() => setShowImageModal(true)}
               onShare={() => setShowShadowPinShare(true)}
             >
-              <img
+              <PrivateMediaImage
                 src={imageMessageSrc}
                 alt={`Image shared by ${message.sender?.display_name || (isOwn ? 'you' : 'this member')}${message.content.trim() ? `: ${message.content.trim()}` : ''}`}
                 loading="lazy"

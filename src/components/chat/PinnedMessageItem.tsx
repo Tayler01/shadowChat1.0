@@ -1,3 +1,5 @@
+import { PrivateMediaAudio } from '../ui/PrivateMediaPlayer'
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
 import React, { useState } from 'react'
 import { PinOff, Plus } from 'lucide-react'
 import { Button } from '../ui/Button'
@@ -81,9 +83,9 @@ export const PinnedMessageItem: React.FC<PinnedMessageItemProps> = ({
           </strong>
           :{' '}
           {message.message_type === 'audio' ? (
-            <audio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
+            <PrivateMediaAudio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
           ) : imageMessageSrc ? (
-            <img
+            <PrivateMediaImage
               src={imageMessageSrc}
               alt="pinned uploaded image"
               loading="lazy"

@@ -1,3 +1,6 @@
+import { MessagesProvider as StreamlinedMessagesProvider, useMessages as useStreamlinedMessages } from '../apps/streamlined/src-overrides/hooks/useMessages';
+jest.mock('../apps/streamlined/src-overrides/hooks/useAuth', () => jest.requireMock('../src/hooks/useAuth'));
+jest.mock('../apps/streamlined/src-overrides/lib/supabase', () => jest.requireMock('../src/lib/supabase'));
 import { renderHook, act, waitFor } from '@testing-library/react';
 import {
   MessagesProvider,
@@ -27,12 +30,20 @@ import type { Message } from '../src/lib/supabase';
 import { runRealtimeRecovery } from '../src/lib/realtimeRecovery';
 import { triggerGroupPushNotification, triggerReactionPushNotification } from '../src/lib/push';
 
+const mockPrivateDelivery = { enabled: false };
+const mockPrivateRealtime = { enabled: false };
+jest.mock('../src/lib/privateRealtimeChannels', () => ({ get PRIVATE_REALTIME_ENABLED() { return mockPrivateRealtime.enabled; } }));
+const mockPrepareMessageMedia = jest.fn();
+jest.mock('../src/lib/privateMediaUrls', () => ({ get PRIVATE_MEDIA_ENABLED() { return mockPrivateDelivery.enabled; } }));
+jest.mock('../src/lib/privateMediaCopies', () => ({ prepareMessageMedia: (...args: unknown[]) => mockPrepareMessageMedia(...args) }));
 jest.mock('../src/hooks/useAuth');
 jest.mock('../src/hooks/useRealtimeRecovery', () => ({
   useRealtimeRecovery: jest.fn(),
 }));
+const mockPlayMessage = jest.fn();
+const mockPlayReaction = jest.fn();
 jest.mock('../src/hooks/useSoundEffects', () => ({
-  useSoundEffects: () => ({ playMessage: jest.fn(), playReaction: jest.fn() }),
+  useSoundEffects: () => ({ playMessage: mockPlayMessage, playReaction: mockPlayReaction }),
 }));
 jest.mock('../src/lib/push', () => ({
   triggerGroupPushNotification: jest.fn().mockResolvedValue(undefined),
@@ -183,6 +194,9 @@ const configureWorkingClient = () => {
 };
 
 beforeEach(() => {
+  mockPrivateDelivery.enabled = false;
+  mockPrivateRealtime.enabled = false;
+  mockPrepareMessageMedia.mockReset();
   localStorage.clear();
   configureWorkingClient();
   (triggerGroupPushNotification as jest.Mock).mockResolvedValue(undefined);
@@ -753,6 +767,25 @@ describe('sendMessage', () => {
     retrySpy.mockRestore();
   });
 
+  it('keeps a rejected message locally without auth retry, reconnect or recipient push', async () => {
+    const insertSpy = jest.spyOn(messagesModule, 'insertMessage').mockResolvedValueOnce({
+      data: null, error: { code: 'PT422', message: 'CONTENT_POLICY_REJECTED', status: 422 },
+    } as any)
+    const retrySpy = jest.spyOn(messagesModule, 'refreshSessionAndRetry')
+    const { result } = renderHook(() => useMessages(), { wrapper: MessagesProvider })
+    jest.mocked(runRealtimeRecovery).mockClear()
+    jest.mocked(triggerGroupPushNotification).mockClear()
+    let rejected: unknown
+    await act(async () => { try { await result.current.sendMessage('Rejected text') } catch (error) { rejected = error } })
+    expect(rejected).toEqual(expect.objectContaining({ message: expect.stringContaining('Edit it and try again') }))
+    expect(insertSpy).toHaveBeenCalledTimes(1)
+    expect(retrySpy).not.toHaveBeenCalled()
+    expect(runRealtimeRecovery).not.toHaveBeenCalledWith('send-error')
+    expect(triggerGroupPushNotification).not.toHaveBeenCalled()
+    expect(result.current.messages).toEqual(expect.arrayContaining([expect.objectContaining({ content: 'Rejected text', delivery_status: 'failed' })]))
+    insertSpy.mockRestore(); retrySpy.mockRestore()
+  })
+
   it('does not issue overlapping retries after an ambiguous send failure', async () => {
     const insertSpy = jest
       .spyOn(messagesModule, 'insertMessage')
@@ -1027,4 +1060,116 @@ describe('message actions', () => {
     expect(rpcFn).toHaveBeenCalledWith('toggle_message_pin', { message_id: 'm1' });
   });
 
+});
+
+test('private attachment retry retains prepared owner URLs after an insert failure', async () => {
+  mockPrivateDelivery.enabled = true;
+  const user = { id: 'user1' } as any;
+  (useAuth as jest.Mock).mockReturnValue({ user, profile: { id: user.id } });
+  (ensureSession as jest.Mock).mockResolvedValue(true);
+  workingClient.from.mockImplementation(() => createQuery({ maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }) }) as any);
+  const original = 'https://example.supabase.co/storage/v1/object/public/shadow-pin/owner/source.png';
+  const owned = 'https://example.supabase.co/storage/v1/object/public/chat-uploads/user1/forwarded/private-retry/image.png';
+  mockPrepareMessageMedia.mockResolvedValue({ content: 'photo', fileUrl: owned, thumbnailUrl: owned });
+  const insert = jest.spyOn(messagesModule, 'insertMessage')
+    .mockRejectedValueOnce(new Error('network unavailable'))
+    .mockResolvedValueOnce({ data: { ...makeDbMessage('saved-private', '2026-10-26T12:00:00Z'), client_message_id: 'private-retry', message_type: 'image', file_url: owned } as any, error: null });
+  const hook = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+  await act(async () => {
+    await expect(hook.result.current.sendMessage('photo', 'image', original, undefined, original, { clientMessageId: 'private-retry' })).rejects.toThrow('network unavailable');
+  });
+  const saved = JSON.parse(localStorage.getItem('shadowchat:outbox:general')!);
+  expect(saved[0]).toMatchObject({ clientMessageId: 'private-retry', fileUrl: owned, thumbnailUrl: owned });
+  await act(async () => { await hook.result.current.retryFailedMessage('private-retry'); });
+  expect(mockPrepareMessageMedia).toHaveBeenNthCalledWith(2, expect.objectContaining({ fileUrl: owned, thumbnailUrl: owned }));
+  expect(insert).toHaveBeenLastCalledWith(expect.objectContaining({ file_url: owned, thumbnail_url: owned }));
+  expect(localStorage.getItem('shadowchat:outbox:general')).toBeNull();
+  insert.mockRestore();
+});
+
+test.each([false,true])('General Broadcast transport is preserved only before private cutover (%s)', async privateMode => {
+  mockPrivateRealtime.enabled = privateMode;
+  (useAuth as jest.Mock).mockReturnValue({ user: {id:'user1'}, profile: {id:'user1'} });
+  (ensureSession as jest.Mock).mockResolvedValue(true);
+  let receive: ((payload: any) => void) | undefined;
+  const channel: any = {
+    on: jest.fn((type: string, filter: any, callback: any) => {
+      if(type === 'broadcast' && filter.event === 'new_message') receive = callback;
+      return channel;
+    }), subscribe: jest.fn(() => channel), send: jest.fn(), state: 'joined',
+  };
+  workingClient.channel.mockReturnValue(channel);
+  const hook = renderHook(() => useMessages(), { wrapper: MessagesProvider });
+  await waitFor(() => expect(receive).toBeDefined());
+  act(() => receive?.({payload:makeDbMessage('legacy-wire', '2026-10-28T00:00:00Z')}));
+  expect(hook.result.current.messages.some(message=>message.id==='legacy-wire')).toBe(!privateMode);
+  const insert = jest.spyOn(messagesModule,'insertMessage').mockResolvedValueOnce({data:makeDbMessage('sent-wire','2026-10-28T00:00:01Z') as any,error:null});
+  await act(async()=>{await hook.result.current.sendMessage('hello','text',undefined,undefined,undefined,{clientMessageId:'wire-test'});});
+  expect(channel.send.mock.calls.length).toBe(privateMode?0:1);
+  insert.mockRestore();
+});
+
+describe.each([
+  ['full', useMessages, MessagesProvider],
+  ['streamlined', useStreamlinedMessages, StreamlinedMessagesProvider],
+] as const)('%s subscription snapshot gap', (_edition, useEditionMessages, EditionProvider) => {
+  const user = { id: 'gap-user', username: 'fixture' } as any;
+  let statusHandler: (status: string) => Promise<void>;
+  let insertHandler: (payload: any) => Promise<void>;
+  beforeEach(() => {
+    jest.clearAllMocks();
+    configureWorkingClient();
+    (useAuth as jest.Mock).mockReturnValue({ user, profile: user });
+    workingClient.channel.mockImplementation(() => {
+      const channel: any = {
+        on: jest.fn((event, filter, handler) => {
+          if(event === 'postgres_changes' && filter.event === 'INSERT' && filter.table === 'messages') insertHandler=handler;
+          return channel;
+        }),
+        subscribe: jest.fn(handler => { statusHandler=handler;return channel; }),
+        state: 'joining', send: jest.fn(),
+      };
+      return channel;
+    });
+  });
+  const queueWindow = (rows: Message[]) => workingClient.from
+    .mockReturnValueOnce(createThenableQuery({data:[],error:null}))
+    .mockReturnValueOnce(createThenableQuery({data:[...rows].reverse(),error:null}));
+
+  it('reconciles a committed insert between initial snapshot and join without duplicate live replay', async () => {
+    const root=makeDbMessage('gap-root','2026-10-28T12:00:00Z');
+    const inserted=makeDbMessage('gap-insert','2026-10-28T12:01:00Z');
+    queueWindow([root]);
+    const hook=renderHook(()=>useEditionMessages(),{wrapper:EditionProvider});
+    await waitFor(()=>expect(hook.result.current.loading).toBe(false));
+    expect(hook.result.current.messages.map(m=>m.id)).toEqual([root.id]);
+    // Commit is visible to REST, but no INSERT event is delivered before join.
+    queueWindow([root,inserted]);
+    await act(async()=>{await statusHandler('SUBSCRIBED');});
+    expect(hook.result.current.messages.map(m=>m.id)).toEqual([root.id,inserted.id]);
+    await act(async()=>{await insertHandler({new:{id:inserted.id}});});
+    expect(hook.result.current.messages.filter(m=>m.id===inserted.id)).toHaveLength(1);
+    hook.unmount();
+  });
+
+  it.each(['older','target'] as const)('reconciles joined %s window in place without resetting pagination',async(mode)=>{
+    const latest=makeLatestWindow();queueWindow(latest);
+    const hook=renderHook(()=>useEditionMessages(),{wrapper:EditionProvider});
+    await waitFor(()=>expect(hook.result.current.loading).toBe(false));
+    const older=makeDbMessage('older-root','2026-05-03T11:00:00Z');
+    if(mode==='older'){
+      queueWindow([older]);await act(async()=>{await hook.result.current.loadOlderMessages();});
+    }else{
+      (fetchGeneralChatThreadedWindow as jest.Mock).mockResolvedValueOnce({messages:[older],pinnedMessages:[],hasOlder:true,hasNewer:true,windowMode:'target',targetStatus:'found',anchorStatus:'not_requested',targetThreadId:older.id});
+      await act(async()=>{await hook.result.current.ensureMessageWindow(older.id);});
+    }
+    const before={ids:hook.result.current.messages.map(m=>m.id),mode:hook.result.current.windowMode,hasOlder:hook.result.current.hasOlder,hasNewer:hook.result.current.hasNewer,targetStatus:hook.result.current.targetStatus,anchorStatus:hook.result.current.anchorStatus};
+    const visible=createThenableQuery({data:hook.result.current.messages,error:null},{in:jest.fn().mockReturnThis()});
+    workingClient.from.mockReturnValueOnce(visible);
+    await act(async()=>{await statusHandler('SUBSCRIBED');});
+    expect(visible.in).toHaveBeenCalledWith('id',before.ids);
+    expect({ids:hook.result.current.messages.map(m=>m.id),mode:hook.result.current.windowMode,hasOlder:hook.result.current.hasOlder,hasNewer:hook.result.current.hasNewer,targetStatus:hook.result.current.targetStatus,anchorStatus:hook.result.current.anchorStatus}).toEqual(before);
+    expect(before.mode).toBe(mode);
+    hook.unmount();
+  });
 });

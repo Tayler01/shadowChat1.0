@@ -1,3 +1,4 @@
+import { PrivateMediaImage } from '../../ui/PrivateMediaImage'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   FileText,
@@ -479,7 +480,7 @@ export function DMHubConversationContentSheet({
                         className="min-h-12 overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.025)] text-left transition-colors hover:border-[var(--border-glow)] hover:bg-[var(--theme-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-focus-ring)]"
                       >
                         {previewUrl ? (
-                          <img src={previewUrl} alt="" loading="lazy" decoding="async" className="aspect-square w-full object-cover" />
+                          <PrivateMediaImage src={previewUrl} alt="" loading="lazy" decoding="async" className="aspect-square w-full object-cover" />
                         ) : (
                           <span className="flex aspect-square w-full items-center justify-center bg-[rgba(var(--theme-accent-rgb),0.06)] text-[var(--theme-accent-readable)]" aria-hidden="true">
                             <Icon className="h-7 w-7" />

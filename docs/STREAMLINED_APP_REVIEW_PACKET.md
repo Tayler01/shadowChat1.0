@@ -1,5 +1,17 @@
 # Streamlined iPhone App Review packet
 
+October 28 checkpoint: build 19 is processed VALID and assigned to the existing
+internal TestFlight group; the separate preview is published. Public App Review
+is not submitted. Build 20 is being prepared with updated notification-envelope
+parsing and a verified dependency fix. Its streamlined Swift notification
+extension remains media-free. Live AI configuration is OpenRouter with default
+`mistralai/mistral-nemo`; native notifications use Expo Push Service and APNs.
+The operator has supplied the private review phone number (kept out of this
+repository) and confirmed personal monitoring. Monitoring cadence, forwarding
+destination and reviewer access to existing community content still need answers.
+The factual provider/backup/native inventory is in the ignored release evidence
+directory; final declarations must match the actual submitted build and service.
+
 Prepared October 26, 2026 from the local release source. This is a working
 submission packet, not a submitted listing or evidence of approval. The release
 owner must replace the remaining placeholders only after the corresponding

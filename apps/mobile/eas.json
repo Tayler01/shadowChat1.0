@@ -12,7 +12,7 @@
       "env": {
         "SHADOWCHAT_APP_EDITION": "streamlined",
         "SHADOWCHAT_STREAMLINED_WEB_ORIGIN": "https://shadowchat-streamlined.netlify.app",
-        "SHADOWCHAT_IOS_BUILD_NUMBER": "19"
+        "SHADOWCHAT_IOS_BUILD_NUMBER": "20"
       }
     },
     "development": {

@@ -1,3 +1,4 @@
+import { PRIVATE_REALTIME_ENABLED } from '../lib/privateRealtimeChannels'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import {
@@ -895,7 +896,7 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat'): Mess
           }
         )
         .on('broadcast', { event: 'new_message' }, (payload: any) => {
-          if (disposed) return
+          if (PRIVATE_REALTIME_ENABLED || disposed) return
           addNewMessage(normalizeBoardChatMessage(payload.payload as BoardChatMessage))
         })
         .on(
@@ -1224,7 +1225,7 @@ export function useBoardChat(boardSlug: string, boardTitle = 'Board Chat'): Mess
           inserted = withSentDeliveryState(data)
           addNewMessage(inserted)
 
-          if (channelRef.current?.state === 'joined') {
+          if (!PRIVATE_REALTIME_ENABLED && channelRef.current?.state === 'joined') {
             channelRef.current.send({
               type: 'broadcast',
               event: 'new_message',

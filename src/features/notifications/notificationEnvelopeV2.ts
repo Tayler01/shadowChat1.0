@@ -188,7 +188,8 @@ const isApprovedNotificationMediaUrl = (url: URL) => {
     APPROVED_NOTIFICATION_SUPABASE_HOSTS.has(hostname) &&
     (
       url.pathname.startsWith('/storage/v1/object/public/') ||
-      url.pathname.startsWith('/storage/v1/render/image/public/')
+      url.pathname.startsWith('/storage/v1/render/image/public/') ||
+      ((url.pathname.startsWith('/storage/v1/object/sign/') || url.pathname.startsWith('/storage/v1/render/image/sign/')) && Boolean(url.searchParams.get('token')))
     )
   )
 }

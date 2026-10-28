@@ -4,6 +4,15 @@ This document turns the June 1, 2026 read-only audit into an implementation back
 
 ## October 23 streamlined release preparation
 
+October 28 update: staged production activation and bounded capture/deletion/
+full-client compatibility checks passed. Separate TestFlight build 19 and the
+streamlined web preview are available. The next explicit two-migration follow-up
+adds private notification authorization and bounded content filtering after
+compatible clients/handlers, with global privacy switches still held. Native
+build 20 preparation includes signed-envelope parsing and the reviewed deepmerge
+security adaptation. Remaining proof and source/runtime distinctions are tracked
+in the current sections of the linked security audit and store readiness docs.
+
 The separate streamlined edition and its staged privacy/account-deletion work
 are being reconciled onto the current production source. Preserve the newer
 September 30 migrations, native clipboard integration, notification delivery

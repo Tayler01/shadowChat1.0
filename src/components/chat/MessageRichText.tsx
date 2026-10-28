@@ -1,3 +1,5 @@
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
+import { PrivateMediaLink } from '../ui/PrivateMediaLink'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ExternalLink, Play } from 'lucide-react'
 import {
@@ -111,7 +113,7 @@ const LinkPreviewCard: React.FC<{ preview: LinkPreview }> = ({ preview }) => {
   }, [preview.image])
 
   return (
-    <a
+    <PrivateMediaLink
       href={href}
       target="_blank"
       rel="noopener noreferrer"
@@ -128,7 +130,7 @@ const LinkPreviewCard: React.FC<{ preview: LinkPreview }> = ({ preview }) => {
               <ExternalLink className="h-5 w-5" aria-hidden="true" />
             </div>
           ) : (
-            <img
+            <PrivateMediaImage
               src={preview.image}
               alt={preview.title ? `${preview.title} preview image` : `${host} preview image`}
               width={1200}
@@ -164,7 +166,7 @@ const LinkPreviewCard: React.FC<{ preview: LinkPreview }> = ({ preview }) => {
         )}
         <p className="truncate text-[11px] text-[var(--text-muted)]">{host}</p>
       </div>
-    </a>
+    </PrivateMediaLink>
   )
 }
 
@@ -184,7 +186,7 @@ const RecognitionPostCard: React.FC<{ card: RecognitionMessageCard }> = ({ card 
     >
       <div className="relative h-24 overflow-hidden bg-[linear-gradient(135deg,rgba(215,170,70,0.2),rgba(6,7,9,0.92))] sm:h-28">
         {bannerSrc ? (
-          <img
+          <PrivateMediaImage
             src={bannerSrc}
             alt=""
             loading="lazy"
@@ -205,7 +207,7 @@ const RecognitionPostCard: React.FC<{ card: RecognitionMessageCard }> = ({ card 
             style={card.profileColor ? { backgroundColor: card.profileColor } : undefined}
           >
             {avatarSrc ? (
-              <img
+              <PrivateMediaImage
                 src={avatarSrc}
                 alt={`${card.displayName} profile picture`}
                 loading="lazy"
@@ -320,7 +322,7 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
             }
 
             return (
-              <a
+              <PrivateMediaLink
                 key={`${index}-${part.href}`}
                 href={part.href}
                 target="_blank"
@@ -328,7 +330,7 @@ export const MessageRichText: React.FC<MessageRichTextProps> = ({
                 className="break-words font-medium text-[var(--text-gold)] underline decoration-[rgba(241,211,138,0.42)] underline-offset-2 transition-colors [overflow-wrap:anywhere] hover:text-[var(--gold-5)]"
               >
                 {part.text}
-              </a>
+              </PrivateMediaLink>
             )
           })}
         </span>

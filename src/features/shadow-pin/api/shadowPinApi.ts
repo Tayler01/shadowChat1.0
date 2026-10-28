@@ -1,8 +1,10 @@
+import { isContentPolicyRejection, normalizeContentPolicyError, normalizeContentPolicyFunctionError } from '../../../lib/contentPolicy'
 import {
   ensureSession,
   getSessionWithTimeout,
   getWorkingClient,
   uploadShadowPinImage,
+  SHADOW_PIN_BUCKET,
 } from '../../../lib/supabase'
 import type {
   ShadowPinCategory,
@@ -465,6 +467,25 @@ async function getSessionAccessToken() {
   return session.access_token
 }
 
+/** A policy rejection guarantees the SQL statement did not commit. Only remove
+ * the exact new path returned by this operation's non-upserting upload. Never
+ * remove media on an ambiguous timeout or another database failure. */
+async function throwShadowPinWriteError(error: unknown, uploadedPath?: string): Promise<never> {
+  if (uploadedPath && isContentPolicyRejection(error)) {
+    try {
+      const client = await getWorkingClient()
+      const { error: cleanupError } = await client.storage.from(SHADOW_PIN_BUCKET).remove([uploadedPath])
+      if (cleanupError) throw cleanupError
+    } catch {
+      const policyError = normalizeContentPolicyError(error) as Error
+      throw Object.assign(new Error(`${policyError.message} The new upload could not be removed; contact support for cleanup.`), {
+        code: 'PT422', contentPolicyRejected: true, cleanupIncomplete: true,
+      })
+    }
+  }
+  throw normalizeContentPolicyError(error)
+}
+
 async function callShadowPinMediaFunction<T>(payload: Record<string, unknown>): Promise<T> {
   const accessToken = await getSessionAccessToken()
   const response = await fetch('/api/shadow-pin/media', {
@@ -477,7 +498,8 @@ async function callShadowPinMediaFunction<T>(payload: Record<string, unknown>): 
   })
   const data = await response.json().catch(() => null)
   if (!response.ok || data?.error) {
-    throw new Error(data?.error || 'ShadowPin image processing failed.')
+    const failure = { code: data?.code, message: data?.error }
+    throw isContentPolicyRejection(failure) ? normalizeContentPolicyError(failure) : new Error(data?.error || 'ShadowPin image processing failed.')
   }
   return data as T
 }
@@ -493,9 +515,10 @@ async function callShadowPinVideoFunction<T>(payload: Record<string, unknown>): 
     body: payload,
   })
 
-  if (error) throw error
+  if (error) throw await normalizeContentPolicyFunctionError(error)
   if (data?.error) {
-    throw new Error(data.error)
+    const failure = { code: data.code, message: data.error }
+    throw isContentPolicyRejection(failure) ? normalizeContentPolicyError(failure) : new Error(data.error)
   }
   return data as T
 }
@@ -917,7 +940,7 @@ export async function createShadowPinCategory(values: ShadowPinCategoryFormValue
     .select(CATEGORY_SELECT)
     .single()
 
-  if (error) throw error
+  if (error) await throwShadowPinWriteError(error, path)
   return processShadowPinMedia<ShadowPinCategory>('category', (data as { id: string }).id)
 }
 
@@ -973,7 +996,7 @@ export async function updateShadowPinCategory(
     .select(CATEGORY_SELECT)
     .single()
 
-  if (error) throw error
+  if (error) await throwShadowPinWriteError(error, typeof update.image_path === 'string' ? update.image_path : undefined)
   const category = data as unknown as ShadowPinCategory
   if (values.file) {
     return processShadowPinMedia<ShadowPinCategory>('category', category.id)
@@ -1033,7 +1056,7 @@ export async function createShadowPinImage(categoryId: string, values: ShadowPin
     .select(SHADOW_PIN_IMAGE_SELECT)
     .single()
 
-  if (error) throw error
+  if (error) await throwShadowPinWriteError(error, path)
   const createdImage = await processShadowPinMedia<ShadowPinImage>('image', (data as { id: string }).id)
   return finalizeCreatedShadowPinImage(createdImage, values.tags)
 }
@@ -1096,7 +1119,7 @@ export async function updateShadowPinImage(
         .select(SHADOW_PIN_IMAGE_SELECT)
         .single()
 
-      if (error) throw error
+      if (error) await throwShadowPinWriteError(error, path)
       const updatedImage = await processShadowPinMedia<ShadowPinImage>('image', (data as { id: string }).id)
       return setShadowPinImageTags(updatedImage, values.tags)
     }
@@ -1127,7 +1150,7 @@ export async function updateShadowPinImage(
     .select(SHADOW_PIN_IMAGE_SELECT)
     .single()
 
-  if (error) throw error
+  if (error) throw normalizeContentPolicyError(error)
   return setShadowPinImageTags(data as unknown as ShadowPinImage, values.tags)
 }
 
@@ -1375,7 +1398,7 @@ export async function createShadowPinComment(
       .eq('id', attachment.path.split('/').pop()!).eq('image_id', imageId).eq('author_id', user.id).maybeSingle()
     if (existing.data) return (await resolveShadowPinCommentAttachments([normalizeShadowPinCommentRecord(existing.data as unknown as ShadowPinCommentRecord)]))[0]
   }
-  if (error) throw error
+  if (error) throw normalizeContentPolicyError(error)
   const comment = normalizeShadowPinCommentRecord(data as unknown as ShadowPinCommentRecord)
   void triggerShadowPinCommentPushNotification(comment.id).catch(() => undefined)
   return (await resolveShadowPinCommentAttachments([comment]))[0]
@@ -1390,7 +1413,7 @@ export async function updateShadowPinComment(commentId: string, body: string) {
     .eq('id', commentId)
     .select(SHADOW_PIN_COMMENT_SELECT)
     .single()
-  if (error) throw error
+  if (error) throw normalizeContentPolicyError(error)
   return normalizeShadowPinCommentRecord(data as unknown as ShadowPinCommentRecord)
 }
 

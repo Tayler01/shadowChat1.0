@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "releaseId": "streamlined-store-privacy-followup-20261028",
+  "projectRef": "shsqqouecvdoifzufkqm",
+  "libraryId": "666331",
+  "hashFormat": "sha256-lf",
+  "predecessor": {
+    "planPath": "supabase/backend-privacy-release.json",
+    "planSha256": "b6bafa03390dfc2840efcc2eefe71e9999c5daeffae1e32fa80b37746916a774",
+    "sourceCommit": "bea0e0bb903232847de1e2c0506648a82ec2b0aa",
+    "activationVersion": "20261023224455"
+  },
+  "migrations": [
+    {
+      "path": "supabase/migrations/20261028120650_member_content_filter.sql",
+      "sha256": "7405bd9ab29aed39dcacd174d53a2e043bca6eeff49080e89e7604cbeb65f7f0"
+    },
+    {
+      "path": "supabase/migrations/20261028121930_notification_private_media_authorization.sql",
+      "sha256": "b156d49dc7d72adf090425bce33a108f367c9142a06a4f8bebdf1bcb36b89bed"
+    }
+  ],
+  "compatibleHandlers": [
+    {
+      "name": "shadow-pin-video",
+      "verifyJwt": false
+    },
+    {
+      "name": "send-push",
+      "verifyJwt": false
+    },
+    {
+      "name": "deliver-notifications-v2",
+      "verifyJwt": false
+    }
+  ],
+  "compatibleNetlifyFunctions": [
+    "shadow-pin-media"
+  ],
+  "stageOrder": [
+    "compatible-handlers-and-clients",
+    "forward-schema",
+    "runtime-acceptance",
+    "separate-reviewed-private-media-cutover"
+  ],
+  "prerequisites": {
+    "compatibleHandlersAndBothWebClientsBeforeSchema": true,
+    "privateNotificationMediaEnabledBeforeSchema": false,
+    "globalStorageBunnyRealtimeSettingsChangedBySchemaStage": false,
+    "nativeSignedMediaRequiresBuildAfter19": true
+  },
+  "executionReceiptMustBind": [
+    "exact clean main source commit and complete backend tree digest",
+    "predecessor activation receipt hash and unchanged 264-migration history",
+    "both web deploy IDs and compatibility evidence",
+    "current function versions and verify_jwt inventory",
+    "each forward migration statement hash and runtime acceptance",
+    "full-app publisher hold and unchanged global privacy flags before cutover"
+  ]
+}

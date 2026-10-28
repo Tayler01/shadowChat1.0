@@ -1,3 +1,6 @@
+import { prepareMessageMedia } from '../lib/privateMediaCopies';
+import { PRIVATE_MEDIA_ENABLED } from '../lib/privateMediaUrls';
+import { isContentPolicyRejection, normalizeContentPolicyError } from '../lib/contentPolicy'
 import { beginChatTiming } from '../lib/chatPerformance';
 /* eslint-disable react-refresh/only-export-components */
 import React, {
@@ -717,6 +720,7 @@ export function useConversationMessages(conversationId: string | null) {
       }
 
       if (result.error && payload.client_message_id && isClientMessageIdSchemaError(result.error)) {
+        if (PRIVATE_MEDIA_ENABLED) throw new Error('This server is missing message retry protection. Please try again after it is updated.');
         const {
           client_message_id: _clientMessageId,
           thumbnail_url: _thumbnailUrl,
@@ -1157,6 +1161,7 @@ export function useConversationMessages(conversationId: string | null) {
       const sendScopeEpoch = sendScopeEpochRef.current.version;
       if (pendingIntentsRef.current.has(intentKey)) return null;
       const createdAt = options.createdAt || new Date().toISOString();
+      let preparedMedia = { content: trimmedContent, fileUrl, thumbnailUrl };
       const optimisticMessage = {
         id: clientMessageId,
         client_message_id: clientMessageId,
@@ -1196,19 +1201,38 @@ export function useConversationMessages(conversationId: string | null) {
               throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
             }
 
+            if (activeUserIdRef.current !== user.id) throw new Error('The account changed while sending this message.');
+            let existing: DMMessage | null = null;
+            if (PRIVATE_MEDIA_ENABLED) {
+              const client = await getWorkingClient();
+              const lookup = await client.from('dm_messages').select(DM_MESSAGE_WITH_SENDER_SELECT)
+                .eq('sender_id', user.id).eq('conversation_id', conversationId)
+                .eq('client_message_id', clientMessageId).maybeSingle();
+              if (lookup.error) throw lookup.error;
+              existing = lookup.data as unknown as DMMessage | null;
+            }
+            const media = !existing && PRIVATE_MEDIA_ENABLED
+              ? await prepareMessageMedia({ senderId: user.id, clientMessageId, messageType, content: trimmedContent, fileUrl, thumbnailUrl })
+              : { content: trimmedContent, fileUrl, thumbnailUrl };
+            if (activeUserIdRef.current !== user.id) throw new Error('The account changed while preparing this attachment.');
+            preparedMedia = { content: media.content, fileUrl: media.fileUrl, thumbnailUrl: media.thumbnailUrl };
+            if (PRIVATE_MEDIA_ENABLED) upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
+              id: clientMessageId, clientMessageId, senderId: user.id, messageType, replyTo,
+              ...media, createdAt, failedAt: createdAt,
+            }, { requirePersistence: true });
             const insertPayload = {
               conversation_id: conversationId,
               sender_id: user.id,
               client_message_id: clientMessageId,
-              content: messageType === 'audio' ? '' : trimmedContent,
+              content: messageType === 'audio' ? '' : media.content,
               message_type: messageType,
-              file_url: fileUrl,
-              ...(thumbnailUrl ? { thumbnail_url: thumbnailUrl, media_processed_at: new Date().toISOString() } : {}),
+              file_url: media.fileUrl,
+              ...(media.thumbnailUrl ? { thumbnail_url: media.thumbnailUrl, media_processed_at: new Date().toISOString() } : {}),
               ...(replyTo ? { reply_to: replyTo } : {}),
-              ...(messageType === 'audio' ? { audio_url: trimmedContent } : {}),
+              ...(messageType === 'audio' ? { audio_url: media.content } : {}),
             };
 
-            const { data, error } = await insertConversationMessage(insertPayload);
+            const { data, error } = existing ? { data: existing, error: null } : await insertConversationMessage(insertPayload);
 
             let finalData = data as unknown;
             let finalError = error as any;
@@ -1232,7 +1256,7 @@ export function useConversationMessages(conversationId: string | null) {
             }
 
             if (finalData) {
-              removeLocalOutboxEntry(getDMOutboxScope(conversationId), clientMessageId);
+              removeLocalOutboxEntry(getDMOutboxScope(conversationId), clientMessageId, user.id);
               finishSendTiming();
               const message = {
                 ...(finalData as DMMessage),
@@ -1256,23 +1280,22 @@ export function useConversationMessages(conversationId: string | null) {
           'Message send timed out while reconnecting. Please try again.'
         );
       } catch (error) {
+        const sendError = normalizeContentPolicyError(error);
         upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
           id: clientMessageId,
           clientMessageId,
           senderId: user.id,
-          content: trimmedContent,
+          ...preparedMedia,
           messageType,
-          fileUrl,
-          thumbnailUrl,
           replyTo,
           createdAt,
           failedAt: new Date().toISOString(),
         });
         if (activeConversationIdRef.current === conversationId && sendScopeEpochRef.current.version === sendScopeEpoch) setMessages(prev => markMessageSendFailed(prev, clientMessageId));
-        await runRealtimeRecovery('send-error').catch(() => undefined);
-        if (error instanceof Error) {
-          (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
-          throw error;
+        if (!isContentPolicyRejection(sendError)) await runRealtimeRecovery('send-error').catch(() => undefined);
+        if (sendError instanceof Error) {
+          (sendError as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
+          throw sendError;
         }
         const wrappedError = new Error('Failed to send message') as Error & { optimisticMessageId?: string };
         wrappedError.optimisticMessageId = clientMessageId;
@@ -1292,22 +1315,25 @@ export function useConversationMessages(conversationId: string | null) {
     if (!failedMessage) return null;
 
     const clientMessageId = failedMessage.client_message_id || failedMessage.id;
-    const retryContent = failedMessage.message_type === 'audio'
+    const preparedEntry = PRIVATE_MEDIA_ENABLED && conversationId
+      ? loadLocalOutboxEntries(getDMOutboxScope(conversationId)).find(entry => entry.senderId === activeUserIdRef.current && entry.clientMessageId === clientMessageId)
+      : undefined;
+    const retryContent = preparedEntry ? preparedEntry.content : failedMessage.message_type === 'audio'
       ? failedMessage.audio_url || failedMessage.content
       : failedMessage.content;
 
     return sendMessage(
       retryContent,
       failedMessage.message_type,
-      failedMessage.file_url,
+      preparedEntry ? preparedEntry.fileUrl : failedMessage.file_url,
       failedMessage.reply_to ?? undefined,
-      failedMessage.thumbnail_url,
+      preparedEntry ? preparedEntry.thumbnailUrl : failedMessage.thumbnail_url,
       {
         clientMessageId,
         createdAt: new Date().toISOString(),
       }
     );
-  }, [sendMessage]);
+  }, [sendMessage, conversationId]);
 
   const discardFailedMessage = useCallback((messageId: string) => {
     if (!conversationId) return;
@@ -1331,7 +1357,7 @@ export function useConversationMessages(conversationId: string | null) {
       .eq('conversation_id', conversationId)
       .eq('sender_id', user.id);
 
-    if (error) throw error;
+    if (error) throw normalizeContentPolicyError(error);
 
     setMessages(prev => prev.map(message => (
       message.id === messageId

@@ -1,3 +1,5 @@
+import { PrivateMediaAudio } from '../ui/PrivateMediaPlayer'
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
 import React, { lazy, Suspense, useState } from 'react'
 import { FailedMessage } from '../../hooks/useFailedMessages'
 import { Button } from '../ui/Button'
@@ -17,7 +19,7 @@ export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
       <div className="bg-red-100 dark:bg-red-900/40 rounded-xl px-3 py-2">
         {(message.type === 'text' || message.type === 'command') && <div>{message.content}</div>}
         {message.type === 'image' && message.dataUrl && (
-          <img
+          <PrivateMediaImage
             src={message.dataUrl}
             alt={message.fileName}
             width={320}
@@ -40,7 +42,7 @@ export const FailedMessageItem: React.FC<Props> = ({ message, onResend }) => {
           <VideoAttachment url={message.dataUrl} meta={message.content} />
         )}
         {message.type === 'audio' && message.dataUrl && (
-          <audio controls src={message.dataUrl} className="max-w-xs" />
+          <PrivateMediaAudio controls src={message.dataUrl} className="max-w-xs" />
         )}
         <div className="text-xs text-red-500 mt-1">Failed to send</div>
         <Button size="sm" variant="ghost" onClick={() => onResend(message)} className="mt-1">

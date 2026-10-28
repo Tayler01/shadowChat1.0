@@ -14,7 +14,7 @@ import {
 } from '../_shared/safe-fetch.ts'
 import { getBunnyStreamReadyState } from '../_shared/bunny-stream-status.ts'
 import { buildBunnyPosterPatch, FALLBACK_VIDEO_POSTER_URL, needsBunnyPosterRepair } from '../_shared/bunny-stream-poster.ts'
-import { authorizeBunnyMediaSource, type BunnyVisibleReference } from '../_shared/bunny-media-access.ts'
+import { authorizeBunnyMediaSource, ownedBunnyDraftReferences, type BunnyVisibleReference } from '../_shared/bunny-media-access.ts'
 import { removeClaimedBunnyMedia } from '../_shared/bunny-media-removal.ts'
 import { createRegisteredBunnyUpload } from '../_shared/bunny-upload-workflow.ts'
 
@@ -1428,6 +1428,23 @@ const handleResolvePrivateMedia = async (req: Request, body: VideoPayload) => {
         if (row.created_by) references.push({ id: row.id, ownerId: row.created_by, sourceType: 'shado_tv_asset', assetId,
           mediaUrls: [row.embed_url, row.trailer_asset_url, row.thumbnail_asset_url, row.poster_asset_url] })
       }
+
+      if (!references.length) {
+        // Unpublished Creator Studio posters/previews are private to the owning
+        // active draft. Read both sides through caller RLS, never the admin client.
+        const { data: assets, error: assetsError } = await actor.from('shadow_pin_draft_assets')
+          .select('id,draft_id,creator_id,provider,asset_kind,provider_asset_id,state,deleted_at,final_image_url,final_thumbnail_url,final_medium_url,video_preview_url,video_playback_url,video_hls_url,video_embed_url')
+          .eq('creator_id', auth.userId).eq('provider', 'bunny_stream').eq('provider_asset_id', assetId)
+          .eq('asset_kind', 'video').is('deleted_at', null).in('state', ['uploading', 'processing', 'ready', 'publish_ready']).limit(32)
+        if (assetsError) throw assetsError
+        if (assets?.length) {
+          const { data: drafts, error: draftsError } = await actor.from('shadow_pin_creator_drafts')
+            .select('id,creator_id,active_asset_id,state').eq('creator_id', auth.userId)
+            .in('id', [...new Set(assets.map(asset => asset.draft_id))]).not('state', 'in', '(published,abandoned)')
+          if (draftsError) throw draftsError
+          references.push(...ownedBunnyDraftReferences(auth.userId, assetId, assets, drafts ?? []))
+        }
+      }
       return references
     },
     trustedReferences: async reference => {
@@ -2403,6 +2420,10 @@ serve(async (req): Promise<Response> => {
         return badRequest('Unsupported Shadow Pin video action.')
     }
   } catch (error) {
+    const policyError = error as { code?: unknown; message?: unknown } | null
+    if (policyError?.code === 'PT422' && policyError.message === 'CONTENT_POLICY_REJECTED') {
+      return json({ code: 'PT422', error: 'CONTENT_POLICY_REJECTED' }, 422)
+    }
     if (error instanceof EdgeRateLimitError) {
       return new Response(JSON.stringify({ error: error.message }), {
         status: 429,

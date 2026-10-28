@@ -1,5 +1,42 @@
 # Streamlined security audit — October 22–23, 2026
 
+## October 28 verified checkpoint
+
+Production activation completed from `bea0e0bb` with 264 migrations. Safe profile
+fingerprints match; private identity columns remain denied. Actual automatic
+evidence capture passed four checks, and modern/legacy deletion passed five,
+including stale-JWT RPC/DM/upload denial. Exact fixture cleanup is verified.
+Full-site WebKit (five checks) and Chromium (four checks) compatibility passed.
+Worker recovery passed a manual dispatch and a scheduled-only fixture. A
+read-only supplemental verifier corrected the pg_net transaction-timestamp
+assumption, confirmed exact fixture cleanup and bounded cron/response
+correlation, and preserved the original failed receipt. It does not claim an
+exact cron/request-ID join.
+
+The combined local follow-up passes both web builds and typechecks, lint,
+362 Jest suites (3,355 passed, 16 existing TODOs), 25 Bunny authorization tests,
+20 private-notification tests and 10 phase/ACL tests. The full Node run's one
+historical phase-enumeration failure is resolved by an explicit two-migration
+follow-up manifest; the original phase plan and catalog parity remain pinned.
+An isolated actual PostgreSQL database applied all 266 migrations. The expanded
+security contract, database lint/advisors, 32 new role checks and original
+full-app role regressions passed; synthetic transactions rolled back. Deployed
+follow-up runtime proof remains pending. Six additional deterministic join-gap
+cases pass within the 43-test message-hook suite after the full Jest run.
+
+Native build 20 preparation includes a narrow, integrity-tested private
+deepmerge adaptation for GHSA-gcqx-w48m-w2h4. The raw native audit still reports
+the previously mitigated node-forge advisory; the release verifier checks its
+exact installed backport and exploit regressions. No advisory allowlist was
+expanded. Native lint/typecheck, 25 tests and the release audit pass. This is
+local preparation, not a signed build 20 or physical-device result.
+
+The separate site and TestFlight build 19 are available. Global private Storage,
+Bunny and Realtime cutover remains held. See
+[store readiness](STREAMLINED_STORE_READINESS.md) and the bounded content-filter
+limits in [MEMBER_CONTENT_FILTER.md](MEMBER_CONTENT_FILTER.md). Earlier dated
+sections below describe historical evidence, not the current rollout status.
+
 This pass covers the shared web code used by both editions, with targeted fixes,
 local regression tests and separately coordinated acceptance on a disposable
 no-data Supabase branch. Isolated migrations, deployed functions and synthetic

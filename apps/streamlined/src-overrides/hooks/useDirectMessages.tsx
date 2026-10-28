@@ -1,3 +1,4 @@
+import { isContentPolicyRejection, normalizeContentPolicyError } from '../../../../src/lib/contentPolicy'
 import { prepareMessageMedia } from '../../../../src/lib/privateMediaCopies';
 import { PRIVATE_MEDIA_ENABLED } from '../../../../src/lib/privateMediaUrls';
 import { beginChatTiming } from '../../../../src/lib/chatPerformance';
@@ -1260,6 +1261,7 @@ export function useConversationMessages(conversationId: string | null) {
           'Message send timed out while reconnecting. Please try again.'
         );
       } catch (error) {
+        const sendError = normalizeContentPolicyError(error);
         upsertLocalOutboxEntry(getDMOutboxScope(conversationId), {
           id: clientMessageId,
           clientMessageId,
@@ -1271,10 +1273,10 @@ export function useConversationMessages(conversationId: string | null) {
           failedAt: new Date().toISOString(),
         });
         if (activeConversationIdRef.current === conversationId && sendScopeEpochRef.current.version === sendScopeEpoch) setMessages(prev => markMessageSendFailed(prev, clientMessageId));
-        await runRealtimeRecovery('send-error').catch(() => undefined);
-        if (error instanceof Error) {
-          (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
-          throw error;
+        if (!isContentPolicyRejection(sendError)) await runRealtimeRecovery('send-error').catch(() => undefined);
+        if (sendError instanceof Error) {
+          (sendError as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
+          throw sendError;
         }
         const wrappedError = new Error('Failed to send message') as Error & { optimisticMessageId?: string };
         wrappedError.optimisticMessageId = clientMessageId;
@@ -1336,7 +1338,7 @@ export function useConversationMessages(conversationId: string | null) {
       .eq('conversation_id', conversationId)
       .eq('sender_id', user.id);
 
-    if (error) throw error;
+    if (error) throw normalizeContentPolicyError(error);
 
     setMessages(prev => prev.map(message => (
       message.id === messageId

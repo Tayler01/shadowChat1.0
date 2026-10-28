@@ -1,3 +1,4 @@
+import { PrivateMediaImage } from '../../../components/ui/PrivateMediaImage'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ExternalLink, Lock, Newspaper, Play, Radio, Users, Video } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -161,7 +162,7 @@ function BackButton({ onClick, label = 'Back' }: { onClick: () => void; label?: 
 function ShadoTvHeader({ onBack, onExit, title }: { onBack?: () => void; onExit: () => void; title?: string }) {
   return (
     <header className="relative z-20 flex h-[calc(4rem+env(safe-area-inset-top))] shrink-0 items-end border-b border-[#9a6a43]/30 bg-[#070806]/92 px-3 pb-2 pt-[env(safe-area-inset-top)] shadow-[0_12px_34px_rgba(0,0,0,0.55)]">
-      <img
+      <PrivateMediaImage
         src={SHADO_TV_ASSETS.crimpShrimp.sectionDivider}
         alt=""
         className="absolute inset-0 h-full w-full object-cover opacity-[0.82]"
@@ -204,7 +205,7 @@ function StatusCard({ episode }: { episode?: ShadoTvVideo | null }) {
 
   return (
     <div className="relative isolate overflow-visible px-4 py-2 text-center">
-      <img
+      <PrivateMediaImage
         src={SHADO_TV_ASSETS.crimpShrimp.countdownParchment}
         alt=""
         className="pointer-events-none absolute -inset-x-3 -inset-y-2 z-0 h-[calc(100%+1rem)] w-[calc(100%+1.5rem)] object-fill"
@@ -254,7 +255,7 @@ function EpisodeCard({
       aria-label={`Open ${video.title}`}
       className="group relative w-full overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-black/24 p-2.5 text-left shadow-[0_16px_34px_rgba(0,0,0,0.34)] transition hover:border-[#9a6a43]/55 hover:bg-black/30 focus:outline-none focus:ring-2 focus:ring-[#9a6a43]/55"
     >
-      <img
+      <PrivateMediaImage
         src={SHADO_TV_ASSETS.crimpShrimp.featuredEpisodeBackdrop}
         alt=""
         aria-hidden="true"
@@ -270,7 +271,7 @@ function EpisodeCard({
       </div>
       <div className="relative z-10 grid min-h-[9.4rem] grid-cols-[5.6rem_1fr] gap-3 min-[420px]:grid-cols-[6.5rem_1fr]">
         <div className="relative min-h-[8.3rem] overflow-visible">
-          <img
+          <PrivateMediaImage
             src={video.posterAsset}
             alt=""
             className="absolute inset-0 h-full w-full object-contain object-center brightness-[1.16] contrast-[1.08] saturate-[1.08] drop-shadow-[0_16px_22px_rgba(0,0,0,0.58)]"
@@ -325,7 +326,7 @@ function ModuleCard({
       onClick={onOpen}
       className="relative aspect-[0.82/1] min-w-0 overflow-hidden rounded-lg border border-[#9a6a43]/30 bg-[#0b0c09] p-2.5 text-left shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition hover:-translate-y-0.5 hover:border-[#9a6a43]/55 focus:outline-none focus:ring-2 focus:ring-[#9a6a43]/55"
     >
-      <img src={asset} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
+      <PrivateMediaImage src={asset} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" />
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.06),rgba(0,0,0,0.2)_38%,rgba(0,0,0,0.72))]" />
       <div className="relative flex h-full flex-col justify-between pb-2">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#9a6a43]/30 bg-black/38 text-[#d1a15b]">
@@ -361,7 +362,7 @@ function HomeView({
   return (
     <main className="mx-auto min-h-0 w-full max-w-[30rem] flex-1 overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)_+_0.75rem)] pt-3">
       <section className="relative h-[19.75rem] overflow-visible rounded-lg border border-[#9a6a43]/30 bg-black/24 shadow-[0_16px_36px_rgba(0,0,0,0.36)] min-[430px]:h-[21rem]">
-        <img
+        <PrivateMediaImage
           src={SHADO_TV_ASSETS.crimpShrimp.seriesTitleHero}
           alt=""
           className="absolute inset-0 h-full w-full object-cover drop-shadow-[0_28px_54px_rgba(0,0,0,0.62)]"
@@ -464,7 +465,7 @@ function EpisodeView({
             />
           ) : (
             <>
-              <img
+              <PrivateMediaImage
                 src={status === 'coming-soon' ? video.posterAsset : video.thumbnailAsset}
                 alt=""
                 className="h-full w-full object-cover object-top opacity-[0.86]"
@@ -537,7 +538,7 @@ function EpisodeView({
               <ShadoTvStreamFrame src={video.trailerAssetUrl} title={`${video.title} trailer`} />
             ) : (
               <>
-                <img src={SHADO_TV_ASSETS.crimpShrimp.statusComingSoon} alt="" className="h-full w-full object-cover opacity-90" loading="lazy" decoding="async" />
+                <PrivateMediaImage src={SHADO_TV_ASSETS.crimpShrimp.statusComingSoon} alt="" className="h-full w-full object-cover opacity-90" loading="lazy" decoding="async" />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/34 p-5 text-center">
                   <p className="text-sm font-black uppercase tracking-[0.16em] text-[#f1dbc0]">{getTrailerLabel(video)}</p>
                 </div>
@@ -787,7 +788,7 @@ export function ShadoTvScreen({ onExit, initialVideoId, onVideoRoute }: ShadoTvS
       animate={{ opacity: 1 }}
       className="relative flex h-full min-h-0 flex-col overflow-hidden bg-[#050604] text-white"
     >
-      <img
+      <PrivateMediaImage
         src={SHADO_TV_ASSETS.crimpShrimp.seriesHubHero}
         alt=""
         className="absolute inset-0 h-full w-full object-cover opacity-[0.18]"

@@ -1,3 +1,4 @@
+import { PrivateMediaImage } from './PrivateMediaImage'
 import React, { useEffect, useState } from 'react';
 import { Ghost, LockKeyhole } from 'lucide-react';
 import { getPresenceOption } from '../../lib/presence';
@@ -98,7 +99,7 @@ export const Avatar = React.memo(function Avatar({
         style={color ? { backgroundColor: color } : undefined}
       >
         {src && !imageError ? (
-          <img
+          <PrivateMediaImage
             src={optimizedSrc}
             alt={alt}
             width={pixelSize}

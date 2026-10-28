@@ -1,3 +1,4 @@
+import { VITE_PRIVATE_REALTIME_ENABLED } from './env'
 import type { RealtimeChannel, RealtimeChannelOptions } from '@supabase/supabase-js'
 
 export const DATABASE_REALTIME_PREFIX = 'shadowchat:db:'
@@ -25,3 +26,5 @@ export const configurePrivateRealtimeChannels = <T extends ChannelClient>(client
   configuredClients.add(client)
   return client
 }
+
+export const PRIVATE_REALTIME_ENABLED = VITE_PRIVATE_REALTIME_ENABLED === 'true'

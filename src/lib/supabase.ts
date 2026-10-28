@@ -3,7 +3,9 @@ import { invokeEdgeFunctionWithRetry } from './edgeFunctionRetry'
 import {
   VITE_SUPABASE_ANON_KEY,
   VITE_SUPABASE_URL,
+  VITE_PRIVATE_REALTIME_ENABLED,
 } from './env'
+import { configurePrivateRealtimeChannels } from './privateRealtimeChannels'
 import { optimizeImageFile } from './imageOptimization'
 import { createStoredImageAsset, type MediaThumbnailProfile } from './mediaAssets'
 import { getResumableStorageEndpoint } from './resumableStorageEndpoint'
@@ -80,6 +82,7 @@ export const purgeOldAuthKeys = (activeKey?: string) => {
 }
 
 const attachRealtimeHeartbeat = (client: AnySupabaseClient) => {
+  configurePrivateRealtimeChannels(client, VITE_PRIVATE_REALTIME_ENABLED === 'true')
   try {
     client.realtime.onHeartbeat?.((status: string) => {
       if (
@@ -185,7 +188,7 @@ if (!globalRef.__supabaseClient) {
   }
 }
 
-supabase = globalRef.__supabaseClient!
+supabase = configurePrivateRealtimeChannels(globalRef.__supabaseClient!, VITE_PRIVATE_REALTIME_ENABLED === 'true')
 
 export const getStoredRefreshToken = (): string | null => {
   if (typeof localStorage === 'undefined') return null

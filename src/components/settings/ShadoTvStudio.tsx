@@ -1,3 +1,4 @@
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { BarChart3, Captions, Clapperboard, Eye, EyeOff, Film, Image, Plus, RotateCcw, Save, Trash2, Upload, Video } from 'lucide-react'
 import { Button } from '../ui/Button'
@@ -528,7 +529,7 @@ export function ShadoTvStudio() {
                         : 'border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--border-glow)]'
                     }`}
                   >
-                    <img src={video.posterAsset} alt="" className="h-16 w-12 rounded-[var(--radius-sm)] object-cover" loading="lazy" decoding="async" />
+                    <PrivateMediaImage src={video.posterAsset} alt="" className="h-16 w-12 rounded-[var(--radius-sm)] object-cover" loading="lazy" decoding="async" />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold text-[var(--text-primary)]">{video.title}</span>
                       <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">
@@ -549,7 +550,7 @@ export function ShadoTvStudio() {
             ) : (
               <div className="space-y-4">
                 <div className="grid gap-3 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.03)] p-4 lg:grid-cols-[10rem_1fr]">
-                  <img src={selectedVideo.posterAsset} alt="" className="h-56 w-full rounded-[var(--radius-md)] object-cover lg:h-full" loading="lazy" decoding="async" />
+                  <PrivateMediaImage src={selectedVideo.posterAsset} alt="" className="h-56 w-full rounded-[var(--radius-md)] object-cover lg:h-full" loading="lazy" decoding="async" />
                   <div className="grid gap-3">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label>

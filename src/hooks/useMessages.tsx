@@ -1,3 +1,7 @@
+import { PRIVATE_REALTIME_ENABLED } from '../lib/privateRealtimeChannels';
+import { prepareMessageMedia } from '../lib/privateMediaCopies';
+import { PRIVATE_MEDIA_ENABLED } from '../lib/privateMediaUrls';
+import { isContentPolicyRejection, normalizeContentPolicyError } from '../lib/contentPolicy'
 import { beginChatTiming } from '../lib/chatPerformance';
 /* eslint-disable react-refresh/only-export-components */
 import React, {
@@ -615,6 +619,7 @@ export const insertMessage = async (messageData: {
   }
 
   if (result.error && messageData.client_message_id && isClientMessageIdSchemaError(result.error)) {
+    if (PRIVATE_MEDIA_ENABLED) throw new Error('This server is missing message retry protection. Please try again after it is updated.');
     const {
       client_message_id: _clientMessageId,
       thumbnail_url: _thumbnailUrl,
@@ -1265,7 +1270,7 @@ function useProvideMessages(): MessagesContextValue {
       }
 
       // Supabase reuses channels by topic, so each resubscribe gets a fresh topic.
-      const newChannel = currentClient.channel(createRealtimeChannelName(`public:messages:${user.id}`), {
+      const newChannel = currentClient.channel(createRealtimeChannelName(`public:messages:${user.id}`), PRIVATE_REALTIME_ENABLED ? undefined : {
           config: {
             broadcast: { self: true },
             presence: { key: user.id }
@@ -1300,6 +1305,7 @@ function useProvideMessages(): MessagesContextValue {
           }
         })
         .on('broadcast', { event: 'new_message' }, (payload: any) => {
+          if (PRIVATE_REALTIME_ENABLED) return;
           const newMessage = payload.payload as Message;
 
           addNewMessage(newMessage as Message)
@@ -1392,6 +1398,14 @@ function useProvideMessages(): MessagesContextValue {
             return;
           }
 
+          if (status === 'SUBSCRIBED') {
+            // The initial snapshot can precede the socket join. Reconcile once
+            // joined so inserts in that gap do not wait for a visibility change.
+            // Existing recovery preserves a historical/thread window in place.
+            await refreshVisibleMessages().catch(() => undefined);
+            return;
+          }
+
           if (err) {
             // Handle specific binding mismatch error
             if (err.message && err.message.includes('mismatch between server and client bindings for postgres changes')) {
@@ -1458,7 +1472,7 @@ function useProvideMessages(): MessagesContextValue {
       void subscriptionManager?.stop();
       channelRef.current = null;
     };
-  }, [addNewMessage, hydrateMessage, playReaction, refreshThreadSummaries, user]);
+  }, [addNewMessage, hydrateMessage, playReaction, refreshThreadSummaries, refreshVisibleMessages, user]);
 
   const sendMessage = useCallback(async (
     content: string,
@@ -1479,6 +1493,7 @@ function useProvideMessages(): MessagesContextValue {
     const intentKey = `${user.id}:${clientMessageId}`;
     if (pendingIntentsRef.current.has(intentKey)) return null;
     const createdAt = options.createdAt || new Date().toISOString();
+    let preparedMedia = { content: content.trim(), fileUrl, thumbnailUrl };
     const optimisticPayload = prepareMessageData(
       user.id,
       content,
@@ -1532,18 +1547,28 @@ function useProvideMessages(): MessagesContextValue {
         throw new Error('Authentication session is invalid or expired. Please refresh the page and try again.');
       }
 
-      const messageData = prepareMessageData(
-        user.id,
-        content,
-        messageType,
-        fileUrl,
-        replyTo,
-        clientMessageId,
-        thumbnailUrl
-      );
+      if (activeUserIdRef.current !== user.id) throw new Error('The account changed while sending this message.');
+      let existing: Message | null = null;
+      if (PRIVATE_MEDIA_ENABLED) {
+        const client = await getWorkingClient();
+        const lookup = await client.from('messages').select(MESSAGE_WITH_USER_SELECT)
+          .eq('user_id', user.id).eq('client_message_id', clientMessageId).maybeSingle();
+        if (lookup.error) throw lookup.error;
+        existing = lookup.data as unknown as Message | null;
+      }
+      const media = !existing && PRIVATE_MEDIA_ENABLED
+        ? await prepareMessageMedia({ senderId: user.id, clientMessageId, messageType, content, fileUrl, thumbnailUrl })
+        : { content, fileUrl, thumbnailUrl };
+      if (activeUserIdRef.current !== user.id) throw new Error('The account changed while preparing this attachment.');
+      preparedMedia = { content: media.content, fileUrl: media.fileUrl, thumbnailUrl: media.thumbnailUrl };
+      if (PRIVATE_MEDIA_ENABLED) upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
+        id: clientMessageId, clientMessageId, senderId: user.id, messageType, replyTo,
+        ...media, createdAt, failedAt: createdAt,
+      }, { requirePersistence: true });
+      const messageData = prepareMessageData(user.id, media.content, messageType, media.fileUrl, replyTo, clientMessageId, media.thumbnailUrl);
 
       const attemptSend = async () => {
-        let { data, error } = await insertMessage(messageData);
+        let { data, error } = existing ? { data: existing, error: null } : await insertMessage(messageData);
 
         if (error && (error.status === 401 || /jwt|token|expired/i.test(error.message))) {
           const retry = await refreshSessionAndRetry(messageData);
@@ -1556,7 +1581,7 @@ function useProvideMessages(): MessagesContextValue {
         }
 
         if (data) {
-          removeLocalOutboxEntry(GROUP_OUTBOX_SCOPE, clientMessageId);
+          removeLocalOutboxEntry(GROUP_OUTBOX_SCOPE, clientMessageId, user.id);
           inserted = {
             ...(data as unknown as Message),
             optimistic: false,
@@ -1571,13 +1596,14 @@ function useProvideMessages(): MessagesContextValue {
             });
           }
 
-          if (channelRef.current?.state === 'joined') {
+          if (!PRIVATE_REALTIME_ENABLED && channelRef.current?.state === 'joined') {
             channelRef.current.send({
               type: 'broadcast',
               event: 'new_message',
               payload: data,
             });
           }
+
         }
       };
 
@@ -1587,14 +1613,13 @@ function useProvideMessages(): MessagesContextValue {
     try {
       await executeSend();
     } catch (error) {
+      const sendError = normalizeContentPolicyError(error);
       upsertLocalOutboxEntry(GROUP_OUTBOX_SCOPE, {
         id: clientMessageId,
         clientMessageId,
         senderId: user.id,
-        content: content.trim(),
+        ...preparedMedia,
         messageType,
-        fileUrl,
-        thumbnailUrl,
         replyTo,
         createdAt,
         failedAt: new Date().toISOString(),
@@ -1613,10 +1638,10 @@ function useProvideMessages(): MessagesContextValue {
           },
         }))
       }
-      void runRealtimeRecovery('send-error').catch(() => undefined);
-      if (error instanceof Error) {
-        (error as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
-        throw error;
+      if (!isContentPolicyRejection(sendError)) void runRealtimeRecovery('send-error').catch(() => undefined);
+      if (sendError instanceof Error) {
+        (sendError as Error & { optimisticMessageId?: string }).optimisticMessageId = clientMessageId;
+        throw sendError;
       }
       const wrappedError = new Error('Failed to send message') as Error & { optimisticMessageId?: string };
       wrappedError.optimisticMessageId = clientMessageId;
@@ -1635,14 +1660,14 @@ function useProvideMessages(): MessagesContextValue {
       message.delivery_status === 'failed'
     );
     const outboxEntry = loadLocalOutboxEntries(GROUP_OUTBOX_SCOPE).find(entry => (
-      entry.id === messageId || entry.clientMessageId === messageId
+      entry.senderId === activeUserIdRef.current && (entry.id === messageId || entry.clientMessageId === messageId)
     ))
 
     if (!failedMessage && !outboxEntry) return null;
 
     const clientMessageId = failedMessage?.client_message_id || failedMessage?.id || outboxEntry!.clientMessageId;
     const messageType = failedMessage?.message_type ?? outboxEntry!.messageType
-    const retryContent = failedMessage
+    const retryContent = PRIVATE_MEDIA_ENABLED && outboxEntry ? outboxEntry.content : failedMessage
       ? failedMessage.message_type === 'audio'
         ? failedMessage.audio_url || failedMessage.content
         : failedMessage.content
@@ -1651,9 +1676,9 @@ function useProvideMessages(): MessagesContextValue {
     return sendMessage(
       retryContent,
       messageType,
-      failedMessage?.file_url ?? outboxEntry?.fileUrl,
+      PRIVATE_MEDIA_ENABLED && outboxEntry ? outboxEntry.fileUrl : failedMessage?.file_url ?? outboxEntry?.fileUrl,
       failedMessage?.reply_to ?? outboxEntry?.replyTo ?? undefined,
-      failedMessage?.thumbnail_url ?? outboxEntry?.thumbnailUrl,
+      PRIVATE_MEDIA_ENABLED && outboxEntry ? outboxEntry.thumbnailUrl : failedMessage?.thumbnail_url ?? outboxEntry?.thumbnailUrl,
       {
         clientMessageId,
         createdAt: new Date().toISOString(),
@@ -1690,7 +1715,7 @@ function useProvideMessages(): MessagesContextValue {
         .eq('user_id', user.id);
 
       if (error) {
-        throw error;
+        throw normalizeContentPolicyError(error);
       }
 
       // Optimistically update local state
@@ -1701,7 +1726,7 @@ function useProvideMessages(): MessagesContextValue {
       );
 
     } catch (error) {
-      throw error;
+      throw normalizeContentPolicyError(error);
     }
   }, [user]);
 

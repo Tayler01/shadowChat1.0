@@ -1,4 +1,6 @@
+import { PrivateMediaImage } from '../../../components/ui/PrivateMediaImage'
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+
 import { createPortal } from 'react-dom'
 import { ChevronDown, Copy, Edit3, Flag, Loader2, MessageSquare, Paperclip, Plus, Reply, Send, Trash2, X } from 'lucide-react'
 import toast from 'react-hot-toast'
@@ -1009,7 +1011,7 @@ function ShadowPinCommentsDialogScope({ image, open, onClose, onCountChange, ini
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            <img
+            <PrivateMediaImage
               src={pinPreviewUrl}
               alt=""
               className="h-12 w-12 shrink-0 rounded-[var(--radius-md)] border border-[var(--border-subtle)] object-cover"

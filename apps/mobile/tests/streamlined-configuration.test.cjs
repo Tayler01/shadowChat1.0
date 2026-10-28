@@ -35,7 +35,7 @@ test('streamlined build uses an isolated HTTPS origin and advances only its buil
     const config = configure({ config: {} });
     assert.equal(config.extra.webAppUrl, origin);
     assert.equal(config.extra.appEdition, 'streamlined');
-    assert.equal(config.ios.buildNumber, '19');
+    assert.equal(config.ios.buildNumber, '20');
     assert.equal(config.ios.bundleIdentifier, expo.ios.bundleIdentifier);
     assert.deepEqual(config.plugins.slice(0, -1), expo.plugins);
     assert.equal(config.plugins.at(-1), './plugins/with-streamlined-store-permissions');
@@ -51,6 +51,22 @@ test('streamlined build fails closed for missing or unsafe origin and reused bui
   }
   withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '17' }, () => assert.throws(() => configure({ config: {} })));
   withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '18' }, () => assert.throws(() => configure({ config: {} })));
+  withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '19' }, () => assert.throws(() => configure({ config: {} })));
+});
+
+test('the store build profile resolves the reviewed streamlined build and origin', () => {
+  const { build } = require('../eas.json');
+  assert.equal(build.streamlined.distribution, 'store');
+  assert.equal(build.streamlined.environment, 'production');
+  withEnv(build.streamlined.env, () => {
+    const config = configure({ config: {} });
+    assert.equal(config.ios.buildNumber, '20');
+    assert.equal(config.extra.appEdition, 'streamlined');
+    assert.equal(config.extra.webAppUrl, origin);
+    assert.equal(config.ios.bundleIdentifier, expo.ios.bundleIdentifier);
+    assert.equal(config.extra.eas.projectId, expo.extra.eas.projectId);
+  });
+  withEnv({}, () => assert.deepEqual(configure({ config: {} }), expo));
 });
 
 test('store permission cleanup removes only unused declarations and leaves full config untouched', () => {

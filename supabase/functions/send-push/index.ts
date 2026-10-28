@@ -1,3 +1,4 @@
+import { getPrivateNotificationPinMedia, NotificationMediaAccessDeniedError, shouldIncludeNotificationMedia } from '../_shared/notification-private-media.ts'
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4'
 import {
@@ -290,13 +291,23 @@ type ShadowPinCommentPushRecord = {
 const unauthorized = (message: string) =>
   new Response(JSON.stringify({ error: message }), {
     status: 401,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   })
+
+const privateNotificationMediaEnabled = () => Deno.env.get('PRIVATE_NOTIFICATION_MEDIA_ENABLED') === 'true'
+const notificationMediaSigningConfig = () => ({
+  projectUrl: Deno.env.get('SUPABASE_URL') || '',
+  bunny: {
+    libraryId: Deno.env.get('BUNNY_STREAM_LIBRARY_ID') || '',
+    pullZoneUrl: Deno.env.get('BUNNY_STREAM_PULL_ZONE_URL') || Deno.env.get('BUNNY_STREAM_CDN_BASE_URL') || '',
+    tokenSecurityKey: Deno.env.get('BUNNY_STREAM_TOKEN_SECURITY_KEY') || '',
+  },
+})
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   })
 const ensureResponse = (response: Response | undefined) =>
   response ?? json({ error: 'Push action did not return a response.' }, 500)
@@ -1760,12 +1771,26 @@ const sendShadowPinPostPush = async (
 
     const badgeCount = await getUnreadBadgeCount(supabase, preferences.user_id)
 
+    // Authorize every target; only full media-enabled previews mint capabilities.
+    let deliveryThumbnail: string | null | undefined = thumbnailUrl
+    if (privateNotificationMediaEnabled()) {
+      deliveryThumbnail = undefined
+      {
+        try {
+          deliveryThumbnail = (await getPrivateNotificationPinMedia(supabase, { eventId: eventRecord.id, userId: preferences.user_id, imageId: image.id, includeMedia: shouldIncludeNotificationMedia(preferences) }, notificationMediaSigningConfig()))?.thumbnailUrl
+        } catch (error) {
+          if (!(error instanceof NotificationMediaAccessDeniedError)) throw error
+          await cancelNotificationDeliveryJob(supabase, eventRecord.id, error.message)
+          return { userId: preferences.user_id, skipped: true, reason: error.message, deliveredCount: 0, removedSubscriptions: 0, attemptedCount: 0, retryableFailures: 0 }
+        }
+      }
+    }
     const pushMessage: PushMessage = {
       data: JSON.stringify({
         title,
         body,
-        icon: thumbnailUrl || undefined,
-        image: thumbnailUrl || undefined,
+        icon: deliveryThumbnail || undefined,
+        image: deliveryThumbnail || undefined,
         tag: `shadow-pin-post:${image.id}`,
         badgeCount,
         unreadCount: badgeCount,
@@ -1920,6 +1945,16 @@ const sendShadowPinCommentPush = async (
       'No active push subscriptions'
     )
     return json({ skipped: true, reason: 'No active push subscriptions' })
+  }
+
+  if (privateNotificationMediaEnabled()) {
+    try {
+      await getPrivateNotificationPinMedia(supabase, { eventId: eventRecord.id, userId: recipientId, imageId: comment.image_id, includeMedia: false }, notificationMediaSigningConfig())
+    } catch (error) {
+      if (!(error instanceof NotificationMediaAccessDeniedError)) throw error
+      await cancelNotificationDeliveryJob(supabase, eventRecord.id, error.message)
+      return json({ skipped: true, reason: error.message })
+    }
   }
 
   const badgeCount = await getUnreadBadgeCount(supabase, recipientId)
@@ -2459,6 +2494,16 @@ const sendNotificationDeliveryRecovery = async (
       }
 
       const badgeCount = await getUnreadBadgeCount(supabase, job.user_id)
+      let deliveryThumbnail: string | undefined
+      if (privateNotificationMediaEnabled() && ['shadow_pin_post','shadow_pin_comment','shadow_pin_reply'].includes(job.event_type)) {
+        try {
+          deliveryThumbnail = (await getPrivateNotificationPinMedia(supabase, { eventId: job.notification_event_id, userId: job.user_id, imageId: job.event_type === 'shadow_pin_post' ? job.entity_id : undefined, includeMedia: job.event_type === 'shadow_pin_post' && shouldIncludeNotificationMedia(preferences) }, notificationMediaSigningConfig()))?.thumbnailUrl
+        } catch (error) {
+          if (!(error instanceof NotificationMediaAccessDeniedError)) throw error
+          await updateNotificationDeliveryJob(supabase, job.job_id, { status: 'cancelled', last_error: error.message })
+          return { delivered: false, retryable: false }
+        }
+      }
       const isCheckers = job.event_type === 'shadow_checkers_turn'
       const eventMoveCount = Number(payload.move_count)
       const eventData = {
@@ -2493,6 +2538,8 @@ const sendNotificationDeliveryRecovery = async (
           data: JSON.stringify({
             title,
             body,
+            icon: deliveryThumbnail,
+            image: deliveryThumbnail,
             tag,
             badgeCount,
             unreadCount: badgeCount,

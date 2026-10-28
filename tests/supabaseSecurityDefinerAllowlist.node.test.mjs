@@ -59,6 +59,11 @@ test('SECURITY DEFINER allowlist is explicit, categorized, and duplicate-free', 
   assert.ok(contract.private_security_definers.every(signature => /^[a-z0-9_]+\.[a-z0-9_]+\(.*\)$/.test(signature)))
   assert.equal(new Set(contract.unexposed_security_definers).size, contract.unexposed_security_definers.length)
   assert.ok(contract.unexposed_security_definers.every(signature => /^[a-z0-9_]+\.[a-z0-9_]+\(.*\)$/.test(signature)))
+  assert.ok(contract.unexposed_security_definers.includes('content_filter_private.audit_rule_change()'))
+  assert.ok(contract.unexposed_security_definers.includes('content_filter_private.guard_member_content()'))
+  for (const role of ['anon', 'authenticated', 'service_role']) {
+    assert.equal(contract.schema_usage_contract.find(entry => entry.schema === 'content_filter_private' && entry.role === role)?.usage, false)
+  }
   assert.ok(contract.unexposed_security_definers.includes('member_mutation_private.set_typing_status_authorized(text,boolean,boolean)'))
   assert.ok(contract.unexposed_security_definers.includes('member_mutation_private.submit_member_report_impl(text,uuid,text,uuid,text,jsonb)'))
   assert.equal(contract.schema_usage_contract.find(entry => entry.schema === 'private' && entry.role === 'authenticated')?.usage, true)

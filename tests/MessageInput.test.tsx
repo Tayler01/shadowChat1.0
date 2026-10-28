@@ -5,6 +5,7 @@ import type { ComponentProps } from 'react'
 import { MessageInput } from '../src/components/chat/MessageInput'
 import { isShadowPinImageShareUrl } from '../src/components/chat/shadowPinShareLinks'
 import { enqueuePendingUploadCleanup, readPendingUploadCleanup } from '../src/lib/pendingUploadCleanup'
+import { normalizeContentPolicyError } from '../src/lib/contentPolicy'
 
 type ComposerSendArguments = Parameters<ComponentProps<typeof MessageInput>['onSendMessage']>
 
@@ -592,6 +593,38 @@ test('keeps text and its local draft when the send is refused', async () => {
   await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(1))
   expect(textarea).toHaveValue('Keep this message')
   await waitFor(() => expect(localStorage.getItem('draft-failed-send')).toBe('Keep this message'))
+})
+
+test('restores an optimistically cleared policy-rejected draft for editing without resending', async () => {
+  const onSendMessage = jest.fn(async (...args: ComposerSendArguments) => {
+    args[6]?.()
+    throw normalizeContentPolicyError({ code: 'PT422', message: 'CONTENT_POLICY_REJECTED' })
+  })
+  render(<MessageInput onSendMessage={onSendMessage} cacheKey="policy-rejected" />)
+  const textarea = screen.getByRole('textbox')
+  fireEvent.change(textarea, { target: { value: 'Please revise this draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(onSendMessage).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(textarea).toHaveValue('Please revise this draft'))
+  expect(localStorage.getItem('draft-policy-rejected')).toBe('Please revise this draft')
+  expect(onSendMessage).toHaveBeenCalledTimes(1)
+})
+
+test('a delayed policy rejection never overwrites a newer composer draft', async () => {
+  let rejectSend!: (error: unknown) => void
+  const onSendMessage = jest.fn((...args: ComposerSendArguments) => {
+    args[6]?.()
+    return new Promise<void>((_resolve, reject) => { rejectSend = reject })
+  })
+  render(<MessageInput onSendMessage={onSendMessage} />)
+  const textarea = screen.getByRole('textbox')
+  fireEvent.change(textarea, { target: { value: 'Old draft' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Send message' }))
+  await waitFor(() => expect(textarea).toHaveValue(''))
+  fireEvent.change(textarea, { target: { value: 'New draft' } })
+  await act(async () => rejectSend(normalizeContentPolicyError({ code: 'PT422', message: 'CONTENT_POLICY_REJECTED' })))
+  expect(textarea).toHaveValue('New draft')
+  expect(onSendMessage).toHaveBeenCalledTimes(1)
 })
 
 test('classifies an empty-MIME video by its extension', async () => {

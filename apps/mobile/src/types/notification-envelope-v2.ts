@@ -226,7 +226,8 @@ export const normalizeNativeNotificationMediaUrl = (value: unknown) => {
         approvedSupabaseHosts.has(hostname) &&
         (
           parsed.pathname.startsWith('/storage/v1/object/public/') ||
-          parsed.pathname.startsWith('/storage/v1/render/image/public/')
+          parsed.pathname.startsWith('/storage/v1/render/image/public/') ||
+      ((parsed.pathname.startsWith('/storage/v1/object/sign/') || parsed.pathname.startsWith('/storage/v1/render/image/sign/')) && Boolean(parsed.searchParams.get('token')))
         )
       )
     );

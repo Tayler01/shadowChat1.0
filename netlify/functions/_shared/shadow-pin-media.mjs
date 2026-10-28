@@ -580,7 +580,17 @@ export async function createImportedShadowPinItem({
     .insert(insertPayload)
     .select('*')
     .single()
-  if (insertError) throw insertError
+  if (insertError) {
+    if (insertError.code === 'PT422' && insertError.message === 'CONTENT_POLICY_REJECTED') {
+      try {
+        const { error: cleanupError } = await admin.storage.from(SHADOW_PIN_BUCKET).remove([originalPath])
+        if (cleanupError) throw cleanupError
+      } catch {
+        console.error('Rejected ShadowPin import requires storage cleanup', { path: originalPath })
+      }
+    }
+    throw insertError
+  }
 
   try {
     return await writeDerivativesForRow(admin, targetType, row, imported.buffer)
@@ -674,7 +684,17 @@ export async function updateImportedShadowPinImage({
     .eq('id', current.id)
     .select('*')
     .single()
-  if (updateError) throw updateError
+  if (updateError) {
+    if (updateError.code === 'PT422' && updateError.message === 'CONTENT_POLICY_REJECTED') {
+      try {
+        const { error: cleanupError } = await admin.storage.from(SHADOW_PIN_BUCKET).remove([originalPath])
+        if (cleanupError) throw cleanupError
+      } catch {
+        console.error('Rejected ShadowPin import requires storage cleanup', { path: originalPath })
+      }
+    }
+    throw updateError
+  }
 
   try {
     return await writeDerivativesForRow(admin, 'image', updated, imported.buffer)
@@ -740,7 +760,17 @@ export async function updateImportedShadowPinCategoryCover({
     .eq('id', current.id)
     .select('*')
     .single()
-  if (updateError) throw updateError
+  if (updateError) {
+    if (updateError.code === 'PT422' && updateError.message === 'CONTENT_POLICY_REJECTED') {
+      try {
+        const { error: cleanupError } = await admin.storage.from(SHADOW_PIN_BUCKET).remove([originalPath])
+        if (cleanupError) throw cleanupError
+      } catch {
+        console.error('Rejected ShadowPin import requires storage cleanup', { path: originalPath })
+      }
+    }
+    throw updateError
+  }
 
   try {
     return await writeDerivativesForRow(admin, 'category', updated, imported.buffer)

@@ -1,3 +1,4 @@
+import { PrivateMediaImage } from '../ui/PrivateMediaImage'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -357,7 +358,7 @@ export const PublicProfileDialog: React.FC<PublicProfileDialogProps> = ({
           >
             <div className="relative h-36 shrink-0 overflow-hidden border-b border-[var(--border-panel)]">
               {bannerSrc ? (
-                <img
+                <PrivateMediaImage
                   src={bannerSrc}
                   alt=""
                   loading="eager"

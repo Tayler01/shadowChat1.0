@@ -1,4 +1,5 @@
 import { ensureSession, getWorkingClient } from './supabase'
+import { parsePrivateMediaUrl } from './privateMediaUrls'
 
 export type LinkTextPart =
   | { type: 'text'; text: string }
@@ -21,7 +22,7 @@ type CachedPreview = {
 }
 
 const URL_PATTERN = /\b((?:https?:\/\/|www\.)[^\s<>"']+)/gi
-const CACHE_PREFIX = 'shadowchat:link-preview:v2:'
+const CACHE_PREFIX = 'shadowchat:link-preview:v3:'
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 const memoryCache = new Map<string, CachedPreview>()
 const pendingRequests = new Map<string, Promise<LinkPreview | null>>()
@@ -143,20 +144,21 @@ const writeCachedPreview = (url: string, preview: LinkPreview) => {
 export const fetchLinkPreview = async (url: string): Promise<LinkPreview | null> => {
   const normalized = normalizeMessageUrl(url)
   if (!normalized) return null
-
-  const cached = readCachedPreview(normalized)
+  // Member-media links are attachments, never input to third-party metadata fetches.
+  try { if (parsePrivateMediaUrl(normalized)) return null } catch { return null }
+  if (!await ensureSession()) return null
+  const workingClient = await getWorkingClient()
+  const { data: sessionData, error: sessionError } = await workingClient.auth.getSession()
+  const accountId = sessionData.session?.user.id
+  if (sessionError || !accountId) return null
+  const scopedKey = `${accountId}:${normalized}`
+  const cached = readCachedPreview(scopedKey)
   if (cached) return cached
 
-  const pending = pendingRequests.get(normalized)
+  const pending = pendingRequests.get(scopedKey)
   if (pending) return pending
 
   const request = (async () => {
-    const sessionValid = await ensureSession()
-    if (!sessionValid) {
-      return null
-    }
-
-    const workingClient = await getWorkingClient()
     const { data, error } = await workingClient.functions.invoke('link-preview', {
       body: { url: normalized },
     }) as { data?: { preview?: LinkPreview }; error?: unknown }
@@ -165,14 +167,16 @@ export const fetchLinkPreview = async (url: string): Promise<LinkPreview | null>
       return null
     }
 
-    writeCachedPreview(normalized, data.preview)
+    const current = await workingClient.auth.getSession()
+    if (current.error || current.data.session?.user.id !== accountId) return null
+    writeCachedPreview(scopedKey, data.preview)
     return data.preview
   })()
     .catch(() => null)
     .finally(() => {
-      pendingRequests.delete(normalized)
+      pendingRequests.delete(scopedKey)
     })
 
-  pendingRequests.set(normalized, request)
+  pendingRequests.set(scopedKey, request)
   return request
 }
