@@ -88,3 +88,73 @@ small native canary; it does not alter Web Push retry semantics.
 
 No Git commit, push, remote migration, Edge deployment, or activation is performed
 by the implementation subtask. The parent release task owns those actions.
+
+## October 29 immediate wake (isolated demo only; production held)
+
+`20261029225224_immediate_bounded_native_notification_wake.sql` wakes the
+existing bounded worker after an eligible outbox INSERT statement, once the
+canonical event and envelope exist in the transaction. `pg_net` dispatches only
+after commit. This is a new lightweight trigger; it does not restore the old
+response collector, scan `net._http_response`, or alter any schedule/runtime gate.
+
+The private dispatcher retains the exact project URL, canary, category,
+watermark and eligible-work checks. Disabled production exits before Vault/HTTP.
+Its singleton uses `FOR UPDATE SKIP LOCKED`, so a concurrent worker cannot make
+a chat INSERT wait for this row. Queuing failures leave durable outbox work for
+the unchanged minute fallback rather than rolling back the message.
+
+Only the matching service-role lease owner clears the successful invocation's
+30-second reservation. It can immediately enqueue up to four successor workers:
+five invocations total cover ten eligible events, matching the maximum canary
+fanout. Every worker still handles two events/four targets within eight seconds;
+accepted-target exclusion, preferences, quiet hours, foreground suppression and
+all other delivery guards are unchanged. A new eligible insertion or fallback
+cron tick starts a fresh bounded burst. An arrival during an existing worker
+refreshes the continuation budget without stealing its lease or dispatching a
+second concurrent worker.
+
+Heavy traffic beyond a burst, retry backoff, a crashed worker, and the narrow
+race where an inserting transaction skips a row held by a release that cannot
+yet see that uncommitted insertion still rely on fallback recovery. The change
+reduces ordinary idle-path queue latency; it does not promise instantaneous OS
+presentation or remove the ten-account rollout gate.
+
+Local PostgreSQL validation uses `tests/sql/immediate-native-notification-wake.sql`
+in one rolled-back transaction, a synthetic Vault value and a transactional
+`net.http_post` stub. It verifies immediate insert wake, arrivals during a lease,
+wrong-owner denial, reservation clearing, continuation ceiling/reset, idle
+behavior, enqueue failure recovery, exact project binding and private ACLs.
+No provider request is made. A second schema-only local database verified real
+two-connection contention: while another session held the singleton for 40
+seconds, the dispatcher returned in 2.873ms and an actual event INSERT completed
+in 10.258ms without queuing HTTP. Recovery after release queued in 6.117ms. That
+database was dropped and the source local database remained unchanged. Physical
+latency remains a separate acceptance gate; no production rollout is implied.
+
+The reviewed migration is installed in the isolated Apple demo as exact version
+`20261029225224` (270 to 271 migrations). Its single project URL is explicitly
+adapted to that demo; the four function bodies, private ACLs, full security
+contract, runtime and schedules were read back. Production remains disabled
+and has not received this migration. The first speed-test preflight was held
+without sending because the reviewer iPhone enrollment was revoked. After the
+user restored notifications, fresh preflight verified the scoped build-23
+installation and one authorized ordinary DM was sent at 23:23:43.678 UTC.
+Its event/outbox was created at 23:23:45.283; Expo accepted its single target
+on the first attempt at 23:23:46.821 (3.143 seconds from message creation,
+1.538 seconds from event creation). Worker HTTP 200 at 23:23:46.950, before
+the next cron minute, verifies the immediate path. The user confirmed the
+physical alert arrived and felt faster, but did not measure OS display time;
+the 3.143-second figure is provider acceptance, not physical delivery latency.
+Tapping remained on Settings in build 23; the separate build-24 routing fix
+still needs phone validation. The exact test message and derived events/targets
+were removed and zero remaining rows verified. Other content, group mute and
+the user's active device enrollment were preserved; both helper sessions were
+revoked locally. No group test or preference mutation occurred.
+
+The demo security-advisor read at 23:09:51 UTC retained 19 informational
+RLS-without-policy findings and existing definer warnings (8 anonymous, 105
+authenticated). The new private functions grant no browser/service execution;
+the full security contract passed and public definers remain 161. This is not
+a claim that the project has zero advisor warnings. Reviewed receipts and the
+guarded, exact-version deployment record are under
+`output/release-evidence/native-push-readiness-20261028/`.

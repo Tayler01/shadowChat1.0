@@ -1,5 +1,36 @@
 # Real-Device Mobile Validation
 
+## October 29 build 24 release progress
+
+Native/web source `16e9983ba94348cbcdc5c64fde6734418903d27b` is frozen;
+`c5f328a4` adds only an exact secret-scan false-positive fingerprint for a
+synthetic installation UUID. Its complete CI run `40971576737` passed, with
+deployment skipped under the existing hold. Demo deploy
+`6ae3d4168ab222349a7db595` is verified live on both phone browser engines.
+Authenticated delayed-DM loading, rapid tab changes, live messages, unread/read,
+Settings and signed images passed. The publisher's post-upload fetch failed;
+read-only reconciliation proved the original upload succeeded. No retry upload.
+
+Member deploy `6ae3c84719824d42cc44bb86` and full deploy
+`6ae27abba1ab469521956722` remain unchanged. Member candidate publication is
+held: required DM checks reproduced PostgreSQL `57014` timeouts (DM window,
+inbox, badge and threaded chat) and an Auth 504. Later isolated RPC timings were
+fast; no causal SQL fix is established. A later Auth 403 coincided with owned
+QA session cleanup and is separate from the earlier failures. Test fixtures
+and owned browser sessions were cleaned up.
+
+EAS build 24 `05cfacfb-dcf8-443d-9532-9db4d4b719a0` is building from `16e9983`.
+Its 115-file archive, native lint/types, 93 tests, dependency audit and Hermes
+export passed. This is an internal TestFlight candidate, not store acceptance.
+Native bridge/config/community contracts remain compatible with the retained
+member website; its optional diagnostic output requires no new member API.
+
+Demo-only immediate wake passed a real speed canary: message-to-provider
+acceptance 3.143 seconds, event-to-provider 1.538 seconds, one target/attempt,
+before the next cron minute. The user confirmed seeing the alert but could not
+measure phone latency. On build 23 the tap still left the previous Settings
+screen visible; build 24 physical tap and icon-badge verification is outstanding.
+
 ## October 29 build 23 physical notification regression
 
 The user accepted startup and Settings-only community controls on build 23.

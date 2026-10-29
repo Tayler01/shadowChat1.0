@@ -247,8 +247,12 @@ test('foundation and activation preserve the complete pre-split SQL catalog', as
   assert.equal(canonicalSha(await readSql(pendingEnrollmentLintAlignment)),
     'c78338ae6866ab45061ad1bc8efcf2f0d6eb827ec3bddb312f41019f22ec6f3a',
     'Forward-only settlement lint alignment changed; rerun its PostgreSQL tests')
+  const immediateNativeWake = '20261029225224_immediate_bounded_native_notification_wake.sql'
+  assert.equal(canonicalSha(await readSql(immediateNativeWake)),
+    'f84f129e1d65865f6fc14ab3ae72b216f394391a613753ac8f14415a76a3a822',
+    'Separately reviewed immediate native wake changed; rerun its PostgreSQL and contention tests')
   assert.deepEqual(securityEraFiles.filter(name=>name>securityActivationName),
-    [...followupNames, scopedNativeCapability, nativeRevocationProof, pendingEnrollmentSettlement, pendingEnrollmentLintAlignment], 'Every migration after activation needs explicit follow-up review')
+    [...followupNames, scopedNativeCapability, nativeRevocationProof, pendingEnrollmentSettlement, pendingEnrollmentLintAlignment, immediateNativeWake], 'Every migration after activation needs explicit follow-up review')
   for(const entry of followup.migrations)assert.equal(canonicalSha(await readSql(entry.path.split('/').at(-1))),entry.sha256,`Reviewed follow-up SQL changed: ${entry.path}`)
   const expectedFiles = [...manifest.map(({ name }) => name).filter(name => !name.startsWith('20261022231052_')),
     ...companionMigrations, securityActivationName].sort()

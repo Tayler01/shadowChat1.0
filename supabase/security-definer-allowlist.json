@@ -1,5 +1,5 @@
 {
-  "reviewed_on": "2026-10-28",
+  "reviewed_on": "2026-10-29",
   "expected_total_security_definers": 161,
   "private_security_definers": [
     "private.can_operator_access_moderation_case(uuid,uuid)",
@@ -57,6 +57,7 @@
     "private.reject_shado_live_append_only_mutation()",
     "private.request_bounded_native_notification_canary()",
     "private.request_legacy_account_deletion_reconciliation()",
+    "private.request_native_notification_wake_v1(boolean)",
     "private.request_notification_delivery_v2(text)",
     "private.request_notification_delivery_v2_after_insert()",
     "private.request_web_push_recovery()",
@@ -77,7 +78,8 @@
     "private.unarchive_dm_conversation_on_message()",
     "private.users_are_connected(uuid,uuid)",
     "private.users_have_block(uuid,uuid)",
-    "private.validate_signup_invite_for_auth_hook(jsonb)"
+    "private.validate_signup_invite_for_auth_hook(jsonb)",
+    "private.wake_new_native_notification_outbox_v1()"
   ],
   "unexposed_security_definers": [
     "activation_private.update_my_activation_journey_impl(integer,text,text)",
@@ -571,6 +573,20 @@
         "supabase/migrations/20261023002455_moderation_retention_cleanup.sql",
         "docs/STREAMLINED_SECURITY_AUDIT.md"
       ]
+    },
+    {
+      "scope": "immediate_bounded_native_notification_wake",
+      "signatures": [
+        "private.request_native_notification_wake_v1(boolean)",
+        "private.wake_new_native_notification_outbox_v1()",
+        "release_native_notification_worker_v2(uuid)"
+      ],
+      "justification": "Private wake helpers deny PUBLIC, anon, authenticated and service_role EXECUTE and pin an empty search_path. The statement trigger calls only the existing project-bound, runtime/canary/category/watermark-gated dispatcher. SKIP LOCKED prevents singleton contention from delaying member inserts. Only the matching service-role worker lease owner clears its reservation and can schedule up to four successor invocations; each retains existing two-event/four-target limits. No old collector or schedule is resumed. Applying this migration leaves production delivery gates unchanged.",
+      "sources": [
+        "supabase/migrations/20261029225224_immediate_bounded_native_notification_wake.sql",
+        "tests/sql/immediate-native-notification-wake.sql"
+      ],
+      "reviewed_on": "2026-10-29"
     }
   ],
   "schema_usage_contract": [
