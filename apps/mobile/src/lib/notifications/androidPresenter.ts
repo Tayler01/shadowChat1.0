@@ -8,6 +8,7 @@ import notifee, {
 } from '@notifee/react-native';
 
 import { getAndroidSoundChannelId } from './config';
+import { readNativeNotificationData, readNativeNotificationEnvelope } from './transportData';
 import { appRuntime } from '../appRuntime';
 import {currentTransportScope,readTransportScope} from '../../community/communityBindings';
 import {
@@ -234,11 +235,8 @@ export const parseNotifeeEnvelope = (
   notification: Notification | undefined,
   options: { interaction?: boolean } = {}
 ) => {
-  const raw = notification?.data?.envelopeV2;
-  if (typeof raw !== 'string') return null;
-  try {
-    return parseNotificationEnvelopeV2(JSON.parse(raw), options);
-  } catch {
-    return null;
-  }
+  return parseNotificationEnvelopeV2(
+    readNativeNotificationEnvelope(readNativeNotificationData(notification?.data)),
+    options,
+  );
 };

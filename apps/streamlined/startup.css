@@ -9,14 +9,27 @@
   padding: 2rem 1.5rem;
   background: var(--bg-shell, #0d0f10);
   color: var(--text-primary, #f1f0ea);
-  font-family: inherit;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   text-align: center;
 }
-.streamlined-loading--fullscreen { min-height: 100dvh; }
-.streamlined-loading__content { width: 100%; max-width: 22rem; }
-.streamlined-loading__mark { display: block; width: 6rem; height: 6rem; margin: 0 auto 1.25rem; object-fit: contain; }
-.streamlined-loading__name { margin: 0; font-size: 1.625rem; font-weight: 600; line-height: 1.25; letter-spacing: -0.025em; }
-.streamlined-loading__rule { display: block; width: 2rem; height: 2px; margin: 1.25rem auto; border-radius: 2px; background: var(--theme-accent-readable, #e9c766); }
-.streamlined-loading__message { margin: 0; color: var(--text-muted, #b2afa3); font-size: 0.875rem; line-height: 1.6; overflow-wrap: anywhere; }
-/* No spinner, shimmer or timed minimum: startup follows the actual load. */
+.streamlined-loading--fullscreen { position: relative; min-height: 100dvh; }
+.streamlined-loading__content { display: grid; justify-items: center; gap: 16px; width: 100%; max-width: 22rem; }
+.streamlined-loading--fullscreen .streamlined-loading__content { position: absolute; top: 50%; left: 50%; margin-top: -48px; transform: translateX(-50%); }
+.streamlined-loading__mark { display: block; width: 96px; height: 96px; margin: 0; object-fit: contain; }
+.streamlined-loading__name { margin: 0; font-size: 1.625rem; font-weight: 600; line-height: 1.25; letter-spacing: .4px; }
+.streamlined-loading__track { width: 200px; max-width: 100%; height: 6px; border-radius: 3px; overflow: hidden; background: #34332d; }
+.streamlined-loading__fill { display: block; width: 35%; height: 100%; border-radius: inherit; background: #4ade80; animation: streamlined-loading-indeterminate 1.2s ease-in-out infinite alternate; }
+.streamlined-loading__message { min-height: 40px; margin: 0; color: var(--text-muted, #c4bba6); font-size: .875rem; line-height: 20px; overflow-wrap: anywhere; }
+.streamlined-loading--compact { min-height: 6rem; padding: 1.5rem; }
+.streamlined-loading--compact .streamlined-loading__mark { width: 32px; height: 32px; }
+.streamlined-loading--compact .streamlined-loading__name { display: none; }
+.streamlined-tab-loading { display: grid; justify-items: center; gap: .5rem; flex: 0 0 auto; padding: .75rem; background: var(--bg-shell, #0d0f10); color: var(--text-muted, #c4bba6); font-size: .875rem; }
+@keyframes streamlined-loading-indeterminate { from { transform: translateX(0); } to { transform: translateX(185%); } }
+/* Use the shared pre-paint Comfort policy; reduced/no motion keeps a quiet,
+   fixed segment and the same accessible loading message. */
+html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .streamlined-loading__fill { animation: none; margin-inline: auto; }
+html:is([data-comfort-text-scale='115'], [data-comfort-text-scale='130']) .streamlined-loading--fullscreen .streamlined-loading__content { position: static; margin-top: 0; transform: none; }
+@media (max-height: 500px) {
+  .streamlined-loading--fullscreen .streamlined-loading__content { position: static; margin-top: 0; transform: none; }
+}
 html:has(#streamlined-document-startup), body:has(#streamlined-document-startup) { margin: 0; background: #0d0f10; font-family: system-ui, -apple-system, sans-serif; }

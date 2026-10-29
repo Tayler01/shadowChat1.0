@@ -2,6 +2,13 @@
 
 ## October 29 submission reconciliation
 
+Latest physical feedback supersedes pending acceptance below: build 23 startup
+and community controls passed, but DM notification taps still open General
+Chat and the iPhone icon retains `1` despite a canonical server badge total of
+zero. Native immediate dispatch, tap routing and OS badge verification are
+release blockers. The minute worker caused a measured 59.599-second delay on
+the last demo DM; public release will not itself change that behavior.
+
 Subsequent release: the streamlined member and demo sites now serve verified
 source `dba49386`, and native 1.0.0 (23) is Apple VALID and available in the
 existing internal TestFlight group. The full website deployment/configuration

@@ -1,5 +1,44 @@
 # Real-Device Mobile Validation
 
+## October 29 build 23 physical notification regression
+
+The user accepted startup and Settings-only community controls on build 23.
+Three authorized demo notifications were sent: a DM and group message 30.519
+seconds apart, followed by one DM only. Expo accepted each exactly once; the
+last waited 59.599 seconds for the minute worker. The group mute was restored.
+The user reports DM taps still open General Chat. The DM unread badge cleared,
+but a `1` remains on the iPhone home-screen icon. Authenticated server readback
+shows every badge category and total at zero. Native tap routing and OS badge
+clearing therefore still fail physical acceptance; build 23 is not the final
+accepted store candidate. Immediate native dispatch is now an explicit release
+requirement, with the scheduled worker retained as recovery only.
+
+Evidence: `output/release-evidence/native-push-readiness-20261028/physical-test-build23-20261029.json`
+and `build23-posttap-diagnosis.json`. Repairs and fresh device verification are
+in progress; these observations do not establish a repaired production path.
+
+The next candidate normalizes Notifee's iOS nested APNs `body` before checking
+both installation scope and envelope. Replaying that SDK payload through the
+real provider fails on build 23 and passes on the candidate, including deferred
+authentication, exact DM destination, duplicate suppression and foreign-scope
+denial. Native badge reconciliation now also runs on receipt and app exit;
+Settings exposes only safe tap status and canonical/device badge counts for
+physical diagnosis. No timed polling or forced-zero shortcut was added.
+All 93 native tests, native lint/types and 14 focused badge/diagnostic tests
+passed before the final build-number advance to 24; its eight configuration
+tests also passed. Phone verification remains outstanding. Source evidence:
+`output/release-evidence/native24-route-regression.md`.
+
+The user also found the older gold-rule loader after sign-in and during some
+tab changes. Streamlined web fallbacks now share the fixed 200-by-6 green bar
+and branding; unknown-duration work is indeterminate rather than a fabricated
+percentage. Ordinary tab transitions retain the current view with an inline
+indicator. Auth and community boundaries stay immediate, and the accepted
+native cold-start cover is unchanged. Twenty-three focused tests and Chromium/
+WebKit component checks passed, including reduced motion, large text and short
+screens. Authenticated delayed-chunk and rapid-tab acceptance is still required
+on the frozen release stage. Evidence: `output/release-evidence/native24-loading-polish/`.
+
 ## October 29 build 23 available for physical acceptance
 
 Source `dba49386a6cdf341aff1a7861062bdbd23204efa` is published to both separate

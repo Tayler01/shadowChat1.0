@@ -19,7 +19,12 @@ function fixture(displayed = []) {
     try { if (typeof value === 'string') value = JSON.parse(value); } catch { return null; }
     return value && typeof value === 'object' ? value : null;
   };
+  const transportModule = { exports: {} };
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/lib/notifications/transportData.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS },
+  }).outputText, { module: transportModule, exports: transportModule.exports });
   const imports = {
+    './transportData': transportModule.exports,
     '@notifee/react-native': { __esModule:true, default: {
       getDisplayedNotifications: async () => displayed,
       displayNotification: async value => { shown.push(value); },

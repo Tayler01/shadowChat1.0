@@ -133,6 +133,8 @@ export default function ShadowChatAppScreen() {
     error: nativeNotifications.error,
     requestId: nativeNotifications.requestId,
     stage: nativeNotifications.stage,
+    ...(appRuntime.streamlined ? { badgeDiagnostics: nativeNotifications.badgeDiagnostics } : {}),
+    ...(appRuntime.streamlined ? { routeDiagnostics: nativeNotifications.routeDiagnostics } : {}),
   }), [
     nativeNotifications.busy,
     nativeNotifications.enabled,
@@ -140,6 +142,8 @@ export default function ShadowChatAppScreen() {
     nativeNotifications.permission,
     nativeNotifications.requestId,
     nativeNotifications.stage,
+    nativeNotifications.badgeDiagnostics,
+    nativeNotifications.routeDiagnostics,
   ]);
 
   const publishTrackedNotificationState = useCallback((

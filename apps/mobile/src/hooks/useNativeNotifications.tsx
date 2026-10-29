@@ -36,6 +36,7 @@ import {
 } from '@/lib/notifications/androidPresenter';
 import { publishNativeNotificationRoute } from '@/lib/nativeAppBridge';
 import { normalizeNotificationRoute } from '@/lib/notifications/routes';
+import { readNativeNotificationData, readNativeNotificationEnvelope, type RouteDiagnostics } from '@/lib/notifications/transportData';
 import {
   parseNotificationEnvelopeV2,
   type NotificationEnvelopeV2,
@@ -43,8 +44,11 @@ import {
 import { runNotificationStage } from '@/lib/notifications/registrationPipeline';
 import type { NativeNotificationStage } from '@/lib/nativeAppBridge';
 import { createBadgeSynchronizer, queueBadgeWrite } from '@/lib/notifications/badgeSynchronizer';
+import { subscribeBadgeLifecycle } from '@/lib/notifications/badgeLifecycle';
+import { diagnosedBadgeOperations, type BadgeDiagnostics } from '@/lib/notifications/badgeDiagnostics';
 
 type NativeNotificationsContextValue = {
+  routeDiagnostics: RouteDiagnostics | null;
   enabled: boolean;
   permission: Notifications.PermissionStatus | 'unknown';
   busy: boolean;
@@ -60,6 +64,7 @@ type NativeNotificationsContextValue = {
   ) => Promise<void>;
   disableThisDevice: (requestId?: string | null) => Promise<void>;
   refreshBadge: () => Promise<void>;
+  badgeDiagnostics: BadgeDiagnostics | null;
 };
 
 const NativeNotificationsContext =
@@ -72,11 +77,9 @@ const parseEnvelopeFromNotification = (
   notification: Notifications.Notification,
   interaction = false
 ) => {
-  const data = notification.request.content.data ?? {};
+  const data = readNativeNotificationData(notification.request.content.data);
   return parseNotificationEnvelopeV2(
-    data.envelopeV2 ??
-    data.notificationEnvelopeV2 ??
-    data,
+    readNativeNotificationEnvelope(data),
     { interaction: appRuntime.streamlined && interaction }
   );
 };
@@ -147,14 +150,15 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   const valid=useCallback(()=>isCurrentCommunity(context),[context]);
   const getEnvelopeFromNotification=useCallback((notification:Notifications.Notification, interaction = false)=>{
     const identity=rememberedInstallation(context.community);
-    if(!valid()||(appRuntime.streamlined && (identity?.userId!==sessionRef.current?.user.id||!scopeMatchesInstallation(context.community,identity,notification.request.content.data))))return null;
+    if(!valid()||(appRuntime.streamlined && (identity?.userId!==sessionRef.current?.user.id||!scopeMatchesInstallation(context.community,identity,readNativeNotificationData(notification.request.content.data)))))return null;
     return parseEnvelopeFromNotification(notification, interaction);
   },[context,valid]);
   const scopedNotifee=useCallback((notification:Parameters<typeof parseNotifeeEnvelope>[0], interaction = false)=>{
     const identity=rememberedInstallation(context.community);
-    if(!valid()||(appRuntime.streamlined && (identity?.userId!==sessionRef.current?.user.id||!scopeMatchesInstallation(context.community,identity,notification?.data))))return null;
+    if(!valid()||(appRuntime.streamlined && (identity?.userId!==sessionRef.current?.user.id||!scopeMatchesInstallation(context.community,identity,readNativeNotificationData(notification?.data)))))return null;
     return parseNotifeeEnvelope(notification, { interaction: appRuntime.streamlined && interaction });
   },[context,valid]);
+  const [routeDiagnostics, setRouteDiagnostics] = useState<RouteDiagnostics | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [permission, setPermission] =
@@ -164,6 +168,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   const [requestId, setRequestId] = useState<string | null>(null);
   const [stage, setStage] = useState<NativeNotificationStage>('idle');
   const [presentation, setPresentation] = useState<NotificationEnvelopeV2 | null>(null);
+  const [badgeDiagnostics, setBadgeDiagnostics] = useState<BadgeDiagnostics | null>(null);
   const handledResponseIds = useRef(new Set<string>());
   const handledNotifeeActionIds = useRef(new Set<string>());
   const pendingResponseRef =
@@ -222,20 +227,27 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     return request;
   }, [handleCredentialRejection, registration]);
 
-  const badgeSynchronizer = useMemo(() => createBadgeSynchronizer({
-    identity: () => badgeProviderActive.current && badgeUpdatesAllowed.current && valid() ? sessionRef.current?.user.id ?? null : null,
-    read: async () => {
-      const { data, error: badgeError } = await client.rpc('get_app_badge_state_v2');
-      if (badgeError) throw badgeError;
+  const badgeSynchronizer = useMemo(() => {
+    const identity = () => badgeProviderActive.current && badgeUpdatesAllowed.current && valid() ? sessionRef.current?.user.id ?? null : null;
+    const read = async () => {
+      const { data, error: badgeError, status } = await client.rpc('get_app_badge_state_v2');
+      if (badgeError) {
+        if (appRuntime.streamlined) throw Object.assign(new Error('Unread count request failed.'), { status });
+        throw badgeError;
+      }
       return data;
-    },
-    apply: async count => {
+    };
+    const apply = async (count: number) => {
       await Promise.all([
         Notifications.setBadgeCountAsync(count),
         notifee.setBadgeCount(count),
       ]);
-    },
-  }), [client, valid]);
+    };
+    const operations = appRuntime.streamlined ? diagnosedBadgeOperations({
+      identity, read, write: apply, readOS: () => Notifications.getBadgeCountAsync(), report: setBadgeDiagnostics,
+    }) : { read, apply };
+    return createBadgeSynchronizer({ identity, ...operations });
+  }, [client, valid]);
   const syncBadgeCount = useCallback(() => runCommunityOperation(context,
     () => badgeSynchronizer.sync()), [badgeSynchronizer, context]);
 
@@ -307,14 +319,23 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     await registration.getNativeNotificationInstallationCredential();
     if(!valid())return;
     if (!sessionRef.current?.user) {
+      if (appRuntime.streamlined) setRouteDiagnostics({ source: 'expo', status: 'waiting_for_session', at: Date.now() });
       pendingResponseRef.current = response;
       return;
     }
     const responseId = response.notification.request.identifier;
     if (handledResponseIds.current.has(responseId)) return;
 
+    if (appRuntime.streamlined) setRouteDiagnostics({ source: 'expo', status: 'received', at: Date.now() });
     const envelope = getEnvelopeFromNotification(response.notification, true);
-    if (!envelope) return;
+    if (!envelope) {
+      if (appRuntime.streamlined) {
+        const identity = rememberedInstallation(context.community);
+        const scoped = identity?.userId === sessionRef.current?.user.id && scopeMatchesInstallation(context.community, identity, readNativeNotificationData(response.notification.request.content.data));
+        setRouteDiagnostics({ source: 'expo', status: scoped ? 'envelope_rejected' : 'scope_rejected', at: Date.now() });
+      }
+      return;
+    }
     handledResponseIds.current.add(responseId);
 
     if (response.actionIdentifier === 'mark_read') {
@@ -323,7 +344,8 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     }
 
     await openEnvelope(envelope);
-  }, [getEnvelopeFromNotification, markEnvelopeRead, openEnvelope, registration, valid]);
+    if (appRuntime.streamlined && valid()) setRouteDiagnostics({ source: 'expo', status: 'route_requested', at: Date.now() });
+  }, [context, getEnvelopeFromNotification, markEnvelopeRead, openEnvelope, registration, valid]);
 
   const consumeNotifeeEvent = useCallback(async (
     event: Pick<NotifeeEvent, 'type' | 'detail'>
@@ -336,23 +358,33 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     await registration.getNativeNotificationInstallationCredential();
     if(!valid())return;
     if (!sessionRef.current?.user) {
+      if (appRuntime.streamlined) setRouteDiagnostics({ source: 'notifee', status: 'waiting_for_session', at: Date.now() });
       pendingNotifeeEventRef.current = event;
       return;
     }
     const envelope = scopedNotifee(event.detail.notification, true);
-    if (!envelope) return;
+    if (!envelope) {
+      if (appRuntime.streamlined) {
+        const identity = rememberedInstallation(context.community);
+        const scoped = identity?.userId === sessionRef.current?.user.id && scopeMatchesInstallation(context.community, identity, readNativeNotificationData(event.detail.notification?.data));
+        setRouteDiagnostics({ source: 'notifee', status: scoped ? 'envelope_rejected' : 'scope_rejected', at: Date.now() });
+      }
+      return;
+    }
     const actionKey = [
       event.detail.notification?.id ?? envelope.eventId,
       event.detail.pressAction?.id ?? 'open',
     ].join(':');
     if (handledNotifeeActionIds.current.has(actionKey)) return;
     handledNotifeeActionIds.current.add(actionKey);
+    if (appRuntime.streamlined) setRouteDiagnostics({ source: 'notifee', status: 'received', at: Date.now() });
     if (event.detail.pressAction?.id === 'mark_read') {
       await markEnvelopeRead(envelope);
       return;
     }
     await openEnvelope(envelope);
-  }, [markEnvelopeRead, openEnvelope, registration, scopedNotifee, valid]);
+    if (appRuntime.streamlined && valid()) setRouteDiagnostics({ source: 'notifee', status: 'route_requested', at: Date.now() });
+  }, [context, markEnvelopeRead, openEnvelope, registration, scopedNotifee, valid]);
 
   const register = useCallback((
     requestPermission: boolean,
@@ -522,6 +554,8 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       const priorSession = sessionRef.current;
       if (nextSession?.user.id !== priorSession?.user.id) {
         badgeUpdatesAllowed.current = Boolean(nextSession?.user);
+        setBadgeDiagnostics(null);
+        setRouteDiagnostics(null);
       }
       sessionRef.current = nextSession;
       setSession(nextSession);
@@ -581,6 +615,11 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
 
   useEffect(() => {
     if (!session?.user.id) return;
+    if (appRuntime.streamlined) return subscribeBadgeLifecycle({
+      refresh: syncBadgeCount,
+      subscribeState: listener => AppState.addEventListener('change', listener),
+      subscribeReceived: listener => Notifications.addNotificationReceivedListener(listener),
+    });
     void syncBadgeCount().catch(() => undefined);
     const subscription = AppState.addEventListener('change', state => {
       if (state === 'active') void syncBadgeCount().catch(() => undefined);
@@ -716,6 +755,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   }, [presentation]);
 
   const value = useMemo<NativeNotificationsContextValue>(() => ({
+    routeDiagnostics,
     enabled,
     permission,
     busy,
@@ -725,7 +765,10 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     enable,
     disableThisDevice,
     refreshBadge: syncBadgeCount,
+    badgeDiagnostics,
   }), [
+    badgeDiagnostics,
+    routeDiagnostics,
     busy,
     disableThisDevice,
     enable,

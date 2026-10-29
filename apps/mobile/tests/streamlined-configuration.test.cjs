@@ -35,7 +35,7 @@ test('streamlined build uses an isolated HTTPS origin and advances only its buil
     const config = configure({ config: {} });
     assert.equal(config.extra.webAppUrl, origin);
     assert.equal(config.extra.appEdition, 'streamlined');
-    assert.equal(config.ios.buildNumber, '23');
+    assert.equal(config.ios.buildNumber, '24');
     assert.equal(config.ios.bundleIdentifier, expo.ios.bundleIdentifier);
     const isSplash = plugin => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen';
     assert.deepEqual(config.plugins.slice(0, -1).filter(plugin => !isSplash(plugin)), expo.plugins.filter(plugin => !isSplash(plugin)));

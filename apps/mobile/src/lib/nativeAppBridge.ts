@@ -3,6 +3,8 @@ import {requireCommunity} from '../community/communityBindings';
 
 import { getNotificationWebUrl, normalizeNotificationRoute } from './notifications/routes';
 import type { NativeNotificationStage } from './notifications/stages';
+import type { BadgeDiagnostics } from './notifications/badgeDiagnostics';
+import type { RouteDiagnostics } from './notifications/transportData';
 export {
   parseNativeWebMessage,
 } from './nativeWebProtocol';
@@ -20,6 +22,8 @@ export type NativeNotificationBridgeState = {
   error: string | null;
   requestId: string | null;
   stage: NativeNotificationStage;
+  badgeDiagnostics?: BadgeDiagnostics | null;
+  routeDiagnostics?: RouteDiagnostics | null;
 };
 
 const buildNativeStateScript = (state: NativeNotificationBridgeState) => {

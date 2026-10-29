@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState, useTransition } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from '../../apps/streamlined/src-overrides/components/auth/AuthGuard'
 import { SoundEffectsProvider } from '../hooks/useSoundEffects'
@@ -46,6 +46,7 @@ function LoadingView({ fullscreen = false }: { fullscreen?: boolean }) {
 
 function StreamlinedShell() {
   const [route, setRoute] = useState(readLocation)
+  const [tabPending, startTabTransition] = useTransition()
   const isDesktop = useIsDesktop()
   useStreamlinedViewport(isDesktop)
   useSessionResumeRecovery()
@@ -109,8 +110,10 @@ function StreamlinedShell() {
   }, [applyMutation])
 
   const navigate = useCallback((view: AppView) => {
-    applyMutation({ method: 'push', url: streamlinedViewUrl(new URL(window.location.href), view) })
-  }, [applyMutation])
+    // Only ordinary tab navigation retains the current surface while a lazy
+    // module loads. Auth, sign-out and community boundaries remain immediate.
+    startTabTransition(() => applyMutation({ method: 'push', url: streamlinedViewUrl(new URL(window.location.href), view) }))
+  }, [applyMutation, startTabTransition])
   const search = useCallback((query: string, scope: 'messages' | 'all') => {
     applyMutation({ method: 'push', url: streamlinedSearchUrl(new URL(window.location.href), query, scope) })
   }, [applyMutation])
@@ -142,6 +145,7 @@ function StreamlinedShell() {
         <nav>{desktopTabs.map(tab => <button key={tab.view} type="button" aria-current={route.view === tab.view ? 'page' : undefined} onClick={() => navigate(tab.view)}>{tab.label}</button>)}</nav>
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        {tabPending && <div className="streamlined-tab-loading" role="status" aria-live="polite"><div className="streamlined-loading__track" role="progressbar" aria-label="Opening tab" aria-valuetext="Loading"><span className="streamlined-loading__fill" /></div><span>Opening tab...</span></div>}
         <Suspense fallback={<LoadingView />}>
           {route.view === 'chat' && <ChatView currentView="chat" onViewChange={navigate} onSearch={search} initialMessageId={route.message ?? undefined} initialThreadId={route.thread ?? undefined} onThreadRoute={routeChat} />}
           {route.view === 'dms' && <DirectMessagesView currentView="dms" onViewChange={navigate} onToggleSidebar={() => navigate('chat')} initialConversation={route.conversation ?? undefined} initialMessageId={route.message ?? undefined} initialPanel={route.dmPanel} initialConnectionsSection={route.dmConnectionsSection} initialCircleId={route.dmCircle ?? undefined} onRoute={routeDM} onConnectionsRoute={routeCircles} />}

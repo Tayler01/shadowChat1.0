@@ -12,6 +12,7 @@ import { COMFORT_RESET_EVENT } from '../lib/comfortPreferences'
 import { getBrowserTimeZone, type NotificationPreferences } from '../lib/push'
 import type { AppView } from '../types/navigation'
 import { canChangeNativeCommunity, requestNativeCommunityChooser } from './nativeCommunity'
+import { NativeBadgeDiagnostics } from './components/NativeBadgeDiagnostics'
 
 const ProfileView = lazy(() => import('../components/profile/ProfileView').then(module => ({ default: module.ProfileView })))
 const BlockedUsersSettings = lazy(() => import('../components/settings/BlockedUsersSettings').then(module => ({ default: module.BlockedUsersSettings })))
@@ -151,6 +152,7 @@ function NotificationsSettings() {
         {push.supportReason && <p className="mb-3 text-sm text-[var(--text-muted)]">{push.supportReason}</p>}
         {push.error && <p className="mb-3 text-sm text-red-200" role="alert">{push.error}</p>}
         {!push.nativeApp && <Button variant="secondary" onClick={() => setSetupOpen(true)}>Notification setup</Button>}
+        {push.nativeApp && <NativeBadgeDiagnostics />}
       </section>
 
       {preferences && <>
