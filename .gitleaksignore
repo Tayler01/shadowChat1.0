@@ -18,3 +18,5 @@ e3df2ebcdf44fab9d8c4445079aeb03367d58983:apps/mobile/google-services.json:gcp-ap
 25930141ad53d3e042314e369664829c788592c0:docs/shadow-circuit/LEVEL_STATUS.csv:generic-api-key:207
 25930141ad53d3e042314e369664829c788592c0:docs/shadow-circuit/LEVEL_STATUS.csv:generic-api-key:228
 25930141ad53d3e042314e369664829c788592c0:docs/shadow-circuit/LEVEL_STATUS.csv:generic-api-key:234
+# Synthetic installation UUID in the iOS transport regression; not an API credential.
+16e9983ba94348cbcdc5c64fde6734418903d27b:apps/mobile/tests/native-notification-ios-transport.test.cjs:generic-api-key:24
