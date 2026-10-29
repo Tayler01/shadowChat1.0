@@ -2,6 +2,15 @@
 
 ## October 29 submission reconciliation
 
+Subsequent release: the streamlined member and demo sites now serve verified
+source `dba49386`, and native 1.0.0 (23) is Apple VALID and available in the
+existing internal TestFlight group. The full website deployment/configuration
+is unchanged. Startup/community/settings polish and notification tap/badge
+repairs are included. Physical acceptance of those repairs remains pending;
+build-22 DM and group alert delivery was confirmed and all test fixtures were
+cleaned. An intermittent member group-window HTTP 500 remains under diagnosis.
+No final policy/privacy cutover or public App Review submission occurred.
+
 Fresh Apple readback still shows PREPARE_FOR_SUBMISSION, selected build 20,
 zero screenshot sets, and empty support/privacy URLs. Metadata remains saved;
 no public review has been submitted. Build 22 is the existing TestFlight build,

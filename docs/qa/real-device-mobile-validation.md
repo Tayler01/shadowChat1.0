@@ -1,5 +1,30 @@
 # Real-Device Mobile Validation
 
+## October 29 build 23 available for physical acceptance
+
+Source `dba49386a6cdf341aff1a7861062bdbd23204efa` is published to both separate
+streamlined sites: member `6ae3c84719824d42cc44bb86`, demo
+`6ae3c61edf81feae481cf4e1`. Full `6ae27abba1ab469521956722` and its configuration,
+functions and schedules were preserved. Both staged and live phone-browser
+checks passed required sign-in/DM/media/Settings scenarios with documented
+transient observations; browser checks are not physical native acceptance.
+
+Native 1.0.0 (23), EAS `76b8e3a7-172e-440e-8c61-c9e550aa4995`, Apple
+`f0aa3b1b-8511-4202-b60e-37553cc8de6a`, is VALID and IN_BETA_TESTING in the
+existing internal group. Signed IPA SHA256:
+`eb6580261d20df96c6b9b959c4b19e1c027b6e62bb356de077077345e51e4be4`.
+All 91 mobile tests, native lint/typecheck/audit, Hermes export and exact archive
+checks passed. Web lint/typechecks/builds and CI passed. Existing testers and
+older builds were preserved; no public App Review submission was made.
+
+User confirmation is still required for the continuous native startup cover,
+Settings-only community controls, correct DM notification tap destination and
+home-screen badge clearing. A live member WebKit check saw an intermittent
+group-window HTTP 500 while the page recovered; this is retained for backend
+investigation, not described as repaired. Native App Store screenshots still
+require actual iPhone captures. Evidence is under
+`output/release-evidence/native-build23-preparation/`.
+
 ## October 29 follow-up on build 22
 
 The user reported visible startup-loader handoffs, a changing progress-bar
