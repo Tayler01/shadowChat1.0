@@ -231,12 +231,13 @@ export const displayAndroidNotificationEnvelope = async (
 };
 
 export const parseNotifeeEnvelope = (
-  notification: Notification | undefined
+  notification: Notification | undefined,
+  options: { interaction?: boolean } = {}
 ) => {
   const raw = notification?.data?.envelopeV2;
   if (typeof raw !== 'string') return null;
   try {
-    return parseNotificationEnvelopeV2(JSON.parse(raw));
+    return parseNotificationEnvelopeV2(JSON.parse(raw), options);
   } catch {
     return null;
   }

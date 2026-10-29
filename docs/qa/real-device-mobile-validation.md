@@ -20,6 +20,32 @@ stable green bar, Settings-only community switching, and repeat demo sign-in.
 No connected iPhone or usable simulator is currently exposed to the agent;
 new native App Store screenshots and physical push proof remain outstanding.
 
+The same day, the user confirmed the reviewer login now works. Two explicitly
+requested text-only Demo Member DMs reached the sole reviewer build-22 native
+installation, with provider acceptance approximately 36 seconds and 8 seconds
+after insert under the bounded minute schedule. The user then confirmed an
+alert arrived, but tapping opened General Chat instead of the DM and the home
+screen badge remained 1 after manually opening the message. Thus physical
+delivery is confirmed; tap routing and read/badge clearing fail acceptance.
+Group-chat notification testing is held because the reviewer has group alerts
+muted. No preference was changed without the requested permission.
+
+The follow-up identified a concrete routing parser mismatch: PostgreSQL emitted
+six fractional-second digits, while native envelope validation accepted at most
+three. The repair normalizes timestamps before parsing, preserves strict
+presentation expiry, and permits explicit taps on already-delivered alerts
+without reusing expired enrichment. Streamlined navigation now survives cold
+WebView startup and repeated taps to the same destination. Read events request
+a canonical native badge refresh with coalesced reads and ordered, identity-
+fenced OS writes. Local tests pass; installed-device acceptance requires build 23.
+
+The user subsequently approved temporarily unmuting the demo reviewer for one
+group test. The separate test ledger records the preference restoration and
+dispatch result; do not infer physical delivery from provider acceptance.
+The user then confirmed the group alert appeared while backgrounded. Both DM
+and group physical delivery are confirmed on build 22; routing/badge acceptance
+remains failed until the successor is tested. Original group mute was restored.
+
 ## October 28 streamlined iPhone build 22
 
 - The user confirmed TestFlight 1.0.0 (22) after a full close and reopen:

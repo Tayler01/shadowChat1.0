@@ -42,6 +42,7 @@ import {
 } from '@/types/notification-envelope-v2';
 import { runNotificationStage } from '@/lib/notifications/registrationPipeline';
 import type { NativeNotificationStage } from '@/lib/nativeAppBridge';
+import { createBadgeSynchronizer, queueBadgeWrite } from '@/lib/notifications/badgeSynchronizer';
 
 type NativeNotificationsContextValue = {
   enabled: boolean;
@@ -58,6 +59,7 @@ type NativeNotificationsContextValue = {
     enrollmentUserId?: string | null
   ) => Promise<void>;
   disableThisDevice: (requestId?: string | null) => Promise<void>;
+  refreshBadge: () => Promise<void>;
 };
 
 const NativeNotificationsContext =
@@ -67,13 +69,15 @@ const createNativeNotificationRequestId = (prefix: string) =>
   `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const parseEnvelopeFromNotification = (
-  notification: Notifications.Notification
+  notification: Notifications.Notification,
+  interaction = false
 ) => {
   const data = notification.request.content.data ?? {};
   return parseNotificationEnvelopeV2(
     data.envelopeV2 ??
     data.notificationEnvelopeV2 ??
-    data
+    data,
+    { interaction: appRuntime.streamlined && interaction }
   );
 };
 
@@ -141,15 +145,15 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   const registration=useMemo(()=>bindCommunityRegistration(context),[context]);
   const client=useMemo(()=>getSupabase(context),[context]);
   const valid=useCallback(()=>isCurrentCommunity(context),[context]);
-  const getEnvelopeFromNotification=useCallback((notification:Notifications.Notification)=>{
+  const getEnvelopeFromNotification=useCallback((notification:Notifications.Notification, interaction = false)=>{
     const identity=rememberedInstallation(context.community);
     if(!valid()||(appRuntime.streamlined && (identity?.userId!==sessionRef.current?.user.id||!scopeMatchesInstallation(context.community,identity,notification.request.content.data))))return null;
-    return parseEnvelopeFromNotification(notification);
+    return parseEnvelopeFromNotification(notification, interaction);
   },[context,valid]);
-  const scopedNotifee=useCallback((notification:Parameters<typeof parseNotifeeEnvelope>[0])=>{
+  const scopedNotifee=useCallback((notification:Parameters<typeof parseNotifeeEnvelope>[0], interaction = false)=>{
     const identity=rememberedInstallation(context.community);
     if(!valid()||(appRuntime.streamlined && (identity?.userId!==sessionRef.current?.user.id||!scopeMatchesInstallation(context.community,identity,notification?.data))))return null;
-    return parseNotifeeEnvelope(notification);
+    return parseNotifeeEnvelope(notification, { interaction: appRuntime.streamlined && interaction });
   },[context,valid]);
   const [session, setSession] = useState<Session | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -167,6 +171,12 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   const pendingNotifeeEventRef =
     useRef<Pick<NotifeeEvent, 'type' | 'detail'> | null>(null);
   const sessionRef = useRef<Session | null>(null);
+  const badgeProviderActive = useRef(true);
+  const badgeUpdatesAllowed = useRef(true);
+  useEffect(() => {
+    badgeProviderActive.current = true;
+    return () => { badgeProviderActive.current = false; };
+  }, []);
   const registrationInFlightRef = useRef<{
     requestId: string;
     promise: Promise<void>;
@@ -212,27 +222,22 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     return request;
   }, [handleCredentialRejection, registration]);
 
-  const syncBadgeCount = useCallback(() => runCommunityOperation(context,async () => {
-    if(!valid())return;
-    const { data, error: badgeError } = await client.rpc(
-      'get_app_badge_state_v2'
-    );
-    if (badgeError) throw badgeError;
-    const record = (
-      data && typeof data === 'object' && !Array.isArray(data)
-        ? data as Record<string, unknown>
-        : {}
-    );
-    if(!valid())return;
-    const total = Number(record.total ?? 0);
-    const bounded = Number.isFinite(total)
-      ? Math.max(0, Math.min(99, Math.floor(total)))
-      : 0;
-    await Promise.all([
-      Notifications.setBadgeCountAsync(bounded),
-      notifee.setBadgeCount(bounded),
-    ]);
-  }), [client, context, valid]);
+  const badgeSynchronizer = useMemo(() => createBadgeSynchronizer({
+    identity: () => badgeProviderActive.current && badgeUpdatesAllowed.current && valid() ? sessionRef.current?.user.id ?? null : null,
+    read: async () => {
+      const { data, error: badgeError } = await client.rpc('get_app_badge_state_v2');
+      if (badgeError) throw badgeError;
+      return data;
+    },
+    apply: async count => {
+      await Promise.all([
+        Notifications.setBadgeCountAsync(count),
+        notifee.setBadgeCount(count),
+      ]);
+    },
+  }), [client, valid]);
+  const syncBadgeCount = useCallback(() => runCommunityOperation(context,
+    () => badgeSynchronizer.sync()), [badgeSynchronizer, context]);
 
   const dismissEnvelopeNotifications = useCallback((eventIds: string[]) => runCommunityOperation(context,async () => {
     const targetIds = new Set(eventIds);
@@ -308,7 +313,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     const responseId = response.notification.request.identifier;
     if (handledResponseIds.current.has(responseId)) return;
 
-    const envelope = getEnvelopeFromNotification(response.notification);
+    const envelope = getEnvelopeFromNotification(response.notification, true);
     if (!envelope) return;
     handledResponseIds.current.add(responseId);
 
@@ -334,7 +339,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       pendingNotifeeEventRef.current = event;
       return;
     }
-    const envelope = scopedNotifee(event.detail.notification);
+    const envelope = scopedNotifee(event.detail.notification, true);
     if (!envelope) return;
     const actionKey = [
       event.detail.notification?.id ?? envelope.eventId,
@@ -403,6 +408,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
           },
         });
         if (isCurrent()) {
+          badgeUpdatesAllowed.current = result.enabled;
           setEnabled(result.enabled);
           setPermission(result.permission);
           setStage(result.enabled ? 'ready' : 'idle');
@@ -452,6 +458,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
   );
 
   const disableThisDevice = useCallback((nextRequestId?: string | null) => runCommunityOperation(context,async () => {
+    badgeUpdatesAllowed.current = false;
     setRequestId(
       nextRequestId ?? createNativeNotificationRequestId('disable')
     );
@@ -464,9 +471,10 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       await registration.revokeNativeNotificationInstallation();
       await Promise.all([
         Notifications.dismissAllNotificationsAsync(),
-        Notifications.setBadgeCountAsync(0),
         notifee.cancelAllNotifications(),
-        notifee.setBadgeCount(0),
+        queueBadgeWrite(async () => {
+          await Promise.all([Notifications.setBadgeCountAsync(0), notifee.setBadgeCount(0)]);
+        }),
       ]);
       setEnabled(false);
       setStage('idle');
@@ -512,6 +520,9 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
 
     const applySession = (nextSession: Session | null) => {
       const priorSession = sessionRef.current;
+      if (nextSession?.user.id !== priorSession?.user.id) {
+        badgeUpdatesAllowed.current = Boolean(nextSession?.user);
+      }
       sessionRef.current = nextSession;
       setSession(nextSession);
 
@@ -557,9 +568,6 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     syncLease(AppState.currentState === 'active');
     const appStateSubscription = AppState.addEventListener('change', state => {
       syncLease(state === 'active');
-      if (state === 'active') {
-        if (session?.user) void syncBadgeCount().catch(() => undefined);
-      }
     });
     const intervalId = setInterval(() => {
       if (AppState.currentState === 'active') syncLease(true);
@@ -570,6 +578,15 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
       if(valid())syncLease(false);
     };
   }, [permission, enabled, session?.user, syncBadgeCount, handleCredentialRejection, registration, valid]);
+
+  useEffect(() => {
+    if (!session?.user.id) return;
+    void syncBadgeCount().catch(() => undefined);
+    const subscription = AppState.addEventListener('change', state => {
+      if (state === 'active') void syncBadgeCount().catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, [session?.user.id, syncBadgeCount]);
 
   useEffect(() => {
     const refreshPermission = async () => {
@@ -681,7 +698,9 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
           }
         }
       )
-      .subscribe();
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED' && valid()) void syncBadgeCount().catch(() => undefined);
+      });
     return () => {
       void client.removeChannel(channel);
     };
@@ -705,6 +724,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     stage,
     enable,
     disableThisDevice,
+    refreshBadge: syncBadgeCount,
   }), [
     busy,
     disableThisDevice,
@@ -714,6 +734,7 @@ export function NativeNotificationsProvider({ children }: { children: ReactNode 
     permission,
     requestId,
     stage,
+    syncBadgeCount,
   ]);
 
   return (

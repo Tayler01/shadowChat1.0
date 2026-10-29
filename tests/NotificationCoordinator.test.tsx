@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { NotificationCoordinatorProvider } from '../src/features/notifications/NotificationCoordinator'
+import { NotificationCoordinatorProvider as StreamlinedNotificationCoordinatorProvider } from '../apps/streamlined/src-overrides/features/notifications/NotificationCoordinator'
 import {
   claimNotificationEvent,
   clearNotificationEventFromSystemTray,
@@ -16,6 +17,9 @@ import {
 } from '../src/lib/appBadge'
 
 jest.mock('../src/hooks/useAuth', () => ({ useAuth: jest.fn() }))
+jest.mock('../apps/streamlined/src-overrides/hooks/useAuth', () => jest.requireMock('../src/hooks/useAuth'))
+jest.mock('../apps/streamlined/src-overrides/lib/supabase', () => jest.requireMock('../src/lib/supabase'))
+jest.mock('../apps/streamlined/src-overrides/lib/notificationInstallation', () => jest.requireMock('../src/lib/notificationInstallation'))
 jest.mock('../src/hooks/useIsDesktop', () => ({ useIsDesktop: jest.fn() }))
 jest.mock('../src/hooks/useSoundEffects', () => ({
   useSoundEffects: () => ({ playNotificationCue: jest.fn() }),
@@ -101,7 +105,21 @@ describe('NotificationCoordinatorProvider', () => {
   })
 
   afterEach(() => {
+    delete window.ReactNativeWebView
     jest.restoreAllMocks()
+  })
+
+  it('streamlined confirmed-read refresh reaches native without sending or inventing a badge count', async () => {
+    const postMessage = jest.fn()
+    window.ReactNativeWebView = { postMessage }
+    const view = render(<StreamlinedNotificationCoordinatorProvider><main>App</main></StreamlinedNotificationCoordinatorProvider>)
+    await waitFor(() => expect(insertHandler).toBeDefined())
+    act(() => window.dispatchEvent(new Event('shadowchat:app-badge-refresh')))
+    expect(postMessage).toHaveBeenCalledWith(JSON.stringify({ version: 1, type: 'notifications_badge_refresh' }))
+    const calls = postMessage.mock.calls.length
+    view.unmount()
+    act(() => window.dispatchEvent(new Event('shadowchat:app-badge-refresh')))
+    expect(postMessage).toHaveBeenCalledTimes(calls)
   })
 
   it('uses one notification_events subscription, atomically claims, routes, and clears', async () => {

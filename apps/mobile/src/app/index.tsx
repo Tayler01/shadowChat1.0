@@ -34,7 +34,7 @@ import {
   type NativeWebMessage,
 } from '@/lib/nativeAppBridge';
 import { runNotificationStage } from '@/lib/notifications/registrationPipeline';
-import { getNotificationWebUrl } from '@/lib/notifications/routes';
+import { getNotificationWebUrl, nextNotificationNavigationTarget, type NotificationNavigationTarget } from '@/lib/notifications/routes';
 import {
   getNativeNotificationInstallationCredential,
   getNativeNotificationInstallationKey,
@@ -95,6 +95,9 @@ export default function ShadowChatAppScreen() {
   const APP_ORIGIN=context.community.origin;
   const APP_URL=new URL(`/?nativeApp=1&nativeBridge=${appRuntime.streamlined ? 4 : 3}`,APP_ORIGIN).href;
   const isAllowedAppUrl=useCallback((value:string)=>communityController?.acceptsBridge(context,value)===true || (value==='about:blank' && isCurrentCommunity(context)),[context]);
+  // Declarative native navigation survives a cold-start WebView that cannot yet
+  // execute injected JavaScript. This state is discarded with its community.
+  const [notificationTarget, setNotificationTarget] = useState<NotificationNavigationTarget | null>(null);
   const webViewRef = useRef<WebView>(null);
   const clipboardBridge = useNativeClipboardBridge(webViewRef, APP_ORIGIN);
   const commandQueueRef = useRef<SerializedCommandQueue | null>(null);
@@ -165,6 +168,10 @@ export default function ShadowChatAppScreen() {
 
   const navigateInsideApp = useCallback((url: string) => {
     if (!isAllowedAppUrl(url)) return;
+    if (appRuntime.streamlined) {
+      setNotificationTarget(previous => nextNotificationNavigationTarget(previous, url));
+      return;
+    }
     const serializedUrl = JSON.stringify(url);
     webViewRef.current?.injectJavaScript(`
       window.location.assign(${serializedUrl});
@@ -271,6 +278,12 @@ export default function ShadowChatAppScreen() {
           : 'The native notification handshake failed.';
         setBridgeError(messageText);
       });
+      return;
+    }
+
+    if (message.type === 'notifications_badge_refresh') {
+      if (!appRuntime.streamlined) return;
+      void nativeNotifications.refreshBadge().catch(() => undefined);
       return;
     }
 
@@ -504,7 +517,7 @@ export default function ShadowChatAppScreen() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
       <WebView
-        key={reloadKey}
+        key={appRuntime.streamlined ? `${reloadKey}:${notificationTarget?.revision ?? 0}` : reloadKey}
         ref={webViewRef}
         allowsBackForwardNavigationGestures
         allowsInlineMediaPlayback
@@ -557,7 +570,7 @@ export default function ShadowChatAppScreen() {
         setSupportMultipleWindows={false}
         sharedCookiesEnabled={!appRuntime.streamlined}
         source={{
-          uri: APP_URL,
+          uri: appRuntime.streamlined ? notificationTarget?.url ?? APP_URL : APP_URL,
           headers: {
             'Cache-Control': 'no-cache',
             Pragma: 'no-cache',

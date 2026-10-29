@@ -33,6 +33,7 @@ export type NativeNotificationState = {
 
 type NativeAppOutboundMessage =
   | { version: 1; type: 'community_choose' }
+  | { version: 1; type: 'notifications_badge_refresh' }
   | { version: 1; type: 'bridge_ready' }
   | {
       version: 1

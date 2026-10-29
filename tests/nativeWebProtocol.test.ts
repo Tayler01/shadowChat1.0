@@ -5,6 +5,9 @@ const ticket = `${requestId}.${'a'.repeat(64)}`
 const userId = '22222222-2222-4222-8222-222222222222'
 
 describe('native web protocol compatibility', () => {
+  it('badge hints carry no web-supplied badge count into the native API', () => {
+    expect(parseNativeWebMessage('{"version":1,"type":"notifications_badge_refresh","count":0}')).toEqual({ version: 1, type: 'notifications_badge_refresh' })
+  })
   it('accepts only the current version of the explicit community chooser command', () => {
     expect(parseNativeWebMessage('{"version":1,"type":"community_choose"}')).toEqual({ version: 1, type: 'community_choose' })
     expect(parseNativeWebMessage('{"version":2,"type":"community_choose"}')).toBeNull()

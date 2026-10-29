@@ -168,11 +168,16 @@ const isNullableBoundedString = (
   (typeof value === 'string' && value.length <= maxLength)
 );
 
-const isNotificationDateTime = (value: unknown): value is string => (
-  typeof value === 'string' &&
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value) &&
-  Number.isFinite(Date.parse(value))
-);
+// PostgreSQL timestamps carry microseconds; Hermes only guarantees ECMAScript
+// millisecond ISO parsing. Normalize for validation without changing the payload.
+export const notificationDateTimeMilliseconds = (value: unknown): number => {
+  if (typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) return Number.NaN;
+  const normalized = value.replace(/\.(\d{1,6})(?=Z|[+-])/, (_, fraction: string) => `.${fraction.padEnd(3, '0').slice(0, 3)}`);
+  return Date.parse(normalized);
+};
+const isNotificationDateTime = (value: unknown): value is string =>
+  Number.isFinite(notificationDateTimeMilliseconds(value));
 
 const isPrivateIpv4 = (hostname: string) => {
   const octets = hostname.split('.');
@@ -253,7 +258,8 @@ export const normalizeNativeNotificationMediaUrl = (value: unknown) => {
 };
 
 export const parseNotificationEnvelopeV2 = (
-  value: unknown
+  value: unknown,
+  options: { interaction?: boolean } = {}
 ): NotificationEnvelopeV2 | null => {
   const record = asRecord(value);
   const eventIds = Array.isArray(record.eventIds) ? record.eventIds : [];
@@ -261,9 +267,7 @@ export const parseNotificationEnvelopeV2 = (
   const content = asRecord(record.content);
   const media = record.media === null ? null : asRecord(record.media);
   const actions = Array.isArray(record.actions) ? record.actions : [];
-  const expiresAt = typeof record.expiresAt === 'string'
-    ? Date.parse(record.expiresAt)
-    : Number.NaN;
+  const expiresAt = notificationDateTimeMilliseconds(record.expiresAt);
 
   const valid = (
     hasExactKeys(record, envelopeKeys) &&
@@ -332,8 +336,15 @@ export const parseNotificationEnvelopeV2 = (
     isNotificationDateTime(record.createdAt) &&
     isNotificationDateTime(record.expiresAt) &&
     Number.isFinite(expiresAt) &&
-    expiresAt > Date.now()
+    (expiresAt > Date.now() || options.interaction === true) &&
+    (!options.interaction || (
+      notificationDateTimeMilliseconds(record.createdAt) <= Date.now() + 60_000 &&
+      expiresAt > notificationDateTimeMilliseconds(record.createdAt)
+    ))
   );
 
-  return valid ? record as unknown as NotificationEnvelopeV2 : null;
+  if (!valid) return null;
+  // A user can open an already-delivered notification after its presentation
+  // TTL. Never reuse its expired enrichment; the destination fetches as caller.
+  return (options.interaction ? { ...record, actor: null, media: null } : record) as unknown as NotificationEnvelopeV2;
 };

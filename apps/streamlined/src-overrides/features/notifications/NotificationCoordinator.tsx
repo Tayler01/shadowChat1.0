@@ -12,6 +12,7 @@ import {
 } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { STREAMLINED_EDITION } from '../../config/featureFlags'
+import { postNativeAppMessage } from '../../../../../src/lib/nativeAppBridge'
 import { useAuth } from '../../hooks/useAuth'
 import { useIsDesktop } from '../../../../../src/hooks/useIsDesktop'
 import { useSoundEffects } from '../../../../../src/hooks/useSoundEffects'
@@ -507,6 +508,9 @@ export function NotificationCoordinatorProvider({ children }: { children: ReactN
       beginVisibleSession()
     }
     const handleBadgeRequest = () => {
+      // WebKit does not implement the native home-screen badge API. Send only
+      // a refresh hint; the native client reads the canonical count itself.
+      postNativeAppMessage({ version: 1, type: 'notifications_badge_refresh' })
       if (pageActive && document.visibilityState === 'visible') {
         void refreshBadgeState().catch(() => undefined)
       }

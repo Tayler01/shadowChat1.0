@@ -20,3 +20,10 @@ export const normalizeNotificationRoute = (value: unknown) => {
 export const getNotificationWebUrl = (route: string) => {
   return new URL(normalizeNotificationRoute(route), appRuntime.origin).href;
 };
+
+export type NotificationNavigationTarget = { url: string; revision: number };
+// A new tap to the same DM still navigates after the web UI has moved elsewhere.
+export const nextNotificationNavigationTarget = (
+  previous: NotificationNavigationTarget | null,
+  url: string
+): NotificationNavigationTarget => ({ url, revision: (previous?.revision ?? 0) + 1 });
