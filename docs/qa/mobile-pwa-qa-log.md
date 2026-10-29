@@ -1,3 +1,60 @@
+## October 29 shared backend performance recovery
+
+- The user reported broad production slowness and a full-app ShadowPin feed
+  that would not load. Earlier phone QA recorded SQL `57014` timeouts across
+  chat, DM and badge RPCs plus an Auth 504. The legacy native/receipt/collector
+  jobs and native canary were already disabled; they were not re-enabled.
+- With the user's memory-upgrade authorization, production
+  `shsqqouecvdoifzufkqm` moved from Nano (up to 0.5 GB) to Micro (1 GB).
+  The dashboard confirmed the same $0.01344/hour price and $0 additional
+  monthly cost. The required restart completed at 23:42:14 UTC; SQL and project
+  health recovered by 23:42:24. No full-app code, website deployment, privacy
+  switch, access rule or native delivery gate changed.
+- This is not proof that RAM alone caused the incident: the resize/restart also
+  reset the unlogged `net._http_response` heap from about 110 MB to 8 KB. Fresh
+  cleanup calls were inexpensive. The old response collector remained stopped.
+  Avoid speculative extension-table changes or restoring historical workers.
+- Unchanged full production passed phone WebKit/Chromium auth, resumed text
+  chat, DM delivery, unread clearing and reload checks. ShadowPin's first image
+  decoded in 2.48/2.83 seconds after navigation; category requests took
+  250/403 ms. The staged streamlined edition passed all 12 checks per engine
+  that had previously encountered backend timeouts. Signed media also decoded.
+  Full ShadowPin and media probes recorded 85 and 44 HTTP responses respectively
+  with no HTTP errors. Three WebKit JavaScript observations remain recorded;
+  a navigation/cancellation cause is not established. They did not prevent
+  the functional assertions from passing.
+- All two group and eight DM test messages and linked events were removed;
+  no media was uploaded. All 11 owned browser sessions were revoked and test
+  processes closed. The user confirmed the app felt normal again.
+- Isolated demo capacity checks passed: 20 ordinary authenticated clients made
+  280 operations (including ten DM send/read checks), with zero errors and
+  worst read 594 ms. A separate run held 60 private realtime subscriptions
+  across 20 clients and completed 240 reads, with zero errors and worst read
+  570 ms. All 40 temporary accounts and associated fixtures were removed and
+  baseline counts restored. These use a small demo dataset, not production
+  load or 20-recipient native push; the native canary remains limited to ten.
+- The final production snapshot at 23:48:29 UTC found no blockers or idle
+  transactions. The checked post-restart log window contained no statement
+  timeouts, Auth 5xx or deadlocks. This bounded observation does not prove
+  long-term freedom from resource pressure.
+- A dedicated local schema-only database with synthetic 4,500 General messages,
+  1,100 DMs, 42,000 notifications and 300 Pins completed 39,974 transactions
+  across 20 authenticated SQL sessions in 60 seconds with zero failures.
+  Overall p95/p99 were 178/228 ms; the heaviest General window had p95 236 ms.
+  Caller/RLS assertions passed. A ten-recipient native stub drained five
+  two-event batches without duplicate claims or provider calls; 28 existing
+  worker tests passed. The owned database and temporary directory were removed.
+  This used uncapped local hardware: it proves volume/query correctness and
+  concurrency, not equivalent managed Micro capacity or physical push delivery.
+  Detailed plans and cleanup: `web-qa/capacity-local/RESULTS.md` under the
+  build-24 evidence directory below. No speculative query tuning was deployed.
+- Evidence: `output/release-evidence/native-build24-preparation/web-qa/`
+  (`production-compute-recovery.json`, `full-micro-shadowpin-1`, `member-4`,
+  `member-5`, and `member-1/post-compute-final-health.json`), plus
+  `output/release-evidence/native-push-readiness-20261028/demo-capacity-20.json`
+  and `demo-capacity-ws20.json`. The newly passing member-web acceptance is
+  prepared but not a publication receipt; both production websites are unchanged.
+
 ## October 28 startup and search stability
 
 - Streamlined search now responds to intentional touch/wheel movement, not

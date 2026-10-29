@@ -4,6 +4,15 @@ This document turns the June 1, 2026 read-only audit into an implementation back
 
 ## October 23 streamlined release preparation
 
+October 29 performance recovery: the shared production database was upgraded
+from Nano to Micro at the same price after cross-RPC timeouts and ShadowPin
+loading failures. Full and streamlined phone checks now pass, and the user
+confirmed recovery. Legacy native collectors remain disabled. The accompanying
+restart also cleared a large unlogged HTTP-response heap, so sole causation by
+RAM is unproven. Twenty-client isolated API/realtime checks passed; production
+native fanout remains separately gated. See the October 29 recovery entry in
+[mobile QA](qa/mobile-pwa-qa-log.md) for measurements, cleanup and limits.
+
 October 28 DM follow-up: published streamlined Chromium exposed an indefinite
 inbox-restoration state. A streamlined-only bounded load/retry repair now passes
 focused tests and both phone-browser fault-injection checks, with account and
