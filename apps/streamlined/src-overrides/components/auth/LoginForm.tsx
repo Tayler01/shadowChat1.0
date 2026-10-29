@@ -43,7 +43,7 @@ const clearRecoveryUrlState = () => {
   window.history.replaceState({}, '', `${url.pathname}${url.search}`);
 };
 
-export function LoginForm() {
+export function LoginForm({ settingsAction }: { settingsAction?: React.ReactNode } = {}) {
   const [view, setView] = useState<AuthView>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -585,6 +585,7 @@ export function LoginForm() {
               )}
             </form>
           )}
+          {settingsAction}
         </div>
         {STREAMLINED_EDITION && (
           <nav aria-label="Public policies and support" className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-1 text-xs text-[var(--text-secondary)]">

@@ -1,5 +1,25 @@
 # Real-Device Mobile Validation
 
+## October 29 follow-up on build 22
+
+The user reported visible startup-loader handoffs, a changing progress-bar
+layout, an unwanted top-level Change community control, and a failed reviewer
+login despite selecting Demo. These reports supersede treating the earlier
+launch acceptance as complete polish acceptance.
+
+The exact private reviewer file was rechecked against demo Auth and actual
+Chromium and WebKit sign-in with native query parameters. Both reached chat;
+the account remains ordinary, confirmed and acknowledged. Earlier demo Auth
+logs contain invalid-credentials responses, but the submitted values are not
+available: the precise phone-input cause is unproven. No password was changed.
+All five probe sessions were revoked and no content was created. Evidence:
+`output/release-evidence/demo-bootstrap-20261028/reviewer-login-recheck-20261029.json`.
+
+The next native build must be physically checked for a continuous launch cover,
+stable green bar, Settings-only community switching, and repeat demo sign-in.
+No connected iPhone or usable simulator is currently exposed to the agent;
+new native App Store screenshots and physical push proof remain outstanding.
+
 ## October 28 streamlined iPhone build 22
 
 - The user confirmed TestFlight 1.0.0 (22) after a full close and reopen:

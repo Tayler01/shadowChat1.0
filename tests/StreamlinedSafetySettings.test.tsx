@@ -5,13 +5,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StreamlinedAccountSettings, StreamlinedSettings } from '../src/streamlined/StreamlinedSettings'
 import { useAuth } from '../apps/streamlined/src-overrides/hooks/useAuth'
 import { useAdminAccess } from '../src/hooks/useAdminAccess'
+import { usePushNotifications } from '../src/hooks/usePushNotifications'
 import { listMyModerationReports } from '../src/lib/moderationCases'
 import { getWorkingClient } from '../apps/streamlined/src-overrides/lib/supabase'
 
 jest.mock('../apps/streamlined/src-overrides/hooks/useAuth', () => ({ useAuth: jest.fn() }))
 jest.mock('../src/hooks/useAdminAccess', () => ({ useAdminAccess: jest.fn() }))
 jest.mock('../src/hooks/usePwaInstallPrompt', () => ({ usePwaInstallPrompt: () => ({}) }))
-jest.mock('../src/hooks/usePushNotifications', () => ({ usePushNotifications: () => ({}) }))
+jest.mock('../src/hooks/usePushNotifications', () => ({ usePushNotifications: jest.fn() }))
 jest.mock('../src/lib/push', () => ({ getBrowserTimeZone: () => 'UTC' }))
 jest.mock('../apps/streamlined/src-overrides/lib/supabase', () => ({ getWorkingClient: jest.fn(), getRealtimeClient: jest.fn() }))
 jest.mock('../src/lib/moderationCases', () => ({
@@ -35,6 +36,7 @@ const client = { channel: jest.fn(), removeChannel: jest.fn() }
 
 beforeEach(() => {
   jest.clearAllMocks()
+  jest.mocked(usePushNotifications).mockReturnValue({} as ReturnType<typeof usePushNotifications>)
   window.history.replaceState({}, '', '/?view=settings')
   window.sessionStorage.clear()
   jest.mocked(useAuth).mockReturnValue({
@@ -70,11 +72,61 @@ test('restricted account access permits leaving or deleting without profile uplo
   expect(deleteAccount).not.toHaveBeenCalled()
 })
 
+test('community settings waits for successful web sign-out before asking native to switch', async () => {
+  const postMessage = jest.fn()
+  window.ReactNativeWebView = { postMessage }
+  window.history.replaceState({}, '', '/?nativeApp=1&nativeBridge=4')
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true)
+  let finish!: () => void
+  const signOut = jest.fn(() => new Promise<void>(resolve => { finish = resolve }))
+  jest.mocked(useAuth).mockReturnValue({ ...useAuth(), signOut })
+  try {
+    render(<StreamlinedAccountSettings allowProfileEditing={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Change community' }))
+    expect(signOut).toHaveBeenCalledTimes(1)
+    expect(postMessage).not.toHaveBeenCalled()
+    finish()
+    await waitFor(() => expect(postMessage).toHaveBeenCalledWith(JSON.stringify({ version: 1, type: 'community_choose' })))
+  } finally {
+    confirm.mockRestore()
+    delete window.ReactNativeWebView
+  }
+})
+
+test('failed sign-out cannot change community', async () => {
+  const postMessage = jest.fn()
+  window.ReactNativeWebView = { postMessage }
+  window.history.replaceState({}, '', '/?nativeApp=1&nativeBridge=4')
+  const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true)
+  const signOut = jest.fn().mockRejectedValue(new Error('Sign out unavailable'))
+  jest.mocked(useAuth).mockReturnValue({ ...useAuth(), signOut })
+  try {
+    render(<StreamlinedAccountSettings allowProfileEditing={false} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Change community' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Change community' })).toBeEnabled())
+    expect(signOut).toHaveBeenCalledTimes(1)
+    expect(postMessage).not.toHaveBeenCalled()
+  } finally {
+    confirm.mockRestore()
+    delete window.ReactNativeWebView
+  }
+})
+
 test('main settings has no app header or redundant back navigation', () => {
   const { container } = render(<StreamlinedSettings currentView="settings" onViewChange={onViewChange} />)
   expect(container.querySelector('header')).toBeNull()
   expect(screen.getByRole('heading', { name: 'Settings' })).toHaveClass('sr-only')
   expect(screen.queryByRole('button', { name: /Back to/ })).not.toBeInTheDocument()
+})
+
+test.each([true, false])('notification setup wizard is web-only (native=%s), preserving the push toggle', nativeApp => {
+  jest.mocked(usePushNotifications).mockReturnValue({ nativeApp, subscribed: false, loading: false, saving: false } as ReturnType<typeof usePushNotifications>)
+  render(<StreamlinedSettings currentView="settings" onViewChange={onViewChange} />)
+  fireEvent.click(screen.getByRole('button', { name: /^Notifications/i }))
+  expect(screen.getByRole('switch', { name: /Push notifications/ })).toBeInTheDocument()
+  const setup = screen.queryByRole('button', { name: 'Notification setup' })
+  if (nativeApp) expect(setup).not.toBeInTheDocument()
+  else expect(setup).toBeInTheDocument()
 })
 
 test('opens private report history and subscribes only to this member updates', async () => {

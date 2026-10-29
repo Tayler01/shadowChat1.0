@@ -6,6 +6,7 @@ export type NativeWebSession = {
 };
 
 export type NativeWebMessage =
+  | { version: 1; type: 'community_choose' }
   | { version: 1; type: 'bridge_ready' }
   | { version: 1; type: 'auth_session'; session: NativeWebSession | null }
   | {
@@ -81,6 +82,7 @@ export const parseNativeWebMessage = (raw: string): NativeWebMessage | null => {
 
   if (
     value.type === 'bridge_ready' ||
+    value.type === 'community_choose' ||
     value.type === 'notifications_open_settings' ||
     value.type === 'native_state_request'
   ) {

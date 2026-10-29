@@ -2,6 +2,7 @@ import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { StreamlinedLoadingView } from '../../../../../src/streamlined/components/StreamlinedLoadingView';
 import { LoginForm } from './LoginForm';
+import { SignInSettings } from '../../../../../src/streamlined/components/SignInSettings';
 import { SHADOW_CIRCUIT_ENABLED } from '../../config/featureFlags';
 import { getAccountDeletionState, subscribeAccountDeletion } from '../../../../../src/lib/accountDeletionReceipt';
 
@@ -33,7 +34,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   }
 
   if (!user) {
-    return <LoginForm />;
+    return <LoginForm settingsAction={<SignInSettings />} />;
   }
 
   return <>{children}</>;

@@ -46,14 +46,16 @@ import {
 } from '@/lib/serializedCommandQueue';
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { appRuntime } from '@/lib/appRuntime';
-import { NativeLaunchLoader } from '@/components/NativeLaunchLoader';
+import { pageLaunchProgress, parseLaunchProgress, STREAMLINED_LAUNCH_SCRIPT } from '@/lib/nativeLaunch';
 import { useCommunityBinding } from '@/community/NativeCommunityBoundary';
 import { addCommunityCleanup,announceCommunityChange,communityController,isCurrentCommunity,runCommunityOperation } from '@/community/communityBindings';
 import { resetCommunityMemory } from '@/lib/supabase';
+import { createCommunityChooserTransition } from '@/community/communityChooserTransition';
 
 const NATIVE_BOOTSTRAP_SCRIPT = `
   (function () {
     window.__SHADOWCHAT_NATIVE_APP__ = true;
+    window.__SHADOWCHAT_NATIVE_COMMUNITY_CHOOSER__ = ${JSON.stringify(appRuntime.streamlined)};
     if (document.documentElement) {
       document.documentElement.dataset.shadowchatNativeApp = 'true';
     }
@@ -86,9 +88,12 @@ function ConfigurationNotice() {
 }
 
 export default function ShadowChatAppScreen() {
-  const {context,requestChooser}=useCommunityBinding();
+  const {context,requestChooser,reportLaunch,restartLaunch}=useCommunityBinding();
+  useEffect(() => {
+    if (!isSupabaseConfigured) reportLaunch(1, 'Configuration required');
+  }, [reportLaunch]);
   const APP_ORIGIN=context.community.origin;
-  const APP_URL=new URL('/?nativeApp=1&nativeBridge=3',APP_ORIGIN).href;
+  const APP_URL=new URL(`/?nativeApp=1&nativeBridge=${appRuntime.streamlined ? 4 : 3}`,APP_ORIGIN).href;
   const isAllowedAppUrl=useCallback((value:string)=>communityController?.acceptsBridge(context,value)===true || (value==='about:blank' && isCurrentCommunity(context)),[context]);
   const webViewRef = useRef<WebView>(null);
   const clipboardBridge = useNativeClipboardBridge(webViewRef, APP_ORIGIN);
@@ -105,11 +110,11 @@ export default function ShadowChatAppScreen() {
     credentialChallenge: string;
   }>>());
   const pendingSessionLossRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const communityChooserTransition = useRef(createCommunityChooserTransition());
   commandQueueRef.current ??= createSerializedCommandQueue();
   notificationCommandQueueRef.current ??= createSerializedCommandQueue();
   const nativeNotifications = useNativeNotifications();
   const [webReady, setWebReady] = useState(false);
-  const [loadProgress, setLoadProgress] = useState<number | undefined>();
   const [canGoBack, setCanGoBack] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [bridgeError, setBridgeError] = useState<string | null>(null);
@@ -286,7 +291,27 @@ export default function ShadowChatAppScreen() {
       });
     };
 
+    if (message.type === 'community_choose') {
+      if (!appRuntime.streamlined) return;
+      if (pendingSessionLossRef.current) {
+        clearTimeout(pendingSessionLossRef.current);
+        pendingSessionLossRef.current = null;
+      }
+      // Explicit switching does not wait for the recovery grace period. Keep
+      // revocation and native sign-out ordered before opening the chooser.
+      void communityChooserTransition.current.request({
+        notificationQueue: notificationCommandQueueRef.current!,
+        sessionQueue: commandQueueRef.current!,
+        isCurrent: () => isCurrentCommunity(context),
+        revoke: () => nativeNotifications.disableThisDevice(`community-change-${Date.now()}`),
+        clearSession: () => syncNativeSession(null),
+        openChooser: requestChooser,
+      }).catch(caught => publishMessageError(caught));
+      return;
+    }
+
     if (message.type === 'auth_session') {
+      if (!communityChooserTransition.current.acceptsAuthSession()) return;
       const applySession = () => {
         void notificationCommandQueueRef.current?.enqueue(async () => {
           const installation =
@@ -423,6 +448,7 @@ export default function ShadowChatAppScreen() {
     publishNotificationState,
     publishTrackedNotificationState,
     syncNativeSession,
+    requestChooser,
   ]);
 
   useEffect(()=>addCommunityCleanup(context,async()=>{
@@ -442,10 +468,12 @@ export default function ShadowChatAppScreen() {
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     if (!communityController?.acceptsBridge(context,event.nativeEvent.url)) return;
+    const launch = appRuntime.streamlined ? parseLaunchProgress(event.nativeEvent.data) : null;
+    if (launch) { reportLaunch(launch.progress, launch.stage); return; }
     if (clipboardBridge.handle(event.nativeEvent.data, event.nativeEvent.url)) return;
     const message = parseNativeWebMessage(event.nativeEvent.data);
     if (message) processNativeMessage(message);
-  }, [clipboardBridge, context, processNativeMessage]);
+  }, [clipboardBridge, context, processNativeMessage, reportLaunch]);
 
   const handleNavigationChange = useCallback((navigation: WebViewNavigation) => {
     setCanGoBack(navigation.canGoBack);
@@ -475,7 +503,6 @@ export default function ShadowChatAppScreen() {
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={styles.safeArea}>
-      {!nativeUserId && appRuntime.streamlined ? <Pressable accessibilityRole="button" accessibilityLabel="Change community" onPress={requestChooser} style={{minHeight:48,justifyContent:'center',paddingHorizontal:16}}><Text style={{color:'#E9C766'}}>Change community{context.community.id==='demo'?' · Demo community':''}</Text></Pressable>:null}
       <WebView
         key={reloadKey}
         ref={webViewRef}
@@ -489,7 +516,7 @@ export default function ShadowChatAppScreen() {
         hideKeyboardAccessoryView
         contentInsetAdjustmentBehavior="never"
         decelerationRate="normal"
-        injectedJavaScriptBeforeContentLoaded={`window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = ${JSON.stringify(clipboardBridge.available)};${NATIVE_BOOTSTRAP_SCRIPT}`}
+        injectedJavaScriptBeforeContentLoaded={`window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = ${JSON.stringify(clipboardBridge.available)};${NATIVE_BOOTSTRAP_SCRIPT}${appRuntime.streamlined ? STREAMLINED_LAUNCH_SCRIPT : ''}`}
         javaScriptCanOpenWindowsAutomatically={false}
         javaScriptEnabled
         mediaPlaybackRequiresUserAction={false}
@@ -498,26 +525,28 @@ export default function ShadowChatAppScreen() {
           setReloadKey(value => value + 1);
         }}
         onError={(event) => {
+          reportLaunch(1, 'Connection interrupted');
           setLoadError(
             event.nativeEvent.description || 'Could not load ShadoChat.'
           );
         }}
         onHttpError={(event) => {
           if (event.nativeEvent.statusCode >= 500) {
+            reportLaunch(1, 'Connection interrupted');
             setLoadError(`ShadoChat returned ${event.nativeEvent.statusCode}.`);
           }
         }}
-        onLoadEnd={() => {
+        onLoad={() => {
           setWebReady(true);
-          setLoadError(null);
           publishNotificationState();
         }}
         onLoadStart={() => {
+          setLoadError(null);
           clipboardBridge.reset();
           setWebReady(false);
-          setLoadProgress(undefined);
+          reportLaunch(0.1, 'Loading community page');
         }}
-        onLoadProgress={(event) => setLoadProgress(event.nativeEvent.progress)}
+        onLoadProgress={(event) => reportLaunch(pageLaunchProgress(event.nativeEvent.progress), 'Loading community page')}
         onMessage={(event) => {
           void handleMessage(event);
         }}
@@ -534,19 +563,13 @@ export default function ShadowChatAppScreen() {
             Pragma: 'no-cache',
           },
         }}
-        startInLoadingState
+        startInLoadingState={!appRuntime.streamlined}
         style={styles.webView}
         thirdPartyCookiesEnabled={!appRuntime.streamlined}
         renderLoading={() => (
-          <View style={[styles.loadingLayer, appRuntime.streamlined && styles.streamlinedLoadingLayer]}>
-            {appRuntime.streamlined ? (
-              <NativeLaunchLoader stage="Loading community page" progress={loadProgress} />
-            ) : (
-              <>
-                <ActivityIndicator color="#E9C766" size="large" />
-                <Text style={styles.loadingText}>Opening ShadoChat</Text>
-              </>
-            )}
+          <View style={styles.loadingLayer}>
+            <ActivityIndicator color="#E9C766" size="large" />
+            <Text style={styles.loadingText}>Opening ShadoChat</Text>
           </View>
         )}
       />
@@ -560,6 +583,7 @@ export default function ShadowChatAppScreen() {
             <Pressable
               accessibilityRole="button"
               onPress={() => {
+                restartLaunch();
                 setLoadError(null);
                 setReloadKey(value => value + 1);
               }}

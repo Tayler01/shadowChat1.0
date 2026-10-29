@@ -55,9 +55,10 @@ test('real React StrictMode mounts, retries startup and remounts a selected comm
       'react-native-safe-area-context': { SafeAreaView: primitive('div') },
       './CommunityChoice': { CommunityChoice: ({ onSelect, error }) => React.createElement('div', null,
         React.createElement('button', { onClick: () => onSelect('demo') }, 'Demo community'), error) },
+      '../lib/nativeLaunch': load('src/lib/nativeLaunch.ts', {}),
       '../components/NativeLaunchLoader': load('src/components/NativeLaunchLoader.tsx',{
         'react/jsx-runtime':require('react/jsx-runtime'),
-        'react-native':{View:primitive('div'),Text:primitive('span'),Image:()=>React.createElement('img',{alt:'Shado brand mark'}),StyleSheet:{create:value=>value}},
+        'react-native':{View:primitive('div'),Text:primitive('span'),Image:()=>React.createElement('img',{alt:'Shado brand mark'}),StyleSheet:{create:value=>value},useWindowDimensions:()=>({height:844,fontScale:1})},
         '../../assets/images/shado-round-mark.png':'bundled-mark',
       }),
       './communityBindings': bindings,
@@ -68,8 +69,10 @@ test('real React StrictMode mounts, retries startup and remounts a selected comm
       '../lib/supabase': { disposeCommunityClient: async () => {}, abortCommunityRequests: () => {} },
       '../../assets/images/shado-round-mark.png': 'bundled-mark',
     });
+    let currentBinding;
     function Consumer() {
       const binding = boundary.useCommunityBinding();
+      currentBinding = binding;
       return React.createElement('output', null, binding.context.community.id);
     }
     const render = key => root.render(React.createElement(React.StrictMode, null,
@@ -89,9 +92,29 @@ test('real React StrictMode mounts, retries startup and remounts a selected comm
     });
     const selected = controller.capture(); assert.equal(selected.community.id, 'demo');
     assert.equal(document.querySelector('output').textContent, 'demo');
+    const persistentMark = document.querySelector('img');
+    assert.ok(persistentMark, 'selection alone must not clear the startup cover');
+    await React.act(async () => { currentBinding.reportLaunch(.4, 'Loading community page'); });
+    await React.act(async () => { currentBinding.reportLaunch(.8, 'Restoring your community'); });
+    await React.act(async () => { currentBinding.reportLaunch(.2, 'Loading community page'); });
+    assert.equal(document.querySelector('img'), persistentMark, 'progress uses the same mounted loader');
+    assert.match(document.body.textContent, /Restoring your community/);
+    await React.act(async () => { currentBinding.reportLaunch(1, 'Ready'); });
+    assert.equal(document.querySelector('img'), null);
+    await React.act(async () => { currentBinding.reportLaunch(.8, 'Restoring your community'); });
+    assert.equal(document.querySelector('img'), null, 'late load signals cannot bring the cover back');
+    await React.act(async () => { currentBinding.restartLaunch(); });
+    assert.ok(document.querySelector('img'), 'explicit retry starts a new cover');
+    await React.act(async () => { currentBinding.reportLaunch(1, 'Connection interrupted'); });
+    assert.equal(document.querySelector('img'), null, 'load errors reveal the actionable error underneath');
+    await React.act(async () => { currentBinding.restartLaunch(); });
+    assert.ok(document.querySelector('img'));
     await React.act(async () => { render('remounted'); });
     assert.equal(controller.capture(), selected); assert.equal(document.querySelector('output').textContent, 'demo');
     assert.equal(legacyRevokes, 2);
+    assert.ok(document.querySelector('img'), 'a real boundary remount waits for page readiness');
+    await React.act(async () => { currentBinding.reportLaunch(1, 'Ready'); });
+    assert.equal(document.querySelector('img'), null);
   } finally {
     await React.act(async () => { root.unmount(); });
     global.window = previousWindow; global.document = previousDocument;

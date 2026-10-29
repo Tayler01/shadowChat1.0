@@ -11,6 +11,7 @@ import { usePushNotifications } from '../hooks/usePushNotifications'
 import { COMFORT_RESET_EVENT } from '../lib/comfortPreferences'
 import { getBrowserTimeZone, type NotificationPreferences } from '../lib/push'
 import type { AppView } from '../types/navigation'
+import { canChangeNativeCommunity, requestNativeCommunityChooser } from './nativeCommunity'
 
 const ProfileView = lazy(() => import('../components/profile/ProfileView').then(module => ({ default: module.ProfileView })))
 const BlockedUsersSettings = lazy(() => import('../components/settings/BlockedUsersSettings').then(module => ({ default: module.BlockedUsersSettings })))
@@ -149,7 +150,7 @@ function NotificationsSettings() {
         <SettingToggle label="Push notifications" description={busy ? 'Checking notification access...' : push.subscribed ? 'Enabled on this device.' : 'Get alerts when the app is in the background.'} checked={push.subscribed} disabled={busy} onChange={() => void togglePush()} />
         {push.supportReason && <p className="mb-3 text-sm text-[var(--text-muted)]">{push.supportReason}</p>}
         {push.error && <p className="mb-3 text-sm text-red-200" role="alert">{push.error}</p>}
-        <Button variant="secondary" onClick={() => setSetupOpen(true)}>Notification setup</Button>
+        {!push.nativeApp && <Button variant="secondary" onClick={() => setSetupOpen(true)}>Notification setup</Button>}
       </section>
 
       {preferences && <>
@@ -193,7 +194,7 @@ function NotificationsSettings() {
           </div>
         </section>
       </>}
-      <NotificationSetupModal open={setupOpen} guidance={push.guidance} guidanceText={push.guidanceText} saving={push.saving} canInstall={canInstall} onClose={() => setSetupOpen(false)} onEnable={enablePush} onInstall={async () => { await promptInstall() }} />
+      {!push.nativeApp && <NotificationSetupModal open={setupOpen} guidance={push.guidance} guidanceText={push.guidanceText} saving={push.saving} canInstall={canInstall} onClose={() => setSetupOpen(false)} onEnable={enablePush} onInstall={async () => { await promptInstall() }} />}
     </div>
   )
 }
@@ -202,7 +203,21 @@ export function StreamlinedAccountSettings({ allowProfileEditing = true }: { all
   const { user, sendPasswordReset, signOut, deleteAccount } = useAuth()
   const [deleting, setDeleting] = useState(false)
   const [confirmation, setConfirmation] = useState('')
-  const [busy, setBusy] = useState<'password' | 'signout' | 'delete' | null>(null)
+  const [busy, setBusy] = useState<'password' | 'signout' | 'delete' | 'community' | null>(null)
+
+  const changeCommunity = async () => {
+    if (busy || !canChangeNativeCommunity()) return
+    if (!window.confirm('Sign out of this community and choose another?')) return
+    setBusy('community')
+    try {
+      await signOut()
+      if (!requestNativeCommunityChooser()) throw new Error('Open sign-in Settings to change community.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Could not change community')
+    } finally {
+      setBusy(null)
+    }
+  }
 
   const resetPassword = async () => {
     if (!user?.email || busy) return
@@ -252,6 +267,7 @@ export function StreamlinedAccountSettings({ allowProfileEditing = true }: { all
       <div className="flex flex-wrap gap-3">
         <Button variant="secondary" disabled={Boolean(busy) || !user?.email} loading={busy === 'password'} onClick={() => void resetPassword()}>Reset password</Button>
         <Button variant="secondary" disabled={Boolean(busy)} loading={busy === 'signout'} onClick={() => void endSession()}>Sign out</Button>
+        {canChangeNativeCommunity() && <Button variant="secondary" style={{ minHeight: 'max(48px, var(--comfort-control-min-size))' }} disabled={Boolean(busy)} loading={busy === 'community'} onClick={() => void changeCommunity()}>Change community</Button>}
       </div>
     </section>
     <section className="glass-panel rounded-[var(--radius-lg)] p-4 sm:p-5" aria-labelledby="streamlined-delete-account">

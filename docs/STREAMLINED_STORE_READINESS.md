@@ -1,5 +1,21 @@
 # Streamlined edition: store readiness
 
+## October 29 submission reconciliation
+
+Fresh Apple readback still shows PREPARE_FOR_SUBMISSION, selected build 20,
+zero screenshot sets, and empty support/privacy URLs. Metadata remains saved;
+no public review has been submitted. Build 22 is the existing TestFlight build,
+but newly requested startup and community-navigation fixes require a successor.
+The review login passed fresh demo Auth and phone-browser checks without a
+password reset; the reported physical-device failure is not yet reproduced.
+
+Remaining release gates include the compatible web publication and production
+privacy cutover, physical notification proof, a working disposable deletion
+review account, final policies/URLs and published privacy disclosures, actual
+native screenshots, final build selection and review notes. Existing browser
+QA captures are not native screenshot evidence. Current Apple/capture receipts:
+`output/release-evidence/store-screenshots-20261029/`.
+
 ## October 28 production and testing checkpoint
 
 Live invitation enforcement rejected seven direct signup bypass attempts; all

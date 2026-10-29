@@ -14,6 +14,7 @@ import {
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CommunityChoice } from './CommunityChoice';
+import { advanceLaunch } from '../lib/nativeLaunch';
 import { NativeLaunchLoader } from '../components/NativeLaunchLoader';
 import type { CommunityContext, CommunityId } from './communityRuntime';
 
@@ -34,7 +35,7 @@ import { createScopedRegistration } from '../lib/notifications/registration';
 import { abortCommunityRequests, disposeCommunityClient } from '../lib/supabase';
 
 const SELECTION = 'shadowchat-community-selection-v1';
-type Binding = { context: CommunityContext; requestChooser: () => void };
+type Binding = { context: CommunityContext; requestChooser: () => void; restartLaunch: () => void; reportLaunch: (progress: number, stage: string) => void };
 const BindingContext = createContext<Binding | null>(null);
 export const useCommunityBinding = () => {
   const value = useContext(BindingContext);
@@ -50,6 +51,11 @@ export function NativeCommunityBoundary({ children }: { children: ReactNode }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | undefined>();
   const [clientEpoch, setClientEpoch] = useState(0);
+  const [launch, setLaunch] = useState({ progress: 0, stage: 'Preparing your community' });
+  const reportLaunch = useCallback((progress: number, stage: string) => {
+    setLaunch(previous => advanceLaunch(previous, progress, stage));
+  }, []);
+  const restartLaunch = useCallback(() => setLaunch({ progress: 0, stage: 'Preparing your community' }), []);
   const selecting = useRef(false);
   const [startupAttempt, setStartupAttempt] = useState(0);
   const choose = useCallback(
@@ -57,6 +63,7 @@ export function NativeCommunityBoundary({ children }: { children: ReactNode }) {
       if (!communityController || !communityRegistry || selecting.current) return;
       selecting.current = true;
       setBusy(true);
+      setLaunch({ progress: 0, stage: 'Preparing your community' });
       setError(undefined);
       try {
         let next: CommunityContext;
@@ -154,7 +161,7 @@ export function NativeCommunityBoundary({ children }: { children: ReactNode }) {
   return (
     <View style={styles.fill}>
       {context && isCurrentCommunity(context) ? (
-        <BindingContext.Provider value={{ context, requestChooser }}>
+        <BindingContext.Provider value={{ context, requestChooser, reportLaunch, restartLaunch }}>
           <View
             key={`${context.generation}:${clientEpoch}:${communityHelperRevision()}`}
             style={styles.fill}
@@ -163,9 +170,9 @@ export function NativeCommunityBoundary({ children }: { children: ReactNode }) {
           </View>
         </BindingContext.Provider>
       ) : null}
-      {!ready || choosing || !context || blocked || busy ? (
-        <SafeAreaView style={[styles.cover, styles.fill]}>
-          {ready && communityRegistry ? (
+      {!ready || choosing || !context || blocked || busy || (baseAppRuntime.streamlined && launch.progress < 1) ? (
+        <SafeAreaView edges={baseAppRuntime.streamlined && !choosing && !busy && !blocked ? [] : undefined} style={[styles.cover, styles.fill]}>
+          {ready && communityRegistry && (choosing || !context || blocked || busy) ? (
             <CommunityChoice
               registry={communityRegistry}
               busy={busy}
@@ -177,7 +184,7 @@ export function NativeCommunityBoundary({ children }: { children: ReactNode }) {
           ) : (
             <View style={[styles.center, baseAppRuntime.streamlined && styles.streamlinedLoading]}>
               {baseAppRuntime.streamlined ? (
-                <NativeLaunchLoader stage="Preparing your community�" />
+                <NativeLaunchLoader stage={launch.stage} progress={launch.progress} />
               ) : (
                 <ActivityIndicator color="#E9C766" />
               )}
@@ -207,6 +214,6 @@ const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: '#050505' },
   cover: { position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 16 },
-  streamlinedLoading: { backgroundColor: '#0d0f10' },
+  streamlinedLoading: { backgroundColor: '#0d0f10', padding: 0, gap: 0 },
   text: { color: '#F4E9CF', fontSize: 16, lineHeight: 24 },
 });

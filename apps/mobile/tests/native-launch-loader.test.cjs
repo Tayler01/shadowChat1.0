@@ -9,7 +9,7 @@ const source = fs.readFileSync(path.join(__dirname, '../src/components/NativeLau
 const moduleStub = { exports: {} };
 const imports = {
   'react/jsx-runtime': require('react/jsx-runtime'),
-  'react-native': { Image: 'Image', Text: 'Text', View: 'View', StyleSheet: { create: value => value } },
+  'react-native': { Image: 'Image', Text: 'Text', View: 'View', StyleSheet: { create: value => value }, useWindowDimensions: () => ({ height: 844, fontScale: 1 }) },
   '../../assets/images/shado-round-mark.png': 'approved-bundled-mark',
 };
 vm.runInNewContext(ts.transpileModule(source, {
@@ -31,15 +31,15 @@ test('community preparation never invents a percentage and retains approved bund
     assert.equal(bar(tree).props.accessibilityValue.now, undefined);
     assert.equal(bar(tree).props.accessibilityValue.text, 'Preparing');
     assert.equal(elements(tree).find(node => node.type === 'Image').props.source, 'approved-bundled-mark');
-    assert.ok(elements(tree).some(node => node.type === 'Text' && node.props.children[0] === 'Preparing your community…'));
+    assert.ok(elements(tree).some(node => node.type === 'Text' && node.props.children === 'Preparing your community…'));
   }
 });
 
-test('only measured page loading supplies accessible percentage with bounded native values', () => {
+test('completed startup milestones supplies accessible percentage with bounded native values', () => {
   for (const [progress, expected] of [[0, 0], [0.427, 43], [1, 100], [-0.1, 0], [1.2, 100]]) {
     const tree = NativeLaunchLoader({ stage: 'Loading community page', progress });
     assert.equal(bar(tree).props.accessibilityValue.now, expected);
-    assert.equal(bar(tree).props.accessibilityValue.text, `${expected}% of community page loaded`);
-    assert.ok(elements(tree).some(node => node.type === 'Text' && node.props.children[1] === ` · ${expected}%`));
+    assert.equal(bar(tree).props.accessibilityValue.text, `${expected}% startup progress`);
+    assert.ok(elements(tree).some(node => node.type === 'Text' && node.props.children === 'Loading community page'));
   }
 });
