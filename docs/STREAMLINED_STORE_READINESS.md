@@ -8,7 +8,8 @@ existing internal TestFlight group. The full website deployment/configuration
 is unchanged. Startup/community/settings polish and notification tap/badge
 repairs are included. Physical acceptance of those repairs remains pending;
 build-22 DM and group alert delivery was confirmed and all test fixtures were
-cleaned. An intermittent member group-window HTTP 500 remains under diagnosis.
+cleaned. An intermittent member group-window HTTP 500 was traced to SQLSTATE
+57014; its underlying latency and performance repair remain outstanding.
 No final policy/privacy cutover or public App Review submission occurred.
 
 Fresh Apple readback still shows PREPARE_FOR_SUBMISSION, selected build 20,

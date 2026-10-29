@@ -20,8 +20,11 @@ older builds were preserved; no public App Review submission was made.
 User confirmation is still required for the continuous native startup cover,
 Settings-only community controls, correct DM notification tap destination and
 home-screen badge clearing. A live member WebKit check saw an intermittent
-group-window HTTP 500 while the page recovered; this is retained for backend
-investigation, not described as repaired. Native App Store screenshots still
+group-window HTTP 500 while the page recovered. Backend logs confirmed SQLSTATE
+57014 (statement timeout), the same query ID as the October 28 investigation.
+The current lock snapshot had no blockers; it cannot exclude earlier contention.
+The underlying latency and proposed bounded row-estimate correction remain
+unverified and unrepaired. Native App Store screenshots still
 require actual iPhone captures. Evidence is under
 `output/release-evidence/native-build23-preparation/`.
 
