@@ -46,11 +46,14 @@ const parseSession = (value: unknown): NativeWebSession | null | undefined => {
   if (value === null) return null;
   if (!isRecord(value)) return undefined;
 
+  // Supabase refresh tokens are opaque and may be short (currently 12 chars).
+  // Identity is verified by the native controller and Auth server, not length.
   if (
     typeof value.accessToken !== 'string' ||
     value.accessToken.length < 20 ||
     typeof value.refreshToken !== 'string' ||
-    value.refreshToken.length < 20 ||
+    value.refreshToken.length === 0 ||
+    value.refreshToken.length > 4096 ||
     typeof value.userId !== 'string' ||
     value.userId.length < 16 ||
     (

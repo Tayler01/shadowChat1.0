@@ -1,3 +1,38 @@
+## October 29 native session and notification regression
+
+- Physical build 24 still left notification taps on the prior Settings/Chat
+  view and retained an iPhone icon badge of one after the web DM unread count
+  cleared. Two authorized demo DM attempts reached Expo in 3.204/2.913 seconds;
+  this is provider acceptance, not measured OS delivery. Exact messages/events/
+  targets and helper sessions were cleaned up; canonical unread returned to zero.
+- The native bridge parser and community controller both invented a minimum
+  refresh-token length of 20. A fresh ordinary demo session confirmed a valid
+  12-character refresh token (only lengths recorded; session revoked). Web auth
+  succeeded while native auth messages were discarded, leaving tap handling
+  waiting for a session and badge synchronization without an authenticated caller.
+- Both validators now accept nonempty opaque refresh tokens up to 4096
+  characters. Exact community origin, JWT issuer/subject/role/expiry, server
+  `getUser` verification and account matching remain mandatory. No server Auth
+  setting or member web code changed.
+- The integrated regression mounts the real community boundary, runtime,
+  native notification provider, bridge and app screen. With a synthetic
+  12-character token it proves server verification, native session attachment,
+  exact DM WebView navigation for taps before/after restoration, canonical badge
+  zero, duplicate suppression and foreign-scope rejection. Only external device/
+  backend SDK dependencies are mocked. Both cases fail against the old gates and
+  pass with the repair. Controller fixtures now use the realistic token length.
+- All 96 native tests, seven protocol Jest tests, native lint/types and root
+  lint/types/full production build passed. Streamlined configuration advances
+  to 25; the default full native build remains 17. Scoped iOS delivery already
+  sends the canonical badge with `mutableContent: false`, so the service
+  extension is not invoked on that path. No extension, entitlement or delivery
+  policy change is included. Signed build-25 distribution and phone acceptance
+  remain separate checks.
+- Evidence: `output/release-evidence/native25-auth-route-baseline.txt`,
+  `native25-auth-route-fixed.txt`, `native25-mobile-tests.log`, and the
+  `native-push-readiness-20261028/refresh-token-shape-proof.json` and
+  `build24-tap-repeat-test.json` receipts. No credentials are in those receipts.
+
 ## October 29 shared backend performance recovery
 
 - The user reported broad production slowness and a full-app ShadowPin feed

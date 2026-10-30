@@ -230,7 +230,9 @@ export function createCommunityRuntime(registry: CommunityRegistry) {
         ensure(
           UUID.test(session.userId) &&
             typeof session.refreshToken === 'string' &&
-            session.refreshToken.length >= 20 &&
+            // Refresh tokens are opaque; valid Supabase tokens can be 12 characters.
+            // Authentication still requires the scoped access-token checks and getUser below.
+            session.refreshToken.length > 0 &&
             session.refreshToken.length <= 4096,
           'Invalid account session.'
         );

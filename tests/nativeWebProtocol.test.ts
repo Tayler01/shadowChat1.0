@@ -5,6 +5,17 @@ const ticket = `${requestId}.${'a'.repeat(64)}`
 const userId = '22222222-2222-4222-8222-222222222222'
 
 describe('native web protocol compatibility', () => {
+  it('accepts bounded opaque refresh tokens without assuming their entropy from length', () => {
+    for (const refreshToken of ['abcdefghijkl', 'x', 'a'.repeat(4096)]) {
+      const session = { accessToken: 'access-token-validated-by-native-controller', refreshToken, userId, expiresAt: null }
+      expect(parseNativeWebMessage(JSON.stringify({ version: 1, type: 'auth_session', session }))).toEqual({ version: 1, type: 'auth_session', session })
+    }
+    for (const refreshToken of ['', null, 12, 'a'.repeat(4097)]) {
+      const session = { accessToken: 'access-token-validated-by-native-controller', refreshToken, userId, expiresAt: null }
+      expect(parseNativeWebMessage(JSON.stringify({ version: 1, type: 'auth_session', session }))).toBeNull()
+    }
+  })
+
   it('badge hints carry no web-supplied badge count into the native API', () => {
     expect(parseNativeWebMessage('{"version":1,"type":"notifications_badge_refresh","count":0}')).toEqual({ version: 1, type: 'notifications_badge_refresh' })
   })

@@ -20,7 +20,9 @@ const member = { origin: 'https://shadowchat-streamlined.netlify.app', projectRe
 const demo = { origin: 'https://synthetic-demo.example.com', projectRef: demoRef, supabaseUrl: `https://${demoRef}.supabase.co`, publicKey: key };
 const registry = () => resolveCommunityRegistry({ member, demoEnabled: true, demo });
 const jwt = claims => `${Buffer.from('{"alg":"HS256"}').toString('base64url')}.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.synthetic`;
-const session = (project = demoRef, id = userA, extra = {}) => ({ accessToken: jwt({ iss: `https://${project}.supabase.co/auth/v1`, sub: id, role: 'authenticated', exp: Math.floor(Date.now()/1000)+3600, ...extra }), refreshToken: 'synthetic_refresh_token_for_unit_tests', userId: id });
+// Supabase issues opaque refresh tokens; the live demo's verified token length is 12.
+// This is a synthetic value, never a credential copied from a session.
+const session = (project = demoRef, id = userA, extra = {}) => ({ accessToken: jwt({ iss: `https://${project}.supabase.co/auth/v1`, sub: id, role: 'authenticated', exp: Math.floor(Date.now()/1000)+3600, ...extra }), refreshToken: 'unitfixture1', userId: id });
 const adapter = calls => ({ getUser: async () => { calls.push('getUser'); return { id:userA }; }, setSession: async value => { calls.push('setSession'); return { id:value.userId }; }, clearSession: async () => { calls.push('clearSession'); } });
 const teardown = calls => Object.fromEntries(['abortAndDrainCommands','revokeInstallation','clearPresentedNotifications','clearClientSession','unmountAndDispose'].map(name => [name, async context => { calls.push(`${name}:${context.community.id}`); }]));
 const deferred = () => { let resolve, reject; const promise=new Promise((a,b)=>{resolve=a;reject=b}); return { promise, resolve, reject }; };
@@ -80,6 +82,20 @@ test('server must authenticate access token before any refresh-bearing setSessio
   assert.equal(await runtime.runSession(context,demo.origin,session(),adapter(calls)),true);
   assert.deepEqual(calls,['getUser','setSession']);assert.equal(runtime.status().signedIn,true);
   assert.throws(()=>runtime.switchCommunity('member',teardown([])),/Sign out/);
+});
+
+test('refresh tokens are opaque and bounded, with no invented minimum length', async () => {
+  for (const refreshToken of ['x', 'unitfixture1', 'x'.repeat(4096)]) {
+    const runtime=createCommunityRuntime(registry()),context=runtime.select('demo'),calls=[];
+    assert.equal(await runtime.runSession(context,demo.origin,{...session(),refreshToken},adapter(calls)),true);
+    assert.deepEqual(calls,['getUser','setSession']);
+  }
+  for (const refreshToken of ['', 'x'.repeat(4097), null, 12, {}]) {
+    const runtime=createCommunityRuntime(registry()),context=runtime.select('demo'),calls=[];
+    await assert.rejects(runtime.runSession(context,demo.origin,{...session(),refreshToken},adapter(calls)));
+    assert(!calls.includes('getUser') && !calls.includes('setSession'));
+    assert.equal(runtime.status().signedIn,false);
+  }
 });
 
 test('signature/server failure and user mismatch never forward refresh tokens; errors are sanitized', async () => {
