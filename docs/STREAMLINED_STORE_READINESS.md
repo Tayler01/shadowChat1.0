@@ -27,10 +27,65 @@ tab changes no longer render a loading screen or progress bar; startup/sign-in
 branding remains.
 
 Combined verification passed111 native cases,123 focused Jest cases and34 media
-Node cases, root lint/full+streamlined types and both web builds. Native26 cloud
-build, actual phone acceptance, current CDN delivery repair and published web
-acceptance remain separate gates. No production poster backfill is claimed.
-Evidence: `output/bugfix-verification-20261030/` and agent receipts.
+Node cases, root lint/full+streamlined types and both web builds. Source
+`6d3296433fe3` passed CI41053411596. The full edition uses preserved36b plus
+the eight allowlisted media/test files at `c10f833c9edb`; its feature flags,
+functions, schedule and navigation remain preserved.
+
+Scoped October30 publication is verified:
+
+| Edition | Deploy | Source |
+| --- | --- | --- |
+| Full | `6ae493d53e9bf7125d1530ad` | `c10f833c9edb` |
+| Streamlined member | `6ae49462fa1b023fd6c6c775` | `6d3296433fe3` |
+| Isolated demo | `6ae494afefc1b390f8271392` | `6d3296433fe3` |
+
+All public/immutable JS, CSS, index and health bytes match sealed artifacts.
+Live ordinary-account login, signed poster decoding and advancing playback pass
+Chromium/Pixel and WebKit/iPhone on all three sites. Streamlined Chat/Pin
+navigation has no tab-loading bar. YouTube routing passes both engines using
+memory-only synthetic metadata; provider ingestion was not exercised. Actual
+ordinary demo Creator upload/TUS/publish passed; its exact Pin, draft, asset,
+provider video, notifications and owned sessions were cleaned and verified.
+
+Bunny library666331 CDN token authentication is now ON, with Embed enforcement
+preserved. Seven existing media capabilities pass positive, unsigned/tampered,
+genuine expiry and renewed playback checks. All five CDN posters are verified;
+one generic ready poster was repaired with an exact one-row CAS. The only other
+row changes were its expected revision increment and timestamp. Six older custom
+poster derivative optimizations remain unexecuted without operator authentication;
+originals are preserved and a tiny poster was excluded. The normal image pipeline
+is healthy. The existing signing key was not replaced or exposed.
+
+`PRIVATE_NOTIFICATION_MEDIA_ENABLED=true` was the sole Edge flag change; deployed
+function source hashes stayed identical. Native workers/schedules remain OFF,
+Storage/public-Realtime cutovers remain paused, and no public Apple submission
+is authorized. Native26's actual signed IPA contains the verified private-Realtime,
+navigation and legacy-installation fixes. Upload submission
+`fd41c14b-22c4-4257-a85e-b53cdacbcd31` finished. Apple build
+`80b7cc6e-240b-4e8d-a186-c823489eac16` is VALID/nonexpired and IN_BETA_TESTING;
+build26 was assigned to the existing internal group without adding testers or
+removing older builds. The operator installed26 and confirmed notification setup
+works; production enrollment independently shows an active scope1 build26 token.
+This is registration proof, not production push-delivery proof: native runtime
+remains disabled. The operator still reports YouTube redirect behavior in details;
+iframe referrer/actual interactive playback diagnosis found inherited no-referrer
+suppression causing Error153. An HTTPS-origin A/B test proved that a YouTube-only
+`strict-origin-when-cross-origin` iframe policy restores real playback and user
+pause/resume in both engines. The focused web-only correction also removes the
+duplicate YouTube Theater prompt; unrelated provider consent and Comfort autoplay
+remain intact. New-source checks, sealed successors and live acceptance are pending;
+do not claim that this follow-up is already published or that native27 is needed.
+
+An actual test found a separate deletion gap: published Creator video assets retain
+a draft reference that blocks ordinary provider cleanup after Pin deletion. The
+fixture was cleaned with exact registry-aware guards; this product lifecycle still
+needs repair before claiming final App Review deletion readiness. Do not replay
+that cleanup or widen the paused release automatically.
+
+Evidence: `output/bugfix-verification-20261030/`,
+`output/release-evidence/native-build26-preparation/`, and
+`output/release-evidence/video-repair-cdn-20261030/`.
 
 
 ## Paused at operator request — October 29, 2026, 9:56 PM Eastern

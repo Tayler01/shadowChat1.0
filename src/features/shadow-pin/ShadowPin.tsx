@@ -548,7 +548,8 @@ const getVideoIframeUrl = (
 const isIframeVideoPin = (image: ShadowPinImage) => Boolean(getVideoIframeUrl(image))
 
 const requiresViewerExternalConsent = (image: ShadowPinImage) => {
-  if (!['youtube', 'x', 'instagram', 'pinterest'].includes(image.provider || '')) return false
+  // YouTube already connects in the feed; opening Theater keeps that player inline.
+  if (!['x', 'instagram', 'pinterest'].includes(image.provider || '')) return false
   return Boolean(
     getVideoIframeUrl(image, 'viewer') ||
     getExternalRichEmbedFrameUrl(image) ||
@@ -2664,6 +2665,7 @@ function ImageCard({
           <PrivateMediaFrame
             ref={iframeRef}
             src={iframeVideoSrc}
+            referrerPolicy={image.provider === 'youtube' ? 'strict-origin-when-cross-origin' : undefined}
             title={image.title}
             className="pointer-events-none block h-full w-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture; web-share"
@@ -3194,6 +3196,7 @@ function ImageViewerMedia({
           <PrivateMediaFrame
             ref={iframeRef}
             src={iframeSrc}
+            referrerPolicy={image.provider === 'youtube' ? 'strict-origin-when-cross-origin' : undefined}
             title={image.title}
             className="block h-full w-full border-0"
             allow="autoplay; encrypted-media; picture-in-picture; web-share"

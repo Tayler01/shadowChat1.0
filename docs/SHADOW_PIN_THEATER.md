@@ -27,7 +27,10 @@ The phone-first contract is:
 - media, identity, Heart, Comment, Share, Details, and owner/operator Edit stay
   available without gesture-only controls
 - Share uses the ShadowChat permalink; Open source remains a separate action
-- third-party interactive embeds require session-only consent inside Theater
+- X, Instagram and Pinterest interactive embeds require session-only consent
+- YouTube opens inline without a duplicate prompt, retaining the Comfort autoplay
+  choice; its iframe supplies the site origin required by YouTube, while the
+  app-wide no-referrer policy remains unchanged
 - only the active video or iframe mounts and plays
 - adjacent loading and poster prefetch remain bounded
 

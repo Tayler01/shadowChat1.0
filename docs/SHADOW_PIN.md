@@ -287,9 +287,12 @@ Markerless cold links preserve their markerless state during paging and close
 by URL replacement so Close cannot navigate out of ShadowChat.
 
 Only active media mounts. Opening Comments replaces active video or an iframe
-with its poster, and hidden-tab cleanup pauses native video. Third-party
-interactive providers require consent for the current Theater session before
-their iframe can mount. Image zoom has visible 48px controls; while zoomed,
+with its poster, and hidden-tab cleanup pauses native video. X, Instagram and
+Pinterest interactive frames require consent for the current Theater session.
+YouTube already connects in the feed and opens inline in Theater without a
+second prompt; only Open source navigates externally. Its iframe sends only the
+site origin via `strict-origin-when-cross-origin`, while the app-wide no-referrer
+policy and Comfort autoplay choice remain intact. Image zoom has visible 48px controls; while zoomed,
 horizontal Pin paging is disabled. A second touch cancels pending paging before
 pinch zoom begins.
 

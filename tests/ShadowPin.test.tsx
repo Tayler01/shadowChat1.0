@@ -1720,6 +1720,7 @@ test('cycles visible iframe videos on a fallback slot when no ended event is ava
     })
     await waitFor(() => {
       expect(container.querySelector('iframe')).toHaveAttribute('src', expect.stringContaining('/embed/leftShort'))
+      expect(container.querySelector('iframe')).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
     })
 
     await act(async () => {
@@ -1732,7 +1733,8 @@ test('cycles visible iframe videos on a fallback slot when no ended event is ava
     expect(container.querySelector('iframe')).toHaveClass('pointer-events-none')
     fireEvent.click(within(rightCard!).getByRole('button', { name: /^Open “/ }))
     expect(screen.getByRole('dialog', { name: 'Pin youtube-right' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Load YouTube' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Load YouTube' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('dialog', { name: 'Pin youtube-right' })).getByTitle('Pin youtube-right')).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
   } finally {
     Object.defineProperty(global, 'IntersectionObserver', {
       configurable: true,
@@ -1782,6 +1784,7 @@ test('opens Bunny embed videos in the fullscreen viewer when direct renditions a
 
     const viewerFrame = screen.getByTitle('Pin bunny')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('player.mediadelivery.net'))
+    expect(viewerFrame).not.toHaveAttribute('referrerpolicy')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=true'))
     expect(viewerFrame).toHaveAttribute('src', expect.not.stringContaining('controls=false'))
     const srcBeforeUnmute = viewerFrame.getAttribute('src')
@@ -1939,7 +1942,7 @@ test('shows iframe video sound controls in pin details without reloading the pla
     expect(videoCard).not.toBeNull()
 
     openPinFromCard(videoCard!)
-    fireEvent.click(screen.getByRole('button', { name: 'Load YouTube' }))
+    expect(screen.queryByRole('button', { name: 'Load YouTube' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByLabelText('Unmute viewer media'))
     expect(screen.getByLabelText('Mute viewer media')).toBeInTheDocument()
   } finally {
@@ -2184,8 +2187,9 @@ test('uses stored Instagram provider preview metadata as the pin card image', ()
   )
 })
 
-test('a main-feed YouTube tap opens ShadowPin Theater with inline controls instead of opening its source', () => {
+test.each([true, false])('a main-feed YouTube tap opens the inline player without another consent gate, with comfort autoplay=%s', autoplay => {
   jest.useFakeTimers()
+  mockShouldAutoplayMedia = autoplay
   mockUseShadowPinImages.mockReturnValue({
     category,
     images: [
@@ -2224,17 +2228,21 @@ test('a main-feed YouTube tap opens ShadowPin Theater with inline controls inste
     fireEvent.click(opener)
     expect(screen.getByRole('dialog', { name: 'Pin youtube' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /open source/i })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Load YouTube' }))
+    expect(screen.queryByRole('button', { name: 'Load YouTube' })).not.toBeInTheDocument()
 
     const viewerFrame = screen.getByTitle('Pin youtube')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('www.youtube.com/embed/Czrv1RX19G0'))
-    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('autoplay=1'))
+    expect(viewerFrame).toHaveAttribute('src', expect.stringContaining(`autoplay=${autoplay ? '1' : '0'}`))
+    expect(viewerFrame).toHaveAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('mute=1'))
     expect(viewerFrame).toHaveAttribute('src', expect.stringContaining('controls=1'))
+    expect(viewerFrame).toHaveAttribute('allowfullscreen')
     const srcBeforeUnmute = viewerFrame.getAttribute('src')
     fireEvent.click(screen.getByLabelText('Unmute viewer media'))
     expect(viewerFrame).toHaveAttribute('src', srcBeforeUnmute)
     expect(screen.getByLabelText('Mute viewer media')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Details$/ }))
+    expect(screen.getByRole('link', { name: /^Open source$/ })).toHaveAttribute('href', 'https://www.youtube.com/shorts/Czrv1RX19G0')
   } finally {
     jest.useRealTimers()
   }

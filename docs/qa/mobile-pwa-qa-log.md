@@ -1,3 +1,37 @@
+## October 30 scoped regression publication
+
+- Full `c10f833c9edb` and streamlined member/demo `6d3296433fe3` are live at
+  `6ae493d53e9bf7125d1530ad`, `6ae49462fa1b023fd6c6c775`, and
+  `6ae494afefc1b390f8271392`. All sealed public/immutable assets and unchanged
+  environment/build/function contracts were verified. The full site's first
+  verification fetch failed transiently; reconciliation accepted the original
+  deployment without a second upload.
+- All three live editions pass ordinary sign-in, authorized poster decode and
+  advancing video on Chromium/Pixel and WebKit/iPhone. Streamlined tab switches
+  have no progress bar. Source-specific staged gallery autoplay and YouTube
+  overlay-to-details routing pass both engines; the YouTube row was memory-only
+  synthetic metadata, not a provider-ingestion test.
+- An initial WebKit no-source play failure and empty-poster decode failure were
+  harness readiness errors. Waiting for signed source/poster assignment resolved
+  them. A normal HTTP-served H264/AAC control passes both engines; no decoder
+  limitation or product failure is claimed from the intercepted control.
+- Actual demo Creator/TUS/publish passed. All exact fixture Pin/draft/asset/provider
+  video, notifications and sessions were removed; deletion audit tombstone retained.
+  The test revealed a separate published-video draft-reference deletion gap,
+  documented in `demo/integration-5/CREATOR_VIDEO_DELETION_GAP.md` under the packet.
+- CDN enforcement is saved; signed/unsigned/tampered/real-expiry/renewal checks pass.
+  All five CDN posters plus the repaired generic poster have direct delivery proof.
+  Six older custom-poster optimizations remain held; originals are preserved.
+- Actual native26 IPA verified and uploaded once. Apple26 VALID/nonexpired,
+  IN_BETA_TESTING and existing internal-group membership are verified; no tester
+  or old build was removed. Operator installed26 and confirmed notification setup
+  works; production scope1 build26 enrollment/token independently verified active.
+  Actual production push delivery remains disabled/unproven, not implied by the
+  registration result. Physical YouTube details redirect remains under diagnosis.
+  Broader App Store release and production native activation remain paused.
+- Final live smoke revoked all seven owned sessions. Evidence:
+  `output/release-evidence/native-build26-preparation/web/postpublication-live-acceptance.json`.
+
 ## October 30 native account and ShadowPin regression preparation
 
 - Device push token collision traced to a revoked Build14 installation retained
