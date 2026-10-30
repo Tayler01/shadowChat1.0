@@ -1,5 +1,23 @@
 # Streamlined edition: store readiness
 
+## October 29 build 25 physical acceptance and submission resume
+
+The operator confirmed that the fresh Demo DM notification now works after
+build 25: the previous notification-tap and iPhone icon badge issue is accepted
+on the physical iPhone. The exact temporary DM was deleted and its absence
+verified; the sending helper session was revoked. This confirms the tested
+Demo flow, not production-wide native activation or every device state.
+
+Apple processed build 25 as VALID, assigned it to the existing internal group,
+and the current App Store draft now selects build 25. The ordinary reviewer
+credentials saved in Apple match the working isolated Demo account. Fresh API
+readback still shows no screenshot sets, empty support/privacy URLs and no
+public review submission. Final policy publication, production privacy cutover,
+original native screenshot uploads remain open. Private review notes now include
+correct community navigation and verified access for a separate ordinary
+deletion-review account. The primary reviewer remains unchanged; all helper
+sessions were revoked. No public review was submitted. User has explicitly resumed completion as a goal.
+
 ## October 29 submission reconciliation
 
 Latest physical feedback supersedes pending acceptance below: build 23 startup

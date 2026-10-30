@@ -1,3 +1,14 @@
+## October 29 build 25 physical notification acceptance
+
+- Build 25 processed VALID and entered the existing internal TestFlight group.
+- The operator requested one fresh Demo DM, sent at 8:51:05 PM Eastern, and
+  confirmed it was working after the requested exact-DM tap and icon badge check.
+  This closes the reported build-24 regression for that observed phone flow.
+- Exact DM `5c2b40b6-1d3e-46b5-9e6c-50ca5b1daf49` was deleted after feedback;
+  sender-side absence and local helper-session revocation were verified.
+  No group message, upload or member-community content was created.
+- Receipt: `output/release-evidence/native-push-readiness-20261028/build25-physical-dm-test.json`.
+
 ## October 29 native session and notification regression
 
 - Physical build 24 still left notification taps on the prior Settings/Chat
