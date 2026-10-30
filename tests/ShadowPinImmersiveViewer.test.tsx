@@ -272,6 +272,19 @@ test('collapsed details do not leave the source link in the tab order', () => {
   expect(screen.getByRole('link', { name: /open source/i })).toBeInTheDocument()
 })
 
+test.each([false, true])('explicit source links use the main document in native=%s', native => {
+  const previous = window.__SHADOWCHAT_NATIVE_APP__
+  window.__SHADOWCHAT_NATIVE_APP__ = native
+  try {
+    renderViewer({ images: images.map(pin => ({ ...pin, source_url: 'https://www.youtube.com/shorts/abc' })) })
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }))
+    expect(screen.getByRole('link', { name: /open source/i })).toHaveAttribute('href', 'https://www.youtube.com/shorts/abc')
+    expect(screen.getByRole('link', { name: /open source/i })).toHaveAttribute('target', native ? '_self' : '_blank')
+  } finally {
+    window.__SHADOWCHAT_NATIVE_APP__ = previous
+  }
+})
+
 test('a second pointer cancels a pending page swipe before pinch zoom begins', () => {
   jest.useFakeTimers()
   const props = renderViewer()

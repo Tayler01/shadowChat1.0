@@ -4,16 +4,16 @@ const core=load('src/community/communityRuntime.ts',{});
 const uuid='11111111-1111-4111-8111-111111111111',user='22222222-2222-4222-8222-222222222222';
 const makeContext=ref=>({community:{id:'demo',origin:'https://demo.example.com',projectRef:ref,supabaseUrl:`https://${ref}.supabase.co`,publicKey:'sb_publishable_synthetic_test_key_000',storageNamespace:`shadowchat-community-v1.${ref}`},generation:1});
 function fixture({current=true,response=true,streamlined=true,build='22',transportError=false,handler,sharedStore}={}){
- const store=sharedStore??new Map(),calls=[];let nonce=0;
+ const store=sharedStore??new Map(),calls=[],writes=[];let nonce=0;
  const noop={};
  const imports={
   'expo-application':{nativeApplicationVersion:'1.0.0',nativeBuildVersion:build},'expo-constants':{__esModule:true,default:{easConfig:{projectId:uuid}}},'expo-crypto':{randomUUID:()=>nonce++?user:uuid},'expo-device':{isDevice:true},'expo-notifications':{getPermissionsAsync:async()=>({status:'granted'}),getExpoPushTokenAsync:async()=>({data:'synthetic-expo-token'})},
-  'expo-secure-store':{WHEN_UNLOCKED_THIS_DEVICE_ONLY:'device',getItemAsync:async key=>store.get(key)??null,setItemAsync:async(key,value)=>store.set(key,value),deleteItemAsync:async key=>store.delete(key)},
+  'expo-secure-store':{WHEN_UNLOCKED_THIS_DEVICE_ONLY:'device',getItemAsync:async key=>store.get(key)??null,setItemAsync:async(key,value,options)=>{writes.push({key,options});store.set(key,value);},deleteItemAsync:async key=>store.delete(key)},
   'react-native':{Platform:{OS:'ios'}},'./background':{registerNativeNotificationBackgroundTask:async()=>{}},'./config':{NOTIFICATION_CHANNEL_SCHEMA_VERSION:2},'./freshDevicePushToken':{getFreshDevicePushTokenAsync:async()=>({data:'synthetic-device-token'})},'./registrationPipeline':{runNotificationStage:async({operation})=>operation()},
   '../../community/communityRuntime':core,'../../community/communityBindings':{isCurrentCommunity:()=>current,requireCommunity:()=>{throw Error('No default project');},baseAppRuntime:{streamlined},runCommunityOperation:async(_,op)=>{if(!current)throw Error('Stale community');return op();},rememberInstallation:()=>{}},
  };
  const module=load('src/lib/notifications/registration.ts',imports,{fetch:async(url,options)=>{const call={url,body:JSON.parse(options.body)};calls.push(call);if(transportError)throw Error('network uncertain');const payload=handler?await handler(call):response;return{ok:true,json:async()=>payload};}});
- return{...module,store,calls};
+ return{...module,store,calls,writes};
 }
 test('registration instances persist installation identifiers only in their own project namespace',async()=>{
  const f=fixture(),a=makeContext('abcdefghijklmnopqrst'),b=makeContext('tsrqponmlkjihgfedcba');
@@ -164,4 +164,80 @@ test('failed settlement preserves both pending tuple and previous valid credenti
  const a=makeContext('abcdefghijklmnopqrst'),f=fixture({transportError:true}),key=core.communityStorageKeys(a.community).credential,previous=JSON.stringify({installationKey:uuid,userId:user,credential:'a'.repeat(64)});
  f.store.set(key,previous);const registration=f.createScopedRegistration(a);await assert.rejects(registration.registerNativeNotificationInstallation(enrollment));
  const pending=f.store.get(key+'.pending-enrollment');await assert.rejects(registration.revokeNativeNotificationInstallation());assert.equal(f.store.get(key),previous);assert.equal(f.store.get(key+'.pending-enrollment'),pending);
+});
+
+const legacyKeyName='shadowchat-native-notification-installation-v2';
+const legacyCredentialName='shadowchat-native-notification-installation-credential-v2';
+const preservedKey='33333333-3333-4333-8333-333333333333';
+const memberContext=()=>({...makeContext('abcdefghijklmnopqrst'),community:{...makeContext('abcdefghijklmnopqrst').community,id:'member'}});
+
+test('upgrade adopts the revoked legacy device key before a fresh scoped enrollment and preserves account handoff',async()=>{
+ const member=memberContext(),nextUser='44444444-4444-4444-8444-444444444444';
+ const issued=new Map([['synthetic-ticket',user],['synthetic-second-ticket',nextUser]]);
+ const server={key:preservedKey,user,credential:'a'.repeat(64),revoked:false,token:'synthetic-expo-token'};
+ const f=fixture({handler:async({url,body})=>{
+  if(url.endsWith('/revoke_notification_installation_with_proof_v1')){
+   if(body.target_installation_key!==server.key||body.target_user_id!==server.user||body.target_credential!==server.credential)return false;
+   server.revoked=true;return true;
+  }
+  assert(url.endsWith('/redeem_scoped_native_notification_enrollment_ticket_v2'));
+  assert.equal(body.target_installation_key,server.key,'same Expo token must retain its device identity');
+  assert.equal(body.target_token,server.token);assert.equal(body.target_community_scope_version,1);
+  const owner=issued.get(body.target_ticket);assert(owner,'fresh authenticated enrollment ticket required');issued.delete(body.target_ticket);
+  server.user=owner;server.credential=body.target_installation_credential;server.revoked=false;
+  return{user_id:owner,installation_id:uuid,community_scope_version:1};
+ }});
+ f.store.set(legacyKeyName,preservedKey);f.store.set(legacyCredentialName,JSON.stringify({installationKey:preservedKey,userId:user,credential:server.credential}));
+ await f.createScopedRegistration(member,true).revokeNativeNotificationInstallation();assert.equal(server.revoked,true);
+ const scoped=f.createScopedRegistration(member);await scoped.adoptLegacyMemberInstallationKey();
+ assert.equal(f.store.get(legacyKeyName),preservedKey);assert.equal(f.store.has(legacyCredentialName),false);
+ assert.equal((await scoped.registerNativeNotificationInstallation(enrollment)).enabled,true);
+ assert.equal(server.credential,enrollment.installationCredential);assert.equal(server.revoked,false);
+ await scoped.revokeNativeNotificationInstallation();assert.equal(server.revoked,true);
+ await scoped.registerNativeNotificationInstallation({...enrollment,enrollmentTicket:'synthetic-second-ticket',enrollmentUserId:nextUser,installationCredential:'c'.repeat(64),requestId:'synthetic-second-request'});
+ assert.equal(server.user,nextUser);assert.equal(server.key,preservedKey);assert.equal(server.credential,'c'.repeat(64));
+ assert(f.writes.filter(w=>w.key===core.communityStorageKeys(member.community).installation).every(w=>w.options.keychainAccessible==='device'));
+});
+
+test('already-revoked legacy identity recovers without its deleted credential and invalidates facade key caches',async()=>{
+ const f=fixture(),member=memberContext(),one=f.createScopedRegistration(member),two=f.createScopedRegistration(member);
+ const abandoned=await one.getNativeNotificationInstallationKey();assert.notEqual(abandoned,preservedKey);
+ f.store.set(legacyKeyName,preservedKey);
+ await Promise.all([two.adoptLegacyMemberInstallationKey(),one.adoptLegacyMemberInstallationKey()]);
+ assert.equal(await one.getNativeNotificationInstallationKey(),preservedKey);assert.equal(await two.getNativeNotificationInstallationKey(),preservedKey);
+ assert.equal(f.calls.length,0);assert.equal(f.store.has(core.communityStorageKeys(member.community).credential),false);
+});
+
+test('confirmed scoped credential preserves its different key and Demo/full never adopt the legacy key',async()=>{
+ const f=fixture(),member=memberContext(),scope=core.communityStorageKeys(member.community);
+ f.store.set(legacyKeyName,preservedKey);f.store.set(scope.installation,uuid);
+ const active=JSON.stringify({installationKey:uuid,userId:user,credential:'c'.repeat(64)});f.store.set(scope.credential,active);
+ await f.createScopedRegistration(member).adoptLegacyMemberInstallationKey();assert.equal(f.store.get(scope.installation),uuid);assert.equal(f.store.get(scope.credential),active);
+ const demo=makeContext('tsrqponmlkjihgfedcba');await f.createScopedRegistration(demo).adoptLegacyMemberInstallationKey();
+ assert.equal(f.store.has(core.communityStorageKeys(demo.community).installation),false);
+ const full=fixture({streamlined:false});full.store.set(legacyKeyName,preservedKey);await full.createScopedRegistration(member).adoptLegacyMemberInstallationKey();assert.equal(full.writes.length,0);
+ assert.equal(f.calls.length,0);
+});
+
+test('legacy revocation, malformed state, and failed pending settlement block adoption without discarding evidence',async()=>{
+ const f=fixture({transportError:true}),member=memberContext(),scope=core.communityStorageKeys(member.community),registration=f.createScopedRegistration(member);
+ f.store.set(legacyKeyName,preservedKey);f.store.set(legacyCredentialName,'unresolved');
+ await assert.rejects(registration.adoptLegacyMemberInstallationKey());assert.equal(f.store.has(scope.installation),false);
+ f.store.delete(legacyCredentialName);f.store.set(legacyKeyName,'malformed');await assert.rejects(registration.adoptLegacyMemberInstallationKey());
+ f.store.set(legacyKeyName,preservedKey);await assert.rejects(registration.registerNativeNotificationInstallation(enrollment));
+ const pending=f.store.get(scope.credential+'.pending-enrollment'),oldKey=f.store.get(scope.installation);
+ await assert.rejects(registration.adoptLegacyMemberInstallationKey());assert.equal(f.store.get(scope.installation),oldKey);assert.equal(f.store.get(scope.credential+'.pending-enrollment'),pending);
+});
+
+test('adoption settles a late old-key enrollment before allowing any queued key reader or new ticket',async()=>{
+ let release;const delayed=new Promise(done=>{release=done;}),server=recoveryServer({delayRedeem:delayed});
+ const member=memberContext(),f=fixture({handler:server.handler}),registration=f.createScopedRegistration(member);
+ f.store.set(legacyKeyName,preservedKey);
+ const attempt=registration.registerNativeNotificationInstallation(enrollment),rejected=assert.rejects(attempt);
+ while(!f.calls.some(call=>call.url.endsWith('/redeem_scoped_native_notification_enrollment_ticket_v2')))await new Promise(resolve=>setImmediate(resolve));
+ const adoption=registration.adoptLegacyMemberInstallationKey(),reader=f.createScopedRegistration(member).getNativeNotificationInstallationKey();
+ await adoption;assert.equal(await reader,preservedKey);release();await rejected;
+ assert.equal(server.state.cancelled.has(enrollment.enrollmentTicket),true);assert.equal(server.state.credential,null);
+ assert.equal(f.store.has(core.communityStorageKeys(member.community).credential+'.pending-enrollment'),false);
+ assert.equal(f.store.get(core.communityStorageKeys(member.community).installation),preservedKey);
 });

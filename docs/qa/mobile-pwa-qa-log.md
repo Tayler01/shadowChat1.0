@@ -1,3 +1,23 @@
+## October 30 native account and ShadowPin regression preparation
+
+- Device push token collision traced to a revoked Build14 installation retained
+  under its legacy UUID. Startup now safely adopts that durable member identity
+  before new enrollment, settles ambiguous pending work, preserves confirmed
+  scoped registration, and keeps Demo separate. Server ownership guards unchanged.
+- Native iframe navigation no longer launches external apps automatically; Pin
+  feed taps open details. Explicit trusted app links retain external navigation.
+  Android dependency patch is exact-version/source guarded. Unsafe schemes and
+  frame clicks are covered by the actual React Native dispatcher regression.
+- Both Pin implementations retain authorized inline fallback and Comfort policy.
+  Normal image derivatives are complete; custom-video poster derivatives now
+  have an ownership-checked, race-safe canonical processing path.
+- Removed pending-tab progress and Suspense branding for ordinary tab changes;
+  cold launch, auth and membership startup branding remain.
+- Combined111 native,123 Jest and34 media Node cases pass, as do root lint/types,
+  streamlined types, full build and streamlined local feature-preview build.
+  These are source/local results; no native26 distribution or phone acceptance
+  is implied. Logs: `output/bugfix-verification-20261030/`.
+
 ## October 29 full-app reconnect release verification
 
 - Published DDA could show an unread DM badge while its visible empty thread

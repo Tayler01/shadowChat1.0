@@ -34,7 +34,7 @@ test('concurrent StrictMode startup effects revoke and select once, and remount 
   let revokes = 0, persists = 0;
   const initialize = startup.createCommunityStartup();
   const options = { registry, controller, streamlined: true, readSelection: async () => 'member',
-    revokeLegacy: async () => { revokes++; await gate.promise; },
+    prepareMemberInstallation: async () => {}, revokeLegacy: async () => { revokes++; await gate.promise; },
     persistSelection: async () => { persists++; },
   };
   const first = initialize(options), second = initialize(options);
@@ -47,7 +47,7 @@ test('concurrent StrictMode startup effects revoke and select once, and remount 
 test('remount after the first chooser selection never restores cached unselected startup state', async () => {
   const controller = core.createCommunityRuntime(registry), initialize = startup.createCommunityStartup();
   const options = { registry, controller, streamlined: true, readSelection: async () => null,
-    revokeLegacy: async () => {}, persistSelection: async () => {},
+    prepareMemberInstallation: async () => {}, revokeLegacy: async () => {}, persistSelection: async () => {},
   };
   assert.equal(await initialize(options), null);
   const selected = controller.select('member');
@@ -58,10 +58,22 @@ test('startup storage failures do not activate any backend and can be retried', 
   const controller = core.createCommunityRuntime(registry), initialize = startup.createCommunityStartup();
   let fails = true;
   const options = { registry, controller, streamlined: true, readSelection: async () => 'member',
-    revokeLegacy: async () => {}, persistSelection: async () => { if (fails) throw Error('storage unavailable'); },
+    prepareMemberInstallation: async () => {}, revokeLegacy: async () => {}, persistSelection: async () => { if (fails) throw Error('storage unavailable'); },
   };
   await assert.rejects(initialize(options)); assert.equal(controller.capture(), null);
   fails = false; assert.equal((await initialize(options)).community.id, 'member');
+});
+
+test('startup blocks community activation and ticket access until member identity preparation succeeds',async()=>{
+ const controller=core.createCommunityRuntime(registry),initialize=startup.createCommunityStartup(),gate=deferred(),order=[];
+ let fails=true;
+ const options={registry,controller,streamlined:true,revokeLegacy:async()=>{order.push('revoke');},
+  prepareMemberInstallation:async()=>{order.push('prepare');await gate.promise;if(fails)throw Error('pending enrollment uncertain');},
+  readSelection:async()=>{order.push('read');return'member';},persistSelection:async()=>{order.push('persist');}};
+ const first=initialize(options);const rejected=assert.rejects(first);assert.equal(first,initialize(options));
+ await new Promise(resolve=>setImmediate(resolve));assert.equal(controller.capture(),null);assert.deepEqual(order,['revoke','prepare']);
+ gate.resolve();await rejected;assert.equal(controller.capture(),null);
+ fails=false;await initialize(options);assert.deepEqual(order,['revoke','prepare','revoke','prepare','read','persist']);assert.equal(controller.capture().community.id,'member');
 });
 
 function clientFixture({fetchImpl}={}) {
@@ -139,7 +151,7 @@ test('switch teardown can abort an SDK request before its fetch completes',async
 test('full native startup preserves member access without legacy revocation or community storage migration',async()=>{
  const controller=core.createCommunityRuntime(registry),initialize=startup.createCommunityStartup();
  const unexpected=async()=>{throw Error('Full app must not migrate community state');};
- const selected=await initialize({registry,controller,streamlined:false,revokeLegacy:unexpected,readSelection:unexpected,persistSelection:unexpected});
+ const selected=await initialize({registry,controller,streamlined:false,prepareMemberInstallation:unexpected,revokeLegacy:unexpected,readSelection:unexpected,persistSelection:unexpected});
  assert.equal(selected.community.id,'member');assert.equal(controller.status().phase,'active');
 });
 

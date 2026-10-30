@@ -14,6 +14,7 @@ export function createCommunityStartup() {
     controller: ReturnType<typeof createCommunityRuntime>;
     streamlined: boolean;
     revokeLegacy: () => Promise<void>;
+    prepareMemberInstallation: () => Promise<void>;
     readSelection: () => Promise<unknown>;
     persistSelection: (id: CommunityId) => Promise<void>;
   }) => {
@@ -23,6 +24,7 @@ export function createCommunityStartup() {
     pending = (async () => {
       if (!options.streamlined) return options.controller.select('member');
       await options.revokeLegacy();
+      await options.prepareMemberInstallation();
       const current = options.controller.capture();
       if (current) return current;
       const stored = restoreCommunitySelection(options.registry, await options.readSelection());

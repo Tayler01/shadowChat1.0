@@ -55,7 +55,7 @@
     "doctor": "expo-doctor",
     "test:dependency-security": "node --test tests/dependency-security.test.cjs",
     "test:streamlined": "node --test tests/streamlined-configuration.test.cjs",
-    "postinstall": "node scripts/apply-tooling-security.cjs",
+    "postinstall": "node scripts/apply-tooling-security.cjs && node scripts/apply-webview-navigation.cjs",
     "test:tooling-security": "node --test tests/tooling-security.test.cjs",
     "audit:release": "node scripts/audit-native-release.cjs"
   },

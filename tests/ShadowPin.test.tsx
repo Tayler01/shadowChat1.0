@@ -885,7 +885,7 @@ test('autoplays focused native video when allowed and stops when comfort disable
   }
 })
 
-test('keeps uploaded Bunny feed videos on native playback when sound is enabled', async () => {
+test('keeps Bunny feed videos native with sound and recovers failed renditions through the inline player', async () => {
   jest.useFakeTimers()
   const originalIntersectionObserver = global.IntersectionObserver
   const originalPlay = HTMLMediaElement.prototype.play
@@ -951,7 +951,7 @@ test('keeps uploaded Bunny feed videos on native playback when sound is enabled'
   })
 
   try {
-    const { container } = render(<ShadowPin onBack={() => {}} />)
+    const { container, rerender } = render(<ShadowPin onBack={() => {}} />)
 
     fireEvent.click(screen.getByText('Fam & Friends'))
     const videoCard = screen.getByAltText('Pin bunny-feed').closest('article')
@@ -980,6 +980,17 @@ test('keeps uploaded Bunny feed videos on native playback when sound is enabled'
       expect(container.querySelector('video')).toHaveAttribute('src', 'https://vz.example/video-guid/play_480p.mp4')
       expect(container.querySelector('iframe')).not.toBeInTheDocument()
     })
+
+    fireEvent.error(container.querySelector('video')!)
+    await waitFor(() => {
+      expect(container.querySelector('video')).not.toBeInTheDocument()
+      expect(container.querySelector('iframe')).toHaveAttribute('src', expect.stringContaining('https://player.mediadelivery.net/embed/123/video-guid'))
+    })
+    expect(container.querySelector('iframe')).toHaveAttribute('allow', expect.stringContaining('autoplay'))
+
+    mockShouldAutoplayMedia = false
+    rerender(<ShadowPin onBack={() => {}} />)
+    await waitFor(() => expect(container.querySelector('iframe')).not.toBeInTheDocument())
   } finally {
     Object.defineProperty(global, 'IntersectionObserver', {
       configurable: true,
@@ -1717,6 +1728,11 @@ test('cycles visible iframe videos on a fallback slot when no ended event is ava
     await waitFor(() => {
       expect(container.querySelector('iframe')).toHaveAttribute('src', expect.stringContaining('/embed/rightShort'))
     })
+
+    expect(container.querySelector('iframe')).toHaveClass('pointer-events-none')
+    fireEvent.click(within(rightCard!).getByRole('button', { name: /^Open “/ }))
+    expect(screen.getByRole('dialog', { name: 'Pin youtube-right' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Load YouTube' })).toBeInTheDocument()
   } finally {
     Object.defineProperty(global, 'IntersectionObserver', {
       configurable: true,
@@ -2168,7 +2184,7 @@ test('uses stored Instagram provider preview metadata as the pin card image', ()
   )
 })
 
-test('opens YouTube video pins with fullscreen player controls', () => {
+test('a main-feed YouTube tap opens ShadowPin Theater with inline controls instead of opening its source', () => {
   jest.useFakeTimers()
   mockUseShadowPinImages.mockReturnValue({
     category,
@@ -2178,6 +2194,7 @@ test('opens YouTube video pins with fullscreen player controls', () => {
         media_type: 'external_video',
         provider: 'youtube',
         provider_playback_id: 'Czrv1RX19G0',
+        source_url: 'https://www.youtube.com/shorts/Czrv1RX19G0',
         video_embed_url: 'https://www.youtube.com/embed/Czrv1RX19G0?playsinline=1&rel=0&loop=1&playlist=Czrv1RX19G0',
         processing_status: 'ready',
       },
@@ -2201,7 +2218,12 @@ test('opens YouTube video pins with fullscreen player controls', () => {
     const videoCard = screen.getByAltText('Pin youtube').closest('article')
     expect(videoCard).not.toBeNull()
 
-    openPinFromCard(videoCard!)
+    const opener = within(videoCard!).getByRole('button', { name: /^Open “/ })
+    expect(opener).toHaveAttribute('data-shadow-pin-media-opener', 'true')
+    expect(opener).toHaveClass('z-10')
+    fireEvent.click(opener)
+    expect(screen.getByRole('dialog', { name: 'Pin youtube' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /open source/i })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Load YouTube' }))
 
     const viewerFrame = screen.getByTitle('Pin youtube')

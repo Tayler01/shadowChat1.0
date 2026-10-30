@@ -333,6 +333,7 @@ export class ShadowPinCreatorRateLimitError extends Error {
 }
 
 const CREATOR_MEDIA_ACTION_LIMITS = new Map([
+  ['process-video-poster', 10],
   ['process-draft-image', 10],
   ['stage-draft-image-from-url', 6],
   ['prepare-draft-image-publish', 6],
@@ -411,6 +412,76 @@ export async function writeDerivativesForRow(admin, targetType, row, buffer) {
 
   if (error) throw error
   return data
+}
+
+/** Custom video covers use the image decoder, but must never mark an unencoded
+ * video ready. Resolve the source from the authorized canonical row only. */
+export async function processShadowPinVideoPoster({ admin, userId, id, expectedBunnyVideoId }) {
+  const { data: row, error } = await admin.from('shadow_pin_images').select('*')
+    .eq('id', id).is('deleted_at', null).maybeSingle()
+  if (error) throw error
+  if (!row || row.media_type !== 'video' || row.provider !== 'bunny_stream'
+    || !expectedBunnyVideoId || row.provider_asset_id !== expectedBunnyVideoId) {
+    throw new Error('Video upload session does not match this Pin.')
+  }
+  await assertCanMutate(admin, row, userId, true)
+  if (typeof row.image_path !== 'string' || !row.image_path.startsWith(`${row.creator_id}/`)
+    || row.image_path.split('/').some(part => !part || part === '.' || part === '..' || /[\\\u0000-\u001f\u007f]/.test(part))) {
+    throw new Error('The poster object does not belong to this image creator.')
+  }
+  // Repeated completion requests reuse an already-derived cover.
+  if (row.thumbnail_path && row.medium_path && row.thumbnail_path !== row.image_path
+    && row.medium_path !== row.image_path) return row
+  const store = admin.storage.from(SHADOW_PIN_BUCKET)
+  const { data: blob, error: downloadError } = await store.download(row.image_path)
+  if (downloadError) throw downloadError
+  const { thumbnail, medium } = await createDerivatives(Buffer.from(await blob.arrayBuffer()))
+  const prefix = `${row.creator_id}/derivatives/images/${row.id}/posters/${crypto.randomUUID()}`
+  const thumbnailPath = `${prefix}/thumbnail.webp`
+  const mediumPath = `${prefix}/medium.webp`
+  const generatedPaths = [thumbnailPath, mediumPath]
+  let publicationAttempted = false
+  try {
+    for (const [path, bytes] of [[thumbnailPath, thumbnail], [mediumPath, medium]]) {
+      const { error: uploadError } = await store.upload(path, bytes, {
+        contentType: 'image/webp', cacheControl: '31536000', upsert: false,
+      })
+      if (uploadError) throw uploadError
+    }
+    const { data: thumbPublic } = store.getPublicUrl(thumbnailPath)
+    const { data: mediumPublic } = store.getPublicUrl(mediumPath)
+    let query = admin.from('shadow_pin_images').update({
+      thumbnail_url: thumbPublic.publicUrl, thumbnail_path: thumbnailPath,
+      medium_url: mediumPublic.publicUrl, medium_path: mediumPath,
+    }).eq('id', row.id).eq('creator_id', row.creator_id).eq('image_path', row.image_path)
+      .eq('provider_asset_id', expectedBunnyVideoId).is('deleted_at', null)
+    // A replacement, deletion, or concurrent cover processor wins without being
+    // overwritten. Original media, video readiness and custom cover stay intact.
+    for (const field of ['thumbnail_path', 'medium_path']) {
+      query = row[field] == null ? query.is(field, null) : query.eq(field, row[field])
+    }
+    publicationAttempted = true
+    const { data: item, error: updateError } = await query.select('*').maybeSingle()
+    if (updateError) throw updateError
+    if (!item) throw new Error('The video cover changed while it was being processed.')
+    return item
+  } catch (processingError) {
+    if (publicationAttempted) {
+      // A lost response can follow a committed update. Never remove a cover
+      // until readback proves neither variant is still referenced, even deleted.
+      const { data: current, error: readError } = await admin.from('shadow_pin_images')
+        .select('*').eq('id', row.id).maybeSingle()
+      if (readError) throw processingError
+      if (current?.thumbnail_path === thumbnailPath || current?.medium_path === mediumPath) {
+        if (!current.deleted_at && current.creator_id === row.creator_id
+          && current.provider_asset_id === expectedBunnyVideoId) return current
+        throw processingError
+      }
+    }
+    const { error: cleanupError } = await store.remove(generatedPaths)
+    if (cleanupError) throw new Error('Video cover processing failed; generated cover cleanup needs retry.', { cause: processingError })
+    throw processingError
+  }
 }
 
 export async function processShadowPinRow({ admin, targetType, id, userId, requireOwnership = true }) {

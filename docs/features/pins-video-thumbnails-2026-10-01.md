@@ -50,3 +50,25 @@ This update does not resolve Home Screen Photos video paste. Native paste is
 physically accepted; the direct PWA clipboard request remains tracked in
 [clipboard research](pwa-video-clipboard-2026-10-01.md). Quiver is reported fixed
 on both apps; native push delivery still needs current phone enrollment proof.
+
+## October 30 custom poster derivatives (local preparation)
+
+The legacy file-upload path now requests real 640px WebP thumbnail and
+1600px-inside medium variants for a captured custom video cover before sending
+the video to Bunny. This reuses the existing Sharp decoder and does not use
+Storage Image Transformations. The worker accepts only a canonical Pin ID and
+the expected Bunny upload UUID, checks actor and source ownership, and preserves
+the original poster and video processing state. A conditional update prevents
+replacement/deletion races; partial or stale generated files are removed. A lost
+update response is read back before removing files that may already be published.
+Existing signed-media delivery remains responsible for viewing the variants.
+
+Read-only production inventory found all 348 image Pins and 27 category covers
+ready with complete original/thumbnail/medium Storage objects. Seven Bunny Pins
+use one Storage poster for all three variants; five use CDN frames and one older
+Pin still has the generic placeholder. No existing member media was changed.
+After release review, the seven custom covers can be processed through the same
+canonical-ID worker with their exact current Bunny UUIDs; additive variants and
+conditional updates preserve originals. The generic cover requires a separate
+provider status/thumbnail check and the existing guarded poster repair, after
+authorized CDN delivery works. These are proposed repairs, not completed work.

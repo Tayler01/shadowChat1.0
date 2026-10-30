@@ -12,8 +12,9 @@ for (const timing of ['before-session', 'after-session']) test(`real app boundar
  const dom=new JSDOM('<div id="root"></div>');const previous={window:global.window,document:global.document,act:global.IS_REACT_ACT_ENVIRONMENT};global.window=dom.window;global.document=dom.window.document;global.IS_REACT_ACT_ENVIRONMENT=true;
  const root=createRoot(document.getElementById('root'));const cache=new Map();let bindings,webProps,expoResponse,nativeSession=null,verified=0,committed=0,badge=1,webMounts=0;const authListeners=new Set();const injections=[];
  const noop=async()=>{};const remove=()=>({remove(){}});const store=new Map([['shadowchat-community-selection-v1','demo']]);
+ let releasePreparation, memberPreparations=0;const preparation=new Promise(resolve=>{releasePreparation=resolve;});
  const identity={userId:uid,installationKey,credential:'a'.repeat(64)};
- const registration={getNativeNotificationInstallationCredential:async()=>{bindings.rememberInstallation(bindings.requireCommunity().community,identity);return identity},getNativeNotificationDeviceOptOut:async()=>false,reconcileNativeNotificationInstallation:async()=>false,updateNativeNotificationForegroundLease:noop,revokeNativeNotificationInstallation:noop};
+ const registration={adoptLegacyMemberInstallationKey:async()=>{memberPreparations++;await preparation;},getNativeNotificationInstallationCredential:async()=>{bindings.rememberInstallation(bindings.requireCommunity().community,identity);return identity},getNativeNotificationDeviceOptOut:async()=>false,reconcileNativeNotificationInstallation:async()=>false,updateNativeNotificationForegroundLease:noop,revokeNativeNotificationInstallation:noop};
  const sdkClient={auth:{getUser:async token=>{verified++;assert.equal(token,access);return{data:{user:{id:uid}},error:null}},setSession:async tokens=>{committed++;nativeSession={...tokens,user:{id:uid}};for(const cb of authListeners)cb('SIGNED_IN',nativeSession);return{data:{session:nativeSession},error:null}},getSession:async()=>({data:{session:nativeSession}}),onAuthStateChange:cb=>{authListeners.add(cb);return{data:{subscription:{unsubscribe:()=>authListeners.delete(cb)}}}},stopAutoRefresh:noop},rpc:async()=>({data:{total:0},error:null}),channel:()=>({on(){return this},subscribe(){return this}}),removeChannel:noop,removeAllChannels:noop};
  const primitive=tag=>({children,onPress})=>React.createElement(tag,{onClick:onPress},children);
  const WebView=React.forwardRef((props,ref)=>{webProps=props;React.useEffect(()=>{webMounts++},[]);React.useImperativeHandle(ref,()=>({injectJavaScript:value=>injections.push(value),goBack(){}}),[]);return React.createElement('output',{'data-uri':props.source.uri},props.source.uri)});
@@ -34,6 +35,10 @@ for (const timing of ['before-session', 'after-session']) test(`real app boundar
   const {NativeNotificationsProvider}=load(path.join(mobile,'src/hooks/useNativeNotifications.tsx'));
   const Screen=load(path.join(mobile,'src/app/index.tsx')).default;
   await React.act(async()=>{root.render(React.createElement(NativeCommunityBoundary,null,React.createElement(NativeNotificationsProvider,null,React.createElement(Screen))));});
+  assert.equal(bindings.activeCommunity(),null,'startup must not expose a project before device identity recovery');
+  assert.equal(webProps,undefined,'no WebView or enrollment bridge mounts before recovery');
+  assert.equal(memberPreparations,1);
+  await React.act(async()=>{releasePreparation();await preparation;});
   assert.equal(bindings.requireCommunity().community.projectRef,demoRef);
   const envelope={schemaVersion:2,eventId:'event1',eventIds:['event1'],type:'dm_message',category:'dm',entityId:'message1',route,groupKey:'dm:test',priority:'high',privacy:'private',actor:null,content:{eyebrow:'dm',title:'ShadowChat',body:null,privateTitle:'ShadowChat',privateBody:'Open ShadowChat to view it.'},media:null,actions:['open'],soundId:'shadow_whisper',androidChannelKey:'messages_v1',badgeCategory:'dm',autoRead:false,createdAt:new Date(Date.now()-1000).toISOString(),expiresAt:new Date(Date.now()+90000).toISOString()};
   const response=(identifier, extra={})=>({actionIdentifier:'default',notification:{request:{identifier,content:{data:{envelopeV2:envelope,communityScope:{version:1,projectRef:demoRef,userId:uid,installationKey},...extra}}}}});

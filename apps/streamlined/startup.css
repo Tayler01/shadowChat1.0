@@ -23,7 +23,6 @@
 .streamlined-loading--compact { min-height: 6rem; padding: 1.5rem; }
 .streamlined-loading--compact .streamlined-loading__mark { width: 32px; height: 32px; }
 .streamlined-loading--compact .streamlined-loading__name { display: none; }
-.streamlined-tab-loading { display: grid; justify-items: center; gap: .5rem; flex: 0 0 auto; padding: .75rem; background: var(--bg-shell, #0d0f10); color: var(--text-muted, #c4bba6); font-size: .875rem; }
 @keyframes streamlined-loading-indeterminate { from { transform: translateX(0); } to { transform: translateX(185%); } }
 /* Use the shared pre-paint Comfort policy; reduced/no motion keeps a quiet,
    fixed segment and the same accessible loading message. */

@@ -47,6 +47,7 @@ import {
 import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
 import { appRuntime } from '@/lib/appRuntime';
 import { pageLaunchProgress, parseLaunchProgress, STREAMLINED_LAUNCH_SCRIPT } from '@/lib/nativeLaunch';
+import { decideAppNavigation, NATIVE_MAIN_DOCUMENT_LINK_SCRIPT, type AppNavigationRequest } from '@/lib/webViewNavigation';
 import { useCommunityBinding } from '@/community/NativeCommunityBoundary';
 import { addCommunityCleanup,announceCommunityChange,communityController,isCurrentCommunity,runCommunityOperation } from '@/community/communityBindings';
 import { resetCommunityMemory } from '@/lib/supabase';
@@ -496,17 +497,14 @@ export default function ShadowChatAppScreen() {
     setCanGoBack(navigation.canGoBack);
   }, []);
 
-  const handleNavigationRequest = useCallback((request: { url: string }) => {
-    if (isAllowedAppUrl(request.url)) return true;
-    if (
-      request.url.startsWith('mailto:') ||
-      request.url.startsWith('tel:') ||
-      request.url.startsWith('sms:') ||
-      request.url.startsWith('https://')
-    ) {
+  // The '*' whitelist below delegates every scheme here; WebView otherwise
+  // auto-opens excluded schemes before consulting our frame/gesture policy.
+  const handleNavigationRequest = useCallback((request: AppNavigationRequest) => {
+    const decision = decideAppNavigation(request, isAllowedAppUrl);
+    if (decision === 'external') {
       void Linking.openURL(request.url);
     }
-    return false;
+    return decision === 'allow';
   }, [isAllowedAppUrl]);
 
   const showNotificationPrompt =
@@ -533,7 +531,7 @@ export default function ShadowChatAppScreen() {
         hideKeyboardAccessoryView
         contentInsetAdjustmentBehavior="never"
         decelerationRate="normal"
-        injectedJavaScriptBeforeContentLoaded={`window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = ${JSON.stringify(clipboardBridge.available)};${NATIVE_BOOTSTRAP_SCRIPT}${appRuntime.streamlined ? STREAMLINED_LAUNCH_SCRIPT : ''}`}
+        injectedJavaScriptBeforeContentLoaded={`window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = ${JSON.stringify(clipboardBridge.available)};${NATIVE_BOOTSTRAP_SCRIPT}${NATIVE_MAIN_DOCUMENT_LINK_SCRIPT}${appRuntime.streamlined ? STREAMLINED_LAUNCH_SCRIPT : ''}`}
         javaScriptCanOpenWindowsAutomatically={false}
         javaScriptEnabled
         mediaPlaybackRequiresUserAction={false}
@@ -569,7 +567,7 @@ export default function ShadowChatAppScreen() {
         }}
         onNavigationStateChange={handleNavigationChange}
         onShouldStartLoadWithRequest={handleNavigationRequest}
-        originWhitelist={['https://*', 'about:blank']}
+        originWhitelist={['*']}
         pullToRefreshEnabled={false}
         setSupportMultipleWindows={false}
         sharedCookiesEnabled={!appRuntime.streamlined}

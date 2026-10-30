@@ -27,7 +27,11 @@ function loadTs(file, imports = {}) {
 }
 
 test('default native profile preserves the complete existing app configuration', () => {
-  withEnv({}, () => assert.deepEqual(configure({ config: {} }), expo));
+  withEnv({}, () => {
+    const config = configure({ config: {} });
+    assert.deepEqual(config, expo);
+    assert.equal(config.ios.buildNumber, '17');
+  });
 });
 
 test('streamlined build uses an isolated HTTPS origin and advances only its build number', () => {
@@ -35,7 +39,7 @@ test('streamlined build uses an isolated HTTPS origin and advances only its buil
     const config = configure({ config: {} });
     assert.equal(config.extra.webAppUrl, origin);
     assert.equal(config.extra.appEdition, 'streamlined');
-    assert.equal(config.ios.buildNumber, '25');
+    assert.equal(config.ios.buildNumber, '26');
     assert.equal(config.ios.bundleIdentifier, expo.ios.bundleIdentifier);
     const isSplash = plugin => Array.isArray(plugin) && plugin[0] === 'expo-splash-screen';
     assert.deepEqual(config.plugins.slice(0, -1).filter(plugin => !isSplash(plugin)), expo.plugins.filter(plugin => !isSplash(plugin)));
@@ -59,6 +63,7 @@ test('streamlined build fails closed for missing or unsafe origin and reused bui
   withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '18' }, () => assert.throws(() => configure({ config: {} })));
   withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '19' }, () => assert.throws(() => configure({ config: {} })));
   withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '22' }, () => assert.throws(() => configure({ config: {} })));
+  withEnv({ SHADOWCHAT_APP_EDITION: 'streamlined', SHADOWCHAT_STREAMLINED_WEB_ORIGIN: origin, SHADOWCHAT_IOS_BUILD_NUMBER: '25' }, () => assert.throws(() => configure({ config: {} })));
 });
 
 test('the store build profile resolves the reviewed streamlined build and origin', () => {

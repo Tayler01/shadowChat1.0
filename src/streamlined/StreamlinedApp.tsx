@@ -46,7 +46,7 @@ function LoadingView({ fullscreen = false }: { fullscreen?: boolean }) {
 
 function StreamlinedShell() {
   const [route, setRoute] = useState(readLocation)
-  const [tabPending, startTabTransition] = useTransition()
+  const [, startTabTransition] = useTransition()
   const isDesktop = useIsDesktop()
   useStreamlinedViewport(isDesktop)
   useSessionResumeRecovery()
@@ -145,8 +145,7 @@ function StreamlinedShell() {
         <nav>{desktopTabs.map(tab => <button key={tab.view} type="button" aria-current={route.view === tab.view ? 'page' : undefined} onClick={() => navigate(tab.view)}>{tab.label}</button>)}</nav>
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        {tabPending && <div className="streamlined-tab-loading" role="status" aria-live="polite"><div className="streamlined-loading__track" role="progressbar" aria-label="Opening tab" aria-valuetext="Loading"><span className="streamlined-loading__fill" /></div><span>Opening tab...</span></div>}
-        <Suspense fallback={<LoadingView />}>
+        <Suspense fallback={null}>
           {route.view === 'chat' && <ChatView currentView="chat" onViewChange={navigate} onSearch={search} initialMessageId={route.message ?? undefined} initialThreadId={route.thread ?? undefined} onThreadRoute={routeChat} />}
           {route.view === 'dms' && <DirectMessagesView currentView="dms" onViewChange={navigate} onToggleSidebar={() => navigate('chat')} initialConversation={route.conversation ?? undefined} initialMessageId={route.message ?? undefined} initialPanel={route.dmPanel} initialConnectionsSection={route.dmConnectionsSection} initialCircleId={route.dmCircle ?? undefined} onRoute={routeDM} onConnectionsRoute={routeCircles} />}
           {route.view === 'pins' && <ShadowPin currentView="pins" onViewChange={navigate} initialImageId={route.pin ?? undefined} initialCommentId={route.comment ?? undefined} initialPanel={route.pinPanel ?? undefined} initialFeedMode={route.pinFeed ?? undefined} initialCircleId={route.pinCircle ?? undefined} onPinRoute={routePin} onFeedModeChange={changeFeed} onCircleChange={changeCircle} />}

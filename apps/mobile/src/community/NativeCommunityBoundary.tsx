@@ -135,6 +135,12 @@ export function NativeCommunityBoundary({ children }: { children: ReactNode }) {
           await registration.getNativeNotificationInstallationCredential();
           await registration.revokeNativeNotificationInstallation();
         },
+        prepareMemberInstallation: async () => {
+          await createScopedRegistration({
+            community: communityRegistry!.member,
+            generation: 0,
+          }).adoptLegacyMemberInstallationKey();
+        },
       });
       if (cancelled) return;
       setContext(next);

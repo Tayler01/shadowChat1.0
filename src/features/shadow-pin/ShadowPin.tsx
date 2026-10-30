@@ -1,3 +1,4 @@
+import { isNativeAppWebView } from '../../lib/nativeAppBridge'
 import { PrivateMediaVideo } from '../../components/ui/PrivateMediaPlayer'
 import { PrivateMediaFrame } from '../../components/ui/PrivateMediaFrame'
 import { usePrivateMediaUrl } from '../../hooks/usePrivateMediaUrl'
@@ -1952,6 +1953,7 @@ function ImageCard({
   const [imageLoadFailed, setImageLoadFailed] = useState(imageSources.length === 0)
   const [imageLoading, setImageLoading] = useState(imageSources.length > 0)
   const [videoLoading, setVideoLoading] = useState(true)
+  const [nativePreviewFailed, setNativePreviewFailed] = useState(false)
   const [radialState, setRadialState] = useState<PinRadialState>(EMPTY_PIN_RADIAL_STATE)
   const [feedback, setFeedback] = useState<PinActionFeedbackState | null>(null)
   const [shareSheet, setShareSheet] = useState<PinShareSheetState>({ open: false, url: '' })
@@ -1966,17 +1968,27 @@ function ImageCard({
   const nativeVideoSrc = getVideoPreviewUrl(image)
   const feedIframeVideoSrc = videoPin ? getVideoIframeUrl(image) : ''
   const feedVideoPlayable = videoPin && Boolean(nativeVideoSrc || feedIframeVideoSrc)
-  const shouldUseSoundIframeVideo = soundEnabled && image.provider === 'bunny_stream' && !nativeVideoSrc && Boolean(feedIframeVideoSrc)
-  const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc) && !shouldUseSoundIframeVideo
+  // A failed direct rendition can still have a working, authorized provider player.
+  const shouldUseFallbackIframeVideo = nativePreviewFailed && Boolean(feedIframeVideoSrc)
+  const shouldRenderNativeVideo = videoPin && activeVideo && Boolean(nativeVideoSrc) && !shouldUseFallbackIframeVideo
   const nativeVideoReady = Boolean(usePrivateMediaUrl(nativeVideoSrc, { enabled: shouldRenderNativeVideo }))
   const iframeVideoSrc = activeVideo ? feedIframeVideoSrc : ''
-  const shouldRenderIframeVideo = videoPin && activeVideo && Boolean(iframeVideoSrc) && (!nativeVideoSrc || shouldUseSoundIframeVideo)
+  const shouldRenderIframeVideo = videoPin && activeVideo && Boolean(iframeVideoSrc) && (!nativeVideoSrc || shouldUseFallbackIframeVideo)
   const handleVideoPlaybackStarted = useCallback(() => onVideoPlaybackStarted(image.id), [image.id, onVideoPlaybackStarted])
   const handleVideoPlaybackComplete = useCallback(() => onVideoPlaybackComplete(image.id), [image.id, onVideoPlaybackComplete])
   const handleVideoPlaybackUnavailable = useCallback(
     () => onVideoPlaybackUnavailable(image.id),
     [image.id, onVideoPlaybackUnavailable]
   )
+
+  const handleNativePreviewUnavailable = useCallback(() => {
+    if (feedIframeVideoSrc) setNativePreviewFailed(true)
+    else handleVideoPlaybackUnavailable()
+  }, [feedIframeVideoSrc, handleVideoPlaybackUnavailable])
+
+  useEffect(() => {
+    setNativePreviewFailed(false)
+  }, [image.id, nativeVideoSrc])
 
   useLayoutEffect(() => {
     if (imageSourceIdentityRef.current === imageSourceIdentity) return
@@ -2027,7 +2039,7 @@ function ImageCard({
     const notifyUnavailable = () => {
       if (started || cancelled || unavailableNotified) return
       unavailableNotified = true
-      handleVideoPlaybackUnavailable()
+      handleNativePreviewUnavailable()
     }
     const play = () => {
       if (cancelled) return
@@ -2069,7 +2081,7 @@ function ImageCard({
       video.removeEventListener('loadedmetadata', play)
       video.removeEventListener('canplay', play)
     }
-  }, [shouldRenderNativeVideo, nativeVideoReady, soundEnabled, nativeVideoSrc, handleVideoPlaybackStarted, handleVideoPlaybackUnavailable, image])
+  }, [shouldRenderNativeVideo, nativeVideoReady, soundEnabled, nativeVideoSrc, handleVideoPlaybackStarted, handleNativePreviewUnavailable, image])
 
   useEffect(() => {
     if (!shouldRenderIframeVideo) return
@@ -2676,7 +2688,7 @@ function ImageCard({
             draggable={false}
             onEnded={handleVideoPlaybackComplete}
             onLoadedData={() => setVideoLoading(false)}
-            onError={() => { setVideoLoading(false); handleVideoPlaybackUnavailable() }}
+            onError={() => { setVideoLoading(false); handleNativePreviewUnavailable() }}
             onContextMenu={event => event.preventDefault()}
             className="block h-full w-full object-cover"
           />
@@ -3239,7 +3251,7 @@ function ImageViewerMedia({
             {sourceUrl && (
               <PrivateMediaLink
                 href={sourceUrl}
-                target="_blank"
+                target={isNativeAppWebView() ? '_self' : '_blank'}
                 rel="noreferrer"
                 className="inline-flex items-center gap-2 rounded-full border border-[var(--border-panel)] bg-[rgba(255,255,255,0.06)] px-4 py-2 text-sm font-semibold text-[var(--text-primary)]"
               >

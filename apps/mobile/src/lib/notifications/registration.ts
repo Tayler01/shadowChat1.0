@@ -26,6 +26,19 @@ const CREDENTIAL_RPC_TIMEOUT_MS = 12_000;
 const DEVICE_ONLY_SECURE_STORE_OPTIONS = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
+const LEGACY_INSTALLATION_KEY = 'shadowchat-native-notification-installation-v2';
+const LEGACY_CREDENTIAL_KEY = 'shadowchat-native-notification-installation-credential-v2';
+// Startup migration and identifier reads must also serialize across facades.
+const installationIdentityOperations = new Map<string, Promise<void>>();
+function withInstallationIdentity<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  const result = (installationIdentityOperations.get(key) ?? Promise.resolve()).then(operation);
+  const settled = result.then(() => undefined, () => undefined);
+  installationIdentityOperations.set(key, settled);
+  void settled.then(() => {
+    if (installationIdentityOperations.get(key) === settled) installationIdentityOperations.delete(key);
+  });
+  return result;
+}
 
 type PendingNativeEnrollment = {
   installationKey: string;
@@ -59,13 +72,13 @@ export function createScopedRegistration(
 ) {
   const scope = communityStorageKeys(context.community);
   const INSTALLATION_KEY = legacy
-    ? 'shadowchat-native-notification-installation-v2'
+    ? LEGACY_INSTALLATION_KEY
     : scope.installation;
   const DEVICE_OPT_OUT_KEY = legacy
     ? 'shadowchat-native-notification-device-opt-out-v2'
     : scope.optOut;
   const INSTALLATION_CREDENTIAL_KEY = legacy
-    ? 'shadowchat-native-notification-installation-credential-v2'
+    ? LEGACY_CREDENTIAL_KEY
     : scope.credential;
   const LEGACY_ENROLLMENT_COMPLETE_KEY = legacy
     ? 'shadowchat-native-notification-enrollment-complete-v2'
@@ -97,9 +110,10 @@ export function createScopedRegistration(
       throw new Error('Previous notification enrollment must be resolved before continuing.');
     }
   };
-  let installationKeyRequest: Promise<string> | null = null;
   const getNativeNotificationInstallationKey = () =>
-    (installationKeyRequest ??= (async () => {
+    withInstallationIdentity(INSTALLATION_KEY, async () => {
+      // Read the durable identity instead of retaining a pre-migration UUID in
+      // a facade's resolved promise. The shared queue prevents double creation.
       const stored = await SecureStore.getItemAsync(INSTALLATION_KEY);
       if (stored && UUID_PATTERN.test(stored)) {
         await SecureStore.setItemAsync(INSTALLATION_KEY, stored, DEVICE_ONLY_SECURE_STORE_OPTIONS);
@@ -108,10 +122,7 @@ export function createScopedRegistration(
       const created = Crypto.randomUUID();
       await SecureStore.setItemAsync(INSTALLATION_KEY, created, DEVICE_ONLY_SECURE_STORE_OPTIONS);
       return created;
-    })().catch((error) => {
-      installationKeyRequest = null;
-      throw error;
-    }));
+    });
 
   const getNativeNotificationDeviceOptOut = async () =>
     (await SecureStore.getItemAsync(DEVICE_OPT_OUT_KEY)) === 'true';
@@ -290,6 +301,27 @@ export function createScopedRegistration(
       settlingEnrollment = null;
     });
     return settlingEnrollment;
+  };
+
+  const adoptLegacyMemberInstallationKey = async () => {
+    if (!usesScopedJournal || context.community.id !== 'member') return;
+    await withInstallationIdentity(INSTALLATION_KEY, async () => {
+      // Only startup may call this, after exact legacy credential revocation
+      // and before exposing a community that can request enrollment tickets.
+      if (await SecureStore.getItemAsync(LEGACY_CREDENTIAL_KEY))
+        throw new Error('Previous notification registration must be revoked before continuing.');
+      await settleNativeNotificationEnrollmentAttempt();
+      // A confirmed scoped registration already owns its identity. Never move
+      // it merely because this device still retains a historical legacy key.
+      if (await getNativeNotificationInstallationCredential()) return;
+      const preserved = await SecureStore.getItemAsync(LEGACY_INSTALLATION_KEY);
+      if (!preserved) return;
+      if (!UUID_PATTERN.test(preserved))
+        throw new Error('Previous notification installation identifier is invalid.');
+      await SecureStore.setItemAsync(INSTALLATION_KEY, preserved, DEVICE_ONLY_SECURE_STORE_OPTIONS);
+      // Deliberately retain the original key. No credentials, user IDs, tokens
+      // or opt-out state cross namespaces; fresh enrollment still authenticates.
+    });
   };
 
   const wait = (milliseconds: number) =>
@@ -621,6 +653,7 @@ export function createScopedRegistration(
 
   return {
     getNativeNotificationInstallationKey,
+    adoptLegacyMemberInstallationKey,
     settleNativeNotificationEnrollmentAttempt,
     getNativeNotificationDeviceOptOut,
     setNativeNotificationDeviceOptOut,

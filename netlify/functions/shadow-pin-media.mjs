@@ -9,6 +9,7 @@ import {
   prepareShadowPinDraftImagePublish,
   publishShadowPinDraftImage,
   processShadowPinRowForUser,
+  processShadowPinVideoPoster,
   processShadowPinDraftImage,
   rollbackShadowPinDraftImagePublish,
   stageShadowPinDraftImageFromUrl,
@@ -42,6 +43,14 @@ export async function handler(event) {
     const userClient = createUserScopedClient(authorization)
     const action = body?.action
     await consumeShadowPinCreatorMediaBudget(admin, user.id, action)
+
+    if (action === 'process-video-poster') {
+      const item = await processShadowPinVideoPoster({
+        admin, userId: user.id, id: body?.id,
+        expectedBunnyVideoId: body?.expectedBunnyVideoId,
+      })
+      return json({ ok: true, item })
+    }
 
     if (action === 'process-draft-image') {
       const result = await processShadowPinDraftImage({

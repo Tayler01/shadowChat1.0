@@ -34,7 +34,7 @@ test('real React StrictMode mounts, retries startup and remounts a selected comm
   try {
     const controller = core.createCommunityRuntime(registry), initializeCommunity = createCommunityStartup();
     const store = new Map(), listeners = new Set();
-    let revision = 0, legacyFailures = 1, legacyRevokes = 0;
+    let revision = 0, legacyFailures = 1, legacyRevokes = 0, memberPreparations = 0;
     store.set('shadowchat-native-notification-installation-credential-v2', 'synthetic-existing-credential');
     const primitive = tag => ({ children, onPress }) => React.createElement(tag, { onClick: onPress }, children);
     const bindings = {
@@ -64,6 +64,7 @@ test('real React StrictMode mounts, retries startup and remounts a selected comm
       './communityBindings': bindings,
       '../lib/notifications/registration': { createScopedRegistration: () => ({
         getNativeNotificationInstallationCredential: async () => ({ valid: true }),
+        adoptLegacyMemberInstallationKey: async () => { assert.equal(store.has('shadowchat-native-notification-installation-credential-v2'), false); memberPreparations++; },
         revokeNativeNotificationInstallation: async () => { legacyRevokes++; if (legacyFailures-- > 0) throw Error('uncertain revoke'); store.delete('shadowchat-native-notification-installation-credential-v2'); },
       }) },
       '../lib/supabase': { disposeCommunityClient: async () => {}, abortCommunityRequests: () => {} },
@@ -84,7 +85,7 @@ test('real React StrictMode mounts, retries startup and remounts a selected comm
     const retry = [...document.querySelectorAll('button')].find(button => button.textContent === 'Retry opening community');
     assert.ok(retry);
     await React.act(async () => { retry.dispatchEvent(new window.MouseEvent('click', { bubbles: true })); });
-    assert.equal(legacyRevokes, 2); assert.equal(controller.capture(), null);
+    assert.equal(legacyRevokes, 2); assert.equal(memberPreparations, 1); assert.equal(controller.capture(), null);
     const demo = [...document.querySelectorAll('button')].find(button => button.textContent === 'Demo community');
     await React.act(async () => {
       demo.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));

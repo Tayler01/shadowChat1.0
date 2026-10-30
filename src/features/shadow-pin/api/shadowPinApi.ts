@@ -685,7 +685,7 @@ async function uploadBunnyTusFile(
   })
 }
 
-async function markShadowPinVideoUploadFailed(imageId: string, error: unknown) {
+async function markShadowPinVideoUploadFailed(imageId: string, bunnyVideoId: string, error: unknown) {
   const message = error instanceof Error ? error.message : 'Video upload failed.'
   const client = await getWorkingClient()
   await client
@@ -696,6 +696,8 @@ async function markShadowPinVideoUploadFailed(imageId: string, error: unknown) {
       processed_at: new Date().toISOString(),
     })
     .eq('id', imageId)
+    .eq('provider_asset_id', bunnyVideoId)
+    .is('deleted_at', null)
 }
 
 async function createShadowPinVideoUpload(
@@ -731,6 +733,12 @@ async function createShadowPinVideoUpload(
   let session: ShadowPinVideoUploadSession | null = null
   try {
     session = await callShadowPinVideoFunction<ShadowPinVideoUploadSession>(payload)
+    if (posterAsset) {
+      await callShadowPinMediaFunction({
+        action: 'process-video-poster', id: session.image.id,
+        expectedBunnyVideoId: session.bunnyVideoId,
+      })
+    }
     await uploadBunnyTusFile(session, file)
     const complete = await callShadowPinVideoFunction<ShadowPinVideoFunctionResponse>({
       action: 'complete-upload',
@@ -740,7 +748,7 @@ async function createShadowPinVideoUpload(
     return attachViewerImageHeart(complete.image)
   } catch (error) {
     if (session?.image.id) {
-      await markShadowPinVideoUploadFailed(session.image.id, error).catch(() => undefined)
+      await markShadowPinVideoUploadFailed(session.image.id, session.bunnyVideoId, error).catch(() => undefined)
     }
     throw error
   }

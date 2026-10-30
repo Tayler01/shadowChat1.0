@@ -1,5 +1,75 @@
 # Streamlined edition: store readiness
 
+## October 30 scoped regression repairs
+
+The operator authorized repairs to account-switch notifications, uploaded-video
+inline playback/posters in both web editions and TestFlight, accidental external
+YouTube navigation, thumbnail generation and tab-loading UI. This resumes those
+repairs only; the broader App Store release goal remains paused.
+
+Prepared build26 preserves the device's legacy member installation UUID after
+revocation and pending-enrollment settlement, before issuing a fresh scoped
+registration ticket. No old credential or token is copied, and server ownership
+checks remain unchanged. The old revoked Build14 token hash exactly matches the
+recent Demo phone token; the differing scoped UUID caused the observed collision.
+
+Native navigation now distinguishes frame loads and deliberate top-level links;
+feed taps remain Pin details actions. Trusted top-document links remain usable;
+unsafe automatic schemes are blocked before React Native can launch them. A
+version/source-hash guarded Android patch preserves frame/gesture metadata.
+Direct-video failures can use the existing authorized inline provider player.
+
+All348 image Pins and27 category covers had complete ready derivatives. Custom
+video posters lacked independent variants; the prepared canonical-ID processor
+creates 640px/1600px WebPs with ownership/session validation and conditional,
+cleanup-safe publication. Original files and video state are preserved. Ordinary
+tab changes no longer render a loading screen or progress bar; startup/sign-in
+branding remains.
+
+Combined verification passed111 native cases,123 focused Jest cases and34 media
+Node cases, root lint/full+streamlined types and both web builds. Native26 cloud
+build, actual phone acceptance, current CDN delivery repair and published web
+acceptance remain separate gates. No production poster backfill is claimed.
+Evidence: `output/bugfix-verification-20261030/` and agent receipts.
+
+
+## Paused at operator request — October 29, 2026, 9:56 PM Eastern
+
+No further release work is authorized until the operator resumes.
+
+- Main/source: `6514274e862501571128b9903079ff0508ddbdf0`, pushed; local lint,
+  types, build, Edge check and three GIF tests passed. CI40987532615 succeeded.
+- Full36 is live at `6ae3f380e1ce806e7ac3456e`; postpublish private reconnect,
+  chat/DM and read clearing passed both phone engines. Member/demo sites unchanged.
+- Production migration271 is applied and verified. Native runtime and schedules
+  remain OFF/unchanged. First rejected transaction and corrected attempt2 receipts
+  are retained; do not rerun either apply helper.
+- Bunny library666331 Embed view token authentication is ON and persisted after
+  reload. At01:55:20UTC all three reviewed assets passed signed200 and normalized
+  unsigned/tampered403 checks. Its existing key was not exposed or replaced.
+  CDN token authentication is still OFF; directplay ON/blockdirectfile OFF.
+  Storage buckets remain public and public Realtime is still allowed.
+- Protected Pin token-path HLS is404 while CDN token handling is OFF; unsigned
+  manifest200. This is a staged boundary issue, not a verified signer defect.
+  Next step is reviewed CDN enforcement plus actual signed playback/negative/
+  genuine expiry tests, then Storage prewarm/cutover and private-only Realtime.
+- KLIPY strict-filter source correction is pushed but NOT deployed. Demo-only
+  deployment helpers are prepared, hardened, and unapplied. Exact approved email
+  was sent to developers@klipy.com; targeted thread check found no reply yet.
+- Apple draft selects VALID build25; ordinary primary and separate disposable
+  deletion-review logins are saved in verified private review notes. No public
+  submission. Native screenshot originals, final provider/privacy declarations,
+  coordinated final policy/version publication and production native canary remain.
+- All completed live-test fixtures and owned sessions were cleaned/revoked.
+  One revoked test-browser profile is retained with owner/SYSTEM-only access
+  after automatic approval rejected deleting it. Do not bypass that rejection.
+
+Resume by reconciling current live state and exact receipts before any mutation.
+Registry proof is time-bounded and must be refreshed before its next use.
+The saved goal is paused, not complete. Provider proof screenshot:
+`output/privacy/bunny-embed-enabled-20261029.png`.
+
+
 ## October 29 continued production release preparation
 
 The full app now serves source `36b71d8f` at deploy

@@ -1,3 +1,4 @@
+import { isNativeAppWebView } from '../../../lib/nativeAppBridge'
 import { PrivateMediaImage } from '../../../components/ui/PrivateMediaImage'
 import { PrivateMediaLink } from '../../../components/ui/PrivateMediaLink'
 import { usePrivateMediaUrl } from '../../../hooks/usePrivateMediaUrl'
@@ -844,7 +845,7 @@ export function ShadowPinImmersiveViewer({
                   <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-white/45">
                     <time dateTime={activeImage.created_at}>{new Date(activeImage.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</time>
                     {getSourceUrl(activeImage) && (
-                      <PrivateMediaLink href={getSourceUrl(activeImage) || undefined} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-white/75 hover:bg-white/10">
+                      <PrivateMediaLink href={getSourceUrl(activeImage) || undefined} target={isNativeAppWebView() ? '_self' : '_blank'} rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-full px-3 text-white/75 hover:bg-white/10">
                         <ExternalLink className="h-4 w-4" /> Open source
                       </PrivateMediaLink>
                     )}
