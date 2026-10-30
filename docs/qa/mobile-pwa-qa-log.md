@@ -1,3 +1,28 @@
+## October 30 YouTube Error153 follow-up publication
+
+- User's build26 screenshots confirmed Error153 in the feed and the duplicate
+  Theater "Load from YouTube?" prompt. Global no-referrer suppressed YouTube's
+  client-origin identity. Only YouTube iframe requests now use
+  strict-origin-when-cross-origin; global privacy and unrelated provider consent
+  remain intact. Theater opens YouTube directly with Comfort autoplay preserved.
+- Full84aafc8e from c10 changes exactly two approved files; member/demo783735db.
+  Deploys: full6ae49ac37f5e56f0a9c0971e,
+  member6ae49b4f5abeabbf13543acf, demo6ae49bb19b2cf8c2723909dd.
+  Public/immutable assets and unchanged configuration/function contracts verified.
+- Local lint/types/builds and focused media tests passed. Operator requested no
+  full suite; exact owned automatic CI41061815093 was cancelled during full Jest.
+  No full-suite success is claimed and no broader tests were restarted.
+- Actual sealed app at its HTTPS origin passed feed/Theater advancing video,
+  real touch pause/resume, no Error153/prompt, fullscreen permission and explicit
+  source-only external navigation in Chromium/Pixel and WebKit/iPhone.
+- Reduced actual live Demo check passed playback/no153/no prompt/no automatic
+  navigation, exact live index/health/loaded-script hashes and origin-only
+  referrer on both engines. Two owned sessions revoked; no content writes.
+  Evidence: `output/playwright/youtube-live-demo-783735db/receipt.json`.
+- TestFlight remains26, no new binary needed. Operator physical follow-up pending.
+  Production native delivery activation and Creator-video deletion gap remain
+  separate from this scoped web fix.
+
 ## October 30 scoped regression publication
 
 - Full `c10f833c9edb` and streamlined member/demo `6d3296433fe3` are live at

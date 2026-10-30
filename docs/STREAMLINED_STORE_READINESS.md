@@ -74,8 +74,24 @@ suppression causing Error153. An HTTPS-origin A/B test proved that a YouTube-onl
 `strict-origin-when-cross-origin` iframe policy restores real playback and user
 pause/resume in both engines. The focused web-only correction also removes the
 duplicate YouTube Theater prompt; unrelated provider consent and Comfort autoplay
-remain intact. New-source checks, sealed successors and live acceptance are pending;
-do not claim that this follow-up is already published or that native27 is needed.
+remain intact. The web-only follow-up is published and verified:
+
+- Full `84aafc8e365f`, preserving c10 with exactly two approved files changed:
+  deploy `6ae49ac37f5e56f0a9c0971e`.
+- Member `783735db63c2`: deploy `6ae49b4f5abeabbf13543acf`.
+- Demo `783735db63c2`: deploy `6ae49bb19b2cf8c2723909dd`.
+
+Sealed-app and actual live HTTPS Demo playback pass both phone engines with real
+advancing video, no Error153/prompt and no automatic external navigation. The
+staged check also verified touch pause/resume, fullscreen permission, explicit
+Open source and origin-only referrer. Only focused media tests were run locally;
+the operator requested no full suite, so owned automatic CI41061815093 was cancelled
+during its full Jest step. Local lint/types/builds and focused tests passed.
+Configuration, feature flags and function ZIPs stayed unchanged. This uses existing
+TestFlight26; no native27 build is needed. Physical hotfix acceptance remains with
+the operator after fully closing/reopening26. Evidence:
+`output/release-evidence/youtube-referrer-20261030/` and
+`output/playwright/youtube-live-demo-783735db/receipt.json`.
 
 An actual test found a separate deletion gap: published Creator video assets retain
 a draft reference that blocks ordinary provider cleanup after Pin deletion. The
