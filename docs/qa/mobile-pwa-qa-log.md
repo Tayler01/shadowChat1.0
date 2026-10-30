@@ -1,3 +1,19 @@
+## October 29 full-app reconnect release verification
+
+- Published DDA could show an unread DM badge while its visible empty thread
+  failed to receive the message after socket recovery. The exact cause was not
+  proven from that run; the preserved 36b snapshot-reconciliation fix was tested.
+- Source `36b71d8f` passed both phone engines on its sealed stage, then at live
+  deploy `6ae3f380e1ce806e7ac3456e`: automatic private rejoin, General/DM live
+  arrival, canonical DM unread zero and cleared navigation badge.
+- Configuration, feature flags, existing functions and the streamlined sites
+  were preserved. Exact live-run fixtures (two group/two DM) and four owned
+  sessions were removed/revoked. No uploads were created by those final runs.
+- The earlier media QA run's exact photo/object and two sessions were separately
+  cleaned. Automatic approval rejected deleting its local profile; it is retained
+  with owner/SYSTEM-only access. No production voice-playback claim is added.
+- Evidence: `output/release-evidence/native-build25-preparation/full36-publication/receipts/`.
+
 ## October 29 build 25 physical notification acceptance
 
 - Build 25 processed VALID and entered the existing internal TestFlight group.

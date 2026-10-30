@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createEdgeAdminClient, requireActiveEdgeMember } from '../_shared/edge-guard.ts'
+import { buildKlipyGifUrl } from '../_shared/klipy-gif-request.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -211,21 +212,7 @@ const buildKlipyUrl = (payload: Required<GifSearchPayload>) => {
     throw new Error('KLIPY_API_KEY is not configured.')
   }
 
-  const baseUrl = (Deno.env.get('KLIPY_API_BASE_URL') || 'https://api.klipy.com').replace(/\/+$/, '')
-  const endpoint = payload.query
-    ? `${baseUrl}/api/v1/${encodeURIComponent(apiKey)}/gifs/search`
-    : `${baseUrl}/api/v1/${encodeURIComponent(apiKey)}/gifs/trending`
-  const url = new URL(endpoint)
-
-  if (payload.query) {
-    url.searchParams.set('q', payload.query)
-  }
-  url.searchParams.set('per_page', String(payload.limit))
-  url.searchParams.set('page', String(payload.page))
-  url.searchParams.set('rating', 'pg-13')
-  url.searchParams.set('locale', 'en-US')
-
-  return url
+  return buildKlipyGifUrl(payload, apiKey, Deno.env.get('KLIPY_API_BASE_URL'))
 }
 
 serve(async req => {

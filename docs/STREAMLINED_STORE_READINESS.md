@@ -1,5 +1,42 @@
 # Streamlined edition: store readiness
 
+## October 29 continued production release preparation
+
+The full app now serves source `36b71d8f` at deploy
+`6ae3f380e1ce806e7ac3456e`. This preserves the full feature/configuration set
+and fixes the observed missed DM after reconnect. Both phone-browser engines
+passed private reconnect, General/DM live delivery and canonical unread clearing
+after publication. All exact test messages and sessions were cleaned. The initial
+post-upload network failure is preserved separately from successful deployment
+reconciliation; the upload was not repeated.
+
+Production now has migration `20261029225224` (271 installed), the bounded
+immediate notification wake. Source, role boundaries and disabled dispatch were
+verified after commit. Runtime, schedules, secrets and bucket visibility stayed
+unchanged; production native delivery remains disabled. The first transaction
+was rejected by an unsupported cron-table lock and did not commit; the separately
+reviewed correction passed rollback checks before the successful second attempt.
+
+Production retention eligibility was checked read-only: no closed or eligible
+cases, no purge. A new ordinary Demo deletion-review account is retained for
+Apple, and its private login is saved in verified Apple review notes. Original
+reviewer credentials remain unchanged. Build 25 is selected in the draft.
+
+GIF filtering now has a tested source correction to the documented KLIPY
+`content_filter=high` parameter (G-rated results), replacing the undocumented
+`rating` parameter. Search, trending and server-only credentials are preserved.
+Deployment and representative live-response validation remain separate gates.
+The operator approved and sent a request to KLIPY for server-side integration
+approval, production access and precise privacy/filtering clarification. Final
+Apple tracking declarations remain unresolved pending that evidence.
+
+Storage buckets, Bunny token controls and the public-channel boundary have not
+yet been enforced. Two TV embed preflights passed; a Pin's signed HLS returned
+404 while its canonical unsigned manifest returned 200 with CDN token controls
+OFF. This is not key-match or enforcement proof. Controlled provider acceptance,
+old-public/cache denial, private-only reconnect, final policy/version rollout,
+production native canary, native screenshots and Apple privacy publication remain.
+
 ## October 29 build 25 physical acceptance and submission resume
 
 The operator confirmed that the fresh Demo DM notification now works after
