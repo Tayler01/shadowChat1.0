@@ -8,8 +8,9 @@ const expoRequire = createRequire(require.resolve('expo/package.json'));
 const cliPath = path.dirname(expoRequire.resolve('@expo/cli/package.json'));
 const cliRequire = createRequire(path.join(cliPath, 'package.json'));
 
-test('the installed forge matches the exact reviewed upstream structural backport', () => {
-  assert.equal(verifyOrApply().advisory, 'GHSA-86w9-cpqp-85rv');
+test('the installed forge matches the reviewed upstream security release', () => {
+  assert.equal(verifyOrApply().version, '1.4.2');
+  assert.equal(verifyOrApply().upstreamFixed, true);
 });
 
 test('RSA valid signatures work while nested algorithm garbage is rejected', () => {
@@ -49,4 +50,9 @@ test('oversized constrained collections reject before collecting per-item issues
   const result = z.array(z.string()).max(2).safeParse(new Array(100000).fill(42));
   assert.equal(result.success, false);
   assert.ok(result.error.issues.length <= 2);
+});
+
+test('PEM decoding preserves Buffer compatibility after the security update', () => {
+  const encoded = forge.pem.encode({ type: 'PUBLIC KEY', body: 'synthetic-key' });
+  assert.deepEqual(forge.pem.decode(Buffer.from(encoded)), forge.pem.decode(encoded));
 });

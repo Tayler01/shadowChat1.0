@@ -1,5 +1,16 @@
 # Full Codebase Audit Next Steps - 2026-06-01
 
+## October 30 Will & Kirk release gate repair
+
+The direct-to-main Will & Kirk feed passed local web gates, but workflow
+41161091600 blocked deployment on existing native tooling dependencies. The mobile
+lockfile now resolves node-forge 1.4.2 (upstream security fixes plus PEM Buffer
+compatibility), glob 14.0.2 and minimatch 11.0.1. The forge install hook verifies
+the reviewed upstream RSA source instead of applying the old 1.4.0 backport. The
+native release audit now requires zero production advisories, with no exceptions.
+Native regression/security tests, lint, TypeScript and Expo Doctor validate this
+tooling-only update; no native app binary or provider configuration is changed.
+
 This document turns the June 1, 2026 read-only audit into an implementation backlog and records status updates as fixes land.
 
 ## October 23 streamlined release preparation

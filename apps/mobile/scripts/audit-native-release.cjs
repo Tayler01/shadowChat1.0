@@ -16,21 +16,6 @@ assert.ok(audit.status === 0 || audit.status === 1, 'npm audit failed to produce
 const report = JSON.parse(audit.stdout);
 assert.ok(!report.error && report.metadata?.vulnerabilities, 'npm audit returned an error.');
 const vulnerabilities = report.vulnerabilities || {};
-const expectedUrl = 'https://github.com/advisories/GHSA-86w9-cpqp-85rv';
-function accountedFor(name, visited = new Set()) {
-  assert.ok(!visited.has(name), 'Unexpected cyclic audit chain.');
-  const issue = vulnerabilities[name];
-  assert.ok(issue && issue.via.length > 0, `Unclassified audit issue: ${name}`);
-  for (const cause of issue.via) {
-    if (typeof cause === 'string') accountedFor(cause, new Set([...visited, name]));
-    else {
-      assert.equal(cause.name, 'node-forge', `Unreviewed advisory in ${name}`);
-      assert.equal(cause.url, expectedUrl, `Unreviewed advisory in ${name}`);
-      assert.equal(cause.range, '<=1.4.0', 'The forge advisory changed; review required.');
-      assert.deepEqual(issue.nodes, ['node_modules/node-forge'], 'An additional forge installation needs its own verified patch.');
-    }
-  }
-}
-for (const name of Object.keys(vulnerabilities)) accountedFor(name);
+assert.deepEqual(Object.keys(vulnerabilities), [], 'Production dependencies must have no audit advisories.');
 console.log(JSON.stringify({ status: 'passed', rawAudit: report.metadata.vulnerabilities,
-  mitigated: Object.keys(vulnerabilities).length ? [patch] : [], regressionTestsPassed: true }, null, 2));
+  upstreamFix: patch, mitigated: [], regressionTestsPassed: true }, null, 2));
