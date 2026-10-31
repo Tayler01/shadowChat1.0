@@ -1226,3 +1226,9 @@ evidence is recorded.
   Follow-up Crown corridor and input-bracing changes await new-build replay.
 - Physical installed-PWA touch, media-card/background and sustained device
   performance remain unverified. No rebuild production deploy yet.
+
+## October 30, 2026 — Will & Kirk story feed
+
+- Isolated production-build component harness at `output/playwright/will-kirk/` uses synthetic catalog responses and a local five-second H.264/AAC MP4; no backend records or Storage objects created. Android/Chromium, iPhone/WebKit, and desktop Chromium verify newest-first ordering, one column, vertical scroll, no horizontal overflow, empty state, error retry, Back, inline MP4 playback with advancing time, controls, and exactly one mounted player after switching stories. Feed and empty-state screenshots captured.
+- iPhone/WebKit emitted a native media-controls `Temporal.Duration` formatting exception with `commitProperty`/`performScheduledLayout` browser-internal stack. It is retained separately in `results.json`; all functional checks passed and no application exceptions were observed. This is a browser-emulation limitation, not proof of physical-device playback.
+- First real 15–20 minute story, provider processing/playback, native background/lock-screen audio, installed-PWA behavior and physical iPhone/Android checks remain unverified. No admin upload interface added.

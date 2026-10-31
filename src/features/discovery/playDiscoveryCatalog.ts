@@ -9,8 +9,8 @@ export const PLAY_DISCOVERY_CATALOG: readonly PlayDiscoveryEntry[] = [
     id: 'destination:will-kirk',
     kind: 'destination',
     title: 'Will & Kirk',
-    subtitle: 'Coming soon in Entertainment',
-    keywords: ['will and kirk', 'film', 'show', 'coming soon'],
+    subtitle: 'Friday audio stories',
+    keywords: ['will and kirk', 'audiobooks', 'audio', 'stories', 'friday'],
     experience: 'will-kirk',
   },
   {

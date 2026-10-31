@@ -1693,3 +1693,10 @@ Canonical detail and release gates live in:
 - Remaining optional follow-up: configure `BUNNY_STREAM_PULL_ZONE_URL` for
   direct CDN playback URLs and run real-device iOS Safari / Android Chrome
   autoplay and audio gesture validation.
+
+## October 30, 2026 — Will & Kirk Friday audio stories
+
+- Replaced the coming-soon screen with a single-column, vertically scrolling story feed, ordered by release timestamp newest first. Reuses the existing Shado TV catalog/upload/playback infrastructure; the channel slug is `will-kirk`. No schema or provider configuration changes.
+- Only published, ready, released stories with a valid release timestamp at or before now appear. Hidden/deleted channels and stories are excluded. Cover art opens one player at a time; no player loads until selected. Catalog refreshes every minute while visible, with retry on errors.
+- User requested agent-managed MP4 uploads; no admin uploader added. Upload each finished 15–20 minute MP4 through the existing authenticated video path, associate it with the published `will-kirk` channel, set its cover and release timestamp, wait for processing to become ready, then publish. Keep future uploads hidden until release: UI date filtering is not a server access gate or an automatic Friday publishing job.
+- Unit coverage verifies release ordering and all exclusion cases. Phone/desktop fixture browser evidence and physical-device limitations are recorded in the mobile QA log. First actual story file has not been supplied or uploaded.
