@@ -19,6 +19,7 @@ import { SHADO_TV_ASSETS } from '../entertainment/shado-tv/assets/manifest'
 import { ShadowMysteryScreen } from '../entertainment/shadow-mystery/ShadowMysteryScreen'
 import { SHADOW_MYSTERY_ASSETS } from '../entertainment/shadow-mystery/assets/manifest'
 import { WillKirkScreen } from '../entertainment/will-kirk/WillKirkScreen'
+import { WillKirkNewEpisodeBadge } from '../entertainment/will-kirk/WillKirkNewEpisodeBadge'
 import { WILL_KIRK_ASSETS } from '../entertainment/will-kirk/assets/manifest'
 import { SHADO_LIVE_ASSETS } from '../entertainment/shado-live/assets/manifest'
 import { SHADO_LIVE_PROTOTYPE_ENABLED, SHADO_LIVE_REAL_ENABLED, SHADOW_CIRCUIT_ENABLED } from '../../config/featureFlags'
@@ -547,6 +548,7 @@ export function GamesHome({
           onClick={enterWillKirk}
           className={pickerCardClass}
         >
+          <WillKirkNewEpisodeBadge />
           <img
             src={WILL_KIRK_ASSETS.pickerBanner}
             alt="Will & Kirk"
