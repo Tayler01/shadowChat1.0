@@ -1243,3 +1243,8 @@ evidence is recorded.
 
 - Android/Chromium, iPhone/WebKit and desktop visual harness passed: unchanged 64px header, compact gold wordmark, no hero/intro/visible story metadata, one-column video frames, picker badge in the top-right corner, expired badge hidden, signed-player component behavior, vertical scrolling and no horizontal overflow. Screenshot artifacts and results under `output/playwright/will-kirk/patch-visual/`.
 - Fake-clock component tests verify badge removal exactly at 24 hours while mounted, cleanup of timers and refresh on return; invalid, future, missing and old release dates are excluded. No test backend data or Storage objects created. The previously documented browser-internal WebKit Temporal.Duration controls warning remains isolated; real-device/PWA/background behavior not claimed.
+
+### Will & Kirk locked chapter countdown — November 1
+
+- Android/Chromium, iPhone/WebKit and desktop fixture checks pass: next chapter cover visible first, lock and Eastern release date inside the frame, live countdown changes each second, no locked play button/player, unchanged 64px header, no horizontal overflow, older chapter playback/scroll preserved. SVG badge placement/expiration checked and screenshots reviewed under `output/playwright/will-kirk/scheduled-visual/`.
+- 17 targeted unit tests pass, including exact unlock and badge boundaries and countdown formatting. Countdown stops ticking while hidden and refreshes on return. Backend publication guard checked before deadline and at a simulated deadline in a rolled-back transaction; actual scheduled run has not occurred. No disposable messages or Storage objects created. Physical installed-PWA remains unverified; existing WebKit native-control warning retained separately.

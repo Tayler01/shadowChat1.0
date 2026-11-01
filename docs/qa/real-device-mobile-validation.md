@@ -451,3 +451,8 @@ Stopping condition:
 | Date | Release/check | Devices | Result | Artifact or evidence | Follow-up |
 | --- | --- | --- | --- | --- | --- |
 | | | | | | |
+
+November 1, 2026: Will & Kirk locked-cover countdown and branded badge passed
+iPhone/WebKit and Android/Chromium browser emulation. Physical installed-PWA,
+background/lock-screen behavior and the actual November 6 timed unlock remain
+unverified. See `output/playwright/will-kirk/scheduled-visual/` for browser proof.

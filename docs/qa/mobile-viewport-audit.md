@@ -182,3 +182,8 @@ Android/Chromium phone profiles before desktop convenience.
 - Do not create a production ShadowPin post merely for mobile smoke. New pins
   fan out notifications and web push to eligible members; use staged/existing
   content unless a controlled real post is explicitly approved.
+
+November 1, 2026: Will & Kirk scheduled-cover lock/countdown, release date and
+SVG picker badge fit phone/desktop frames with no horizontal overflow; header
+remains 64px plus safe area. Screenshots reviewed from
+`output/playwright/will-kirk/scheduled-visual/`. Physical PWA checks are pending.
