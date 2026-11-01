@@ -32,7 +32,7 @@ jobs:
     timeout-minutes: 45
     env:
       NATIVE_SOURCE_SHA: 6d3296433fe3be45da48bb4074b76d942f0770d3
-      NATIVE_CAPTURE_ROOT: ${{ runner.temp }}/native-store-capture
+      NATIVE_CAPTURE_ROOT: /tmp/shadowchat-native-${{ github.run_id }}-${{ github.run_attempt }}
       MAESTRO_VERSION: cli-2.12.0
       MAESTRO_SHA256: a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e
     steps:
@@ -96,10 +96,10 @@ jobs:
         with:
           name: native-iphone-build26-${{ github.run_id }}
           path: |
-            ${{ runner.temp }}/native-store-capture/final/01-chat.png
-            ${{ runner.temp }}/native-store-capture/final/02-shadowpin.png
-            ${{ runner.temp }}/native-store-capture/final/03-direct-messages.png
-            ${{ runner.temp }}/native-store-capture/final/provenance.json
+            ${{ env.NATIVE_CAPTURE_ROOT }}/final/01-chat.png
+            ${{ env.NATIVE_CAPTURE_ROOT }}/final/02-shadowpin.png
+            ${{ env.NATIVE_CAPTURE_ROOT }}/final/03-direct-messages.png
+            ${{ env.NATIVE_CAPTURE_ROOT }}/final/provenance.json
           if-no-files-found: error
           retention-days: 7
       - name: Retain safe compiler diagnostics on failure
@@ -109,7 +109,7 @@ jobs:
           name: native-compiler-diagnostics-${{ github.run_id }}
           # Generated before any screenshot login secret enters a process.
           # Never upload private/ or Maestro diagnostics, including on failure.
-          path: ${{ runner.temp }}/native-store-capture/build.log
+          path: ${{ env.NATIVE_CAPTURE_ROOT }}/build.log
           if-no-files-found: ignore
           retention-days: 7
       - name: Destroy only this job's disposable simulator
