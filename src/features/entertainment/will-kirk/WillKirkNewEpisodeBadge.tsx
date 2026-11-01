@@ -35,5 +35,5 @@ export function WillKirkNewEpisodeBadge() {
   }, [expiresAt])
 
   if (expiresAt == null) return null
-  return <span className="absolute right-3 top-3 z-10 rounded-full border border-[#ffe2a0]/70 bg-[#d7aa46] px-3 py-1.5 text-xs font-black text-black shadow-[0_3px_14px_rgba(0,0,0,0.7)]">New episode</span>
+  return <span className="pointer-events-none absolute right-2 top-2 z-10" style={{ width: '7.75rem', filter: 'drop-shadow(0 3px 7px rgba(0,0,0,0.85))' }}><img src="/entertainment/will-kirk/new-episode-badge.svg" alt="New episode" width={248} height={108} className="h-auto w-full" /></span>
 }

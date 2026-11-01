@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 248 108" fill="none">
+  <defs>
+    <linearGradient id="night" x2="248" y2="108" gradientUnits="userSpaceOnUse"><stop stop-color="#1b2b40"/><stop offset=".5" stop-color="#070d17"/><stop offset="1" stop-color="#16283d"/></linearGradient>
+    <linearGradient id="gold" x2="0" y2="108" gradientUnits="userSpaceOnUse"><stop stop-color="#fff0bb"/><stop offset=".4" stop-color="#dcb66a"/><stop offset=".7" stop-color="#a5752c"/><stop offset="1" stop-color="#f4d99b"/></linearGradient>
+  </defs>
+  <path d="M20 70 6 100l39-9 18 13 9-30M176 74l9 30 18-13 39 9-14-30" fill="#70292c" stroke="#c28e45" stroke-width="1.5"/>
+  <path d="M16 14Q124-4 232 14v66Q124 104 16 80Z" fill="url(#night)" stroke="url(#gold)" stroke-width="3"/>
+  <path d="M22 20Q124 3 226 20v55Q124 97 22 75Z" stroke="#c69b50" stroke-opacity=".65"/>
+  <path d="m124 12 3 7 8 1-6 5 1 8-6-4-7 4 2-8-6-5 8-1Z" fill="url(#gold)"/>
+  <path d="M42 39h40m84 0h40M39 69h24m122 0h24" stroke="url(#gold)"/>
+  <circle cx="35" cy="39" r="2" fill="#e6c987"/><circle cx="213" cy="39" r="2" fill="#e6c987"/>
+  <text x="124" y="48" text-anchor="middle" fill="#f7e2ae" font-family="Georgia,serif" font-size="20" letter-spacing="5">NEW</text>
+  <text x="124" y="76" text-anchor="middle" fill="url(#gold)" font-family="Georgia,serif" font-size="27" font-weight="bold" letter-spacing="2">EPISODE</text>
+</svg>
