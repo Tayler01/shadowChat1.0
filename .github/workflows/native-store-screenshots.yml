@@ -1,0 +1,122 @@
+name: Native App Store screenshots
+
+# Deliberately manual; this does not build/submit to EAS or App Store Connect.
+on:
+  workflow_dispatch:
+    inputs:
+      chat_marker:
+        description: Exact existing synthetic demo chat text that must be loaded
+        required: true
+        type: string
+      pin_marker:
+        description: Existing synthetic demo Pin accessibility text that must be loaded
+        required: true
+        type: string
+      dm_marker:
+        description: Existing synthetic demo conversation name that must be loaded
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-store-screenshots
+  cancel-in-progress: false
+
+jobs:
+  capture:
+    # Public repositories use the free STANDARD runner, never a larger runner.
+    if: github.repository == 'Tayler01/shadowChat1.0' && !github.event.repository.private
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      NATIVE_SOURCE_SHA: 6d3296433fe3be45da48bb4074b76d942f0770d3
+      NATIVE_CAPTURE_ROOT: ${{ runner.temp }}/native-store-capture
+      MAESTRO_VERSION: cli-2.12.0
+      MAESTRO_SHA256: a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v5
+        with:
+          ref: 6d3296433fe3be45da48bb4074b76d942f0770d3
+          path: native-source
+          persist-credentials: false
+          sparse-checkout: apps/mobile
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24.15.0
+      - name: Prepare exact Build 26 configuration and simulator
+        env:
+          EXPO_PUBLIC_SUPABASE_URL: ${{ vars.MOBILE_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.MOBILE_SUPABASE_ANON_KEY }}
+        run: node scripts/native-store-screenshots.mjs prepare
+      - name: Install existing locked native dependencies
+        working-directory: native-source/apps/mobile
+        run: npm ci
+      - name: Generate native project and compile a genuine Release simulator app
+        working-directory: native-source/apps/mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a
+          source "$NATIVE_CAPTURE_ROOT/build.env"
+          set +a
+          npx --no-install expo prebuild --platform ios --no-install
+          (cd ios && pod install)
+          xcodebuild -workspace ios/ShadoChat.xcworkspace -scheme ShadoChat \
+            -configuration Release -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$NATIVE_SIMULATOR_ID" \
+            -derivedDataPath "$NATIVE_CAPTURE_ROOT/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO build > "$NATIVE_CAPTURE_ROOT/build.log" 2>&1
+      - name: Install pinned capture tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            "https://github.com/mobile-dev-inc/Maestro/releases/download/$MAESTRO_VERSION/maestro.zip" \
+            -o "$NATIVE_CAPTURE_ROOT/maestro.zip"
+          printf '%s  %s\n' "$MAESTRO_SHA256" "$NATIVE_CAPTURE_ROOT/maestro.zip" | shasum -a 256 --check
+          unzip -q "$NATIVE_CAPTURE_ROOT/maestro.zip" -d "$NATIVE_CAPTURE_ROOT/tooling"
+      - name: Authenticate into synthetic Demo community and capture loaded native screens
+        env:
+          # Credentials exist only in this process; never pass them on CLI arguments.
+          NATIVE_SCREENSHOT_EMAIL: ${{ secrets.NATIVE_SCREENSHOT_EMAIL }}
+          NATIVE_SCREENSHOT_PASSWORD: ${{ secrets.NATIVE_SCREENSHOT_PASSWORD }}
+          CAPTURE_CHAT_MARKER: ${{ inputs.chat_marker }}
+          CAPTURE_PIN_MARKER: ${{ inputs.pin_marker }}
+          CAPTURE_DM_MARKER: ${{ inputs.dm_marker }}
+          MAESTRO_CLI_NO_ANALYTICS: '1'
+          MAESTRO_NO_ANALYTICS: '1'
+        run: node scripts/native-store-screenshots.mjs capture
+      - name: Upload only successful post-login native PNGs and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-iphone-build26-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/native-store-capture/final/01-chat.png
+            ${{ runner.temp }}/native-store-capture/final/02-shadowpin.png
+            ${{ runner.temp }}/native-store-capture/final/03-direct-messages.png
+            ${{ runner.temp }}/native-store-capture/final/provenance.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain safe compiler diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-compiler-diagnostics-${{ github.run_id }}
+          # Generated before any screenshot login secret enters a process.
+          # Never upload private/ or Maestro diagnostics, including on failure.
+          path: ${{ runner.temp }}/native-store-capture/build.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Destroy only this job's disposable simulator
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${NATIVE_SIMULATOR_ID:-}" ]; then
+            xcrun simctl shutdown "$NATIVE_SIMULATOR_ID" || true
+            xcrun simctl delete "$NATIVE_SIMULATOR_ID"
+          fi
