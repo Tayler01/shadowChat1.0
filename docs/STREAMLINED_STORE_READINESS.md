@@ -1,5 +1,44 @@
 # Streamlined edition: store readiness
 
+## November 1 release work resumed
+
+The operator resumed the remaining App Store preparation and authorized the
+necessary targeted checks, preserving the full edition. The operator is not yet
+available for the physical notification test; production native delivery stays
+disabled until that check can be coordinated. No new durable goal was created.
+
+- Fresh Apple readback confirms PREPARE_FOR_SUBMISSION and no review submission.
+  The draft now selects VALID, App Store-eligible build26; other version fields
+  are preserved. Evidence: `output/release-evidence/store-readiness-20261101/`.
+- KLIPY's documented strict filter is deployed and independently source-verified
+  in Demo v8 and production v93. Each environment passed two ordinary synthetic
+  authenticated requests (search/trending), returning six GIFs per request.
+  Owned sessions were revoked and cleanup verified; no content was created.
+  Other functions, secrets, runtime, Cron, buckets and Realtime controls stayed
+  unchanged. Evidence: `output/release-evidence/app-privacy-worksheet-build25/`
+  `klipy-deploy-20261101/` and `klipy-production-20261101/`.
+- KLIPY acknowledged ticket CSM-1066 with a two-business-day response estimate.
+  There is no substantive provider privacy/production clarification yet.
+- Fresh read-only checks show Demo already has private-only Realtime; production
+  still permits public channels. All three protected Storage buckets remain
+  public in each environment. Do not repeat the completed Demo Realtime change.
+- The published full edition has advanced to preserved-full source75a83ede;
+  its Will and Kirk changes must be retained in any subsequent full publication.
+- A manual-only native screenshot workflow is running on a standard macOS GitHub
+  runner using exact build26 native source, genuine iPhone simulator pixels and
+  an existing ordinary synthetic Demo account. No EAS build or store submission
+  is performed by this workflow. Capture remains unverified until the images
+  pass native provenance, content and Apple upload checks.
+- Creator video deletion repair is implemented locally, including ordinary
+  deletion calling provider cleanup, a same-account retry notice, idempotent
+  server receipts and a narrow consumed-draft reference exception. The focused
+  database checks pass84 assertions. Hosted deployment/lifecycle acceptance is
+  still pending; local checks are not live deletion proof.
+
+The historical pause entries below describe earlier boundaries and are superseded
+only by this resumed scope. Public submission still requires final privacy
+enforcement, policies/disclosures, native notification acceptance and screenshots.
+
 ## October 30 scoped regression repairs
 
 The operator authorized repairs to account-switch notifications, uploaded-video

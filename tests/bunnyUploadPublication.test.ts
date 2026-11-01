@@ -6,6 +6,7 @@ import { webcrypto } from 'node:crypto'
 import { transpileModule, ModuleKind } from 'typescript'
 import { createRegisteredBunnyUpload } from '../supabase/functions/_shared/bunny-upload-workflow'
 import * as bunnyPoster from '../supabase/functions/_shared/bunny-stream-poster'
+import * as bunnyRemoval from '../supabase/functions/_shared/bunny-media-removal'
 
 const owner = '10000000-0000-4000-8000-000000000001'
 const categoryId = '20000000-0000-4000-8000-000000000002'
@@ -13,7 +14,7 @@ const sourceId = '30000000-0000-4000-8000-000000000003'
 const assetId = '40000000-0000-4000-8000-000000000004'
 const libraryId = '123'
 type Row = Record<string, any>
-type Failure = 'publish-response-lost' | 'draft-activation' | 'register' | 'create-response-lost' | 'finish' | 'processing-job'
+type Failure = 'publish-response-lost' | 'draft-activation' | 'register' | 'create-response-lost' | 'finish' | 'processing-job' | 'claim-retained' | 'provider-delete-response-lost'
 
 /** Execute the real endpoint with a stateful DB/provider boundary. A lost DB
  * response deliberately commits the canonical row before returning an error. */
@@ -41,6 +42,15 @@ function fixture(slug: 'shadow-pin-video' | 'shado-tv-bunny-upload', failure?: F
     else if (name === 'finish_bunny_upload') {
       if (failure === 'finish') return { data: null, error: new Error('Reservation completion response lost') }
       reservations.delete(args.target_reservation_id)
+    } else if (name === 'claim_bunny_media_removal') {
+      if (failure === 'claim-retained') return { data: null, error: new Error('Another retained item still uses this video') }
+      if (!registry.some(row => row.source_type === args.target_source_type && row.source_id === args.target_source_id
+        && row.asset_id === args.target_asset_id && row.library_id === args.target_library_id && row.owner_id === args.target_owner_id)) {
+        return { data: null, error: new Error('Video removal requires exact trusted provider ownership') }
+      }
+      return { data: sourceId, error: null }
+    } else if (name === 'finish_bunny_media_removal') {
+      return { data: null, error: null }
     } else if (name !== 'reserve_bunny_upload') throw new Error(`Unexpected RPC: ${name}`)
     return { data: null, error: null }
   })
@@ -83,7 +93,10 @@ function fixture(slug: 'shadow-pin-video' | 'shado-tv-bunny-upload', failure?: F
       return Response.json({ guid: assetId })
     }
     if (url === `https://video.bunnycdn.com/library/${libraryId}/videos/${assetId}` && options?.method === 'DELETE') {
-      events.push('provider:delete'); providerAssets.delete(assetId)
+      events.push('provider:delete')
+      const existed = providerAssets.delete(assetId)
+      if (failure === 'provider-delete-response-lost' && existed) throw new Error('Provider response lost after delete')
+      if (!existed) return new Response(null, { status: 404 })
       return Response.json({ success: true })
     }
     throw new Error('Unexpected external request')
@@ -95,7 +108,7 @@ function fixture(slug: 'shadow-pin-video' | 'shado-tv-bunny-upload', failure?: F
     '../_shared/edge-guard.ts': { authenticateEdgeUser: async () => ({ id: owner }), requireActiveEdgeMember: async () => {}, consumeEdgeRateLimit: async () => {}, EdgeAuthenticationError: class extends Error {}, EdgeRateLimitError: class extends Error {} },
     '../_shared/bunny-upload-workflow.ts': { createRegisteredBunnyUpload },
     '../_shared/bunny-stream-poster.ts': bunnyPoster,
-    '../_shared/safe-fetch.ts': {}, '../_shared/bunny-stream-status.ts': {}, '../_shared/bunny-media-access.ts': {}, '../_shared/bunny-media-removal.ts': {},
+    '../_shared/safe-fetch.ts': {}, '../_shared/bunny-stream-status.ts': {}, '../_shared/bunny-media-access.ts': {}, '../_shared/bunny-media-removal.ts': bunnyRemoval,
   }
   const source = readFileSync(path.resolve(`supabase/functions/${slug}/index.ts`), 'utf8')
   const compiled = transpileModule(source, { compilerOptions: { module: ModuleKind.CommonJS } }).outputText
@@ -183,5 +196,61 @@ test.each(['finish', 'processing-job'] as const)('TV %s failure retains the publ
   expect(fx.tables.shado_tv_videos[0].provider_asset_id).toBe(assetId)
   expect(fx.providerAssets.has(assetId)).toBe(true)
   expect([...fx.reservations.values()][0].assetId).toBe(assetId)
+  expect(fx.events).not.toContain('provider:delete')
+})
+
+const deletionFixture = (failure?: Failure) => {
+  const fx = fixture('shadow-pin-video', failure)
+  fx.tables.shadow_pin_images.push({ id: sourceId, creator_id: owner, provider: 'bunny_stream', provider_asset_id: assetId, deleted_at: '2026-11-01T00:00:00Z', provider_payload: {} })
+  fx.registry.push({ library_id: libraryId, asset_id: assetId, owner_id: owner, source_type: 'shadow_pin_image', source_id: sourceId })
+  fx.providerAssets.add(assetId)
+  return fx
+}
+
+test('canonical deletion claims before provider removal, finishes before clearing identity, and retries its completed receipt', async () => {
+  const fx = deletionFixture()
+  const request = { action: 'delete-video-asset', imageId: sourceId }
+  expect((await fx.request(request)).status).toBe(200)
+  expect(fx.providerAssets.size).toBe(0)
+  expect(fx.tables.shadow_pin_images[0].provider_asset_id).toBeNull()
+  expect(fx.events).toEqual(['claim_bunny_media_removal', 'provider:delete', 'finish_bunny_media_removal', 'shadow_pin_images:update'])
+  expect((await fx.request(request)).status).toBe(200)
+  expect(fx.events).toHaveLength(4)
+})
+
+test('lost canonical cleanup database response is recovered from the completed server receipt without another provider delete', async () => {
+  const fx = deletionFixture('publish-response-lost')
+  const request = { action: 'delete-video-asset', imageId: sourceId }
+  expect((await fx.request(request)).ok).toBe(false)
+  expect(fx.tables.shadow_pin_images[0].provider_asset_id).toBeNull()
+  expect((await fx.request(request)).status).toBe(200)
+  expect(fx.events.filter(event => event === 'provider:delete')).toHaveLength(1)
+})
+
+test('an unknown provider delete response leaves the identity for an exact retry, then accepts provider 404', async () => {
+  const fx = deletionFixture('provider-delete-response-lost')
+  const request = { action: 'delete-video-asset', imageId: sourceId }
+  expect((await fx.request(request)).ok).toBe(false)
+  expect(fx.tables.shadow_pin_images[0].provider_asset_id).toBe(assetId)
+  expect(fx.events).not.toContain('finish_bunny_media_removal')
+  expect((await fx.request(request)).status).toBe(200)
+  expect(fx.tables.shadow_pin_images[0].provider_asset_id).toBeNull()
+})
+
+test('live canonical Pins and retained claims never reach external deletion', async () => {
+  const live = deletionFixture()
+  live.tables.shadow_pin_images[0].deleted_at = null
+  expect((await live.request({ action: 'delete-video-asset', imageId: sourceId })).status).toBe(403)
+  expect(live.events).not.toContain('provider:delete')
+  const held = deletionFixture('claim-retained')
+  expect((await held.request({ action: 'delete-video-asset', imageId: sourceId })).ok).toBe(false)
+  expect(held.events).not.toContain('provider:delete')
+})
+
+test('missing provider identity without a completed server receipt cannot invent cleanup success', async () => {
+  const fx = deletionFixture()
+  fx.tables.shadow_pin_images[0].provider_asset_id = null
+  expect((await fx.request({ action: 'delete-video-asset', imageId: sourceId })).status).toBe(400)
+  expect(fx.providerAssets.has(assetId)).toBe(true)
   expect(fx.events).not.toContain('provider:delete')
 })

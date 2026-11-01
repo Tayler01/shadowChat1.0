@@ -313,7 +313,7 @@ export function useShadowPinImages(categoryId: string | null) {
       }))
       invalidateShadowPinCategoriesCache(cacheUserId)
       if (nextEntry) setImages(nextEntry.images)
-      return normalizeImage(image)
+      return { ...normalizeImage(image), videoCleanupPending: image.videoCleanupPending }
     } finally {
       setSaving(false)
     }

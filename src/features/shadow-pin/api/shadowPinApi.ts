@@ -504,13 +504,19 @@ async function callShadowPinMediaFunction<T>(payload: Record<string, unknown>): 
   return data as T
 }
 
-async function callShadowPinVideoFunction<T>(payload: Record<string, unknown>): Promise<T> {
+async function callShadowPinVideoFunction<T>(payload: Record<string, unknown>, expectedAccountId?: string): Promise<T> {
   const sessionValid = await ensureSession(true)
   if (!sessionValid) {
     throw new Error('Sign in to save videos.')
   }
 
   const client = await getWorkingClient()
+  if (expectedAccountId !== undefined) {
+    const { data: { session } } = await client.auth.getSession()
+    if (!expectedAccountId || session?.user.id !== expectedAccountId) {
+      throw new Error('Sign in to the account that removed this Pin to retry video cleanup.')
+    }
+  }
   const { data, error } = await client.functions.invoke('shadow-pin-video', {
     body: payload,
   })
@@ -1179,13 +1185,39 @@ export async function deleteShadowPinCategory(categoryId: string) {
   return data as ShadowPinCategory
 }
 
-export async function deleteShadowPinImage(imageId: string) {
+export type ShadowPinImageDeletionResult = ShadowPinImage & {
+  videoCleanupPending?: { imageId: string; accountId: string }
+}
+
+export async function retryDeletedShadowPinVideoCleanup(imageId: string, accountId: string): Promise<ShadowPinImage> {
+  const result = await callShadowPinVideoFunction<{ ok: boolean; image: ShadowPinImage }>({
+    action: 'delete-video-asset', imageId,
+  }, accountId)
+  if (!result?.ok || result.image?.id !== imageId || !result.image.deleted_at || result.image.provider_asset_id) {
+    throw new Error('Video cleanup did not return a completed deletion receipt.')
+  }
+  return result.image
+}
+
+export async function deleteShadowPinImage(imageId: string): Promise<ShadowPinImageDeletionResult> {
   const client = await getWorkingClient()
   const { data, error } = await client.rpc('delete_shadow_pin_image', {
     target_image_id: imageId,
   })
   if (error) throw error
-  return data as ShadowPinImage
+  const removed = data as ShadowPinImage & { deleted_by?: string | null }
+  if (removed?.deleted_at && removed.provider === 'bunny_stream' && removed.media_type === 'video'
+    && removed.source_type === 'file_upload' && removed.provider_asset_id) {
+    const pending = { imageId, accountId: removed.deleted_by ?? '' }
+    try {
+      return { ...removed, ...await retryDeletedShadowPinVideoCleanup(imageId, pending.accountId) }
+    } catch {
+      // Canonical deletion already succeeded. Never report a rollback or leave
+      // the deleted Pin in the grid when provider cleanup needs another attempt.
+      return { ...removed, videoCleanupPending: pending }
+    }
+  }
+  return removed
 }
 
 export async function toggleShadowPinCategoryHeart(categoryId: string) {

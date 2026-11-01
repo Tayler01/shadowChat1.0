@@ -15,7 +15,7 @@ import {
 import { getBunnyStreamReadyState } from '../_shared/bunny-stream-status.ts'
 import { buildBunnyPosterPatch, FALLBACK_VIDEO_POSTER_URL, needsBunnyPosterRepair } from '../_shared/bunny-stream-poster.ts'
 import { authorizeBunnyMediaSource, ownedBunnyDraftReferences, type BunnyVisibleReference } from '../_shared/bunny-media-access.ts'
-import { removeClaimedBunnyMedia } from '../_shared/bunny-media-removal.ts'
+import { hasCompletedBunnyPinRemoval, removeClaimedBunnyMedia } from '../_shared/bunny-media-removal.ts'
 import { createRegisteredBunnyUpload } from '../_shared/bunny-upload-workflow.ts'
 
 const corsHeaders = {
@@ -1854,6 +1854,9 @@ const handleDeleteVideoAsset = async (req: Request, body: VideoPayload) => {
 
   const pin = await getAssetCleanupPin(auth.supabase, auth.userId, imageId)
   if (!pin) return notFound('Pin not found.')
+  // A provider/database success can outlive its HTTP response. Re-read the
+  // server-owned receipt before retrying; never infer cleanup from a null GUID.
+  if (hasCompletedBunnyPinRemoval(pin)) return json({ ok: true, image: pin })
   if (pin.provider !== 'bunny_stream' || !pin.provider_asset_id) {
     return badRequest('Pin does not have a Bunny Stream video asset.')
   }

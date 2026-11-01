@@ -75,6 +75,7 @@ import {
   searchShadowPinImages,
 } from '../../../../../src/features/shadow-pin/api/shadowPinApi'
 import { ShadowPinCommentsDialog } from './components/ShadowPinCommentsDialog'
+import { showShadowPinDeletionNotice } from '../../../../../src/features/shadow-pin/components/shadowPinDeletionNotice'
 import { ShadowPinImmersiveViewer } from './components/ShadowPinImmersiveViewer'
 import { buildViewerSequence, createShadowPinPermalink } from '../../../../../src/features/shadow-pin/immersiveViewerModel'
 import { useModerationReport } from '../../../../../src/features/moderation/useModerationReport'
@@ -3504,7 +3505,7 @@ function ShadowPinHome({
       setViewerSessionImages(current => current.filter(item => item.id !== image.id))
       setModal(null)
       await activeConnectionsState.refresh()
-      toast.success('Pin removed')
+      showShadowPinDeletionNotice(removedImage)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to delete this Pin')
     }
@@ -4544,7 +4545,7 @@ function ShadowPinCategoryScreen({
     const removedImage = await imagesState.removeImage(image.id)
     tracker.recordPinMutation(removedImage ?? image, 'pin_deleted', imagesState.category)
     setModal(null)
-    toast.success('Pin removed')
+    showShadowPinDeletionNotice(removedImage)
   }
 
   const toggleImageHeart = (image: ShadowPinImage) => {
