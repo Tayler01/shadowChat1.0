@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { STREAMLINED_POLICY_EFFECTIVE_DATE, STREAMLINED_POLICY_VERSION } from './streamlinedPolicyVersion'
 
 export type StreamlinedLegalPage = 'privacy' | 'terms' | 'safety' | 'delete-account'
 
@@ -37,14 +38,15 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 function PrivacyPolicy() {
   return <>
     <Section title="One account across ShadowChat">
-      <p>The streamlined edition uses the same ShadowChat account, approved membership and content as the full web app. Activity in one edition can appear in the other. Installing an app does not grant membership.</p>
+      <p>The member community in the streamlined edition uses the same ShadowChat account, approved membership and content as the full web app. Activity in one edition can appear in the other. Installing an app does not grant membership.</p>
+      <p>The separate demonstration community uses its own accounts and synthetic review content. It does not provide access to the member community.</p>
     </Section>
     <Section title="Information the service handles">
       <ul className="list-disc space-y-3 pl-5">
         <li><strong>Account and profile:</strong> sign-in email, authentication and invitation information, username, profile details, profile images and account status.</li>
         <li><strong>Member content:</strong> group and direct messages, replies, reactions, photos, videos, files, voice messages, and ShadowPin posts, comments and related interactions.</li>
-        <li><strong>Preferences and activity:</strong> saved items, blocked members, read state, presence and notification preferences. ShadowPin also records visits, time spent viewing, opened Pins, reactions, shares and related activity associated with your account for operator analytics.</li>
-        <li><strong>Notifications and operation:</strong> push subscriptions or device tokens, notification delivery information, browser/device details and diagnostic or security records processed by the app and its service providers.</li>
+        <li><strong>Preferences and activity:</strong> saved items, blocked members, in-app Connections and Inner Circle relationships, read state, presence and notification preferences. These social features do not import your phone address book. ShadowPin also records visits, time spent viewing, opened Pins, reactions, shares and related activity associated with your account for operator analytics.</li>
+        <li><strong>Notifications and operation:</strong> push subscriptions or device tokens, notification delivery information, browser/device details, and diagnostic, security and service-performance records processed by the app and its service providers.</li>
         <li><strong>Safety:</strong> reports, relevant content or evidence, moderation decisions and updates to the reporting member.</li>
       </ul>
       <p>The adult membership screen asks for an 18-or-older declaration. It does not request a date of birth or an identity document and does not verify your age. Your declaration, accepted policy version and acceptance time are stored with your account so your acknowledgement applies across devices.</p>
@@ -58,27 +60,29 @@ function PrivacyPolicy() {
       <ul className="list-disc space-y-3 pl-5">
         <li><strong>Supabase:</strong> sign-in, account and conversation records, realtime delivery, files, reports and server functions.</li>
         <li><strong>Netlify:</strong> web hosting and media-related server functions. Requests can include IP addresses, browser details and the resource requested.</li>
-        <li><strong>Bunny Stream:</strong> uploaded ShadowPin video processing, storage and playback delivery.</li>
-        <li><strong>KLIPY:</strong> GIF searches and trending results. Your search text is sent through the server, and loading GIF media connects your browser to its media host.</li>
+        <li><strong>Bunny Stream:</strong> uploaded ShadowPin video processing, storage and playback delivery. Playback requests expose network and technical playback information to Bunny. Removing a video from the active service is separate from copies in a viewer&apos;s browser, caches and provider operational records.</li>
+        <li><strong>GIF availability:</strong> KLIPY search and KLIPY-hosted media are unavailable in this edition, including the demonstration community. Existing messages are preserved and show an unavailable-media notice instead of loading that provider. The full web app still offers KLIPY GIFs under its separate enabled features; shared accounts and conversations do not make those provider requests part of this edition. Uploaded images, including animated GIF files, remain available.</li>
         <li><strong>AI features:</strong> before each <code>@ai</code> or <code>/summary</code> request, a confirmation shows the text to share and the configured AI recipient. If you approve, <code>@ai</code> shares your question and <code>/summary</code> shares up to 20 recent loaded message texts. The app does not add account identifiers or media files to that request, but message text may itself contain personal information or links. The currently configured recipient is OpenRouter and the model hosting provider it selects; the current default model is Mistral Nemo. The confirmation identifies the recipient and model for your request. Canceling the confirmation does not send that request. Do not approve information you do not want processed by the named AI service.</li>
-        <li><strong>Linked media:</strong> link previews can request the shared URL and metadata from the destination site. Images or thumbnails may load from external hosts. Loading an interactive YouTube, X, Instagram or Pinterest item connects your browser to that provider; its own privacy practices apply. A playback confirmation does not prevent earlier thumbnail or preview requests.</li>
+        <li><strong>Linked media:</strong> link previews can request a shared page and its information from the destination site. Previews and automatically playing linked videos can contact YouTube, Pinterest and other external hosts as you browse, before you open an item. Choosing to load an external player can send additional requests. These providers receive your IP address and browser information and apply their own privacy practices. This edition uses YouTube&apos;s privacy-enhanced player mode; that mode still contacts Google to load and operate the player. A playback confirmation does not prevent earlier image, preview or automatically playing video requests.</li>
         <li><strong>Push and diagnostics:</strong> browser push services handle subscription endpoints and delivery. Native iPhone notifications use Expo Push Service and Apple Push Notification service, which process device tokens, delivery metadata and notification payloads. Notifications can display content according to your settings. Hosting and infrastructure providers also process diagnostic and security records.</li>
         <li><strong>Zoho Mail:</strong> emails you send to our support or privacy addresses, including their contents, attachments and sender details. Both addresses are handled directly in the same Zoho inbox; support mail is not forwarded to another mailbox.</li>
       </ul>
-      <p>Optional AI and linked-media processing happens when those features are used. Provider settings, retention and international processing details must be finalized for the published store policy; no provider training or zero-retention promise is made here.</p>
+      <p>Our primary database is in the United States. Hosting, delivery, communication and other providers can process information in other countries. Their retention and uses vary with the service, account settings and legal obligations. Optional AI processing shares only the text approved for that request with the named recipient and model host; we do not promise universal zero retention or that no provider can train on approved request text.</p>
     </Section>
     <Section title="Information on your device">
       <p>The app uses browser storage for sign-in continuity, drafts, pending messages, cached conversation data and device preferences such as accessibility settings. Signing out and account deletion have different effects; downloaded or copied content and copies on other devices are not remotely erased. Use your browser or device controls to clear remaining local data on a shared device.</p>
     </Section>
-    <Section title="Security and the limits of this preview">
+    <Section title="Security and media access">
       <p>ShadowChat is not end-to-end encrypted. Do not treat chat messages or uploaded files as inaccessible to the service operator or its infrastructure providers.</p>
-      <p>Access protections for uploaded media links remain under security review. Some media is currently delivered through public URLs. Do not use this preview for confidential or highly sensitive information.</p>
+      <p>We use account permissions, private media storage and time-limited playback or download links to limit access to member content. A valid signed link can remain usable until it expires, including after access to the original content changes. Authorized viewers can save or share content. Browser caches, downloads and independent copies are not remotely erased when access changes or an account is deleted. Public profile images and external linked media have different visibility and provider controls.</p>
+      <p>No online service can promise absolute security. Do not share information you cannot risk another member retaining or disclosing.</p>
     </Section>
     <Section title="Retention and account deletion">
-      <p>Ordinary account content is retained to provide the service until you remove it or request account deletion, subject to operational cleanup rules. Account deletion removes the shared sign-in, authored content, profile, uploads and related registrations from the active service, with the exceptions below. Interrupted requests can be retried; removal is complete when the server confirms completion. Backup expiry and service-provider retention still need verified disclosure.</p>
-      <p>Submitted safety evidence is a limited exception. The selected policy keeps it while a case or appeal is active or a documented legal hold applies; otherwise it becomes eligible for purge 90 days after case closure. This is an operator-selected retention period, not a claimed legal requirement. The operator reviews eligible closed cases weekly for evidence removal, excluding active appeals and legal holds. Evidence capture and restricted reviewer access are deployed; completion of the first operating purge check still needs verification. Eligibility does not mean automatic deletion exactly on day 90.</p>
+      <p>Ordinary account content is retained to provide the service until you remove it or request account deletion, subject to operational cleanup rules. Account deletion removes the shared sign-in, authored content, profile, uploads and related registrations from the active service, with the exceptions below. Interrupted requests can be retried; removal is complete when the server confirms completion. Existing backups are not individually edited by an account-deletion request.</p>
+      <p>Submitted safety evidence is a limited exception. It is kept while a case or appeal is active or a documented legal hold applies; otherwise it becomes eligible for removal 90 days after case closure. This is an operator-selected retention period, not a claimed legal requirement. Caleb Y Polder reviews eligible closed cases weekly for evidence removal, excluding active appeals and legal holds. Eligibility does not mean automatic deletion exactly on day 90.</p>
       <p>Resolved support and privacy emails are deleted after 90 days unless still needed for a safety case or legal obligation.</p>
       <p>Completed deletion receipts remain valid for 24 hours, and cleanup of expired completed receipts is scheduled hourly. Minimal records of removed provider assets remain to prevent reauthorization. Backups, provider records and external copies are separate from active-service removal.</p>
+      <p>Our current Supabase Pro service provides access to seven days of daily database backups. This is a recovery window, not a deadline for physical erasure from every provider system. Database backups do not contain uploaded Storage file contents. Providers can retain operational, security, recovery and legally required records separately from active account content. We do not promise immediate erasure of every provider-held record or external copy.</p>
       <p>An account deletion request applies to your shared ShadowChat account in both editions. Signing out or uninstalling an app does not delete it. Content another member has independently shared may remain as a copy under that member&apos;s account; removing the original account or Pin does not withdraw that independent copy.</p>
       <a href="/?legal=delete-account" className={linkClass}>How to delete your account</a>
     </Section>
@@ -108,7 +112,7 @@ function TermsOfUse() {
     </Section>
     <Section title="Reporting and enforcement">
       <p>Report objectionable content or abusive members through the in-app reporting controls. Blocking is available to manage unwanted contact. Authorized operators may review reports and relevant evidence, remove content, restrict accounts, and take further action required by applicable law.</p>
-      <p>Reports go to the operator Safety Case Center. Caleb Y Polder checks that center and the support/privacy inbox daily. Daily review is not a guaranteed response time. In-app reports are not an emergency service; escalation procedures and coverage during operator unavailability still need verification before store release.</p>
+      <p>Reports go to the operator Safety Case Center. Caleb Y Polder is the sole reviewer and checks that center and the support/privacy inbox daily. Daily review is not a guaranteed response time or continuous emergency coverage. In-app reports are not an emergency service.</p>
     </Section>
     <Section title="Privacy and account choices">
       <p>Read the privacy policy before sharing content, including its explanation of service providers and optional AI features. The service is not end-to-end encrypted. You can decline these terms and use the account-management link to request deletion instead of entering the app.</p>
@@ -117,8 +121,8 @@ function TermsOfUse() {
         <a href="/?legal=delete-account" className={linkClass}>Account deletion</a>
       </div>
     </Section>
-    <Section title="Preview and changes">
-      <p>This is a web preview for reviewing the streamlined experience. Features and these draft policies can change before a store release. A material policy update may require a new acknowledgement before you continue.</p>
+    <Section title="Changes to these terms">
+      <p>We may update these terms as the service changes. A material policy update may require a new acknowledgement before you continue.</p>
     </Section>
   </>
 }
@@ -137,9 +141,9 @@ function CommunitySafety() {
       <p>Use the member blocking controls to manage unwanted contact. You can review your blocked members in Settings &gt; Privacy. A report and a block are separate actions; submitting a report does not automatically block someone.</p>
       <a href="/?view=settings&settingsSection=safety" className={linkClass}>Open my safety reports</a>
     </Section>
-    <Section title="Operator response and release checks">
+    <Section title="Operator response">
       <p>Reports need review by authorized operators, with action on prohibited content and abusive accounts. Suspected CSAM must be handled under applicable child-safety and reporting law.</p>
-      <p>Caleb Y Polder checks the Safety Case Center and support/privacy inbox daily. Daily review is not a guaranteed response time. Use the support address below for a safety concern when you cannot use an in-app report. Do not email suspected illegal material. Confirming child-safety escalation, evidence handling, reporting procedures and coverage during operator unavailability remain store-release steps.</p>
+      <p>Caleb Y Polder is the sole reviewer and checks the Safety Case Center and support/privacy inbox daily. Reports involving immediate danger or suspected child exploitation receive priority when reviewed. The service is not continuously monitored, and daily review is not a guaranteed response time. Use the support address below for a safety concern when you cannot use an in-app report. Report the location of suspected illegal material without emailing, downloading or reposting it. Appropriate authorities are contacted where required by applicable law. If someone is in immediate danger, contact local emergency services.</p>
     </Section>
   </>
 }
@@ -161,13 +165,13 @@ function AccountDeletion({ privacyEmail }: { privacyEmail: string | null }) {
     </Section>
     <Section title="What deletion removes and what may remain">
       <p>The deletion workflow removes your shared sign-in, authored content, profile, uploaded media and notification registrations from the active service. Wait for server confirmation before treating removal as complete. Completed deletion receipts are valid for 24 hours and cleanup of expired completed receipts is scheduled hourly. Minimal removed-provider records remain to prevent reauthorization.</p>
-      <p>Submitted safety evidence may be retained for an active case or appeal or a documented legal hold. Under the selected policy, other submitted evidence becomes eligible for purge 90 days after case closure. The operator reviews eligible closed cases weekly for evidence removal; completion of the first operating purge check still needs verification. Unsubmitted evidence uploads are included in ordinary account cleanup. Backup and provider retention periods still require verification. Authorized content another member independently shared can remain as their own copy, governed by that member&apos;s account. Deleting the original account or Pin does not delete that independent copy. Downloads and other external copies are not remotely erased.</p>
+      <p>Submitted safety evidence may be retained for an active case or appeal or a documented legal hold. Other submitted evidence becomes eligible for removal 90 days after case closure. Caleb Y Polder reviews eligible closed cases weekly for evidence removal; eligibility does not mean automatic deletion exactly on day 90. Unsubmitted evidence uploads are included in ordinary account cleanup. Existing database backups are not individually edited, and provider operational, recovery, security and legally required records can outlast active-service deletion. Authorized content another member independently shared can remain as their own copy, governed by that member&apos;s account. Deleting the original account or Pin does not delete that independent copy. Downloads and other external copies are not remotely erased.</p>
     </Section>
     <Section title="If you cannot sign in">
       <p>Try the password-reset option on the sign-in screen. If you still need help, email the privacy address below and ask to delete your ShadowChat account. Include the account email or username and send from the account email when possible. We will verify ownership before processing the request. You do not need to install the app or accept the streamlined terms to request deletion. Never send your password, verification code or identity documents in an initial email.</p>
       {privacyEmail
         ? <a href={`mailto:${privacyEmail}?subject=ShadowChat%20account%20deletion%20request`} className={linkClass}>Email a deletion request</a>
-        : <p role="status" className="font-medium text-[var(--text-gold)]">The deletion-support mailbox is not configured in this preview. The external support route remains a store-release requirement.</p>}
+        : <p role="status" className="font-medium text-[var(--text-gold)]">The deletion-support mailbox is unavailable. You can still open account deletion or resume a saved deletion request using the links above.</p>}
     </Section>
   </>
 }
@@ -184,12 +188,8 @@ export function StreamlinedPolicies({ page, supportEmail, privacyEmail, operator
         <a href="/" className={linkClass}>Back to ShadowChat</a>
         <p className="mt-2 text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">ShadowChat Streamlined</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">{title}</h1>
-        <p className="mt-3 text-sm text-[var(--text-muted)]">Preview policy · Version 2026-10-22.2 · October 22, 2026</p>
+        <p className="mt-3 text-sm text-[var(--text-muted)]">Policy version {STREAMLINED_POLICY_VERSION} · Effective {STREAMLINED_POLICY_EFFECTIVE_DATE}</p>
       </header>
-      <aside aria-label="Policy draft status" className="rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[var(--bg-panel)] p-4 text-sm leading-6 text-[var(--text-secondary)]">
-        <strong className="block text-[var(--text-gold)]">For preview review</strong>
-        Private-media protections, provider retention and operating moderation procedures still need verified completion. These pages are not final store-release policies.
-      </aside>
       <nav aria-label="ShadowChat policies" className="flex flex-wrap gap-x-5 gap-y-1 border-b border-[var(--border-panel)] pb-3">
         {policyPages.map(policy => <a key={policy.page} href={`/?legal=${policy.page}`} aria-current={page === policy.page ? 'page' : undefined} className={`${linkClass} text-sm ${page === policy.page ? 'font-semibold' : ''}`}>{policy.title}</a>)}
       </nav>

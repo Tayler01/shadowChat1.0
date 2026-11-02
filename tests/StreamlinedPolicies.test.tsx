@@ -1,9 +1,11 @@
 import { render, screen } from '@testing-library/react'
 import { StreamlinedPolicies, type StreamlinedLegalPage } from '../src/streamlined/StreamlinedPolicies'
 
-test.each<StreamlinedLegalPage>(['privacy', 'terms', 'safety', 'delete-account'])('renders public %s policy without auth and clearly marks unfinished release details', page => {
+test.each<StreamlinedLegalPage>(['privacy', 'terms', 'safety', 'delete-account'])('renders the final public %s policy without auth', page => {
   render(<StreamlinedPolicies page={page} />)
-  expect(screen.getByRole('complementary', { name: 'Policy draft status' })).toHaveTextContent('not final store-release policies')
+  expect(screen.queryByRole('complementary', { name: 'Policy draft status' })).not.toBeInTheDocument()
+  expect(screen.getByText('Policy version 2026-11-01.1 · Effective November 1, 2026')).toBeInTheDocument()
+  expect(screen.queryByText(/For preview review|not final store-release policies/)).not.toBeInTheDocument()
   expect(screen.getByText('Service operator: Caleb Y Polder')).toBeInTheDocument()
   expect(screen.getByText('Support mailbox: not configured.')).toBeInTheDocument()
   expect(screen.getByText('Privacy mailbox: not configured.')).toBeInTheDocument()
@@ -28,15 +30,20 @@ test('discloses retained provider processing, server acknowledgement and the sel
   expect(screen.getByText(/accepted policy version and acceptance time are stored with your account/)).toBeInTheDocument()
   expect(screen.getByText(/up to 20 recent loaded message texts/)).toBeInTheDocument()
   expect(screen.getByText(/OpenRouter and the model hosting provider it selects/)).toBeInTheDocument()
-  expect(screen.getByText(/KLIPY:/)).toBeInTheDocument()
+  expect(screen.getByText(/KLIPY search and KLIPY-hosted media are unavailable in this edition/)).toBeInTheDocument()
   expect(screen.getByText(/Bunny Stream:/)).toBeInTheDocument()
   expect(screen.getByText(/Zoho Mail:/)).toBeInTheDocument()
   expect(screen.getByText(/Expo Push Service and Apple Push Notification service/)).toBeInTheDocument()
-  expect(screen.getByText(/operator reviews eligible closed cases weekly for evidence removal/)).toBeInTheDocument()
-  expect(screen.getByText(/completion of the first operating purge check still needs verification/)).toBeInTheDocument()
+  expect(screen.getByText(/Caleb Y Polder reviews eligible closed cases weekly for evidence removal/)).toBeInTheDocument()
+  expect(screen.getByText(/Eligibility does not mean automatic deletion exactly on day 90/)).toBeInTheDocument()
+  expect(screen.getByText(/recovery window, not a deadline for physical erasure/)).toBeInTheDocument()
+  expect(screen.getByText(/Database backups do not contain uploaded Storage file contents/)).toBeInTheDocument()
   expect(screen.getByText(/Resolved support and privacy emails are deleted after 90 days/)).toBeInTheDocument()
   expect(screen.getByText(/support mail is not forwarded to another mailbox/)).toBeInTheDocument()
-  expect(screen.getByText(/Some media is currently delivered through public URLs/)).toBeInTheDocument()
+  expect(screen.getByText(/private media storage and time-limited playback or download links/)).toBeInTheDocument()
+  expect(screen.getByText(/A valid signed link can remain usable until it expires/)).toBeInTheDocument()
+  expect(screen.getByText(/Public profile images and external linked media have different visibility/)).toBeInTheDocument()
+  expect(screen.queryByText(/Some media is currently delivered through public URLs/)).not.toBeInTheDocument()
   expect(screen.queryByText(/Sentry receives/)).not.toBeInTheDocument()
   expect(screen.getByText(/90 days after case closure/)).toBeInTheDocument()
   expect(screen.getByText(/This does not share the surrounding private conversation/)).toBeInTheDocument()
@@ -46,9 +53,18 @@ test('discloses retained provider processing, server acknowledgement and the sel
 
 test.each<StreamlinedLegalPage>(['terms', 'safety'])('discloses approved daily operator review without promising a response time on %s', page => {
   render(<StreamlinedPolicies page={page} />)
-  expect(screen.getByText(/Caleb Y Polder checks/)).toHaveTextContent('daily')
-  expect(screen.getByText(/Daily review is not a guaranteed response time/)).toBeInTheDocument()
-  expect(screen.getByText(/coverage during operator unavailability/)).toBeInTheDocument()
+  expect(screen.getByText(/Caleb Y Polder is the sole reviewer/)).toHaveTextContent('daily')
+  expect(screen.getByText(/daily review is not a guaranteed response time/i)).toBeInTheDocument()
+  expect(screen.getByText(/continuous emergency coverage|not continuously monitored/)).toBeInTheDocument()
+})
+
+test('explains early external media contact and provider retention without a universal privacy assurance', () => {
+  render(<StreamlinedPolicies page="privacy" />)
+  expect(screen.getByText(/automatically playing linked videos can contact YouTube, Pinterest and other external hosts as you browse, before you open an item/)).toBeInTheDocument()
+  expect(screen.getByText(/A playback confirmation does not prevent earlier image/)).toBeInTheDocument()
+  expect(screen.getByText(/The full web app still offers KLIPY GIFs under its separate enabled features/)).toBeInTheDocument()
+  expect(screen.getByText(/we do not promise universal zero retention/)).toBeInTheDocument()
+  expect(screen.getByText(/These social features do not import your phone address book/)).toBeInTheDocument()
 })
 
 test('uses supplied contacts and operator overrides with the confirmed operator as the default', () => {

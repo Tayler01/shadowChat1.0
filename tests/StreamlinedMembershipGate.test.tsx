@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { StreamlinedMembershipGate } from '../src/streamlined/StreamlinedMembershipGate'
 import { useAuth } from '../apps/streamlined/src-overrides/hooks/useAuth'
 import { acceptStreamlinedMembership, getStreamlinedMembershipAcknowledgement, type StreamlinedMembershipAcknowledgement } from '../src/streamlined/membershipAcknowledgement'
+import { STREAMLINED_POLICY_VERSION } from '../src/streamlined/streamlinedPolicyVersion'
 
 jest.mock('../apps/streamlined/src-overrides/hooks/useAuth', () => ({ useAuth: jest.fn() }))
 jest.mock('../src/streamlined/membershipAcknowledgement', () => ({ getStreamlinedMembershipAcknowledgement: jest.fn(), acceptStreamlinedMembership: jest.fn() }))
@@ -11,12 +12,12 @@ const flags = globalThis as typeof globalThis & { __SHADOWCHAT_LOCAL_FEATURE_PRE
 const localPreviewMarker = document.createElement('meta')
 localPreviewMarker.name = 'shadowchat-local-feature-preview'
 localPreviewMarker.content = 'enabled'
-const receipt: StreamlinedMembershipAcknowledgement = { userId: 'member-1', policyVersion: '2026-10-22.2', adultDeclared: true, termsAccepted: true, privacyAcknowledged: true, acceptedAt: '2026-10-22T20:00:00Z' }
+const receipt: StreamlinedMembershipAcknowledgement = { userId: 'member-1', policyVersion: STREAMLINED_POLICY_VERSION, adultDeclared: true, termsAccepted: true, privacyAcknowledged: true, acceptedAt: '2026-10-22T20:00:00Z' }
 const read = jest.mocked(getStreamlinedMembershipAcknowledgement)
 const accept = jest.mocked(acceptStreamlinedMembership)
 const setMember = (id: string | null, loading = false) => jest.mocked(useAuth).mockReturnValue({ user: id ? { id } : null, loading, signOut } as unknown as ReturnType<typeof useAuth>)
 const preview = (fallback?: React.ReactNode) => <StreamlinedMembershipGate unacceptedContent={fallback}><div>Member content</div></StreamlinedMembershipGate>
-const continueButton = () => screen.getByRole('button', { name: 'Continue to preview' })
+const continueButton = () => screen.getByRole('button', { name: 'Continue to ShadowChat' })
 async function acknowledge() {
   await waitFor(() => expect(screen.getByRole('radio', { name: 'I am 18 or older' })).toBeEnabled())
   fireEvent.click(screen.getByRole('radio', { name: 'I am 18 or older' }))
@@ -79,7 +80,21 @@ test('reads the server across mounts and isolates account changes', async () => 
   view.rerender(preview())
   expect(screen.queryByText('Member content')).not.toBeInTheDocument()
   await waitFor(() => expect(read).toHaveBeenLastCalledWith('member-2'))
-  expect(await screen.findByRole('button', { name: 'Continue to preview' })).toBeDisabled()
+  expect(await screen.findByRole('button', { name: 'Continue to ShadowChat' })).toBeDisabled()
+})
+
+test('preserves the prior adult declaration while requiring explicit updated policy acknowledgement once', async () => {
+  read.mockResolvedValue({ ...receipt, policyVersion: '2026-10-22.2' })
+  render(preview())
+  expect(screen.queryByRole('radio', { name: 'I am 18 or older' })).not.toBeInTheDocument()
+  expect(await screen.findByText(/Your existing adult declaration is saved/)).toBeInTheDocument()
+  expect(screen.queryByRole('radio', { name: 'I am 18 or older' })).not.toBeInTheDocument()
+  expect(continueButton()).toBeDisabled()
+  fireEvent.click(screen.getByRole('checkbox', { name: /I agree to the Terms of use/ }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /I have read and acknowledge the Privacy policy/ }))
+  fireEvent.click(continueButton())
+  expect(await screen.findByText('Member content')).toBeInTheDocument()
+  expect(accept).toHaveBeenCalledWith({ userId: 'member-1', adultDeclared: true, termsAccepted: true, privacyAcknowledged: true })
 })
 
 test('ignores browser-only acceptance', async () => {

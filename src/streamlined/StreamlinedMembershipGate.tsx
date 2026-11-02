@@ -4,6 +4,7 @@ import { useAuth } from '../../apps/streamlined/src-overrides/hooks/useAuth'
 import { acceptStreamlinedMembership, getStreamlinedMembershipAcknowledgement } from './membershipAcknowledgement'
 import { isLocalFeaturePreview } from './localFeaturePreview'
 import { StreamlinedLoadingView } from './components/StreamlinedLoadingView'
+import { STREAMLINED_POLICY_VERSION } from './streamlinedPolicyVersion'
 
 // The server stores an adult SELF-DECLARATION, not verified age. Existing
 // membership/RLS enforcement remains authoritative across both editions.
@@ -21,6 +22,7 @@ function MembershipCheck({ userId, signOut, children, unacceptedContent }: Membe
   const [retry, setRetry] = useState(0)
   const [saving, setSaving] = useState(false)
   const [age, setAge] = useState<'adult' | 'underage' | null>(null)
+  const [adultPreviouslyDeclared, setAdultPreviouslyDeclared] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
@@ -35,7 +37,10 @@ function MembershipCheck({ userId, signOut, children, unacceptedContent }: Membe
     setStatus('checking')
     setError(null)
     void getStreamlinedMembershipAcknowledgement(userId).then(record => {
-      if (requestId === requestIdRef.current) setStatus(record === null ? 'required' : 'accepted')
+      if (requestId !== requestIdRef.current) return
+      setAdultPreviouslyDeclared(Boolean(record?.adultDeclared))
+      if (record?.adultDeclared) setAge('adult')
+      setStatus(record?.policyVersion === STREAMLINED_POLICY_VERSION ? 'accepted' : 'required')
     }).catch(reason => {
       if (requestId !== requestIdRef.current) return
       setStatus('failed')
@@ -95,10 +100,10 @@ function MembershipCheck({ userId, signOut, children, unacceptedContent }: Membe
       <header>
         <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)]">ShadowChat Streamlined</p>
         <h1 className="mt-3 text-2xl font-semibold">Before you continue</h1>
-        <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">This preview is for approved members aged 18 and older. It shares your account and content with the full app.</p>
+        <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">This edition is for approved members aged 18 and older. It shares your account and content with the full app.</p>
       </header>
       <form onSubmit={event => void continueToPreview(event)} className="space-y-5">
-        <fieldset disabled={busy} className="rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[var(--bg-panel)] px-4 pb-2">
+        {adultPreviouslyDeclared ? <p className="text-sm leading-6 text-[var(--text-secondary)]">Your existing adult declaration is saved. Please review the updated terms and privacy policy.</p> : <fieldset disabled={busy} className="rounded-[var(--radius-lg)] border border-[var(--border-panel)] bg-[var(--bg-panel)] px-4 pb-2">
           <legend className="px-2 text-sm font-semibold">Are you 18 or older?</legend>
           <label className="flex min-h-12 cursor-pointer items-center gap-3 py-3 text-sm">
             <input type="radio" name={`${inputId}-age`} checked={age === 'adult'} onChange={() => setAge('adult')} className="h-5 w-5 shrink-0 accent-[var(--theme-accent-readable)]" />
@@ -108,7 +113,7 @@ function MembershipCheck({ userId, signOut, children, unacceptedContent }: Membe
             <input type="radio" name={`${inputId}-age`} checked={age === 'underage'} onChange={() => setAge('underage')} className="h-5 w-5 shrink-0 accent-[var(--theme-accent-readable)]" />
             I am under 18
           </label>
-        </fieldset>
+        </fieldset>}
         {age === 'underage' && <p role="alert" className="rounded-[var(--radius-sm)] border border-[var(--border-panel)] p-4 text-sm leading-6 text-[var(--text-gold)]">You must be at least 18 to use this edition. Please sign out. You can still manage or delete your existing account using the link below.</p>}
         <div className="space-y-2">
           <label htmlFor={`${inputId}-terms`} className="flex min-h-12 cursor-pointer items-start gap-3 py-3 text-sm leading-6">
@@ -117,13 +122,13 @@ function MembershipCheck({ userId, signOut, children, unacceptedContent }: Membe
           </label>
           <label htmlFor={`${inputId}-privacy`} className="flex min-h-12 cursor-pointer items-start gap-3 py-3 text-sm leading-6">
             <input id={`${inputId}-privacy`} type="checkbox" checked={privacyAcknowledged} disabled={busy || age === 'underage'} onChange={event => setPrivacyAcknowledged(event.target.checked)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--theme-accent-readable)]" />
-            <span>I have read and acknowledge the <a href="/?legal=privacy" target="_blank" rel="noreferrer" className={policyLinkClass}>Privacy policy</a>, including the limitations of this preview.</span>
+            <span>I have read and acknowledge the <a href="/?legal=privacy" target="_blank" rel="noreferrer" className={policyLinkClass}>Privacy policy</a>, including how media links, service providers and retained copies work.</span>
           </label>
         </div>
         <p className="text-xs leading-6 text-[var(--text-muted)]">This is your declaration that you are 18 or older, not an identity or age check. No date of birth is requested. We save the policy version, your acknowledgement and the time with your account so it applies across your devices.</p>
         {error && <p role="alert" className="text-sm text-[var(--text-gold)]">{error}</p>}
         <div className="flex flex-col gap-3 sm:flex-row">
-          <Button type="submit" disabled={!canContinue} loading={saving} className="min-h-12">Continue to preview</Button>
+          <Button type="submit" disabled={!canContinue} loading={saving} className="min-h-12">Continue to ShadowChat</Button>
           <Button type="button" variant="secondary" loading={signingOut} disabled={saving} className="min-h-12" onClick={() => void endSession()}>Sign out</Button>
         </div>
       </form>

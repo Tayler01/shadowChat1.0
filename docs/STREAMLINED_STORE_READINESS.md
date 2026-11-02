@@ -1,6 +1,159 @@
 # Streamlined edition: store readiness
 
+## Targeted submission plan — November 1, after physical scroll acceptance
+
+Finish line: App Store Connect accepts the production review submission and
+shows Waiting for Review (or In Review). Apple approval and public release are
+subsequent external milestones. No new durable goal is created by this plan.
+
+Freeze feature scope. Retain group chat, all existing chat/radial/media/voice
+functionality, DMs and ShadowPin. Preserve unrelated full-app changes. Use build26
+unless a remaining fix actually requires a native binary; do not rebuild merely
+for hosted web/configuration changes. Run targeted tests, not the full suite.
+
+Run three independent lanes, with one owner executing shared-backend mutations:
+
+1. **Privacy enforcement (critical path).** Reconcile the current prepared
+   Storage/Bunny plans against live state. Verify Demo's remaining provider
+   settings; protect its Storage first, then production Storage and production
+   private-only Realtime in controlled stages. Demo private-only Realtime is
+   already on. Each stage must prove authorized media still renders, anonymous
+   and unauthorized requests fail, old public/cache URLs no longer expose
+   protected bytes, and both editions retain chat/DM/reconnect behavior. Stop
+   and repair a failed stage without reopening protected data as a rollback.
+2. **Normal native notifications.** Preserve the completed singleton phone proof.
+   Validate bounded dispatch/receipt recovery and database health under the
+   intended 10–20-user load in isolation, then enable normal production native
+   delivery in stages with observation and an explicit stop condition. Never
+   restart the legacy collectors. Completion requires delivery operating outside
+   a test window, correct tap/read/badge behavior and no full-app slowdown.
+3. **Store package (parallel with the above).** Finish genuine simulator captures,
+   inspect synthetic content and original dimensions, upload and verify Apple's
+   processing. Confirm the KLIPY ticket response/production permission and actual
+   partner collection settings; finish the external-embed/GIF privacy assessment.
+   Prepare final policies, support/privacy URLs and Apple's data declarations
+   from verified behavior. Publish those after the relevant enforcement is live.
+   Do not silently remove GIFs or other approved functionality to bypass an
+   external dependency; raise a concrete user decision if that becomes necessary.
+
+After all three lanes pass, perform one focused release acceptance pass:
+
+- Ordinary invitation-only signup/login; no public self-enrollment bypass.
+- Reporting/blocking and the operator safety workflow.
+- Disposable account deletion through the real demo UI, including owned media,
+  with verified cleanup; ensure the reviewer's primary login remains usable.
+- General/DM/photo/voice/ShadowPin smoke, focusing on paths affected by final
+  privacy/notification changes. Repeat physical phone checks only where changed
+  native behavior or an unresolved risk warrants them.
+- Isolated demo access for Apple, no member content exposure; clear review
+  instructions and a separate deletion-test account or reproducible provision.
+- Complete Apple metadata: processed screenshots, final support/privacy links,
+  correct data declarations, age/content answers, US-only availability, rights,
+  review contact and eligible build26. Recheck agreements and validation errors.
+
+Then submit once using the user's existing submission authorization and read
+back Apple's submission ID/status. Do not call a prepared draft, selected build,
+TestFlight assignment or upload receipt a production submission.
+
+Operator involvement is limited to unavoidable account/security challenges,
+legal/spending decisions not already authorized, or a specific device retest.
+KLIPY's response and Apple's eventual review timing remain external dependencies;
+finish independent work while waiting rather than repeatedly testing passed paths.
+
 ## November 1 release work resumed
+
+### Verified privacy cutover closeout — November 1 Eastern / November 2 UTC
+
+This readback supersedes the earlier public-bucket and production Realtime
+status notes below. All three protected buckets (`chat-uploads`, `message-media`,
+`shadow-pin`) are private in Demo and production. Production's private readback
+was at 01:33:03 UTC. Production Realtime now has `private_only=true`, verified
+at 01:46:57 UTC; the hash of every other configuration field stayed unchanged.
+Demo's existing private-only Realtime setting was preserved.
+
+The production hot-cache check correctly failed: all six previously warmed
+public/transform fixture URLs continued returning cached HTTP 200 bytes through
+the 60-second observation bound after the SQL bucket switch. The buckets stayed
+private. The supported dedicated CDN purge API then accepted exactly three
+bucket purges in Demo at 01:40:15–16 UTC and production at 01:42:37–38 UTC.
+No original object was rewritten or deleted. Storage's API normally queues a
+purge on a public-to-private transition; an idempotent private-to-private update
+does not trigger that transition. Direct SQL therefore needs the dedicated
+purge step, followed by observed denial. See [Supabase CDN purge](https://supabase.com/docs/guides/storage/cdn/purge-cdn-cache)
+and the [Storage implementation](https://github.com/supabase/storage/blob/master/src/storage/storage.ts).
+
+Fresh-private acceptance passed six checks in each environment: ordinary owner
+and recipient signed bytes, genuine two-second expiry and renewal, anonymous
+signing denial without a returned URL, public/transform denial, and authorized
+signed transforms. Every exact fixture, notification and owned session was
+cleaned. After purge propagation, three retained production originals across all
+three buckets denied public retrieval and applicable public transforms; ordinary
+non-owner QA1 signed originals and image transforms still succeeded. Five
+retained Demo originals likewise denied public access while owner/recipient
+signed bytes matched. Production aggregate counts and oldest/newest object
+timestamps remained unchanged: 489 chat uploads, 33 message-media objects and
+1,284 ShadowPin objects.
+
+Bunny HTTP authorization and actual expiry/renewal acceptance passed in both
+libraries without changing provider settings or original assets. Production
+covered seven resources across the existing episode, trailer and Pin: signed
+embeds, HLS master/child/segment, MP4, preview and poster succeeded; exact unsigned
+and tampered controls failed; genuinely expired capabilities failed and fresh
+renewals succeeded. This is HTTP acceptance, not a new browser-video decoding
+or physical-device playback claim.
+
+Production and Demo each passed eight bounded Realtime checks, including explicit
+`PrivateOnly` rejection of anonymous/authenticated public joins with and without
+Postgres subscriptions, private authorization negatives, private database joins,
+and rejection of browser Broadcast/Presence writes on the release channel. All
+owned sockets and sessions were closed/revoked. Service-origin release delivery
+was not exercised by these checks.
+
+The final current full and streamlined production phone checks passed all four
+iPhone/WebKit and Android/Chromium paths after purge and Realtime enforcement:
+an on-screen signed ShadowPin image decoded, a test-owned socket closed and
+successfully rejoined a private database channel, and a fresh reload decoded the
+image again. No protected public Storage URL was requested and all four owned
+sessions were revoked. Screenshots were visually inspected. Demo also passed
+both phone engines after its buckets became private. The final full WebKit run
+retained request errors during the intentional full reload for notifications,
+presence and foreground RPCs; initial rendering, signed media and reconnect
+checks passed. These focused checks do not replace the broader General/DM,
+voice, push-image, native suspension or physical-device acceptance elsewhere.
+
+Evidence is under `output/release-evidence/privacy-cutover-20261101/`: dedicated
+purge and Realtime cutover receipts, `production-fresh-private-runs/`,
+`historical-production-storage-1793583851883.json`,
+`historical-demo-storage-1793583677307.json`,
+`production-cache-inventory-before-after.json`,
+`production-bunny-a392e45f-3fa1-4d3e-8cda-13bae06eaa51-{issue,expiry}.json`, and
+`production-realtime-0bf0bece-6969-45ce-b401-18a20bdd1332.json`.
+Final phone receipts/screenshots are in
+`output/playwright/privacy-phone-20261101/member-1793584055177/` and
+`output/playwright/privacy-phone-20261101/full-1793584055209/`.
+
+Limits remain explicit: CDN denial was sampled from this workstation after a
+documented bucket-wide purge, not independently measured at every edge. Browser
+caches and previously downloaded copies cannot be recalled; signed URLs remain
+bearer capabilities until expiry. Public profile buckets are outside this
+three-bucket policy. Third-party embed/GIF disclosures, Apple privacy labels,
+native notification activation and store submission remain separate work.
+
+Later closeout: Docker was recovered without resetting its persistent data;
+all existing database container health checks passed. The three Demo Storage
+buckets were switched to private with explicit false readback. Pre-cutover
+owner/recipient signing, real expiry and renewal passed, but the immediate
+same-URL post-cutover probe failed its first assertion. Its exact fixtures and
+owned sessions were cleaned successfully. Keep Demo buckets private while
+diagnosing cache/authorization behavior; production Storage is not switched.
+Evidence: `output/release-evidence/privacy-cutover-20261101/`.
+The subsequent fresh-private probe passed six checks with complete fixture and
+session cleanup. Five unchanged historical Demo originals across all three
+buckets also denied public access while authorized owner/recipient signing and
+image transforms succeeded, measured 468.5 seconds after cutover readback.
+This establishes steady-state privacy, not instantaneous hot-cache eviction.
+Demo Bunny signed playback, unsigned/tampered rejection, genuine five-minute
+expiry and fresh renewal passed without changing provider settings or originals.
 
 The operator resumed the remaining App Store preparation and authorized the
 necessary targeted checks, preserving the full edition. No new durable goal was
@@ -683,6 +836,12 @@ The setting acknowledges operator-reviewed proof; it does not provide that proof
 Compatibility, legacy repairs, actual Storage/CDN denial and protected Bunny
 playback must pass before the cutover is eligible. Source changes alone are not
 that evidence.
+
+The November 1 cutover demonstrated that SQL bucket metadata updates alone do
+not establish CDN revocation. Use the supported public-to-private Storage API
+transition for a new cutover, or the dedicated bucket cache purge if the bucket
+is already private, and verify retained old public/transform URLs after
+propagation. Never reopen a protected bucket merely to trigger a purge.
 
 ### Local backend verification
 

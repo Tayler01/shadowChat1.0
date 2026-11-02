@@ -19,6 +19,12 @@ test('pins the expected account and version without a browser timestamp', async 
   await acceptStreamlinedMembership({ userId: 'member-1', adultDeclared: true, termsAccepted: true, privacyAcknowledged: true })
   expect(rpc).toHaveBeenCalledWith('accept_streamlined_membership', { p_expected_user_id: 'member-1', p_policy_version: STREAMLINED_POLICY_VERSION, p_adult_declared: true, p_terms_accepted: true, p_privacy_acknowledged: true })
 })
+
+test('reads a recognized prior adult declaration without treating it as a current save receipt', async () => {
+  rpc.mockResolvedValue({ data: [{ ...row, policy_version: '2026-10-22.2' }], error: null })
+  expect(await getStreamlinedMembershipAcknowledgement('member-1')).toMatchObject({ policyVersion: '2026-10-22.2', adultDeclared: true })
+  await expect(acceptStreamlinedMembership({ userId: 'member-1', adultDeclared: true, termsAccepted: true, privacyAcknowledged: true })).rejects.toThrow(/policy has changed/)
+})
 test.each(['adultDeclared', 'termsAccepted', 'privacyAcknowledged'])('rejects missing %s before a request', async field => {
   await expect(acceptStreamlinedMembership({ userId: 'member-1', adultDeclared: true, termsAccepted: true, privacyAcknowledged: true, [field]: false })).rejects.toThrow(/Confirm/)
   expect(rpc).not.toHaveBeenCalled()

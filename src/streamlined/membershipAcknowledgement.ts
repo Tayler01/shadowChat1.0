@@ -1,8 +1,9 @@
 import { getWorkingClient } from '../../apps/streamlined/src-overrides/lib/supabase'
+import { PREVIOUS_STREAMLINED_POLICY_VERSION, STREAMLINED_POLICY_VERSION } from './streamlinedPolicyVersion'
 
 // Keep in sync with the server's versioned acknowledgement migration. Changing
 // legal text materially requires a new version and a matching server rollout.
-export const STREAMLINED_POLICY_VERSION = '2026-10-22.2'
+export { STREAMLINED_POLICY_VERSION } from './streamlinedPolicyVersion'
 
 export interface StreamlinedMembershipAcknowledgement {
   userId: string
@@ -13,11 +14,12 @@ export interface StreamlinedMembershipAcknowledgement {
   acceptedAt: string
 }
 
-function parseAcknowledgement(value: unknown, expectedUserId: string): StreamlinedMembershipAcknowledgement {
+function parseAcknowledgement(value: unknown, expectedUserId: string, allowPrevious = false): StreamlinedMembershipAcknowledgement {
   if (!value || typeof value !== 'object') throw new Error('The membership confirmation was incomplete. Please try again.')
   const row = value as Record<string, unknown>
   if (row.user_id !== expectedUserId) throw new Error('The signed-in account changed. Reload before continuing.')
-  if (row.policy_version !== STREAMLINED_POLICY_VERSION
+  if ((row.policy_version !== STREAMLINED_POLICY_VERSION
+      && !(allowPrevious && row.policy_version === PREVIOUS_STREAMLINED_POLICY_VERSION))
     || row.adult_declared !== true
     || row.terms_accepted !== true
     || row.privacy_acknowledged !== true
@@ -42,7 +44,7 @@ export async function getStreamlinedMembershipAcknowledgement(expectedUserId: st
   if (!Array.isArray(data)) throw new Error('The membership check returned an incomplete response. Please retry.')
   if (data.length === 0) return null
   if (data.length !== 1) throw new Error('The membership check returned an unexpected response. Please retry.')
-  return parseAcknowledgement(data[0], expectedUserId)
+  return parseAcknowledgement(data[0], expectedUserId, true)
 }
 
 export async function acceptStreamlinedMembership(input: {
