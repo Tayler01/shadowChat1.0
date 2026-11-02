@@ -33,6 +33,16 @@ const nativeProduct = () => {
   }
   return { device, appPath, plist };
 };
+const recordSimulatorSigning = appPath => {
+  const signature = spawnSync('codesign', ['-d', '--entitlements', ':-', appPath], { encoding: 'utf8' });
+  const executable = command('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleExecutable', join(appPath, 'Info.plist')]);
+  writeJson(join(root, 'simulator-signing-state.json'), {
+    mode: 'Xcode-simulator-local-ad-hoc-active-architecture', certificateOrPurchaseUsed: false,
+    shippingSourceChanged: false, signatureInspectionStatus: signature.status,
+    publicEntitlements: `${signature.stdout || ''}\n${signature.stderr || ''}`,
+    executableSha256: hash(join(appPath, executable)), embeddedBundleSha256: hash(join(appPath, 'main.jsbundle')),
+  });
+};
 
 if (process.argv[2] === 'prepare') {
   if (process.platform !== 'darwin') throw new Error('A genuine macOS/Xcode simulator host is required.');
@@ -48,8 +58,12 @@ if (process.argv[2] === 'prepare') {
     if (!/^[A-Z_]+$/.test(key) || /[\r\n']/.test(value)) throw new Error('Invalid public build configuration.');
     return `${key}='${value}'`;
   }).join('\n') + '\n', { mode: 0o600 });
-  const cacheKey = `native-store-build26-v1-${createHash('sha256').update(JSON.stringify({
+  const team = eas.submit.production.ios.appleTeamId;
+  if (!/^[A-Z0-9]{10}$/.test(team)) throw new Error('Unexpected original Apple team identifier.');
+  appendFileSync(required('GITHUB_ENV'), `NATIVE_APPLE_TEAM=${team}\n`);
+  const cacheKey = `native-store-build26-v2-${createHash('sha256').update(JSON.stringify({
     sourceSha, env, node: process.version, xcode: command('xcodebuild', ['-version']), arch: command('uname', ['-m']),
+    simulatorSigning: 'xcode-local-ad-hoc-identity', activeArchitectureOnly: true,
   })).digest('hex')}`;
   appendFileSync(required('GITHUB_OUTPUT'), `cache-key=${cacheKey}\n`);
   const devices = JSON.parse(sim(['list', 'devicetypes', '--json'])).devicetypes;
@@ -75,6 +89,7 @@ if (process.argv[2] === 'prepare') {
   const { device, appPath } = nativeProduct();
   const diagnostics = join(root, 'entry-diagnostics');
   mkdirSync(diagnostics, { recursive: true });
+  recordSimulatorSigning(appPath);
   sim(['install', device.id, appPath]);
   command('open', ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', device.id]);
   sim(['launch', device.id, bundle]);
@@ -87,6 +102,9 @@ if (process.argv[2] === 'prepare') {
     '--debug-output', join(diagnostics, 'private-debug'), '--test-output-dir', join(diagnostics, 'private-output'), join(diagnostics, 'entry.yaml')],
   { cwd: diagnostics, env: process.env, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 240000 });
   writeFileSync(join(diagnostics, 'credential-free-entry.txt'), `${result.stdout || ''}\n${result.stderr || ''}`);
+  const consoleResult = spawnSync('xcrun', ['simctl', 'spawn', device.id, 'log', 'show', '--style', 'compact', '--last', '5m',
+    '--predicate', 'process == "ShadoChat"'], { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024, timeout: 20000 });
+  writeFileSync(join(diagnostics, 'credential-free-native-console.txt'), (consoleResult.stdout || consoleResult.stderr || '').slice(-24000));
   sim(['io', device.id, 'screenshot', join(diagnostics, 'native-after-entry.png')]);
   writeJson(join(root, 'entry-probe-result.json'), { simulatorId: device.id, passed: result.status === 0, exitCode: result.status,
     at: new Date().toISOString(), credentialsSupplied: false, genuineNativeFramebuffer: true });
@@ -189,6 +207,7 @@ if (process.argv[2] === 'prepare') {
     nativeSourceSha: sourceSha, bundleIdentifier: bundle, version: plist('CFBundleShortVersionString'), build: '26',
     executableSha256: hash(join(appPath, plist('CFBundleExecutable'))),
     embeddedBundleSha256: hash(join(appPath, 'main.jsbundle')),
+    simulatorSigning: existsSync(join(root, 'simulator-signing-state.json')) ? json(join(root, 'simulator-signing-state.json')) : null,
     simulator: device, xcode: command('xcodebuild', ['-version']),
     community: 'isolated synthetic demo', webOrigin: 'https://shadowchat-review-demo.netlify.app',
     sessionCleanup: 'UI sign-out verified', runId: process.env.GITHUB_RUN_ID, files,
