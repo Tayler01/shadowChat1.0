@@ -1,5 +1,59 @@
 # Streamlined edition: store readiness
 
+## Current submission status — November 2 UTC / November 1 Eastern
+
+The final member and Demo web artifacts are published and verified at source
+`d70d643e36413f0644338959678ed843be7b8295`: member deploy
+`6ae7f9963336062833799ce3`, Demo deploy `6ae7f849a7c647cfc00e2a53`.
+The full web artifact remains source `24d1d323` with its existing features.
+Build 26 remains the native submission build. This current summary supersedes
+the earlier planning and paused/public-state notes retained below.
+
+- **Privacy and policies:** all three protected Storage buckets are private in
+  both environments; dedicated CDN purges and retained-object public/transform
+  denial are verified alongside signed access, genuine expiry and renewal.
+  Both environments require private Realtime. Final policy `2026-11-01.1` and
+  exact acknowledgement migration/history are deployed. Existing adult
+  declarations and old receipts remain intact; final consent works once without
+  asking age again or flashing a gate on subsequent login/reload. Browser caches,
+  downloads and valid bearer links until expiry remain explicit limitations.
+- **Approved scope and Apple privacy assessment:** KLIPY search/hosted media is
+  disabled only in Streamlined member/Demo; full-web GIFs and original messages
+  are preserved. YouTube uses privacy-enhanced mode. The current worksheet has
+  thirteen data types, Name Analytics and Performance Data, with the obsolete
+  KLIPY Search History basis removed; Tracking No is recommended from reviewed
+  actual paths, without a universal no-provider-collection promise.
+- **Hosted acceptance and review access:** both phone engines passed final
+  policy persistence/public routes; final member signed images and private
+  reconnect passed with zero protected public requests or page errors. Primary
+  Apple review login is verified. The current reserved deletion-review login
+  also passed fresh iPhone/WebKit login and account-deletion-route access without
+  accepting terms; it was not deleted. Owned browser sessions were revoked.
+- **Normal native delivery:** Demo and production use the active production
+  audience, all nine categories, worker/receipt recovery and the ten-second
+  bounded native job. Legacy collectors remain off and Web Push recovery stays
+  on. The latest production control readback returned worker HTTP 200. The
+  33-worker-test and isolated twenty-recipient/SQL gates passed; the accepted
+  physical build-26 tap/read/badge/minimize proof is separate. Rollout monitoring
+  does not claim newly measured cloud/APNs latency or OS display for every user.
+- **Submitted:** Apple accepted build 26 for production review at
+  `2026-11-02T04:00:41.26Z`. Submission
+  `add39da5-51fd-4842-8a69-4066a3fcb805` and version both read back
+  `WAITING_FOR_REVIEW`. This is submitted, not approved or live.
+- **Screenshots:** the user's three physical-phone screenshots were upscaled
+  as explicitly requested to 1320×2868; all three processed COMPLETE at Apple.
+  They are not simulator captures. The simulator screenshot agent was stopped.
+  Final evidence is `output/release-evidence/user-screenshots-upscaled-20261101/final-submission-manifest.json`;
+  submission receipt is `output/release-evidence/submission-closeout-20261101/final-submission-execution/recovery-submit.readback.json`.
+  Remaining release work is Apple's review, any requested remediation, and
+  production install verification after approval/release.
+
+Current evidence: `output/release-evidence/appstore-final-web-20261102/`;
+`output/release-evidence/privacy-reconciliation-20261102/` (including
+`review-logins-final-1793588453530/receipt.json` and actual hosted policy receipts);
+`output/playwright/privacy-phone-20261101/member-1793587830659/`; and
+`output/release-evidence/native-notification-repair-20261030/production-rollout-20261102/`.
+
 ## Targeted submission plan — November 1, after physical scroll acceptance
 
 Finish line: App Store Connect accepts the production review submission and
