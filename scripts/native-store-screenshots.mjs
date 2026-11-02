@@ -20,6 +20,19 @@ const writeJson = (path, value) => writeFileSync(path, `${JSON.stringify(value, 
 const flow = (path, steps) => writeFileSync(path, `${JSON.stringify({ appId: bundle })}\n---\n${JSON.stringify(steps, null, 2)}\n`);
 const tap = text => ({ tapOn: { text } });
 const wait = text => ({ extendedWaitUntil: { visible: { text }, timeout: 60000 } });
+const nativeProduct = () => {
+  const device = json(join(root, 'simulator.json'));
+  const productDir = process.env.NATIVE_SIMULATOR_PRODUCT || join(root, 'DerivedData/Build/Products/Release-iphonesimulator');
+  const app = readdirSync(productDir).find(name => name.endsWith('.app') && !name.includes('Tests'));
+  if (!app) throw new Error('Native Release simulator app missing.');
+  const appPath = join(productDir, app);
+  const plist = key => command('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, join(appPath, 'Info.plist')]);
+  if (plist('CFBundleIdentifier') !== bundle || plist('CFBundleVersion') !== '26' ||
+      plist('CFBundleSupportedPlatforms:0') !== 'iPhoneSimulator' || !existsSync(join(appPath, 'main.jsbundle'))) {
+    throw new Error('Native Release simulator artifact identity mismatch.');
+  }
+  return { device, appPath, plist };
+};
 
 if (process.argv[2] === 'prepare') {
   if (process.platform !== 'darwin') throw new Error('A genuine macOS/Xcode simulator host is required.');
@@ -53,19 +66,38 @@ if (process.argv[2] === 'prepare') {
   sim(['bootstatus', id, '-b']);
   sim(['status_bar', id, 'override', '--time', '9:41', '--dataNetwork', 'wifi', '--wifiMode', 'active', '--wifiBars', '3', '--batteryState', 'charged', '--batteryLevel', '100']);
   console.log(`Prepared real ${device.name} simulator; exact native Build 26 source. No EAS/Apple build or submission.`);
+} else if (process.argv[2] === 'entry-probe') {
+  // A separate workflow step supplies NO account credentials. This allows safe
+  // diagnostics of genuine native startup/chooser/WebView accessibility.
+  if (Object.keys(process.env).some(key => /^(NATIVE_SCREENSHOT_|MAESTRO_SCREENSHOT_)/.test(key))) {
+    throw new Error('Entry probe must run without screenshot credentials.');
+  }
+  const { device, appPath } = nativeProduct();
+  const diagnostics = join(root, 'entry-diagnostics');
+  mkdirSync(diagnostics, { recursive: true });
+  sim(['install', device.id, appPath]);
+  command('open', ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', device.id]);
+  sim(['launch', device.id, bundle]);
+  await new Promise(resolve => setTimeout(resolve, 10000));
+  sim(['io', device.id, 'screenshot', join(diagnostics, 'native-before-entry.png')]);
+  flow(join(diagnostics, 'entry.yaml'), [
+    { launchApp: { clearState: true } }, wait('Demo community'), tap('Demo community'), wait('Enter your email'),
+  ]);
+  const result = spawnSync(join(root, 'tooling/maestro/bin/maestro'), ['--device', device.id, 'test',
+    '--debug-output', join(diagnostics, 'private-debug'), '--test-output-dir', join(diagnostics, 'private-output'), join(diagnostics, 'entry.yaml')],
+  { cwd: diagnostics, env: process.env, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 240000 });
+  writeFileSync(join(diagnostics, 'credential-free-entry.txt'), `${result.stdout || ''}\n${result.stderr || ''}`);
+  sim(['io', device.id, 'screenshot', join(diagnostics, 'native-after-entry.png')]);
+  writeJson(join(root, 'entry-probe-result.json'), { simulatorId: device.id, passed: result.status === 0, exitCode: result.status,
+    at: new Date().toISOString(), credentialsSupplied: false, genuineNativeFramebuffer: true });
+  if (result.status !== 0) throw new Error('Credential-free native entry probe failed; inspect its native PNGs and safe CLI output.');
+  console.log('Credential-free native entry probe passed; Demo login is ready.');
 } else if (process.argv[2] === 'capture') {
   required('NATIVE_SCREENSHOT_EMAIL'); required('NATIVE_SCREENSHOT_PASSWORD');
   required('CAPTURE_CHAT_MARKER'); required('CAPTURE_PIN_MARKER'); required('CAPTURE_DM_MARKER');
-  const device = json(join(root, 'simulator.json'));
-  const productDir = process.env.NATIVE_SIMULATOR_PRODUCT || join(root, 'DerivedData/Build/Products/Release-iphonesimulator');
-  const app = readdirSync(productDir).find(name => name.endsWith('.app') && !name.includes('Tests'));
-  if (!app) throw new Error('Native Release simulator app missing.');
-  const appPath = join(productDir, app);
-  const plist = (key) => command('/usr/libexec/PlistBuddy', ['-c', `Print :${key}`, join(appPath, 'Info.plist')]);
-  if (plist('CFBundleIdentifier') !== bundle || plist('CFBundleVersion') !== '26' ||
-      plist('CFBundleSupportedPlatforms:0') !== 'iPhoneSimulator' || !existsSync(join(appPath, 'main.jsbundle'))) {
-    throw new Error('Native Release simulator artifact identity mismatch.');
-  }
+  const { device, appPath, plist } = nativeProduct();
+  const entryProbe = existsSync(join(root, 'entry-probe-result.json')) ? json(join(root, 'entry-probe-result.json')) : null;
+  const entryReady = entryProbe?.passed === true && entryProbe.simulatorId === device.id;
   const final = join(root, 'final');
   const privateDir = join(root, 'private');
   const safeStatus = { runId: process.env.GITHUB_RUN_ID, nativeSourceSha: sourceSha, phases: [] };
@@ -75,10 +107,10 @@ if (process.argv[2] === 'prepare') {
     console.log(`Native capture phase ${phase}: ${status}`);
   };
   mkdirSync(final, { recursive: true }); mkdirSync(privateDir, { recursive: true, mode: 0o700 });
-  sim(['install', device.id, appPath]);
+  if (!entryReady) sim(['install', device.id, appPath]);
   const maestro = join(root, 'tooling/maestro/bin/maestro');
   if (!existsSync(maestro)) throw new Error('Pinned Maestro installation missing.');
-  const signout = [tap('Settings'), wait('Account'), tap('Account'), wait('Sign out'), tap('Sign out'), wait('Enter your email')];
+  const signout = [{ tapOn: { text: 'Back to direct messages', optional: true } }, tap('Settings'), wait('Account'), tap('Account'), wait('Sign out'), tap('Sign out'), wait('Enter your email')];
   flow(join(privateDir, 'entry.yaml'), [
     { launchApp: { clearState: true } }, wait('Demo community'), tap('Demo community'), wait('Enter your email'),
   ]);
@@ -94,6 +126,8 @@ if (process.argv[2] === 'prepare') {
   ]);
   flow(join(privateDir, 'dms.yaml'), [
     tap('DMs(, .* unread)?'), wait('${MAESTRO_CAPTURE_DM_MARKER}'), { waitForAnimationToEnd: {} },
+    tap('${MAESTRO_CAPTURE_DM_MARKER}'), wait('Hello from the review account\\. This private conversation is part of the demo\\.'),
+    { waitForAnimationToEnd: {} },
   ]);
   flow(join(privateDir, 'signout.yaml'), signout);
   // Pinned Maestro only injects MAESTRO_* shell variables into flows. Credentials
@@ -122,7 +156,8 @@ if (process.argv[2] === 'prepare') {
   };
   let authenticationStarted = false;
   try {
-    if (run(join(privateDir, 'entry.yaml'), 'entry-before-credentials').status !== 0) throw new Error('Native entry flow failed.');
+    if (entryReady) record('entry-before-credentials', 'passed-via-separate-no-credential-probe');
+    else if (run(join(privateDir, 'entry.yaml'), 'entry-before-credentials').status !== 0) throw new Error('Native entry flow failed.');
     for (const [name, filename] of [['login', '01-chat.png'], ['pins', '02-shadowpin.png'], ['dms', '03-direct-messages.png']]) {
       if (name === 'login') authenticationStarted = true;
       if (run(join(privateDir, `${name}.yaml`), name).status !== 0) throw new Error(`Native ${name} screen did not reach its synthetic-content assertion.`);
@@ -161,5 +196,5 @@ if (process.argv[2] === 'prepare') {
   });
   console.log('Captured three genuine post-login iPhone PNGs and verified UI sign-out. Review pixels before App Store upload.');
 } else {
-  throw new Error('Usage: node scripts/native-store-screenshots.mjs prepare|capture');
+  throw new Error('Usage: node scripts/native-store-screenshots.mjs prepare|entry-probe|capture');
 }

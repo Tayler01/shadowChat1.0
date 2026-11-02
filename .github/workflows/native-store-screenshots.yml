@@ -99,6 +99,11 @@ jobs:
             -o "$NATIVE_CAPTURE_ROOT/maestro.zip"
           printf '%s  %s\n' "$MAESTRO_SHA256" "$NATIVE_CAPTURE_ROOT/maestro.zip" | shasum -a 256 --check
           unzip -q "$NATIVE_CAPTURE_ROOT/maestro.zip" -d "$NATIVE_CAPTURE_ROOT/tooling"
+      - name: Probe genuine native entry without any account credentials
+        env:
+          MAESTRO_CLI_NO_ANALYTICS: '1'
+          MAESTRO_NO_ANALYTICS: '1'
+        run: node scripts/native-store-screenshots.mjs entry-probe
       - name: Authenticate into synthetic Demo community and capture loaded native screens
         env:
           # Credentials exist only in this process; never pass them on CLI arguments.
@@ -139,6 +144,20 @@ jobs:
           # Only helper-created phase names, timestamps and enumerated failure
           # classes. No Maestro output, screenshots, hierarchy or commands.
           path: ${{ env.NATIVE_CAPTURE_ROOT }}/safe-capture-status.json
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain strictly pre-authentication native entry diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-entry-diagnostics-${{ github.run_id }}
+          # This step ran before screenshot credentials were supplied anywhere.
+          # Never include the post-login Maestro private directories.
+          path: |
+            ${{ env.NATIVE_CAPTURE_ROOT }}/entry-diagnostics/native-before-entry.png
+            ${{ env.NATIVE_CAPTURE_ROOT }}/entry-diagnostics/native-after-entry.png
+            ${{ env.NATIVE_CAPTURE_ROOT }}/entry-diagnostics/credential-free-entry.txt
+            ${{ env.NATIVE_CAPTURE_ROOT }}/entry-probe-result.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Destroy only this job's disposable simulator
