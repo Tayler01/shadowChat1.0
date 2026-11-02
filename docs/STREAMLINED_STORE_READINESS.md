@@ -7,8 +7,10 @@ necessary targeted checks, preserving the full edition. No new durable goal was
 created. A later bounded production notification test confirmed DM delivery,
 destination and badge clearing; General opened correctly but did not scroll to
 the message or clear read state until the operator scrolled manually. The scroll
-regression remains a release issue. Production native delivery is disabled again
-after the test, with all legacy/native schedules still off.
+regression was repaired and the operator subsequently accepted the long-DM and
+General Chat notification targets on build26. Production native delivery is
+disabled again after the bounded tests, with all legacy/native schedules still
+off; normal ongoing native activation remains a separate release action.
 
 - Fresh Apple readback confirms PREPARE_FOR_SUBMISSION and no review submission.
   The draft now selects VALID, App Store-eligible build26; other version fields
@@ -25,14 +27,14 @@ after the test, with all legacy/native schedules still off.
 - Fresh read-only checks show Demo already has private-only Realtime; production
   still permits public channels. All three protected Storage buckets remain
   public in each environment. Do not repeat the completed Demo Realtime change.
-- The published full edition has advanced to preserved-full source8a7ecdbf;
-  its Will and Kirk changes must be retained in any subsequent full publication.
+- The published full edition preserves source8a7ecdbf and its Will and Kirk
+  changes; the scoped follow-up is source24d1d323, deploy6ae7dd897e918b7f92379f6d.
 - A manual-only native screenshot workflow is running on a standard macOS GitHub
   runner using exact build26 native source, genuine iPhone simulator pixels and
   an existing ordinary synthetic Demo account. No EAS build or store submission
   is performed by this workflow. Capture remains unverified until the images
   pass native provenance, content and Apple upload checks.
-- Creator video deletion repair is implemented locally, including ordinary
+- Creator video deletion repair is published in all three editions, including ordinary
   deletion calling provider cleanup, a same-account retry notice, idempotent
   server receipts and a narrow consumed-draft reference exception. The focused
   database checks pass84 assertions. Demo migration20261101232759 and
@@ -40,7 +42,7 @@ after the test, with all legacy/native schedules still off.
   lifecycle acceptance now passes ordinary upload/publish/delete, lost-response
   retry and provider404 verification, with owned fixtures cleaned. Production
   migration20261101232759 and shadow-pin-video v103 are deployed and exact source
-  readback verified. The frontend retry/deletion changes still await publication.
+  readback verified. The frontend retry/deletion changes shipped with the scroll fix.
 - Current full8a7/member783 compatibility passes Chromium/Pixel and WebKit/iPhone:
   General/DM delivery, canonical reads, unread/reload, both typing scopes, signed
   DM images and forced socket close/private rejoin. All owned fixtures and22
@@ -54,10 +56,19 @@ after the test, with all legacy/native schedules still off.
   `6ae7d8eff8fd8359399bc660` and `6ae7d9858403f940b4109af1`. Eight isolated
   phone-runtime paths passed; live member login/Settings/inbox and demo iPhone
   General/DM checks also passed with cleanup verified. No physical-device fix is
-  claimed yet. Full publication remains held for its initial bundle budget; a
-  two-file lazy setup-card extraction passes the unchanged strict limits and
-  preserves its controller, copy and callbacks, but is not published.
-- The production push canary created exactly two native outboxes for the operator,
+  claimed by browser proof alone. Physical follow-up now confirms the long-DM
+  target opens properly and General opens fully visible with the badge staying
+  clear after minimize/reopen. All five exact test messages and their notification
+  records/sessions were removed; the real Caleb reply and conversation remain.
+  Evidence: `output/release-evidence/native-notification-repair-20261030/`
+  `canary-resume-20261101/post-scroll-member-20261102/PHYSICAL_ACCEPTANCE.json`
+  and `tall-history/cleanup-final.json`. A two-file lazy setup-card extraction
+  resolves the full initial-bundle budget without changing limits or controller,
+  copy or callbacks. The full publication above is verified at exact served
+  JS/CSS/index/health bytes with member/demo sites, flags, environments, functions
+  and janitor schedule preserved. The live full Settings/DM-inbox smoke also
+  passed with zero read-state mutations and its owned session revoked.
+- The first production push canary created exactly two native outboxes for the operator,
   no other native recipient, and stopped at23:51:52UTC. Both Expo receipts returned
   ok and were reconciled while delivery stayed disabled. Exact test messages and
   their notification records were removed and verified; the operator's real reply
@@ -66,7 +77,8 @@ after the test, with all legacy/native schedules still off.
 
 The historical pause entries below describe earlier boundaries and are superseded
 only by this resumed scope. Public submission still requires final privacy
-enforcement, policies/disclosures, native notification acceptance and screenshots.
+enforcement, policies/disclosures, normal ongoing native notification activation
+and screenshots.
 
 ## October 30 scoped regression repairs
 
