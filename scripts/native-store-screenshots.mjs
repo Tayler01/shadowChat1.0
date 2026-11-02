@@ -148,6 +148,8 @@ if (process.argv[2] === 'prepare') {
       { scrollUntilVisible: { element: { text: continueText }, direction: 'DOWN', timeout: 20000 } }, tap(continueText),
     ] } },
     wait('${MAESTRO_CAPTURE_CHAT_MARKER}'), { waitForAnimationToEnd: {} },
+    { tapOn: { text: 'Not Now', optional: true } }, { waitForAnimationToEnd: {} },
+    { assertNotVisible: 'Turn on the full ShadoChat experience' },
     { assertNotVisible: 'Enter your email' }, { assertNotVisible: 'Enter your password' },
     // Native screen pixels are captured INSIDE one uninterrupted app/UI flow.
     // Maestro2.12 requires relative artifact paths, never absolute paths.
