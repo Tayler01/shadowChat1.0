@@ -33,34 +33,15 @@ const nativeProduct = () => {
   }
   return { device, appPath, plist };
 };
-const signSimulatorForKeychain = appPath => {
-  // Restore Build26's original public signing identity/notification entitlements
-  // on this disposable simulator copy. No certificate or source rebuild is used.
-  const team = json(join(mobile, 'eas.json')).submit.production.ios.appleTeamId;
-  if (!/^[A-Z0-9]{10}$/.test(team)) throw new Error('Unexpected original Apple team identifier.');
-  const original = json(join(mobile, 'app.json')).expo.ios.entitlements;
-  const entitlements = { ...original,
-    'application-identifier': `${team}.${bundle}`, 'com.apple.developer.team-identifier': team,
-    'aps-environment': 'production', 'beta-reports-active': true, 'get-task-allow': false,
-    'keychain-access-groups': [`${team}.${bundle}`],
-  };
-  const signingFile = join(root, 'simulator-entitlements.plist');
-  const xml = Object.entries(entitlements).map(([key, value]) => `<key>${key}</key>${
-    typeof value === 'boolean' ? `<${value}/>` : Array.isArray(value)
-      ? `<array>${value.map(item => `<string>${item}</string>`).join('')}</array>` : `<string>${value}</string>`
-  }`).join('');
-  writeFileSync(signingFile, `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>${xml}</dict></plist>\n`);
+const recordSimulatorSigning = appPath => {
+  const signature = spawnSync('codesign', ['-d', '--entitlements', ':-', appPath], { encoding: 'utf8' });
   const executable = command('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleExecutable', join(appPath, 'Info.plist')]);
-  const unsignedExecutableSha256 = hash(join(appPath, executable));
-  const bundleSha256 = hash(join(appPath, 'main.jsbundle'));
-  command('codesign', ['--force', '--sign', '-', '--entitlements', signingFile, '--generate-entitlement-der', appPath]);
-  if (hash(join(appPath, 'main.jsbundle')) !== bundleSha256) throw new Error('Signing changed the original embedded JavaScript bundle.');
-  const state = { mode: 'local-ad-hoc-simulator-only', originalTeam: team, originalApplicationIdentifier: `${team}.${bundle}`,
-    originalNotificationEntitlementsPreserved: true, explicitDefaultKeychainGroup: `${team}.${bundle}`,
-    certificateOrPurchaseUsed: false, shippingSourceChanged: false, unsignedExecutableSha256,
-    signedExecutableSha256: hash(join(appPath, executable)), embeddedBundleSha256: bundleSha256 };
-  writeJson(join(root, 'simulator-signing-state.json'), state);
-  return state;
+  writeJson(join(root, 'simulator-signing-state.json'), {
+    mode: 'Xcode-simulator-local-ad-hoc-active-architecture', certificateOrPurchaseUsed: false,
+    shippingSourceChanged: false, signatureInspectionStatus: signature.status,
+    publicEntitlements: `${signature.stdout || ''}\n${signature.stderr || ''}`,
+    executableSha256: hash(join(appPath, executable)), embeddedBundleSha256: hash(join(appPath, 'main.jsbundle')),
+  });
 };
 
 if (process.argv[2] === 'prepare') {
@@ -77,8 +58,12 @@ if (process.argv[2] === 'prepare') {
     if (!/^[A-Z_]+$/.test(key) || /[\r\n']/.test(value)) throw new Error('Invalid public build configuration.');
     return `${key}='${value}'`;
   }).join('\n') + '\n', { mode: 0o600 });
-  const cacheKey = `native-store-build26-v1-${createHash('sha256').update(JSON.stringify({
+  const team = eas.submit.production.ios.appleTeamId;
+  if (!/^[A-Z0-9]{10}$/.test(team)) throw new Error('Unexpected original Apple team identifier.');
+  appendFileSync(required('GITHUB_ENV'), `NATIVE_APPLE_TEAM=${team}\n`);
+  const cacheKey = `native-store-build26-v2-${createHash('sha256').update(JSON.stringify({
     sourceSha, env, node: process.version, xcode: command('xcodebuild', ['-version']), arch: command('uname', ['-m']),
+    simulatorSigning: 'xcode-local-ad-hoc-identity', activeArchitectureOnly: true,
   })).digest('hex')}`;
   appendFileSync(required('GITHUB_OUTPUT'), `cache-key=${cacheKey}\n`);
   const devices = JSON.parse(sim(['list', 'devicetypes', '--json'])).devicetypes;
@@ -104,7 +89,7 @@ if (process.argv[2] === 'prepare') {
   const { device, appPath } = nativeProduct();
   const diagnostics = join(root, 'entry-diagnostics');
   mkdirSync(diagnostics, { recursive: true });
-  signSimulatorForKeychain(appPath);
+  recordSimulatorSigning(appPath);
   sim(['install', device.id, appPath]);
   command('open', ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', device.id]);
   sim(['launch', device.id, bundle]);

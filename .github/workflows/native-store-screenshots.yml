@@ -67,6 +67,7 @@ jobs:
         run: npm ci
       - name: Generate native project and compile a genuine Release simulator app
         if: steps.native-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 45
         working-directory: native-source/apps/mobile
         shell: bash
         run: |
@@ -78,9 +79,12 @@ jobs:
           (cd ios && pod install)
           xcodebuild -workspace ios/ShadoChat.xcworkspace -scheme ShadoChat \
             -configuration Release -sdk iphonesimulator \
-            -destination "platform=iOS Simulator,id=$NATIVE_SIMULATOR_ID" \
+            -destination "platform=iOS Simulator,id=$NATIVE_SIMULATOR_ID,arch=$(uname -m)" \
             -derivedDataPath "$NATIVE_CAPTURE_ROOT/DerivedData" \
-            CODE_SIGNING_ALLOWED=NO build > "$NATIVE_CAPTURE_ROOT/build.log" 2>&1
+            ONLY_ACTIVE_ARCH=YES "ARCHS=$(uname -m)" \
+            CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=- \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES CODE_SIGN_LOCAL_EXECUTION_IDENTITY='Ad Hoc' \
+            "DEVELOPMENT_TEAM=$NATIVE_APPLE_TEAM" build > "$NATIVE_CAPTURE_ROOT/build.log" 2>&1
           mkdir -p "$NATIVE_SIMULATOR_PRODUCT"
           ditto "$NATIVE_CAPTURE_ROOT/DerivedData/Build/Products/Release-iphonesimulator/ShadoChat.app" \
             "$NATIVE_SIMULATOR_PRODUCT/ShadoChat.app"
