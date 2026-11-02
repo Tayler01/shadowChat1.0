@@ -1,5 +1,17 @@
 # ShadowPin Theater
 
+## Streamlined YouTube privacy mode - November 1, 2026
+
+The streamlined renderer normalizes existing and newly created standard YouTube
+embed URLs to `www.youtube-nocookie.com` at render time. Feed, Details and Theater
+retain the same player parameters, origin/referrer handling, fullscreen support,
+Comfort autoplay choice and original Open source link. The full-edition renderer
+and stored provider URLs are unchanged. This is YouTube's privacy-enhanced mode,
+not a universal no-collection or no-tracking guarantee; thumbnails, playback and
+provider operational requests can still contact external hosts. Source and
+synthetic network evidence are in
+`output/release-evidence/privacy-reconciliation-20261102/`.
+
 ## Status
 
 Wave One candidate 2 is implemented and live on the isolated

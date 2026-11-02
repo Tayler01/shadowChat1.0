@@ -1,4 +1,5 @@
 import { isNativeAppWebView } from '../../../../../src/lib/nativeAppBridge'
+import { youtubePrivacyEnhancedUrl } from '../../../../../src/lib/youtubePrivacy'
 import { PrivateMediaVideo } from '../../../../../src/components/ui/PrivateMediaPlayer'
 import { PrivateMediaFrame } from '../../../../../src/components/ui/PrivateMediaFrame'
 import { usePrivateMediaUrl } from '../../../../../src/hooks/usePrivateMediaUrl'
@@ -502,7 +503,7 @@ const getYoutubeAutoplayUrl = (
 ) => {
   if (!image.video_embed_url) return ''
   try {
-    const url = new URL(image.video_embed_url)
+    const url = youtubePrivacyEnhancedUrl(image.video_embed_url)
     url.searchParams.set('autoplay', autoplay ? '1' : '0')
     url.searchParams.set('mute', '1')
     url.searchParams.set('playsinline', '1')
