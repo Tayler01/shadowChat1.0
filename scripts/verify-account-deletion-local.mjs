@@ -152,6 +152,34 @@ try {
       ('shadow-pin','derivatives/images/${otherPin}/thumbnail.webp',null),('chat-uploads','${other}/keep.jpg','${other}'),
       ('moderation-evidence','${member}/submitted.jpg','${member}'),('moderation-evidence','${member}/draft.jpg','${member}');
   `)
+  // Install the canonical notification table and reliability columns, including
+  // recipient cascades, actor SET NULL, required payload/dedupe and source FKs.
+  await db.exec('create table public.dm_conversations(id uuid primary key);')
+  const notificationFoundation = (await readFile(path.join(root, 'supabase/migrations/20260420010000_push_notifications_foundation.sql'), 'utf8')).replaceAll('\r\n', '\n')
+  const notificationStart = notificationFoundation.indexOf('CREATE TABLE IF NOT EXISTS public.notification_events (')
+  const notificationEnd = notificationFoundation.indexOf('\n);', notificationStart) + 3
+  assert.ok(notificationStart >= 0 && notificationEnd > notificationStart)
+  await db.exec(notificationFoundation.slice(notificationStart, notificationEnd))
+  const notificationReliability = await readFile(path.join(root, 'supabase/migrations/20260717193835_notification_reliability_rebuild.sql'), 'utf8')
+  const reliabilityStart = notificationReliability.indexOf('alter table public.notification_events')
+  const reliabilityEnd = notificationReliability.indexOf(';', reliabilityStart) + 1
+  assert.ok(reliabilityStart >= 0 && reliabilityEnd > reliabilityStart)
+  await db.exec(notificationReliability.slice(reliabilityStart, reliabilityEnd))
+  await db.exec('grant select,insert,update,delete on public.notification_events to service_role;')
+  const notifications = [
+    ['departed-actor', other, 'shadow_pin_post', ownPin, member, { actor: { id: member, display_name: 'Departed member' }, thumbnail_url: 'https://example.test/departed.jpg' }],
+    ['legacy-actor-snapshot', other, 'presence_active', unknown, null, { actor: { id: member } }],
+    ['removed-pin-other-actor', other, 'shadow_pin_reply', ownPin, other, { actor: { id: other } }],
+    ['removed-pin-in-payload', other, 'shadow_pin_comment', unknown, other, { actor: { id: other }, image_id: ownPin }],
+    ['departing-recipient', member, 'group_message', otherPin, other, { actor: { id: other } }],
+    ['unrelated-pin', other, 'shadow_pin_post', otherPin, other, { actor: { id: other }, image_id: otherPin }],
+    ['unrelated-dm', other, 'dm_message', otherPin, other, { actor: { id: other }, image_id: ownPin }],
+    ['other-domain-same-uuid', other, 'system', ownPin, null, {}],
+    ['safety-notice', other, 'moderation_case_update', caseId, admin, { actor: { id: admin } }],
+  ]
+  for (const [key, userId, type, entityId, actorId, payload] of notifications) {
+    await query('insert into public.notification_events(user_id,type,entity_id,actor_id,payload,dedupe_key) values($1,$2,$3,$4,$5,$6)', [userId, type, entityId, actorId, payload, key])
+  }
   await migration('20261022231054_account_deletion_pin_reference.sql')
   await migration('20261023001140_active_member_access_boundary.sql')
   await migration('20261023001141_complete_account_deletion.sql')
@@ -281,6 +309,7 @@ try {
   await query("insert into storage.objects(bucket_id,name,owner) values('chat-uploads',$1,$2)",[`${other}/new.jpg`,other])
   equal(await scalar("select count(*)::int from storage.objects where name=$1",[`${other}/new.jpg`]),1,'unrelated member uploads remain available')
   await rejects('select public.erase_account_data($1)',[member],/Storage cleanup must finish/,'rows cannot disappear before storage checkpoint')
+  equal(await scalar('select count(*)::int from public.notification_events'),notifications.length,'rejected early cleanup preserves every notification')
   await rejects('select public.checkpoint_account_deletion($1,$2)',[member,'storage_removed'],/out of order/,'cannot skip provider checkpoint')
   await query("update private.account_deletion_jobs set manifest=jsonb_set(manifest,'{bunny_assets}',$2::jsonb) where user_id=$1",[member,JSON.stringify([{ library_id:'123',asset_id:lateAsset }])])
   await rejects('select public.checkpoint_account_deletion($1,$2)',[member,'providers_removed'],/Pending provider removals/,'an omitted manual claim cannot be marked removed by an unrelated provider confirmation')
@@ -303,8 +332,19 @@ try {
   equal(await scalar("select count(*)::int from storage.objects where bucket_id='moderation-captured-media'"),2,'service-owned evidence copies survive account cleanup')
   equal(await scalar("select count(*)::int from storage.objects where bucket_id='moderation-evidence' and name=$1",[`${member}/submitted.jpg`]),0,'original submitted attachment is removed only after independent capture')
   await query('select public.checkpoint_account_deletion($1,$2)',[member,'storage_removed'])
+  await db.exec('begin;')
+  await query('select public.erase_account_data($1)',[member])
+  equal(await scalar("select count(*)::int from public.notification_events where dedupe_key='departed-actor'"),1,'regression: old account erasure retains departed profile/media notification copies')
+  await db.exec('rollback; reset role;')
+  await migration('20261102011356_account_deletion_notification_cleanup.sql')
+  equal(await scalar("select prosecdef from pg_proc where oid='public.erase_account_data(uuid)'::regprocedure"),false,'notification cleanup preserves security-invoker execution')
+  for (const role of ['anon','authenticated']) {
+    equal(await scalar('select has_function_privilege($1,$2,$3)',[role,'public.erase_account_data(uuid)','execute']),false,`${role} cannot invoke service account erasure`)
+  }
+  await service()
   await query('select public.erase_account_data($1)',[member])
   await query('select public.erase_account_data($1)',[member])
+  equal((await query('select dedupe_key from public.notification_events order by dedupe_key')).map(row=>row.dedupe_key),['other-domain-same-uuid','safety-notice','unrelated-dm','unrelated-pin'],'departed actor/recipient and removed-Pin notifications disappear; unrelated and safety notices remain')
   equal(await scalar('select count(*)::int from private.bunny_upload_reservations'),0,'confirmed provider cleanup clears its durable intents')
   equal(await scalar('select count(*)::int from public.shadow_pin_images'),1,'own Pins erased, other Pin survives')
   equal(await scalar('select title from public.shadow_pin_categories where id=$1',[category]),'Shared Pins','shared category text anonymized')
