@@ -99,6 +99,8 @@ export const NATIVE_CANARY_LIMITS = Object.freeze({
 
 type NativeCanaryBudget = { deadlineMs: number; signal: AbortSignal }
 type NativeCanaryRuntime = {
+  /** Missing on older schemas: preserve the legacy named-canary contract. */
+  audience_mode?: string
   delivery_mode: string
   worker_invocation_enabled: boolean
   receipt_reconciliation_enabled: boolean
@@ -108,12 +110,18 @@ type NativeCanaryRuntime = {
   activation_watermark: string
 }
 
-export const isNativeCanaryEnabled = (runtime: NativeCanaryRuntime | null, action: string) => Boolean(
-  runtime && runtime.delivery_mode === 'active' && runtime.worker_invocation_enabled &&
-  !runtime.all_users_enabled && runtime.canary_user_ids.length > 0 &&
-  runtime.canary_user_ids.length <= 10 && runtime.enabled_categories.length > 0 &&
-  (action === 'deliver' || (action === 'receipts' && runtime.receipt_reconciliation_enabled)),
-)
+export const isNativeCanaryEnabled = (runtime: NativeCanaryRuntime | null, action: string) => {
+  if (!runtime || runtime.delivery_mode !== 'active' || !runtime.worker_invocation_enabled ||
+    runtime.enabled_categories.length === 0) return false
+  const mode = runtime.audience_mode ?? 'canary'
+  const audienceAllowed = mode === 'production'
+    ? runtime.all_users_enabled && runtime.canary_user_ids.length === 0
+    : mode === 'canary' && !runtime.all_users_enabled &&
+      runtime.canary_user_ids.length > 0 && runtime.canary_user_ids.length <= 10
+  // Audience size is a rollout gate, not a batch/concurrency/time budget.
+  return audienceAllowed && (action === 'deliver' ||
+    (action === 'receipts' && runtime.receipt_reconciliation_enabled))
+}
 
 export const getNativeProviderTimeout = (deadlineMs: number, nowMs = Date.now()) => Math.max(
   0,
@@ -1097,7 +1105,7 @@ const checkExpoReceipts = async (
 ) => {
   const now = new Date().toISOString()
   const affectedOutboxIds = new Set<string>()
-  const { data: expiredTargetRows, error: expiredTargetsQueryError } = await supabase
+  let expiredTargetsQuery = supabase
     .from('notification_delivery_targets_v2')
     .select(
       'id, outbox_id, notification_installations!inner(environment)',
@@ -1105,12 +1113,15 @@ const checkExpoReceipts = async (
     .eq('transport', 'expo')
     .eq('status', 'accepted')
     .eq('notification_installations.environment', deliveryEnvironment)
-    .in('notification_installations.user_id', runtime.canary_user_ids)
     .gte('created_at', runtime.activation_watermark)
     .lt('receipt_attempt_count', NATIVE_CANARY_LIMITS.attempts)
     .lte('receipt_expires_at', now)
     .order('created_at', { ascending: true })
     .limit(NATIVE_CANARY_LIMITS.receipts)
+  if ((runtime.audience_mode ?? 'canary') === 'canary') {
+    expiredTargetsQuery = expiredTargetsQuery.in('notification_installations.user_id', runtime.canary_user_ids)
+  }
+  const { data: expiredTargetRows, error: expiredTargetsQueryError } = await expiredTargetsQuery
   if (expiredTargetsQueryError) throw expiredTargetsQueryError
   const expiredTargetIds = (expiredTargetRows ?? []).map(target => target.id)
   if (expiredTargetIds.length > 0) {
@@ -1131,7 +1142,7 @@ const checkExpoReceipts = async (
     if (target.outbox_id) affectedOutboxIds.add(target.outbox_id)
   }
 
-  const { data, error } = await supabase
+  let receiptTargetsQuery = supabase
     .from('notification_delivery_targets_v2')
     .select(
       'id, outbox_id, installation_id, provider_message_id, receipt_attempt_count, receipt_expires_at, created_at, notification_installations!inner(environment)',
@@ -1139,7 +1150,6 @@ const checkExpoReceipts = async (
     .eq('transport', 'expo')
     .eq('status', 'accepted')
     .eq('notification_installations.environment', deliveryEnvironment)
-    .in('notification_installations.user_id', runtime.canary_user_ids)
     .gte('created_at', runtime.activation_watermark)
     .not('provider_message_id', 'is', null)
     .lte('next_receipt_check_at', now)
@@ -1148,6 +1158,10 @@ const checkExpoReceipts = async (
     .order('next_receipt_check_at', { ascending: true })
     .order('created_at', { ascending: true })
     .limit(Math.max(0, NATIVE_CANARY_LIMITS.receipts - expiredTargetIds.length))
+  if ((runtime.audience_mode ?? 'canary') === 'canary') {
+    receiptTargetsQuery = receiptTargetsQuery.in('notification_installations.user_id', runtime.canary_user_ids)
+  }
+  const { data, error } = await receiptTargetsQuery
   if (error) throw error
   let delivered = 0
   let invalid = 0
@@ -1319,6 +1333,9 @@ export const handleNotificationDeliveryRequest = async (request: Request) => {
         ok: true,
         environment: deliveryEnvironment,
         worker: 'deliver-notifications-v2',
+        runtimeContract: 2,
+        audienceModes: ['canary', 'production'],
+        limits: NATIVE_CANARY_LIMITS,
       })
     }
     // Legacy jobs cannot invoke broad delivery even if somebody resumes one.
@@ -1333,10 +1350,15 @@ export const handleNotificationDeliveryRequest = async (request: Request) => {
     try {
       const { data: runtime, error: runtimeError } = await supabase
         .from('notification_v2_runtime_config')
-        .select('delivery_mode,worker_invocation_enabled,receipt_reconciliation_enabled,all_users_enabled,canary_user_ids,enabled_categories,activation_watermark')
+        // Older deployments do not have audience_mode yet. Selecting the private
+        // runtime row keeps that upgrade order safe; missing means named canary.
+        .select('*')
         .eq('singleton', true)
         .maybeSingle()
       if (runtimeError) throw runtimeError
+      if (runtime?.audience_mode === 'production' && deliveryEnvironment !== 'production') {
+        return json({ skipped: 'Production audience requires the production environment', claimed: 0 })
+      }
       if (!isNativeCanaryEnabled(runtime, body.task)) return json({ skipped: 'Native canary is disabled', claimed: 0 })
       const { data: acquired, error: leaseError } = await supabase.rpc('acquire_native_notification_worker_v2', {
         target_action: body.task,

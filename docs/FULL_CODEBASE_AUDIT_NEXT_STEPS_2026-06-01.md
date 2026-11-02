@@ -1,5 +1,36 @@
 # Full Codebase Audit Next Steps - 2026-06-01
 
+## November 2 verified native production audience activation
+
+The native-notification release separates explicit production recipient
+eligibility from the ten-account canary gate while retaining the existing
+two-event/two-device/concurrency-two/eight-second worker bounds, three attempts
+and five-invocation burst. It adds per-device credential enforcement, production
+receipt environment isolation and delivery/receipt fairness. Root applied exact
+migration/history version `20261102010152` to Demo and production, verified all
+eight Edge source files/configuration and REST audience visibility, then checked
+HTTP 200 protected health contract 2 before separate explicit activation. Demo
+Edge 8 activated at `2026-11-02T01:54:00.846861Z`; production Edge 66 activated at
+`2026-11-02T02:03:59.301786Z`. Only native job 5/7 respectively uses the approved
+ten-second cadence. Former native collectors stay off, Web Push recovery stays
+on and fresh forward watermarks prevent historical replay. Focused Deno
+33/33, real isolated PostgreSQL fanout/security/recovery checks and required
+lint/typecheck/build passed. Accepted Build 26 phone evidence is reused because
+payload/auth/routing is unchanged.
+
+Three bounded read-only observations per environment verified stable active
+controls, empty pending/receipt samples and no worker errors/lingering leases;
+seven sampled Demo and eight sampled production cron executions all succeeded.
+Demo had zero eligible native members; production had one. Recipient-indexed
+production reads through `02:06:05.900616` UTC found no ordinary notification
+events since activation. No test sends/enrollments were created, so this rollout
+adds no new live provider/receipt/OS-display or cloud-latency proof. Earlier
+accepted physical tests and the local twenty-recipient simulation are separate
+evidence. See the November 2 section of
+[the native notification guide](features/native-notification-canary-2026-09-30.md)
+and its exact migration/Edge/activation/monitoring receipts. Remote backend
+activation does not establish a later Git push, web deploy or native build.
+
 ## October 30 Will & Kirk release gate repair
 
 The direct-to-main Will & Kirk feed passed local web gates, but workflow

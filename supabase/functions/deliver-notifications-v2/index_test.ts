@@ -32,6 +32,21 @@ Deno.test('native canary gates fail closed for disabled, global and unscoped del
   assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, receipt_reconciliation_enabled: false }, 'receipts'), false)
 })
 
+Deno.test('explicit production audience is separate from the named rollout cap and legacy schema', () => {
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, audience_mode: 'production',
+    all_users_enabled: true, canary_user_ids: [] }, 'deliver'), true)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, audience_mode: 'production',
+    all_users_enabled: true, canary_user_ids: [] }, 'receipts'), true)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, audience_mode: 'production' }, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, audience_mode: 'production',
+    all_users_enabled: true }, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, audience_mode: 'unknown' }, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled({ ...canaryRuntime, canary_user_ids: Array(20).fill('named') }, 'deliver'), false)
+  assert.equal(isNativeCanaryEnabled(canaryRuntime, 'deliver'), true) // pre-column schema
+  assert.equal(NATIVE_CANARY_LIMITS.events, 2)
+  assert.equal(NATIVE_CANARY_LIMITS.concurrency, 2)
+})
+
 Deno.test('provider budget reserves persistence within an eight-second invocation', () => {
   assert.equal(NATIVE_CANARY_LIMITS.runtimeMs, 8_000)
   assert.ok(NATIVE_CANARY_LIMITS.events * NATIVE_CANARY_LIMITS.installationsPerEvent <= 5)
@@ -89,6 +104,20 @@ Deno.test('legacy delivery and receipt actions cannot wake database or Expo work
   assert.equal(calls, 0)
 })
 
+Deno.test('protected health advertises the production contract and exact bounds without database/provider work', async () => {
+  let calls = 0
+  await withWorkerMock(() => { calls += 1; throw new Error('Unexpected health fetch') }, async () => {
+    const response = await handleNotificationDeliveryRequest(canaryRequest('health'))
+    const body = await response.json()
+    assert.equal(body.ok, true)
+    assert.equal(body.runtimeContract, 2)
+    assert.deepEqual(body.audienceModes, ['canary', 'production'])
+    assert.equal(body.limits.events, 2)
+    assert.equal(body.limits.runtimeMs, 8_000)
+  })
+  assert.equal(calls, 0)
+})
+
 Deno.test('disabled runtime checks only its singleton row and never claims or calls a provider', async () => {
   const paths: string[] = []
   await withWorkerMock(input => {
@@ -109,8 +138,9 @@ const createDeliveryFaultBackend = (provider: () => Promise<Response>, receipt =
   preferences?: Record<string, unknown>
   claim?: Record<string, unknown>
   blocks?: unknown[]
+  runtime?: typeof canaryRuntime & { audience_mode?: string }
 } = {}) => {
-  const userId = canaryRuntime.canary_user_ids[0]
+  const userId = String(overrides.claim?.user_id || canaryRuntime.canary_user_ids[0])
   const eventId = '22222222-2222-4222-8222-222222222222'
   const installationId = '33333333-3333-4333-8333-333333333333'
   const target: Record<string, unknown> = { id: 'target', outbox_id: 'outbox', installation_id: installationId,
@@ -128,7 +158,7 @@ const createDeliveryFaultBackend = (provider: () => Promise<Response>, receipt =
       return await provider()
     }
     const name = url.pathname.split('/').at(-1)
-    if (name === 'notification_v2_runtime_config') return Response.json([canaryRuntime])
+    if (name === 'notification_v2_runtime_config') return Response.json([overrides.runtime || canaryRuntime])
     if (name === 'acquire_native_notification_worker_v2') return Response.json('worker-lease')
     if (name === 'release_native_notification_worker_v2' || name === 'validate_notification_outbox_v2_lease' || name === 'complete_notification_outbox_v2') return Response.json(true)
     if (name === 'claim_notification_outbox_v2') return Response.json([{ outbox_id: 'outbox', lease_token: 'lease', event_id: eventId, user_id: userId, expires_at: new Date(Date.now() + 90_000).toISOString(), ...overrides.claim }])
@@ -163,6 +193,76 @@ const scopedInstallation = {
   community_scope_version: 1,
 }
 const accepted = () => Promise.resolve(Response.json({ data: [{ status: 'ok', id: 'ticket-one' }] }))
+
+Deno.test('production dispatch and accepted-target recovery cover twenty distinct native recipients within unchanged per-call bounds', async () => {
+  const productionRuntime = { ...canaryRuntime, audience_mode: 'production',
+    all_users_enabled: true, canary_user_ids: [] }
+  const durations: number[] = []
+  let acceptedTargets = 0
+  for (let index = 1; index <= 20; index += 1) {
+    const userId = `97000000-0000-4000-8000-${String(index).padStart(12, '0')}`
+    const backend = createDeliveryFaultBackend(accepted, false, {
+      runtime: productionRuntime, claim: { user_id: userId },
+      installation: { ...scopedInstallation, user_id: userId, environment: 'production' },
+      token: { environment: 'production' },
+    })
+    const start = performance.now()
+    await withWorkerMock(backend.fetchMock, async () => {
+      Deno.env.set('SUPABASE_URL', 'https://abcdefghijklmnopqrst.supabase.co')
+      Deno.env.set('NOTIFICATION_DELIVERY_ENVIRONMENT', 'production')
+      const first = await handleNotificationDeliveryRequest(canaryRequest())
+      assert.equal(first.status, 200)
+      assert.equal((await first.json()).claimed, 1)
+      assert.equal(backend.target.status, 'accepted')
+      // Recovery may claim the event again, but cannot resubmit its accepted target.
+      await handleNotificationDeliveryRequest(canaryRequest())
+    })
+    durations.push(performance.now() - start)
+    assert.equal(backend.calls(), 1)
+    assert.ok(backend.providerMessages.every(messages => messages.length <= NATIVE_CANARY_LIMITS.installationsPerEvent))
+    acceptedTargets += 1
+  }
+  assert.equal(acceptedTargets, 20)
+  assert.equal(NATIVE_CANARY_LIMITS.events, 2)
+  assert.equal(NATIVE_CANARY_LIMITS.runtimeMs, 8_000)
+  assert.ok(Math.max(...durations) < NATIVE_CANARY_LIMITS.runtimeMs)
+  console.info(JSON.stringify({ mockedNativeRecipients: 20, acceptedTargets,
+    providerCalls: acceptedTargets, recoveryDuplicateSubmissions: 0,
+    slowestTwoInvocationsMs: Math.max(...durations) }))
+})
+
+Deno.test('production receipt lookup drains accepted records without a named list and keeps five-target query bounds', async () => {
+  const runtime = { ...canaryRuntime, audience_mode: 'production', all_users_enabled: true, canary_user_ids: [] }
+  const backend = createDeliveryFaultBackend(() => Promise.resolve(Response.json({ data: { 'ticket-one': { status: 'ok' } } })), true, { runtime })
+  const queries: URL[] = []
+  await withWorkerMock((input, init) => {
+    const url = new URL(String(input))
+    if (url.pathname.endsWith('/notification_delivery_targets_v2') && (!init?.method || init.method === 'GET')) queries.push(url)
+    return backend.fetchMock(input, init)
+  }, async () => {
+    Deno.env.set('NOTIFICATION_DELIVERY_ENVIRONMENT', 'production')
+    const response = await handleNotificationDeliveryRequest(canaryRequest('bounded_canary', 'receipts'))
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).delivered, 1)
+  })
+  assert.equal(backend.target.status, 'delivered')
+  assert.equal(backend.calls(), 1)
+  assert.ok(queries.filter(url => url.searchParams.has('receipt_expires_at')).every(url =>
+    !url.searchParams.has('notification_installations.user_id') && Number(url.searchParams.get('limit')) <= 5))
+})
+
+Deno.test('production audience rejects a nonproduction worker environment before acquiring or sending', async () => {
+  const paths: string[] = []
+  await withWorkerMock(input => {
+    paths.push(new URL(String(input)).pathname)
+    return Promise.resolve(Response.json([{ ...canaryRuntime, audience_mode: 'production',
+      all_users_enabled: true, canary_user_ids: [] }]))
+  }, async () => {
+    const response = await handleNotificationDeliveryRequest(canaryRequest())
+    assert.equal((await response.json()).claimed, 0)
+  })
+  assert.deepEqual(paths, ['/rest/v1/notification_v2_runtime_config'])
+})
 
 Deno.test('actual scoped Expo iOS and Android dispatch bind trusted scope outside envelope and use generic OS fallback', async () => {
   for (const platform of ['ios', 'android']) {

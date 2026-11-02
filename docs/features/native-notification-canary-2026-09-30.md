@@ -1,11 +1,17 @@
 # Bounded native notification canary — September 30, 2026
 
+Current rollout: the explicit production audience is active in Demo and
+production as of November 2. The [verified activation section](#november-2-verified-bounded-production-audience-activation)
+records the current eligibility, ten-second recovery cadence and evidence.
+The September 30 and October 29 sections preserve the original named-canary
+contract; their ten-account audience limit and minute cadence are historical.
+
 This additive repair creates an independent native canary. Applying the migration
 does not enable delivery. The August containment remains: the legacy delivery,
 recovery, receipt and `pg_net` response collector jobs stay paused. The active
 bounded Web Push fallback and its schedule are unchanged.
 
-## Delivery and database bounds
+## September 30 original delivery and database bounds
 
 `20260930215719_bounded_native_notification_canary.sql` adds a private singleton
 lease, a new paused `shadowchat-native-push-canary` minute schedule, service-only
@@ -49,7 +55,7 @@ it. Explicit provider throttle/server rejection or retryable ticket errors may
 reset it to pending, within three attempts. This tradeoff is deliberate for the
 small native canary; it does not alter Web Push retry semantics.
 
-## Activation sequence and rollback
+## September 30 canary activation sequence and rollback
 
 1. Validate/apply enrollment-grant repair and bounded delivery migrations.
 2. Deploy the new `deliver-notifications-v2`. Verify its guarded health action,
@@ -73,6 +79,85 @@ small native canary; it does not alter Web Push retry semantics.
    worker/receipt gates false and empty category/canary lists. Preserve canonical
    events/read state and the active Web Push fallback. Broad rollout stays off.
 
+## November 2 verified bounded production audience activation
+
+The reviewed migration `20261102010152_bounded_native_production_audience.sql`
+separates audience eligibility from dispatch capacity. `audience_mode` defaults
+to `canary`; that mode still requires 1–10 named users and
+`all_users_enabled=false`. Production requires an explicit `production` mode,
+`all_users_enabled=true` and an empty canary list. The migration itself enables
+no runtime or schedule. Root separately applied its exact version/history,
+deployed and read back the worker, checked protected health and explicitly
+activated the production audience in Demo and production.
+
+Demo activated at `2026-11-02T01:54:00.846861Z` with Edge version 8; production
+activated at `2026-11-02T02:03:59.301786Z` with Edge version 66. Both deployments
+verified all eight source files, preserved `verify_jwt=false` with no import map,
+preserved unrelated functions and confirmed the new audience column through
+service-role PostgREST. Protected health returned HTTP 200, runtime contract 2,
+production environment and the exact delivery limits. Both explicit activations
+use all nine approved categories, empty named canaries and fresh forward
+watermarks. Exact migration statements/history were read back; unrelated
+additive account-deletion history was preserved. This status is remote backend
+evidence, independent of any later Git commit or web/native binary release.
+
+Production recipients must satisfy the existing active-member service authority,
+an undeleted/unbanned Auth row and an active owned production Expo installation
+with a valid token. Scoped installations additionally require their owned active
+credential. Token selection repeats the credential check per device and caps
+selection at two devices; a valid device cannot authorize a revoked second one.
+Legacy unscoped native registrations remain supported. Accepted receipts drain
+even after member/device revocation, while production receipt selection remains
+restricted to production installations. Due delivery and receipts alternate when
+both exist, preventing receipt starvation.
+
+The limits remain two events, two installations per event, concurrency two,
+eight seconds per worker, three seconds per provider request, three attempts and
+an initial invocation plus four continuations. Root enabled only
+`shadowchat-native-push-canary` at a ten-second cadence (Demo job 5, production
+job 7). With twenty
+simultaneously eligible recipients, a burst covers ten; remaining recipients may
+wait up to ten seconds plus worker/provider delay. No instantaneous delivery or
+APNs latency guarantee is implied. Former native collectors/recovery/receipt
+jobs remain off and Web Push recovery remains on.
+
+Local evidence: 33 focused Deno tests passed, the isolated PostgreSQL production
+suite passed, lint/typecheck/build passed, and `git diff --check` passed. The SQL
+suite covers twenty simultaneous recipients, denied memberships/installations,
+per-device credential revocation, legacy compatibility, token cap, lease-time
+revocation, enqueue recovery, receipt fairness and environment isolation,
+retained canary cap and no historical replay. One thousand idle ticks with ten
+thousand historical pending rows took 169.172 ms total and generated no new
+Vault reads or HTTP calls. The due-work plan used the production partial index.
+These are local PostgreSQL/simulated-provider measurements, not cloud latency.
+
+Build 26 physical DM/General long-history opening, read/badge clearing and
+minimize/reopen checks were accepted separately; fixtures were fully removed.
+This release changes no payload/auth/routing behavior, so those accepted phone
+checks are reused. Scoped payloads contain no actor/media or rich attachment,
+and the streamlined iOS extension clears attachments without fetching URLs.
+
+Read-only monitoring verified three observations in each environment. Demo had
+zero eligible native members and seven distinct sampled cron executions all
+succeeded. Production had one eligible native member; observations at
+`02:04:54.491218`, `02:05:29.923872` and `02:05:42.546798` UTC verified the exact
+active window, empty bounded pending/receipt samples, no worker error or lingering
+lease/reservation, and eight distinct sampled successful cron executions.
+Production recipient-indexed reads through `02:06:05.900616` UTC found no ordinary
+postactivation notification events for that eligible member. No synthetic send,
+enrollment or fixture was created by monitoring. These are bounded idle/control
+checks: this rollout did not newly exercise a live provider submission, receipt
+or OS display, and did not measure interactive auth/chat latency or cloud/APNs
+delivery time. The earlier accepted phone proof and local twenty-recipient
+provider simulation remain separate evidence.
+
+Root-only staged SQL, exact source hashes, migration/Edge/activation receipts,
+bounded monitoring evidence, rollout/stop order and exact-version helpers are under
+`output/release-evidence/native-notification-repair-20261030/production-rollout-20261102/`.
+The helpers preserve unrelated additive migration history and reject replay.
+Use the exact saved activation watermark with the guarded stop procedure; retain
+accepted ledger/user content and never enable the old collectors to drain it.
+
 ## Local validation
 
 - Deno worker tests exercise disabled/legacy action guards, shared time budget,
@@ -86,8 +171,9 @@ small native canary; it does not alter Web Push retry semantics.
 - Physical TestFlight registration, lock-screen delivery and receipt proof
   require the actual signed build and phone. Local tests do not establish them.
 
-No Git commit, push, remote migration, Edge deployment, or activation is performed
-by the implementation subtask. The parent release task owns those actions.
+The implementation lane performed local edits and read-only remote verification.
+Root executed the remote migration, Edge deployment and activation; Git commit,
+push and the wider store release remain tracked by the parent release task.
 
 ## October 29 immediate wake (isolated demo only; production held)
 
