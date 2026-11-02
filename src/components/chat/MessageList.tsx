@@ -306,6 +306,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     surfaceKey,
     readerId: profile?.id,
     initialMessageId: routeInitialMessageId,
+    hasNewer,
     restorationReady: !cursorWindowError && (!cursorWindowFetchKey || resolvedCursorWindowKey === cursorWindowFetchKey),
     renderSignal: renderWindowStart,
     getMessageId,
@@ -831,7 +832,7 @@ export const MessageList: React.FC<MessageListProps> = ({
 
     deepLinkFetchRef.current = null
     setFirstUnreadMessageId(null)
-    setAutoScroll(false)
+    if (!initialPositionReady) setAutoScroll(false)
 
     if (targetIndex < renderWindowStart) {
       setDeepLinkStatus('mounting')
@@ -862,7 +863,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
 
     // Target positioning and settling belong to the shared scroll controller.
-    if ((feedState === 'anchoredCatchup' || feedState === 'userScrolledUp') && !targetMessageId) {
+    if ((feedState === 'anchoredCatchup' || feedState === 'userScrolledUp' || feedState === 'bottomPinned') && !targetMessageId) {
       initialTargetJumpDoneRef.current = initialMessageId
       setDeepLinkStatus('settled')
     } else {
@@ -870,6 +871,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
   }, [
     feedState,
+    initialPositionReady,
     targetMessageId,
     profile?.id,
     routeInitialMessageId,

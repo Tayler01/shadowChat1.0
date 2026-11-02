@@ -1205,6 +1205,7 @@ export const DirectMessagesView: React.FC<DirectMessagesViewProps> = ({
     readerId: profile?.id,
     renderSignal: messageScrollElement,
     initialMessageId: ignoreInitialTarget ? null : initialMessageId,
+    hasNewer,
     getMessageId: getDMMessageId,
     getMessageCreatedAt: getDMMessageCreatedAt,
     getElementId: getDMMessageElementId,

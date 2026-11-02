@@ -40,6 +40,7 @@ interface UseUnreadScrollOptions<TMessage> {
   surfaceKey: string
   readerId?: string | null
   initialMessageId?: string | null
+  hasNewer?: boolean
   renderSignal?: unknown
   getMessageId: (message: TMessage) => string
   getMessageCreatedAt: (message: TMessage) => string
@@ -76,6 +77,7 @@ export function useUnreadScroll<TMessage>({
   surfaceKey,
   readerId,
   initialMessageId,
+  hasNewer = false,
   renderSignal,
   getMessageId,
   getMessageCreatedAt,
@@ -117,6 +119,8 @@ export function useUnreadScroll<TMessage>({
   onFollowingChangeRef.current = onFollowingChange
   const cursorRef = useRef(cursor)
   const messagesRef = useRef(messages)
+  const hasNewerRef = useRef(hasNewer)
+  hasNewerRef.current = hasNewer
   const loadingRef = useRef(loading)
   const cursorLoadingRef = useRef(cursorLoading)
   const restorationReadyRef = useRef(restorationReady)
@@ -412,6 +416,7 @@ export function useUnreadScroll<TMessage>({
     userScrollRef.current.touching = false
     clearTargetSettleTimer()
     initialUnreadJumpDoneRef.current = true
+    initialUnreadTargetIdRef.current = null
     setReadyScope(scopeKey)
     initialUnreadReadHoldRef.current = false
     scrollContainerToBottom(behavior)
@@ -588,22 +593,37 @@ export function useUnreadScroll<TMessage>({
     const finishRestoreTiming = beginChatTiming('restore', timingSurface)
 
     const container = containerRef.current
-    const settledAnchor = container ? captureMessageScrollAnchor(container) : null
+    // Keep the requested row itself stable. The first visible context row can
+    // stay put while media between it and the target expands below the fold.
+    const targetId = targetMessageIdRef.current
+    const target = targetId ? document.getElementById(getElementId(targetId)) : null
+    const settledAnchor = container && targetId && target instanceof HTMLElement && container.contains(target)
+      ? { id: targetId, offset: target.getBoundingClientRect().top - container.getBoundingClientRect().top }
+      : container ? captureMessageScrollAnchor(container) : null
     const settlingScope = scopeGenerationRef.current.version
     targetSettleTimerRef.current = window.setTimeout(() => {
       targetSettleTimerRef.current = null
       if (settlingScope !== scopeGenerationRef.current.version || !enabledRef.current) return
       if (container) restoreMessageScrollAnchor(container, settledAnchor)
-      updateLastObservedMessage()
       initialUnreadJumpDoneRef.current = true
       setReadyScope(scopeKey)
-      anchoredPositionRef.current = containerRef.current ? captureMessageScrollAnchor(containerRef.current) : null
+      anchoredPositionRef.current = settledAnchor
       initialUnreadTargetIdRef.current = null
-      initialUnreadReadHoldRef.current = !markAfterSettled
+      // A notification for the latest loaded message should resume the normal
+      // live feed. A centered historical window must retain its position.
+      const latest = messagesRef.current[messagesRef.current.length - 1]
+      const followTarget = Boolean(initialMessageId && targetId === initialMessageId && latest && getMessageId(latest) === targetId && !hasNewerRef.current)
+      initialUnreadReadHoldRef.current = !markAfterSettled && !followTarget
       setTargetMessageId(null)
-      setFeedState(nextState)
+      setAutoScroll(followTarget)
+      if (followTarget) {
+        scrollContainerToBottom('auto')
+        saveMessageScrollAnchor(readerId, surfaceKey, null)
+      }
+      updateLastObservedMessage()
+      setFeedState(followTarget ? 'bottomPinned' : nextState)
       finishRestoreTiming()
-      if (markAfterSettled) {
+      if (markAfterSettled || followTarget) {
         void markObservedRead(true).catch(() => undefined)
       }
     }, TARGET_SETTLE_MS)
@@ -616,9 +636,20 @@ export function useUnreadScroll<TMessage>({
     surfaceKey,
     scopeKey,
     containerRef,
+    getElementId,
+    getMessageId,
+    initialMessageId,
+    readerId,
+    scrollContainerToBottom,
+    setAutoScroll,
   ])
 
   useLayoutEffect(() => {
+    cancelFollowLatest()
+    if (markTimerRef.current !== null) {
+      window.clearTimeout(markTimerRef.current)
+      markTimerRef.current = null
+    }
     userScrollRef.current.active = false
     userScrollRef.current.touching = false
     if (userScrollSettleTimerRef.current !== null) window.clearTimeout(userScrollSettleTimerRef.current)
@@ -638,7 +669,7 @@ export function useUnreadScroll<TMessage>({
     clearTargetSettleTimer()
     anchoredPositionRef.current = null
     scrollGeometryRef.current = { height: 0, viewport: 0 }
-  }, [clearTargetSettleTimer, setAutoScroll, setFeedState, setTargetMessageId, scopeKey, initialMessageId])
+  }, [cancelFollowLatest, clearTargetSettleTimer, setAutoScroll, setFeedState, setTargetMessageId, scopeKey, initialMessageId])
 
   useEffect(() => {
     return () => {
@@ -878,7 +909,7 @@ export function useUnreadScroll<TMessage>({
         if (savedAnchor && !initialMessageId) restoreMessageScrollAnchor(container, savedAnchor)
         else scrollMessageWithinContainer(container, target, 'center')
         setAutoScroll(false)
-        completeTargetAfterSettle('anchoredCatchup', false)
+        completeTargetAfterSettle('anchoredCatchup', Boolean(initialMessageId))
       }
       return
     }

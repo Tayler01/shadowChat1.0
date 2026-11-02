@@ -3,9 +3,12 @@
 ## November 1 release work resumed
 
 The operator resumed the remaining App Store preparation and authorized the
-necessary targeted checks, preserving the full edition. The operator is not yet
-available for the physical notification test; production native delivery stays
-disabled until that check can be coordinated. No new durable goal was created.
+necessary targeted checks, preserving the full edition. No new durable goal was
+created. A later bounded production notification test confirmed DM delivery,
+destination and badge clearing; General opened correctly but did not scroll to
+the message or clear read state until the operator scrolled manually. The scroll
+regression remains a release issue. Production native delivery is disabled again
+after the test, with all legacy/native schedules still off.
 
 - Fresh Apple readback confirms PREPARE_FOR_SUBMISSION and no review submission.
   The draft now selects VALID, App Store-eligible build26; other version fields
@@ -22,7 +25,7 @@ disabled until that check can be coordinated. No new durable goal was created.
 - Fresh read-only checks show Demo already has private-only Realtime; production
   still permits public channels. All three protected Storage buckets remain
   public in each environment. Do not repeat the completed Demo Realtime change.
-- The published full edition has advanced to preserved-full source75a83ede;
+- The published full edition has advanced to preserved-full source8a7ecdbf;
   its Will and Kirk changes must be retained in any subsequent full publication.
 - A manual-only native screenshot workflow is running on a standard macOS GitHub
   runner using exact build26 native source, genuine iPhone simulator pixels and
@@ -32,8 +35,28 @@ disabled until that check can be coordinated. No new durable goal was created.
 - Creator video deletion repair is implemented locally, including ordinary
   deletion calling provider cleanup, a same-account retry notice, idempotent
   server receipts and a narrow consumed-draft reference exception. The focused
-  database checks pass84 assertions. Hosted deployment/lifecycle acceptance is
-  still pending; local checks are not live deletion proof.
+  database checks pass84 assertions. Demo migration20261101232759 and
+  shadow-pin-video v8 are deployed with exact source/history readback. Hosted
+  lifecycle acceptance now passes ordinary upload/publish/delete, lost-response
+  retry and provider404 verification, with owned fixtures cleaned. Production
+  migration20261101232759 and shadow-pin-video v103 are deployed and exact source
+  readback verified. The frontend retry/deletion changes still await publication.
+- Current full8a7/member783 compatibility passes Chromium/Pixel and WebKit/iPhone:
+  General/DM delivery, canonical reads, unread/reload, both typing scopes, signed
+  DM images and forced socket close/private rejoin. All owned fixtures and22
+  sessions were cleaned. This does not establish public/cache denial or every
+  media surface; Storage and production Realtime enforcement remain separate.
+- The notification scroll repair passes97 focused Jest cases, lint, both
+  typechecks and both builds. It keeps the requested row anchored through media
+  layout, pins latest-message notifications to the real bottom and acknowledges
+  visible messages after settling. Phone-browser runtime acceptance and
+  publication remain pending; no physical-device fix is claimed yet.
+- The production push canary created exactly two native outboxes for the operator,
+  no other native recipient, and stopped at23:51:52UTC. Both Expo receipts returned
+  ok and were reconciled while delivery stayed disabled. Exact test messages and
+  their notification records were removed and verified; the operator's real reply
+  and its conversation were preserved. Evidence:
+  `output/release-evidence/native-notification-repair-20261030/canary-resume-20261101/`.
 
 The historical pause entries below describe earlier boundaries and are superseded
 only by this resumed scope. Public submission still requires final privacy

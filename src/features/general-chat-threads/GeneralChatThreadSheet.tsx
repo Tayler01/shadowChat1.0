@@ -132,6 +132,7 @@ export function GeneralChatThreadSheet({
     autoScroll, feedState, initialPositionReady, firstUnreadMessageId, handleUnreadScroll,
     scrollToBottom, setAutoScroll, captureScrollAnchor, restoreScrollAnchor,
   } = useUnreadScroll<Message>({
+    hasNewer: thread.hasNewer,
     containerRef: scrollRef, messages: scrollMessages, cursor, cursorLoading,
     enabled: open && Boolean(threadId), readerId: user?.id, surfaceKey,
     loading: thread.loading || thread.loadedThreadId !== threadId,

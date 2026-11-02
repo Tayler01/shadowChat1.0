@@ -1,5 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
-import { useUnreadScroll } from '../src/hooks/useUnreadScroll'
+import { useUnreadScroll as useFullUnreadScroll } from '../src/hooks/useUnreadScroll'
+import { useUnreadScroll as useStreamlinedUnreadScroll } from '../apps/streamlined/src-overrides/hooks/useUnreadScroll'
 import { MOBILE_VIEWPORT_UPDATED_EVENT } from '../src/lib/mobileViewport'
 import { getSavedMessageScrollAnchor, saveMessageScrollAnchor } from '../src/lib/messageScrollAnchor'
 
@@ -63,7 +64,7 @@ const useFakeTimersWithImmediateRaf = () => {
   global.cancelAnimationFrame = cancelAnimationFrame
 }
 
-describe('useUnreadScroll', () => {
+describe.each([['full', useFullUnreadScroll], ['streamlined', useStreamlinedUnreadScroll]] as const)('%s useUnreadScroll', (_edition, useUnreadScroll) => {
   const originalRequestAnimationFrame = window.requestAnimationFrame
   const originalCancelAnimationFrame = window.cancelAnimationFrame
   const originalResizeObserver = global.ResizeObserver
@@ -82,6 +83,163 @@ describe('useUnreadScroll', () => {
     window.cancelAnimationFrame = originalCancelAnimationFrame
     global.ResizeObserver = originalResizeObserver
     jest.restoreAllMocks()
+  })
+
+  it.each(['cold', 'warm', 'same-view'] as const)('settles an exact %s notification target after hydration and follows the next live arrival', async mode => {
+    useFakeTimersWithImmediateRaf()
+    let onResize: ResizeObserverCallback | undefined
+    global.ResizeObserver = class {
+      constructor(callback: ResizeObserverCallback) { onResize = callback }
+      observe = jest.fn()
+      disconnect = jest.fn()
+    } as unknown as typeof ResizeObserver
+    const surface = document.createElement('div')
+    const container = document.createElement('div')
+    const footer = document.createElement('div')
+    footer.dataset.mobileChatFooter = 'true'
+    surface.append(container, footer)
+    document.body.appendChild(surface)
+    setScrollMetrics(container, 1400)
+    setRect(container, 0, 400)
+    setRect(footer, 240, 400)
+    let scrollTop = 0
+    Object.defineProperty(container, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (value: number) => { scrollTop = Math.max(0, Math.min(value, container.scrollHeight - container.clientHeight)) },
+    })
+    container.scrollTo = jest.fn((options: ScrollToOptions) => { container.scrollTop = options.top ?? 0 }) as typeof container.scrollTo
+    const row = document.createElement('div')
+    row.id = 'message-notification'
+    row.dataset.messageId = 'notification'
+    let rowTop = 1100
+    row.getBoundingClientRect = () => ({ top: rowTop - container.scrollTop, bottom: rowTop + 60 - container.scrollTop, height: 60 } as DOMRect)
+    const markRead = jest.fn()
+    const options = {
+      containerRef: { current: container }, cursor: null, surfaceKey: `dm:notification-${mode}`,
+      getMessageId: (message: TestMessage) => message.id, getMessageCreatedAt: (message: TestMessage) => message.created_at,
+      getElementId: (id: string) => `message-${id}`, onMarkReadToLatest: markRead,
+    }
+    const {result, rerender, unmount} = renderHook(({loading, target, messages}) => useUnreadScroll<TestMessage>({
+      ...options, loading, initialMessageId: target, messages,
+    }), {initialProps: {loading: mode === 'cold', target: mode === 'cold' ? 'notification' : undefined as string | undefined, messages: mode === 'cold' ? [] : [makeMessage('old', 1)]}})
+    act(() => {
+      if (mode !== 'cold') result.current.scrollToBottomIfFollowing()
+      if (mode === 'same-view') {
+        container.dispatchEvent(new WheelEvent('wheel', {deltaY: -40}))
+        container.scrollTop = 100
+        result.current.handleUnreadScroll()
+      }
+      rerender({loading: true, target: 'notification', messages: []})
+      jest.advanceTimersByTime(300)
+    })
+    expect(markRead).not.toHaveBeenCalled()
+    act(() => {
+      // A header near the composer is not yet a readable message bubble.
+      container.scrollTop = 976
+      container.appendChild(row)
+      rerender({loading: false, target: 'notification', messages: [makeMessage('notification', 2)]})
+    })
+    act(() => {
+      // Upstream media grows after the first positioning pass.
+      rowTop += 160
+      setScrollMetrics(container, 1560)
+      jest.advanceTimersByTime(180)
+    })
+    expect(result.current.initialPositionReady).toBe(true)
+    expect(result.current.autoScroll).toBe(true)
+    expect(container.scrollTop).toBe(1160)
+    // Intersection with the scrollport alone is insufficient: the complete
+    // newest bubble must be above its owning fixed composer/navigation.
+    expect(row.getBoundingClientRect().bottom).toBeLessThanOrEqual(footer.getBoundingClientRect().top)
+    await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve() })
+    expect(markRead).toHaveBeenCalledWith(makeMessage('notification', 2))
+    act(() => {
+      // A preview/attachment can finish after the initial target settle timer.
+      rowTop += 120
+      setScrollMetrics(container, 1680)
+      onResize?.([], {} as ResizeObserver)
+    })
+    expect(row.getBoundingClientRect().bottom).toBeLessThanOrEqual(footer.getBoundingClientRect().top)
+    act(() => {
+      setScrollMetrics(container, 1780)
+      rerender({loading: false, target: 'notification', messages: [makeMessage('notification', 2), makeMessage('live', 3)]})
+    })
+    expect(container.scrollTop).toBe(1380)
+    unmount()
+    surface.remove()
+  })
+
+  it('keeps an exact history target through delayed media without following newer history or overriding a swipe', async () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 2000)
+    setRect(container, 0, 400)
+    const oldRow = document.createElement('div')
+    oldRow.id = 'message-context'
+    oldRow.dataset.messageId = 'context'
+    oldRow.getBoundingClientRect = () => ({top: 500 - container.scrollTop, bottom: 750 - container.scrollTop, height: 250} as DOMRect)
+    const target = document.createElement('div')
+    target.id = 'message-history'
+    target.dataset.messageId = 'history'
+    let targetTop = 750
+    target.getBoundingClientRect = () => ({top: targetTop - container.scrollTop, bottom: targetTop + 60 - container.scrollTop, height: 60} as DOMRect)
+    container.append(oldRow, target)
+    const markRead = jest.fn()
+    const options = {
+      containerRef: {current: container}, messages: [makeMessage('context', 1), makeMessage('history', 2)], cursor: null,
+      surfaceKey: 'general_chat:history-notification', initialMessageId: 'history', hasNewer: true,
+      getMessageId: (message: TestMessage) => message.id, getMessageCreatedAt: (message: TestMessage) => message.created_at,
+      getElementId: (id: string) => `message-${id}`, onMarkReadToLatest: markRead,
+    }
+    const {result, unmount} = renderHook(() => useUnreadScroll<TestMessage>(options))
+    act(() => { targetTop += 300; jest.advanceTimersByTime(180) })
+    expect(target.getBoundingClientRect().top).toBe(170)
+    expect(result.current.autoScroll).toBe(false)
+    await act(async () => { jest.advanceTimersByTime(300); await Promise.resolve() })
+    expect(markRead).toHaveBeenCalledWith(options.messages[1])
+    act(() => {
+      container.dispatchEvent(new WheelEvent('wheel', {deltaY: -100}))
+      container.scrollTop = 100
+      result.current.handleUnreadScroll()
+      targetTop += 200
+      jest.advanceTimersByTime(1000)
+    })
+    expect(container.scrollTop).toBe(100)
+    expect(result.current.autoScroll).toBe(false)
+    unmount()
+    container.remove()
+  })
+
+  it('continues following incoming messages after an own-send jump cancels unread targeting', () => {
+    useFakeTimersWithImmediateRaf()
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    setScrollMetrics(container, 1400)
+    setRect(container, 0, 400)
+    container.scrollTo = jest.fn((options: ScrollToOptions) => { container.scrollTop = options.top ?? 0 }) as typeof container.scrollTo
+    const row = document.createElement('div')
+    row.id = 'message-unread'
+    row.dataset.messageId = 'unread'
+    row.getBoundingClientRect = () => ({top: 800 - container.scrollTop, bottom: 860 - container.scrollTop, height: 60} as DOMRect)
+    container.appendChild(row)
+    const containerRef = {current: container}
+    const {result, rerender, unmount} = renderHook(({messages}) => useUnreadScroll<TestMessage>({
+      containerRef, messages, cursor: makeCursor('old', 1), surfaceKey: 'dm:send-during-unread',
+      getMessageId: message => message.id, getMessageCreatedAt: message => message.created_at,
+      getElementId: id => `message-${id}`, onMarkReadToLatest: jest.fn(),
+    }), {initialProps: {messages: [makeMessage('unread', 2)]}})
+    expect(result.current.feedState).toBe('layoutSettling')
+    act(() => result.current.scrollToBottom('auto'))
+    act(() => {
+      setScrollMetrics(container, 1500)
+      rerender({messages: [makeMessage('unread', 2), makeMessage('live-after-send', 3)]})
+    })
+    expect(result.current.autoScroll).toBe(true)
+    expect(container.scrollTop).toBe(1100)
+    unmount()
+    container.remove()
   })
 
   it('bottom-pins cached messages during reconnect after cursor state is known', async () => {
