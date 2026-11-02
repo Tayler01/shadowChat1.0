@@ -33,6 +33,35 @@ const nativeProduct = () => {
   }
   return { device, appPath, plist };
 };
+const signSimulatorForKeychain = appPath => {
+  // Restore Build26's original public signing identity/notification entitlements
+  // on this disposable simulator copy. No certificate or source rebuild is used.
+  const team = json(join(mobile, 'eas.json')).submit.production.ios.appleTeamId;
+  if (!/^[A-Z0-9]{10}$/.test(team)) throw new Error('Unexpected original Apple team identifier.');
+  const original = json(join(mobile, 'app.json')).expo.ios.entitlements;
+  const entitlements = { ...original,
+    'application-identifier': `${team}.${bundle}`, 'com.apple.developer.team-identifier': team,
+    'aps-environment': 'production', 'beta-reports-active': true, 'get-task-allow': false,
+    'keychain-access-groups': [`${team}.${bundle}`],
+  };
+  const signingFile = join(root, 'simulator-entitlements.plist');
+  const xml = Object.entries(entitlements).map(([key, value]) => `<key>${key}</key>${
+    typeof value === 'boolean' ? `<${value}/>` : Array.isArray(value)
+      ? `<array>${value.map(item => `<string>${item}</string>`).join('')}</array>` : `<string>${value}</string>`
+  }`).join('');
+  writeFileSync(signingFile, `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>${xml}</dict></plist>\n`);
+  const executable = command('/usr/libexec/PlistBuddy', ['-c', 'Print :CFBundleExecutable', join(appPath, 'Info.plist')]);
+  const unsignedExecutableSha256 = hash(join(appPath, executable));
+  const bundleSha256 = hash(join(appPath, 'main.jsbundle'));
+  command('codesign', ['--force', '--sign', '-', '--entitlements', signingFile, '--generate-entitlement-der', appPath]);
+  if (hash(join(appPath, 'main.jsbundle')) !== bundleSha256) throw new Error('Signing changed the original embedded JavaScript bundle.');
+  const state = { mode: 'local-ad-hoc-simulator-only', originalTeam: team, originalApplicationIdentifier: `${team}.${bundle}`,
+    originalNotificationEntitlementsPreserved: true, explicitDefaultKeychainGroup: `${team}.${bundle}`,
+    certificateOrPurchaseUsed: false, shippingSourceChanged: false, unsignedExecutableSha256,
+    signedExecutableSha256: hash(join(appPath, executable)), embeddedBundleSha256: bundleSha256 };
+  writeJson(join(root, 'simulator-signing-state.json'), state);
+  return state;
+};
 
 if (process.argv[2] === 'prepare') {
   if (process.platform !== 'darwin') throw new Error('A genuine macOS/Xcode simulator host is required.');
@@ -75,6 +104,7 @@ if (process.argv[2] === 'prepare') {
   const { device, appPath } = nativeProduct();
   const diagnostics = join(root, 'entry-diagnostics');
   mkdirSync(diagnostics, { recursive: true });
+  signSimulatorForKeychain(appPath);
   sim(['install', device.id, appPath]);
   command('open', ['-a', 'Simulator', '--args', '-CurrentDeviceUDID', device.id]);
   sim(['launch', device.id, bundle]);
@@ -87,6 +117,9 @@ if (process.argv[2] === 'prepare') {
     '--debug-output', join(diagnostics, 'private-debug'), '--test-output-dir', join(diagnostics, 'private-output'), join(diagnostics, 'entry.yaml')],
   { cwd: diagnostics, env: process.env, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 240000 });
   writeFileSync(join(diagnostics, 'credential-free-entry.txt'), `${result.stdout || ''}\n${result.stderr || ''}`);
+  const consoleResult = spawnSync('xcrun', ['simctl', 'spawn', device.id, 'log', 'show', '--style', 'compact', '--last', '5m',
+    '--predicate', 'process == "ShadoChat"'], { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024, timeout: 20000 });
+  writeFileSync(join(diagnostics, 'credential-free-native-console.txt'), (consoleResult.stdout || consoleResult.stderr || '').slice(-24000));
   sim(['io', device.id, 'screenshot', join(diagnostics, 'native-after-entry.png')]);
   writeJson(join(root, 'entry-probe-result.json'), { simulatorId: device.id, passed: result.status === 0, exitCode: result.status,
     at: new Date().toISOString(), credentialsSupplied: false, genuineNativeFramebuffer: true });
@@ -189,6 +222,7 @@ if (process.argv[2] === 'prepare') {
     nativeSourceSha: sourceSha, bundleIdentifier: bundle, version: plist('CFBundleShortVersionString'), build: '26',
     executableSha256: hash(join(appPath, plist('CFBundleExecutable'))),
     embeddedBundleSha256: hash(join(appPath, 'main.jsbundle')),
+    simulatorSigning: existsSync(join(root, 'simulator-signing-state.json')) ? json(join(root, 'simulator-signing-state.json')) : null,
     simulator: device, xcode: command('xcodebuild', ['-version']),
     community: 'isolated synthetic demo', webOrigin: 'https://shadowchat-review-demo.netlify.app',
     sessionCleanup: 'UI sign-out verified', runId: process.env.GITHUB_RUN_ID, files,

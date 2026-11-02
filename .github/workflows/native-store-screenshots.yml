@@ -157,7 +157,9 @@ jobs:
             ${{ env.NATIVE_CAPTURE_ROOT }}/entry-diagnostics/native-before-entry.png
             ${{ env.NATIVE_CAPTURE_ROOT }}/entry-diagnostics/native-after-entry.png
             ${{ env.NATIVE_CAPTURE_ROOT }}/entry-diagnostics/credential-free-entry.txt
+            ${{ env.NATIVE_CAPTURE_ROOT }}/entry-diagnostics/credential-free-native-console.txt
             ${{ env.NATIVE_CAPTURE_ROOT }}/entry-probe-result.json
+            ${{ env.NATIVE_CAPTURE_ROOT }}/simulator-signing-state.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Destroy only this job's disposable simulator
