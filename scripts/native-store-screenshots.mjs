@@ -1,5 +1,5 @@
 // Capture real iOS simulator pixels. This helper never patches the shipping app.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { resolve, join } from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
@@ -128,24 +128,36 @@ if (process.argv[2] === 'prepare') {
   if (!entryReady) sim(['install', device.id, appPath]);
   const maestro = join(root, 'tooling/maestro/bin/maestro');
   if (!existsSync(maestro)) throw new Error('Pinned Maestro installation missing.');
-  const signout = [{ tapOn: { text: 'Back to direct messages', optional: true } }, tap('Settings'), wait('Account'), tap('Account'), wait('Sign out'), tap('Sign out'), wait('Enter your email')];
+  const signout = [{ tapOn: { text: 'Back to direct messages', optional: true } },
+    { tapOn: { text: 'Back to Shado Pin', optional: true } },
+    tap('Settings'), wait('Account'), tap('Account'), wait('Sign out'), tap('Sign out'), wait('Enter your email')];
   flow(join(privateDir, 'entry.yaml'), [
     { launchApp: { clearState: true } }, wait('Demo community'), tap('Demo community'), wait('Enter your email'),
   ]);
-  flow(join(privateDir, 'login.yaml'), [
+  const continueText = 'Continue to ShadowChat';
+  flow(join(privateDir, 'capture.yaml'), [
     tap('Enter your email'), { inputText: { text: '${MAESTRO_SCREENSHOT_EMAIL}', label: 'Enter dedicated synthetic screenshot account email' } },
     tap('Enter your password'), { inputText: { text: '${MAESTRO_SCREENSHOT_PASSWORD}', label: 'Enter dedicated synthetic screenshot account password' } }, { hideKeyboard: {} },
     { tapOn: { text: 'Sign in', below: { text: 'Password' } } },
+    // Wait for either the real policy gate or loaded Chat before branching.
+    wait(`(${required('CAPTURE_CHAT_MARKER')})|${continueText}`),
+    { runFlow: { when: { visible: { text: continueText } }, commands: [
+      { tapOn: { text: 'I am 18 or older', optional: true } },
+      tap('I agree to the.*'), tap('I have read and acknowledge the.*'), tap(continueText),
+    ] } },
     wait('${MAESTRO_CAPTURE_CHAT_MARKER}'), { waitForAnimationToEnd: {} },
     { assertNotVisible: 'Enter your email' }, { assertNotVisible: 'Enter your password' },
-  ]);
-  flow(join(privateDir, 'pins.yaml'), [
-    tap('ShadowPin(, .* unread)?'), wait('${MAESTRO_CAPTURE_PIN_MARKER}'), { waitForAnimationToEnd: {} },
-  ]);
-  flow(join(privateDir, 'dms.yaml'), [
+    // Native screen pixels are captured INSIDE one uninterrupted app/UI flow.
+    // Maestro2.12 requires relative artifact paths, never absolute paths.
+    { takeScreenshot: '01-chat' },
+    tap('ShadowPin(, .* unread)?'), { tapOn: { text: 'Discover', optional: true } },
+    wait('Demo Inspiration'), tap('Demo Inspiration'),
+    wait('${MAESTRO_CAPTURE_PIN_MARKER}'), { waitForAnimationToEnd: {} },
+    { takeScreenshot: '02-shadowpin' }, tap('Back to Shado Pin'),
     tap('DMs(, .* unread)?'), wait('${MAESTRO_CAPTURE_DM_MARKER}'), { waitForAnimationToEnd: {} },
     tap('${MAESTRO_CAPTURE_DM_MARKER}'), wait('Hello from the review account\\. This private conversation is part of the demo\\.'),
     { waitForAnimationToEnd: {} },
+    { takeScreenshot: '03-direct-messages' }, ...signout,
   ]);
   flow(join(privateDir, 'signout.yaml'), signout);
   // Pinned Maestro only injects MAESTRO_* shell variables into flows. Credentials
@@ -160,7 +172,7 @@ if (process.argv[2] === 'prepare') {
   const run = (file, phase) => {
     record(phase, 'started');
     const result = spawnSync(maestro, ['--device', device.id, 'test', '--debug-output', join(privateDir, 'debug'), '--test-output-dir', join(privateDir, 'test-output'), file],
-      { cwd: privateDir, env: childEnv, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 480000 });
+      { cwd: privateDir, env: childEnv, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 720000 });
     // Classify failures without exporting CLI text, hierarchy, commands or input values.
     const output = `${result.stdout || ''}\n${result.stderr || ''}`;
     const classification = result.status === 0 ? 'passed'
@@ -172,23 +184,46 @@ if (process.argv[2] === 'prepare') {
     record(phase, result.status === 0 ? 'passed' : 'failed', { exitCode: result.status, classification });
     return result;
   };
+  const captureNames = ['01-chat.png', '02-shadowpin.png', '03-direct-messages.png'];
+  const collectCaptures = () => {
+    const discovered = [];
+    const visit = dir => {
+      if (!existsSync(dir)) return;
+      for (const item of readdirSync(dir, { withFileTypes: true })) {
+        if (item.isSymbolicLink()) continue;
+        const path = join(dir, item.name);
+        if (item.isDirectory()) visit(path);
+        else if (captureNames.includes(item.name)) discovered.push(path);
+      }
+    };
+    visit(join(privateDir, 'test-output'));
+    for (const name of captureNames) {
+      const matches = discovered.filter(path => path.endsWith(`/${name}`));
+      if (matches.length > 1) throw new Error('Ambiguous native screenshot artifact.');
+      if (matches.length === 1) copyFileSync(matches[0], join(final, name));
+    }
+    return captureNames.filter(name => existsSync(join(final, name))).map(name => ({ name, sha256: hash(join(final, name)) }));
+  };
   let authenticationStarted = false;
+  let uiSignOutVerified = false;
   try {
     if (entryReady) record('entry-before-credentials', 'passed-via-separate-no-credential-probe');
     else if (run(join(privateDir, 'entry.yaml'), 'entry-before-credentials').status !== 0) throw new Error('Native entry flow failed.');
-    for (const [name, filename] of [['login', '01-chat.png'], ['pins', '02-shadowpin.png'], ['dms', '03-direct-messages.png']]) {
-      if (name === 'login') authenticationStarted = true;
-      if (run(join(privateDir, `${name}.yaml`), name).status !== 0) throw new Error(`Native ${name} screen did not reach its synthetic-content assertion.`);
-      // simctl reads the actual foreground simulator framebuffer; no browser capture or resizing.
-      sim(['io', device.id, 'screenshot', join(final, filename)]);
-    }
-    if (run(join(privateDir, 'signout.yaml'), 'signout').status !== 0) throw new Error('UI sign-out verification failed.');
+    authenticationStarted = true;
+    if (run(join(privateDir, 'capture.yaml'), 'continuous-native-capture-and-signout').status !== 0) throw new Error('Native content capture or sign-out failed.');
+    uiSignOutVerified = true;
   } catch {
     const cleanup = authenticationStarted ? run(join(privateDir, 'signout.yaml'), 'failure-signout') : null;
     if (!cleanup) record('failure-signout', 'not-needed-before-credentials');
     const cleanupStatus = !cleanup ? 'not needed before credentials' : cleanup.status === 0 ? 'passed' : 'requires exact session reconciliation';
     throw new Error(`Native capture failed; no screenshot artifacts uploaded. UI sign-out cleanup ${cleanupStatus}. No private diagnostics are uploaded.`);
   } finally {
+    const captured = collectCaptures();
+    writeJson(join(final, 'review-provenance.json'), { runId: process.env.GITHUB_RUN_ID, nativeSourceSha: sourceSha,
+      bundleIdentifier: bundle, build: '26', simulator: device, captured,
+      method: 'genuine native simulator screenshots within one continuous Maestro app flow',
+      expectedPolicyVersion: '2026-11-01.1', uiSignOutVerified, reviewOnlyUntilAllChecksPass: true,
+      noBrowserCapture: true, noCropResizeOrRendering: true });
     // Maestro can include resolved input commands in diagnostics. These are never
     // deliverables; remove the exact directory this helper created after sign-out.
     if (resolve(privateDir) !== join(root, 'private')) throw new Error('Unsafe diagnostic cleanup target.');
@@ -204,6 +239,7 @@ if (process.argv[2] === 'prepare') {
   });
   writeJson(join(final, 'provenance.json'), {
     capturedAt: new Date().toISOString(), kind: 'native-iOS-simulator-Release',
+    captureMethod: 'native screenshot within continuous Maestro app flow', expectedPolicyVersion: '2026-11-01.1',
     nativeSourceSha: sourceSha, bundleIdentifier: bundle, version: plist('CFBundleShortVersionString'), build: '26',
     executableSha256: hash(join(appPath, plist('CFBundleExecutable'))),
     embeddedBundleSha256: hash(join(appPath, 'main.jsbundle')),

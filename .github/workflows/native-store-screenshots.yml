@@ -140,6 +140,20 @@ jobs:
           path: ${{ env.NATIVE_CAPTURE_ROOT }}/build.log
           if-no-files-found: ignore
           retention-days: 7
+      - name: Retain only marker-verified native partials for review after failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-only-native-partials-${{ github.run_id }}
+          # These names are generated only AFTER successful loaded-content
+          # assertions. Login forms/private diagnostics are never included.
+          path: |
+            ${{ env.NATIVE_CAPTURE_ROOT }}/final/01-chat.png
+            ${{ env.NATIVE_CAPTURE_ROOT }}/final/02-shadowpin.png
+            ${{ env.NATIVE_CAPTURE_ROOT }}/final/03-direct-messages.png
+            ${{ env.NATIVE_CAPTURE_ROOT }}/final/review-provenance.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Retain credential-free capture phase status
         if: always()
         uses: actions/upload-artifact@v4
