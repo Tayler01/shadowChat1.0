@@ -50,7 +50,13 @@ after the test, with all legacy/native schedules still off.
   typechecks and both builds. It keeps the requested row anchored through media
   layout, pins latest-message notifications to the real bottom and acknowledges
   visible messages after settling. Phone-browser runtime acceptance and
-  publication remain pending; no physical-device fix is claimed yet.
+  publication are complete for member and demo: sourcecde36bb0, deploys
+  `6ae7d8eff8fd8359399bc660` and `6ae7d9858403f940b4109af1`. Eight isolated
+  phone-runtime paths passed; live member login/Settings/inbox and demo iPhone
+  General/DM checks also passed with cleanup verified. No physical-device fix is
+  claimed yet. Full publication remains held for its initial bundle budget; a
+  two-file lazy setup-card extraction passes the unchanged strict limits and
+  preserves its controller, copy and callbacks, but is not published.
 - The production push canary created exactly two native outboxes for the operator,
   no other native recipient, and stopped at23:51:52UTC. Both Expo receipts returned
   ok and were reconciled while delivery stayed disabled. Exact test messages and
