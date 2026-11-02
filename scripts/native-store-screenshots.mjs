@@ -35,6 +35,10 @@ if (process.argv[2] === 'prepare') {
     if (!/^[A-Z_]+$/.test(key) || /[\r\n']/.test(value)) throw new Error('Invalid public build configuration.');
     return `${key}='${value}'`;
   }).join('\n') + '\n', { mode: 0o600 });
+  const cacheKey = `native-store-build26-v1-${createHash('sha256').update(JSON.stringify({
+    sourceSha, env, node: process.version, xcode: command('xcodebuild', ['-version']), arch: command('uname', ['-m']),
+  })).digest('hex')}`;
+  appendFileSync(required('GITHUB_OUTPUT'), `cache-key=${cacheKey}\n`);
   const devices = JSON.parse(sim(['list', 'devicetypes', '--json'])).devicetypes;
   const device = ['iPhone 17 Pro Max', 'iPhone 16 Pro Max'].map(name => devices.find(d => d.name === name)).find(Boolean);
   if (!device) throw new Error('No supported 6.9-inch iPhone simulator type installed.');
@@ -53,7 +57,7 @@ if (process.argv[2] === 'prepare') {
   required('NATIVE_SCREENSHOT_EMAIL'); required('NATIVE_SCREENSHOT_PASSWORD');
   required('CAPTURE_CHAT_MARKER'); required('CAPTURE_PIN_MARKER'); required('CAPTURE_DM_MARKER');
   const device = json(join(root, 'simulator.json'));
-  const productDir = join(root, 'DerivedData/Build/Products/Release-iphonesimulator');
+  const productDir = process.env.NATIVE_SIMULATOR_PRODUCT || join(root, 'DerivedData/Build/Products/Release-iphonesimulator');
   const app = readdirSync(productDir).find(name => name.endsWith('.app') && !name.includes('Tests'));
   if (!app) throw new Error('Native Release simulator app missing.');
   const appPath = join(productDir, app);
@@ -64,38 +68,73 @@ if (process.argv[2] === 'prepare') {
   }
   const final = join(root, 'final');
   const privateDir = join(root, 'private');
+  const safeStatus = { runId: process.env.GITHUB_RUN_ID, nativeSourceSha: sourceSha, phases: [] };
+  const record = (phase, status, extra = {}) => {
+    safeStatus.phases.push({ phase, status, at: new Date().toISOString(), ...extra });
+    writeJson(join(root, 'safe-capture-status.json'), safeStatus);
+    console.log(`Native capture phase ${phase}: ${status}`);
+  };
   mkdirSync(final, { recursive: true }); mkdirSync(privateDir, { recursive: true, mode: 0o700 });
   sim(['install', device.id, appPath]);
   const maestro = join(root, 'tooling/maestro/bin/maestro');
   if (!existsSync(maestro)) throw new Error('Pinned Maestro installation missing.');
   const signout = [tap('Settings'), wait('Account'), tap('Account'), wait('Sign out'), tap('Sign out'), wait('Enter your email')];
-  flow(join(privateDir, 'login.yaml'), [
+  flow(join(privateDir, 'entry.yaml'), [
     { launchApp: { clearState: true } }, wait('Demo community'), tap('Demo community'), wait('Enter your email'),
-    tap('Enter your email'), { inputText: { text: '${NATIVE_SCREENSHOT_EMAIL}', label: 'Enter dedicated synthetic screenshot account email' } },
-    tap('Enter your password'), { inputText: { text: '${NATIVE_SCREENSHOT_PASSWORD}', label: 'Enter dedicated synthetic screenshot account password' } }, { hideKeyboard: {} },
+  ]);
+  flow(join(privateDir, 'login.yaml'), [
+    tap('Enter your email'), { inputText: { text: '${MAESTRO_SCREENSHOT_EMAIL}', label: 'Enter dedicated synthetic screenshot account email' } },
+    tap('Enter your password'), { inputText: { text: '${MAESTRO_SCREENSHOT_PASSWORD}', label: 'Enter dedicated synthetic screenshot account password' } }, { hideKeyboard: {} },
     { tapOn: { text: 'Sign in', below: { text: 'Password' } } },
-    wait('${CAPTURE_CHAT_MARKER}'), { waitForAnimationToEnd: {} },
+    wait('${MAESTRO_CAPTURE_CHAT_MARKER}'), { waitForAnimationToEnd: {} },
     { assertNotVisible: 'Enter your email' }, { assertNotVisible: 'Enter your password' },
   ]);
   flow(join(privateDir, 'pins.yaml'), [
-    tap('ShadowPin(, .* unread)?'), wait('${CAPTURE_PIN_MARKER}'), { waitForAnimationToEnd: {} },
+    tap('ShadowPin(, .* unread)?'), wait('${MAESTRO_CAPTURE_PIN_MARKER}'), { waitForAnimationToEnd: {} },
   ]);
   flow(join(privateDir, 'dms.yaml'), [
-    tap('DMs(, .* unread)?'), wait('${CAPTURE_DM_MARKER}'), { waitForAnimationToEnd: {} },
+    tap('DMs(, .* unread)?'), wait('${MAESTRO_CAPTURE_DM_MARKER}'), { waitForAnimationToEnd: {} },
   ]);
   flow(join(privateDir, 'signout.yaml'), signout);
-  const run = file => spawnSync(maestro, ['--device', device.id, 'test', '--debug-output', join(privateDir, 'debug'), '--test-output-dir', join(privateDir, 'test-output'), file],
-    { cwd: privateDir, env: process.env, stdio: 'ignore', timeout: 480000 });
+  // Pinned Maestro only injects MAESTRO_* shell variables into flows. Credentials
+  // stay in child-process environment; they never become CLI arguments.
+  const childEnv = { ...process.env,
+    MAESTRO_SCREENSHOT_EMAIL: required('NATIVE_SCREENSHOT_EMAIL'),
+    MAESTRO_SCREENSHOT_PASSWORD: required('NATIVE_SCREENSHOT_PASSWORD'),
+    MAESTRO_CAPTURE_CHAT_MARKER: required('CAPTURE_CHAT_MARKER'),
+    MAESTRO_CAPTURE_PIN_MARKER: required('CAPTURE_PIN_MARKER'),
+    MAESTRO_CAPTURE_DM_MARKER: required('CAPTURE_DM_MARKER'),
+  };
+  const run = (file, phase) => {
+    record(phase, 'started');
+    const result = spawnSync(maestro, ['--device', device.id, 'test', '--debug-output', join(privateDir, 'debug'), '--test-output-dir', join(privateDir, 'test-output'), file],
+      { cwd: privateDir, env: childEnv, encoding: 'utf8', maxBuffer: 8 * 1024 * 1024, timeout: 480000 });
+    // Classify failures without exporting CLI text, hierarchy, commands or input values.
+    const output = `${result.stdout || ''}\n${result.stderr || ''}`;
+    const classification = result.status === 0 ? 'passed'
+      : /ReferenceError|is not defined/.test(output) ? 'missing-flow-variable'
+      : /Parsing Failed|parse.*error|UnrecognizedProperty|Unknown.*command/i.test(output) ? 'flow-parse-error'
+      : /Assertion.*fail|not visible|not found|Unable to find|No visible element/i.test(output) ? 'element-or-content-not-found'
+      : /driver.*(fail|error)|xcodebuild.*(fail|error)|Failed to.*(driver|device)/i.test(output) ? 'native-driver-error'
+      : result.error?.code === 'ETIMEDOUT' ? 'phase-timeout' : 'unclassified-cli-failure';
+    record(phase, result.status === 0 ? 'passed' : 'failed', { exitCode: result.status, classification });
+    return result;
+  };
+  let authenticationStarted = false;
   try {
+    if (run(join(privateDir, 'entry.yaml'), 'entry-before-credentials').status !== 0) throw new Error('Native entry flow failed.');
     for (const [name, filename] of [['login', '01-chat.png'], ['pins', '02-shadowpin.png'], ['dms', '03-direct-messages.png']]) {
-      if (run(join(privateDir, `${name}.yaml`)).status !== 0) throw new Error(`Native ${name} screen did not reach its synthetic-content assertion.`);
+      if (name === 'login') authenticationStarted = true;
+      if (run(join(privateDir, `${name}.yaml`), name).status !== 0) throw new Error(`Native ${name} screen did not reach its synthetic-content assertion.`);
       // simctl reads the actual foreground simulator framebuffer; no browser capture or resizing.
       sim(['io', device.id, 'screenshot', join(final, filename)]);
     }
-    if (run(join(privateDir, 'signout.yaml')).status !== 0) throw new Error('UI sign-out verification failed.');
+    if (run(join(privateDir, 'signout.yaml'), 'signout').status !== 0) throw new Error('UI sign-out verification failed.');
   } catch {
-    const cleanup = run(join(privateDir, 'signout.yaml'));
-    throw new Error(`Native capture failed; no screenshot artifacts uploaded. UI sign-out cleanup ${cleanup.status === 0 ? 'passed' : 'requires exact session reconciliation'}. No private diagnostics are uploaded.`);
+    const cleanup = authenticationStarted ? run(join(privateDir, 'signout.yaml'), 'failure-signout') : null;
+    if (!cleanup) record('failure-signout', 'not-needed-before-credentials');
+    const cleanupStatus = !cleanup ? 'not needed before credentials' : cleanup.status === 0 ? 'passed' : 'requires exact session reconciliation';
+    throw new Error(`Native capture failed; no screenshot artifacts uploaded. UI sign-out cleanup ${cleanupStatus}. No private diagnostics are uploaded.`);
   } finally {
     // Maestro can include resolved input commands in diagnostics. These are never
     // deliverables; remove the exact directory this helper created after sign-out.

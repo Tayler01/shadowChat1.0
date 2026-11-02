@@ -29,10 +29,11 @@ jobs:
     # Public repositories use the free STANDARD runner, never a larger runner.
     if: github.repository == 'Tayler01/shadowChat1.0' && !github.event.repository.private
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       NATIVE_SOURCE_SHA: 6d3296433fe3be45da48bb4074b76d942f0770d3
       NATIVE_CAPTURE_ROOT: /tmp/shadowchat-native-${{ github.run_id }}-${{ github.run_attempt }}
+      NATIVE_SIMULATOR_PRODUCT: ${{ github.workspace }}/output/native-simulator-product
       MAESTRO_VERSION: cli-2.12.0
       MAESTRO_SHA256: a6044a84542f522f434c5dc3d609e60c7446d423f3ed1b2ae513f5c48663ec5e
     steps:
@@ -49,14 +50,23 @@ jobs:
         with:
           node-version: 24.15.0
       - name: Prepare exact Build 26 configuration and simulator
+        id: prepare
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ vars.MOBILE_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.MOBILE_SUPABASE_ANON_KEY }}
         run: node scripts/native-store-screenshots.mjs prepare
+      - name: Restore exact pre-authentication native simulator product
+        id: native-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: output/native-simulator-product
+          key: ${{ steps.prepare.outputs.cache-key }}
       - name: Install existing locked native dependencies
+        if: steps.native-cache.outputs.cache-hit != 'true'
         working-directory: native-source/apps/mobile
         run: npm ci
       - name: Generate native project and compile a genuine Release simulator app
+        if: steps.native-cache.outputs.cache-hit != 'true'
         working-directory: native-source/apps/mobile
         shell: bash
         run: |
@@ -71,6 +81,15 @@ jobs:
             -destination "platform=iOS Simulator,id=$NATIVE_SIMULATOR_ID" \
             -derivedDataPath "$NATIVE_CAPTURE_ROOT/DerivedData" \
             CODE_SIGNING_ALLOWED=NO build > "$NATIVE_CAPTURE_ROOT/build.log" 2>&1
+          mkdir -p "$NATIVE_SIMULATOR_PRODUCT"
+          ditto "$NATIVE_CAPTURE_ROOT/DerivedData/Build/Products/Release-iphonesimulator/ShadoChat.app" \
+            "$NATIVE_SIMULATOR_PRODUCT/ShadoChat.app"
+      - name: Cache only the exact compiled app before any screenshot authentication
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: output/native-simulator-product
+          key: ${{ steps.prepare.outputs.cache-key }}
       - name: Install pinned capture tooling
         shell: bash
         run: |
@@ -110,6 +129,16 @@ jobs:
           # Generated before any screenshot login secret enters a process.
           # Never upload private/ or Maestro diagnostics, including on failure.
           path: ${{ env.NATIVE_CAPTURE_ROOT }}/build.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Retain credential-free capture phase status
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-capture-phase-status-${{ github.run_id }}
+          # Only helper-created phase names, timestamps and enumerated failure
+          # classes. No Maestro output, screenshots, hierarchy or commands.
+          path: ${{ env.NATIVE_CAPTURE_ROOT }}/safe-capture-status.json
           if-no-files-found: ignore
           retention-days: 7
       - name: Destroy only this job's disposable simulator
