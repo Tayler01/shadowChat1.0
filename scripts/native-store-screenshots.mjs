@@ -135,15 +135,17 @@ if (process.argv[2] === 'prepare') {
     { launchApp: { clearState: true } }, wait('Demo community'), tap('Demo community'), wait('Enter your email'),
   ]);
   const continueText = 'Continue to ShadowChat';
+  const policyHeading = 'Before you continue';
   flow(join(privateDir, 'capture.yaml'), [
     tap('Enter your email'), { inputText: { text: '${MAESTRO_SCREENSHOT_EMAIL}', label: 'Enter dedicated synthetic screenshot account email' } },
     tap('Enter your password'), { inputText: { text: '${MAESTRO_SCREENSHOT_PASSWORD}', label: 'Enter dedicated synthetic screenshot account password' } }, { hideKeyboard: {} },
     { tapOn: { text: 'Sign in', below: { text: 'Password' } } },
     // Wait for either the real policy gate or loaded Chat before branching.
-    wait(`(${required('CAPTURE_CHAT_MARKER')})|${continueText}`),
-    { runFlow: { when: { visible: { text: continueText } }, commands: [
+    wait(`(${required('CAPTURE_CHAT_MARKER')})|${policyHeading}`),
+    { runFlow: { when: { visible: { text: policyHeading } }, commands: [
       { tapOn: { text: 'I am 18 or older', optional: true } },
-      tap('I agree to the.*'), tap('I have read and acknowledge the.*'), tap(continueText),
+      tap('I agree to the.*'), tap('I have read and acknowledge the.*'),
+      { scrollUntilVisible: { element: { text: continueText }, direction: 'DOWN', timeout: 20000 } }, tap(continueText),
     ] } },
     wait('${MAESTRO_CAPTURE_CHAT_MARKER}'), { waitForAnimationToEnd: {} },
     { assertNotVisible: 'Enter your email' }, { assertNotVisible: 'Enter your password' },
