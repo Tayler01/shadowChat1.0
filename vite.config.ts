@@ -11,6 +11,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     define: {
+      __SHADOWCHAT_STREAMLINED_EDITION__: 'false',
       __SHADOWCHAT_BOARDS_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_BOARDS')),
       __SHADOWCHAT_ESP_ADMIN_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_ESP_ADMIN')),
       __SHADOWCHAT_ACTIVITY_ENABLED__: JSON.stringify(isEnabled('VITE_FEATURE_ACTIVITY')),

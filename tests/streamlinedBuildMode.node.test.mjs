@@ -15,10 +15,16 @@ for (const mode of ['production', 'development', 'local-preview']) {
     const loaded = await loadConfigFromFile({ command: 'build', mode }, configFile)
     const enabled = mode === 'local-preview'
     assert.equal(loaded.config.define.__SHADOWCHAT_LOCAL_FEATURE_PREVIEW__, JSON.stringify(enabled))
+    assert.equal(loaded.config.define.__SHADOWCHAT_STREAMLINED_EDITION__, 'true')
     assert.equal(loaded.config.build.outDir, path.resolve('apps/streamlined', enabled ? 'dist-local-preview' : 'dist'))
     assert.equal(loaded.config.preview.host, '127.0.0.1')
   })
 }
+
+test('full app fixes its edition flag false so streamed provider gates cannot disable its GIFs', async () => {
+  const loaded = await loadConfigFromFile({ command: 'build', mode: 'production' }, path.resolve('vite.config.ts'))
+  assert.equal(loaded.config.define.__SHADOWCHAT_STREAMLINED_EDITION__, 'false')
+})
 
 async function fixture({ outputLocal = false, markerLocal = outputLocal, runtimeLocal = outputLocal, htmlLocal = outputLocal, modules = requiredModules }, verifyLocal) {
   const directory = await mkdtemp(path.join(tmpdir(), 'shadowchat-streamlined-mode-'))

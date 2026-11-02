@@ -32,6 +32,7 @@ for (const required of ['src/components/chat/MessageInput.tsx', 'src/components/
   assert(modules.includes(required), `Required shared feature missing: ${required}`)
 }
 const chunks = Object.values(manifest).map(entry => entry.file)
+assert(!chunks.some(file => /GifPicker/.test(file)), 'KLIPY picker entered the first-release streamlined artifact')
 assert(!chunks.some(file => /vendor-(phaser|babylon|livekit)|GamesHome|WeatherView/.test(file)), 'Unrelated runtime was bundled')
 const visited = new Set()
 function visit(key) {
@@ -53,6 +54,7 @@ let hasLocalRuntimeGuard = false
 for (const file of chunks.filter(file => file.endsWith('.js'))) {
   assert((await stat(path.join(root, file))).size < 525_000, `Oversized chunk: ${file}`)
   const code = await readFile(path.join(root, file), 'utf8')
+  assert(!code.includes('klipy-gifs'), 'KLIPY API invocation entered the first-release streamlined artifact')
   if (code.includes('shadowchat-local-feature-preview')) hasLocalRuntimeGuard = true
 }
 assert.equal(hasLocalRuntimeGuard, localFeaturePreview, localFeaturePreview ? 'Local feature preview runtime guard is missing' : 'A local feature preview runtime entered the release artifact')

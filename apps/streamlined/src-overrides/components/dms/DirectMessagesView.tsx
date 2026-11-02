@@ -1,6 +1,7 @@
 import { PrivateMediaAudio } from '../../../../../src/components/ui/PrivateMediaPlayer'
 import { isContentPolicyRejection } from '../../../../../src/lib/contentPolicy'
 import { PrivateMediaImage } from '../../../../../src/components/ui/PrivateMediaImage'
+import { isUnavailableKlipyUrl } from '../../../../../src/lib/klipyAvailability'
 import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 
 import { motion, AnimatePresence } from 'framer-motion'
@@ -167,9 +168,10 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
   const isGrouped = shouldGroupMessage(message, previousMessage)
   const isOwn = message.sender_id === currentUserId
   const isIncoming = !isOwn
-  const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+  const unavailableKlipySource = [message.file_url, message.thumbnail_url, message.audio_url].find(isUnavailableKlipyUrl)
+  const isImageMessage = message.message_type === 'image' && Boolean(message.file_url) && !unavailableKlipySource
   const mediaCaption = getMessageCaption(message)
-  const isVideoMessage = message.message_type === 'video' && Boolean(message.file_url)
+  const isVideoMessage = message.message_type === 'video' && Boolean(message.file_url) && !unavailableKlipySource
   const isFloatingMediaMessage = isImageMessage || isVideoMessage
   const videoMessageUrl = isVideoMessage ? message.file_url || '' : ''
   const imageMessageSrc = getImageMessageDisplaySrc(message.file_url, message.thumbnail_url)
@@ -499,6 +501,8 @@ const DirectMessageBubble = React.memo(function DirectMessageBubble({
                 </Button>
               </div>
             </div>
+          ) : unavailableKlipySource ? (
+            <PrivateMediaImage src={unavailableKlipySource} alt="" className="mt-1 max-w-xs" />
           ) : message.message_type === 'audio' ? (
             <PrivateMediaAudio
               controls

@@ -1,5 +1,6 @@
 import { ensureSession, getWorkingClient } from './supabase'
 import { parsePrivateMediaUrl } from '../../../../src/lib/privateMediaUrls'
+import { isUnavailableKlipyUrl } from '../../../../src/lib/klipyAvailability'
 
 export type LinkTextPart =
   | { type: 'text'; text: string }
@@ -142,6 +143,7 @@ const writeCachedPreview = (url: string, preview: LinkPreview) => {
 }
 
 export const fetchLinkPreview = async (url: string): Promise<LinkPreview | null> => {
+  if (isUnavailableKlipyUrl(url)) return null
   const normalized = normalizeMessageUrl(url)
   if (!normalized) return null
   // Member-media links are attachments, never input to third-party metadata fetches.

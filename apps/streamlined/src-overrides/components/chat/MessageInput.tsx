@@ -1,4 +1,5 @@
 import { isContentPolicyRejection } from '../../../../../src/lib/contentPolicy'
+import { KLIPY_GIFS_ENABLED } from '../../../../../src/lib/klipyAvailability'
 import React, { useState, useRef, useEffect, useCallback, Suspense } from 'react'
 import { motion } from 'framer-motion'
 import { BellRing, ChevronDown, Film, Send, Smile, Command, Plus, Mic, X } from 'lucide-react'
@@ -38,7 +39,7 @@ import { useComposerKeyboardDismiss } from '../../../../../src/hooks/useComposer
 import { useNativeVideoPaste } from '../../../../../src/hooks/useNativeVideoPaste'
 
 const normalizeComposerValue = (value: string) => (value.trim().length === 0 ? '' : value)
-const GifPicker = React.lazy(() => import('../../../../../src/components/chat/GifPicker').then(module => ({ default: module.GifPicker })))
+const GifPicker = KLIPY_GIFS_ENABLED ? React.lazy(() => import('../../../../../src/components/chat/GifPicker').then(module => ({ default: module.GifPicker }))) : null
 const StagedAttachmentList = React.lazy(() => import('../../../../../src/components/chat/StagedAttachmentList').then(module => ({ default: module.StagedAttachmentList })))
 const AIShareConsentDialog = React.lazy(() => import('../../../../../src/streamlined/AIShareConsentDialog').then(module => ({ default: module.AIShareConsentDialog })))
 const HYPE_SEND_LONG_PRESS_MS = 650
@@ -96,9 +97,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   replyingTo,
   onCancelReply,
   typingChannel = 'general',
-  enableGifPicker = false,
+  enableGifPicker: requestedGifPicker = false,
   aiReplyDestination = 'current-conversation',
 }) => {
+  const enableGifPicker = KLIPY_GIFS_ENABLED && requestedGifPicker
   const composerScopeKey = `${identityKey ?? ''}:${cacheKey}`
   const { draft, setDraft, clear } = useDraft(cacheKey, identityKey)
   const [composerState, setComposerState] = useState(() => ({ key: composerScopeKey, message: draft }))
@@ -702,13 +704,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   }
 
   const openGifPicker = () => {
+    if (!enableGifPicker) return
     setShowGifPicker(true)
     setShowAttachmentMenu(false)
     setShowEmojiPicker(false)
   }
 
   const handleGifSelect = async (gif: GifResult) => {
-    if (disabled || submittingRef.current) {
+    if (!enableGifPicker || disabled || submittingRef.current) {
       return
     }
 
@@ -1052,7 +1055,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         </div>
       )}
 
-      {showGifPicker && enableGifPicker && (
+      {GifPicker && showGifPicker && enableGifPicker && (
         <Suspense fallback={<div role="status" aria-label="Loading GIF picker" className="mb-2 text-sm text-[var(--text-muted)]">Loading GIF picker…</div>}>
           <GifPicker
             onSelect={gif => void handleGifSelect(gif)}

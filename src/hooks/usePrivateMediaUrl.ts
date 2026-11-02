@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isUnavailableKlipyUrl } from '../lib/klipyAvailability'
 import {
   getPrivateMediaGeneration,
   PRIVATE_MEDIA_ENABLED,
@@ -14,7 +15,7 @@ type PrivateMediaHookOptions = { enabled?: boolean }
 /** Undefined means pending/denied. Never replace it with the original public URL. */
 const useSignedPrivateMediaUrl = (source?: string | null, options: PrivateMediaHookOptions = {}) => {
   const [resolved, setResolved] = useState<ResolvedSource | null>(null)
-  const enabled = options.enabled !== false
+  const enabled = options.enabled !== false && !isUnavailableKlipyUrl(source)
   const requiresSigning = requiresPrivateMediaUrl(source)
 
   useEffect(() => {
@@ -59,7 +60,7 @@ const useSignedPrivateMediaUrl = (source?: string | null, options: PrivateMediaH
 }
 
 const usePublicMediaUrl = (source?: string | null, options: PrivateMediaHookOptions = {}) =>
-  options.enabled !== false && source ? source : undefined
+  options.enabled !== false && source && !isUnavailableKlipyUrl(source) ? source : undefined
 
 // The rollout flag is fixed for the lifetime of a build, so hook order never changes.
 // Keep the dormant signing lifecycle outside the default application's runtime.

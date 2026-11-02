@@ -1,5 +1,6 @@
 import { PrivateMediaAudio } from '../../../../../src/components/ui/PrivateMediaPlayer'
 import { PrivateMediaImage } from '../../../../../src/components/ui/PrivateMediaImage'
+import { isUnavailableKlipyUrl } from '../../../../../src/lib/klipyAvailability'
 import React, { Suspense, lazy, useEffect, useRef, useState } from 'react'
 import {
   Pin,
@@ -240,9 +241,10 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
     const canDelete = isOwner || (isOperator && Boolean(message.user) && !isAuthorOperator)
     const isShadoAI = message.user?.username === 'shado_ai'
     const isAIMessage = isShadoAI || message.message_type === 'command'
-    const isImageMessage = message.message_type === 'image' && Boolean(message.file_url)
+    const unavailableKlipySource = [message.file_url, message.thumbnail_url, message.audio_url].find(isUnavailableKlipyUrl)
+    const isImageMessage = message.message_type === 'image' && Boolean(message.file_url) && !unavailableKlipySource
     const mediaCaption = getMessageCaption(message)
-    const isVideoMessage = message.message_type === 'video' && Boolean(message.file_url)
+    const isVideoMessage = message.message_type === 'video' && Boolean(message.file_url) && !unavailableKlipySource
     const isFloatingMediaMessage = isImageMessage || isVideoMessage
     const videoMessageUrl = isVideoMessage ? message.file_url || '' : ''
     const imageMessageSrc = getImageMessageDisplaySrc(message.file_url, message.thumbnail_url)
@@ -615,7 +617,9 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(
                       />
                     </>
                   )}
-                  {message.message_type === 'audio' ? (
+                  {unavailableKlipySource ? (
+                    <PrivateMediaImage src={unavailableKlipySource} alt="" className="mt-1 max-w-xs" />
+                  ) : message.message_type === 'audio' ? (
                     <PrivateMediaAudio controls src={message.audio_url ?? undefined} className="mt-1 max-w-full" />
                   ) : isImageMessage ? (
                     <ChatImageRadialHeart

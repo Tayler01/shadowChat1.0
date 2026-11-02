@@ -9,6 +9,7 @@ import {
 } from 'react'
 import { usePrivateMediaUrl } from '../../hooks/usePrivateMediaUrl'
 import { PRIVATE_MEDIA_ENABLED } from '../../lib/privateMediaUrls'
+import { KLIPY_GIFS_ENABLED } from '../../lib/klipyAvailability'
 
 /** Swap expiring credentials without resetting an in-progress recording or video. */
 function usePrivateMediaSource(
@@ -63,7 +64,7 @@ function usePrivateMediaSource(
 
 // Select inside forwardRef so disabled builds discard the protected component entirely.
 export const PrivateMediaAudio = forwardRef<HTMLAudioElement, AudioHTMLAttributes<HTMLAudioElement>>(
-  PRIVATE_MEDIA_ENABLED ? function SignedPrivateMediaAudio({ src, ...props }, forwardedRef) {
+  PRIVATE_MEDIA_ENABLED || !KLIPY_GIFS_ENABLED ? function SignedPrivateMediaAudio({ src, ...props }, forwardedRef) {
     const elementRef = useRef<HTMLAudioElement>(null)
     const resolvedSource = usePrivateMediaUrl(src)
     useImperativeHandle(forwardedRef, () => elementRef.current!, [])
@@ -73,7 +74,7 @@ export const PrivateMediaAudio = forwardRef<HTMLAudioElement, AudioHTMLAttribute
 )
 
 export const PrivateMediaVideo = forwardRef<HTMLVideoElement, VideoHTMLAttributes<HTMLVideoElement>>(
-  PRIVATE_MEDIA_ENABLED ? function SignedPrivateMediaVideo({ src, poster, ...props }, forwardedRef) {
+  PRIVATE_MEDIA_ENABLED || !KLIPY_GIFS_ENABLED ? function SignedPrivateMediaVideo({ src, poster, ...props }, forwardedRef) {
     const elementRef = useRef<HTMLVideoElement>(null)
     const resolvedSource = usePrivateMediaUrl(src)
     const resolvedPoster = usePrivateMediaUrl(poster)

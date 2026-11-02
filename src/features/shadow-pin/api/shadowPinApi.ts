@@ -1,4 +1,5 @@
 import { isContentPolicyRejection, normalizeContentPolicyError, normalizeContentPolicyFunctionError } from '../../../lib/contentPolicy'
+import { isUnavailableKlipyUrl, KLIPY_UNAVAILABLE_LABEL } from '../../../lib/klipyAvailability'
 import {
   ensureSession,
   getSessionWithTimeout,
@@ -487,6 +488,7 @@ async function throwShadowPinWriteError(error: unknown, uploadedPath?: string): 
 }
 
 async function callShadowPinMediaFunction<T>(payload: Record<string, unknown>): Promise<T> {
+  if ([payload.url, payload.sourceUrl].some(value => typeof value === 'string' && isUnavailableKlipyUrl(value))) throw new Error(KLIPY_UNAVAILABLE_LABEL)
   const accessToken = await getSessionAccessToken()
   const response = await fetch('/api/shadow-pin/media', {
     method: 'POST',
@@ -505,6 +507,7 @@ async function callShadowPinMediaFunction<T>(payload: Record<string, unknown>): 
 }
 
 async function callShadowPinVideoFunction<T>(payload: Record<string, unknown>, expectedAccountId?: string): Promise<T> {
+  if ([payload.url, payload.sourceUrl].some(value => typeof value === 'string' && isUnavailableKlipyUrl(value))) throw new Error(KLIPY_UNAVAILABLE_LABEL)
   const sessionValid = await ensureSession(true)
   if (!sessionValid) {
     throw new Error('Sign in to save videos.')

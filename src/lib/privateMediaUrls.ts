@@ -1,4 +1,5 @@
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import { isUnavailableKlipyUrl, KLIPY_UNAVAILABLE_LABEL } from './klipyAvailability'
 import { VITE_PRIVATE_MEDIA_ENABLED, VITE_SUPABASE_URL } from './env'
 import { getWorkingClient, supabase } from './supabase'
 import { PERSONAL_BLOCKS_CHANGED_EVENT } from './personalBlocking'
@@ -116,6 +117,7 @@ export const resolvePrivateMediaSource = async (
   value: string,
   options: PrivateMediaOptions = {},
 ): Promise<ResolvedPrivateMediaSource> => {
+  if (isUnavailableKlipyUrl(value)) throw new Error(KLIPY_UNAVAILABLE_LABEL)
   if (!PRIVATE_MEDIA_ENABLED) return { url: value, expiresAt: null }
   const target = parsePrivateMediaUrl(value)
   const bunny = !target && isBunnyMediaCandidate(value)

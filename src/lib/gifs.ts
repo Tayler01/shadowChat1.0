@@ -1,4 +1,5 @@
 import { invokeAuthenticatedEdgeFunction } from './edgeFunctions'
+import { KLIPY_GIFS_ENABLED } from './klipyAvailability'
 
 export type GifResult = {
   id: string
@@ -28,6 +29,7 @@ export const searchKlipyGifs = async ({
   limit = 24,
   signal,
 }: GifSearchOptions = {}): Promise<GifSearchResponse> => {
+  if (!KLIPY_GIFS_ENABLED) return { gifs: [], nextPage: null }
   const data = await invokeAuthenticatedEdgeFunction<GifSearchResponse>('klipy-gifs', {
       query: query.trim(),
       page,
