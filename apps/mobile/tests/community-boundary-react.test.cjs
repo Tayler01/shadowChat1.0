@@ -60,6 +60,7 @@ test('real React StrictMode mounts, retries startup and remounts a selected comm
         'react/jsx-runtime':require('react/jsx-runtime'),
         'react-native':{View:primitive('div'),Text:primitive('span'),Image:()=>React.createElement('img',{alt:'Shado brand mark'}),StyleSheet:{create:value=>value},useWindowDimensions:()=>({height:844,fontScale:1})},
         '../../assets/images/shado-round-mark.png':'bundled-mark',
+        './NativeLoadingFill':{NativeLoadingFill:()=>React.createElement('div')},
       }),
       './communityBindings': bindings,
       '../lib/notifications/registration': { createScopedRegistration: () => ({

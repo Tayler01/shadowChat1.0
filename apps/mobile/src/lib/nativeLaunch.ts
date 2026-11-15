@@ -14,13 +14,21 @@ export function pageLaunchProgress(progress: number): number {
 // web editions also work; never treat the WebView load event as app readiness.
 export const STREAMLINED_LAUNCH_SCRIPT = `
 (function () {
+  var authoritative = false;
   var finished = false;
   var pending = false;
   function post(progress, stage) {
     window.ReactNativeWebView.postMessage(JSON.stringify({version:1,type:'launch_progress',progress:progress,stage:stage}));
   }
+  window.addEventListener('shadowchat:startup-work', function(event) {
+    var state = event.detail;
+    if (!state || typeof state.progress !== 'number' || !isFinite(state.progress) || state.progress < 0 || state.progress > 1) return;
+    authoritative = true;
+    window.ReactNativeWebView.postMessage(JSON.stringify({version:1,type:'startup_work',progress:state.progress,complete:state.complete === true,failed:state.failed === true}));
+    if (state.complete || state.failed) { finished = true; observer.disconnect(); }
+  });
   function check() {
-    if (finished || pending || !document.documentElement) return;
+    if (authoritative || finished || pending || !document.documentElement) return;
     var root = document.getElementById('root');
     if (!root || !root.children.length) return;
     if (document.getElementById('streamlined-document-startup')) return;
@@ -33,6 +41,7 @@ export const STREAMLINED_LAUNCH_SCRIPT = `
     // React can replace one suspense fallback with another in the same frame.
     pending = true;
     requestAnimationFrame(function () { requestAnimationFrame(function () {
+      if (authoritative) return;
       pending = false;
       if (!root.children.length || document.querySelector('.streamlined-loading[aria-busy="true"]')) return;
       finished = true;
@@ -50,6 +59,12 @@ export const STREAMLINED_LAUNCH_SCRIPT = `
 export function parseLaunchProgress(raw: string): { progress: number; stage: string } | null {
   try {
     const message = JSON.parse(raw);
+    if (message?.version === 1 && message.type === 'startup_work' && Number.isFinite(message.progress) && message.progress >= 0 && message.progress <= 1) {
+      if (message.failed === true) return { progress: 1, stage: 'Connection interrupted' };
+      if (message.complete === true && message.progress === 1) return { progress: 1, stage: 'Ready' };
+      if (message.complete === false && message.progress < 1) return { progress: 0.7 + message.progress * 0.3, stage: 'Loading startup work' };
+      return null;
+    }
     if (message?.version !== 1 || message.type !== 'launch_progress') return null;
     // The bootstrap emits only these exact milestones. No arbitrary overlay text.
     if (message.progress === 0.8 && message.stage === 'Restoring your community') return { progress: 0.8, stage: message.stage };

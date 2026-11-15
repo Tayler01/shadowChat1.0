@@ -1,30 +1,86 @@
-# Dependencies and generated native projects
+# EAS archives from the repository root even though the Expo project lives in
+# apps/mobile. Exclude every unrelated root surface explicitly so only the
+# standalone mobile application is uploaded to the cloud builder.
+/.agents/
+/.codex/
+/.git
+/.github/
+/.netlify/
+/.playwright-cli/
+/contracts/
+/dist/
+/docs/
+/firmware/
+/netlify/
+/native/
+/output/
+/public/
+/release-notes/
+/scripts/
+/services/
+/source-assets/
+/assets-source/
+/src/
+/supabase/
+/tests/
+/tools/
+
+/.env
+/.env.*
+/.gitattributes
+/.gitignore
+/.gitleaksignore
+/AGENT.md
+/AGENTS.md
+/deno.lock
+/design-qa.md
+/eslint.config.js
+/index.html
+/jest.config.js
+/LICENSE
+/netlify.toml
+/netlify.streamlined.toml
+/package-lock.json
+/package.json
+/PLAN.md
+/postcss.config.js
+/README.md
+/render.yaml
+/setup.sh
+/skills-lock.json
+/STATUS.md
+/tailwind.config.js
+/TASK.md
+/tsconfig.app.json
+/tsconfig.json
+/tsconfig.node.json
+/tsconfig.test.json
+/vite.config.ts
+
+/apps/mobile/.env
+/apps/streamlined/
+/apps/mobile/.env.*
+/apps/mobile/.expo/
+/apps/mobile/android/
+/apps/mobile/ios/
+/apps/mobile/node_modules/
+/apps/mobile/output/
+/apps/mobile/npm-debug.log*
+/apps/mobile/yarn-debug.log*
+/apps/mobile/yarn-error.log*
+
+# EAS may treat apps/mobile as the archive root even when it discovers this
+# repository-root ignore file. Anchor generated native trees to that root so
+# local Expo modules retain their own ios/android source directories.
 node_modules/
 /android/
 /ios/
-
-# Expo caches and local bundle verification
-.expo/
 output/
-dist/
-web-build/
+.expo/
 
-# Local secrets and machine-only credentials
-.env
-.env.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-credentials.json
-firebase-service-account*.json
-service-account*.json
-*-firebase-adminsdk-*.json
+*.log
+/export-ios/
 
-# Development noise
-*.tsbuildinfo
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.DS_Store
+/archive/
+/supabase/
+/export-ios/

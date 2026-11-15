@@ -1,3 +1,4 @@
+import { NATIVE_LOADING_PRESENTATION_SCRIPT } from '@/lib/nativeLoadingPresentation';
 import type { Session } from '@supabase/supabase-js';
 import * as Crypto from 'expo-crypto';
 import * as Linking from 'expo-linking';
@@ -531,7 +532,7 @@ export default function ShadowChatAppScreen() {
         hideKeyboardAccessoryView
         contentInsetAdjustmentBehavior="never"
         decelerationRate="normal"
-        injectedJavaScriptBeforeContentLoaded={`window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = ${JSON.stringify(clipboardBridge.available)};${NATIVE_BOOTSTRAP_SCRIPT}${NATIVE_MAIN_DOCUMENT_LINK_SCRIPT}${appRuntime.streamlined ? STREAMLINED_LAUNCH_SCRIPT : ''}`}
+        injectedJavaScriptBeforeContentLoaded={`window.__SHADOWCHAT_NATIVE_CLIPBOARD__ = ${JSON.stringify(clipboardBridge.available)};${NATIVE_BOOTSTRAP_SCRIPT}${NATIVE_MAIN_DOCUMENT_LINK_SCRIPT}${appRuntime.streamlined ? NATIVE_LOADING_PRESENTATION_SCRIPT + STREAMLINED_LAUNCH_SCRIPT : ''}`}
         javaScriptCanOpenWindowsAutomatically={false}
         javaScriptEnabled
         mediaPlaybackRequiresUserAction={false}

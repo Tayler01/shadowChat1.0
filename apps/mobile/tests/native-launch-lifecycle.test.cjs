@@ -34,7 +34,7 @@ function page() {
   const state = { children: [], documentStartup: true, busy: true, frames: [], messages: [], disconnected: false };
   let callback;
   vm.runInNewContext(STREAMLINED_LAUNCH_SCRIPT, {
-    window: { ReactNativeWebView: { postMessage: raw => state.messages.push(JSON.parse(raw)) } },
+    window: { addEventListener: () => {}, ReactNativeWebView: { postMessage: raw => state.messages.push(JSON.parse(raw)) } },
     document: {
       documentElement: {},
       getElementById: id => id === 'root' ? { get children() { return state.children; } } : state.documentStartup ? {} : null,
@@ -71,4 +71,12 @@ test('an actionable auth error with aria-busy=false reveals the underlying error
   state.children = [{}]; state.documentStartup = false; state.busy = false;
   state.mutate(); state.frame(); state.frame();
   assert.equal(state.messages.at(-1).stage, 'Ready');
+});
+
+test('actual work protocol cannot announce readiness with unfinished work', () => {
+  const raw = message => JSON.stringify({ version: 1, type: 'startup_work', ...message });
+  assert.equal(parseLaunchProgress(raw({progress: .5, complete: false, failed: false})).progress, .85);
+  assert.equal(parseLaunchProgress(raw({progress: 1, complete: false, failed: false})), null);
+  assert.equal(parseLaunchProgress(raw({progress: 1, complete: true, failed: false})).stage, 'Ready');
+  assert.equal(parseLaunchProgress(raw({progress: .5, complete: false, failed: true})).stage, 'Connection interrupted');
 });
