@@ -727,7 +727,9 @@ export const MessageList: React.FC<MessageListProps> = ({
     }
     if (!loading && !cursorLoading && !cursorWindowResolving && initialPositionReady
       && (deepLinkStatus === 'none' || deepLinkStatus === 'settled')
-      && windowMode !== 'layoutSettling' && windowMode !== 'targetingDeepLink') onInitialPositionState('ready')
+      // initialPositionReady is the controller's completion contract. Its display
+      // state may remain layoutSettling when a read cursor needs no update.
+      && windowMode !== 'targetingDeepLink') onInitialPositionState('ready')
   }, [active, onInitialPositionState, cursorError, cursorWindowError, deepLinkStatus, loading,
     cursorLoading, cursorWindowResolving, initialPositionReady, windowMode])
 

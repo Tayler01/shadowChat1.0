@@ -12,6 +12,7 @@ const mockScrollToBottom = jest.fn()
 const mockHandleUnreadScroll = jest.fn()
 const mockMarkLatestRead = jest.fn()
 const mockUnreadState = {
+  initialPositionReady: null as boolean | null,
   autoScroll: true,
   firstUnreadMessageId: null as string | null,
   feedState: null as string | null,
@@ -48,7 +49,7 @@ jest.mock('../src/hooks/useUnreadScroll', () => ({
 
 mockUseUnreadScroll.mockImplementation(() => ({
   autoScroll: mockUnreadState.autoScroll,
-  initialPositionReady: !mockUseMessages()?.loading && mockUnreadState.feedState !== 'targetingFirstUnread' && mockUnreadState.feedState !== 'targetingDeepLink',
+  initialPositionReady: mockUnreadState.initialPositionReady ?? (!mockUseMessages()?.loading && mockUnreadState.feedState !== 'targetingFirstUnread' && mockUnreadState.feedState !== 'targetingDeepLink'),
   firstUnreadMessageId: mockUnreadState.firstUnreadMessageId,
   feedState: mockUnreadState.feedState ?? (mockUnreadState.autoScroll ? 'bottomPinned' : 'userScrolledUp'),
   targetMessageId: mockUnreadState.firstUnreadMessageId,
@@ -130,6 +131,7 @@ describe('MessageList mobile keyboard layout', () => {
   const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
 
   beforeEach(() => {
+    mockUnreadState.initialPositionReady = null
     mockUnreadState.autoScroll = true
     mockUnreadState.firstUnreadMessageId = null
     mockUnreadState.feedState = null
@@ -806,9 +808,11 @@ describe('MessageList mobile keyboard layout', () => {
     rerender(messageListElement(props))
     expect(onInitialPositionState).not.toHaveBeenCalled()
     mockUnreadState.feedState = 'layoutSettling'
+    mockUnreadState.initialPositionReady = false
     rerender(messageListElement(props))
     expect(onInitialPositionState).not.toHaveBeenCalled()
-    mockUnreadState.feedState = 'followingLatest'
+    // A settled, all-read feed can retain this label indefinitely.
+    mockUnreadState.initialPositionReady = true
     rerender(messageListElement(props))
     expect(onInitialPositionState).toHaveBeenCalledWith('ready')
   })})
