@@ -1725,3 +1725,73 @@ Canonical detail and release gates live in:
 - Before release, public metadata has no episode provider ID, payload or playback URLs. Existing private registry holds ownership; guarded self-removing Cron job publishes playback at the deadline. Pre-deadline behavior and simulated unlock/self-removal verified in a rolled-back transaction. Member role cannot access Cron schema; unsigned media delivery returns 403. No schema, RLS or Edge Function changes.
 - Main `8d21ab1f`, scoped full-app source `8a7ecdbf`. Lint, app TypeScript, default/full production builds and budgets, 17 focused tests, docs verification and phone/desktop fixture checks pass. Initial 639-byte CSS budget overrun corrected with equivalent inline presentation styles; caps unchanged. Artifact root: `output/playwright/will-kirk/scheduled-release/`; screenshots: `output/playwright/will-kirk/scheduled-visual/`.
 - Published Netlify `6ae7cec2a16ecd2adb234d76`; verified 30 public/immutable file SHA readbacks and unchanged function archives/schedule, canonical environment and build settings. Then published the locked catalog preview; readback confirms Chapter Two first, ready/locked with all playback metadata withheld, existing Chapter One still released, and unlock job active. Broad rollout hold remains true. No duplicate announcement or disposable test content.
+
+## November 15, 2026 - paired loading/preload web delivery; build31 compiling
+
+Explicit user approval received for paired hosted member/demo publication. Final
+web source `25e86029383c67b9c7ccc8d8c55949264baa85b4` is published to member
+`6af9fdae4ef4400840d817c2` and demo `6af9fd588bd4a9bd40846a8d`. Each passed
+164 exact public/immutable asset responses plus media GET405/unauthenticated
+POST401; site settings, private flags and function ZIP preserved. Full site and
+backend/schema remain unchanged; GitHub rollout hold/native-build stop retained.
+The direct local-gate exception in DEPLOYMENT_GUIDE was used; no CI pass claimed.
+
+Authenticated synthetic demo: five reloads each in iPhone WebKit/Android Chromium
+emulation passed. Every run painted100% before overlay removal and revealed
+loaded messages at the bottom with no temporary jump arrow. Signed-out member
+startup passed both engines. Synthetic pagehide/visibility/pageshow cycles with
+2s,30s,120s and repeated2s wall-clock waits passed both engines. These do not
+suspend an iOS process or expire a valid token. Production-member authenticated,
+physical iPhone and native-simulator acceptance remain gaps.
+
+Demo-first QA caught an intermittent95% hang: the explicit initialPositionReady
+signal was true while the display label layoutSettling could persist indefinitely
+on an all-read feed. Followup uses that explicit completion contract. Final lint,
+types, full/member/demo builds,101 affected scroll/chat/thread tests and5 startup
+work/final-paint tests passed; unchanged frozen133-test receipt retained.
+Gitleaks task diffs0; Trivy production HIGH/CRITICAL0 with unchanged inputs.
+CodeQL821 files reported22 pre-existing alerts in byte-identical unrelated files;
+focused followups MessageList1file/native38files reported0 alerts. Whole repo is
+not represented as alert-free.
+
+Build30 was compiled/submitted but package comparison then found its isolated
+source had omitted the existing Swift clipboard module. Original Swift/podspec
+restored byte-for-byte from main; source archive now verifies them. Native lint,
+types and115 tests passed. Superseding1.0.1(31), EAS build
+`013f275a-01a9-46a0-8042-21351ec19d79`, source
+`4de6ec6d8bd08bf0bd4d32165fbd97218d678959`, is compiling. Native changes are
+also preserved on main `df1739e71e615950d2f99abde7b846b9e423bc50`; native Git
+blobs match the build source apart from eas.json trailing whitespace. No public
+App Store release. Final Apple processing/internal availability still pending.
+
+Evidence: `output/tasks/ios-loading-resume/revision3/release/` (final hosted
+receipts under `final/`). No test messages/posts/storage objects or policy
+acceptance writes; normal demo read-cursor effects only. Own demo sessions revoked,
+browser contexts closed. Unrelated development changes preserved.
+
+### Delivery closeout - November 15, 2026, 18:59 UTC
+
+**TestFlight1.0.1(31) is available** in ShadoChat Internal Beta. Apple readback
+confirms VALID / IN_BETA_TESTING, existing tester preserved, prior builds retained.
+EAS build `013f275a-01a9-46a0-8042-21351ec19d79` and submission
+`8f3069c0-7bc5-4bae-9ce5-cb82bae38b47` FINISHED. Apple build
+`958f0b9a-d609-44e3-82cc-2542c883f9c6`. Compiled IPA includes actual startup-work
+bridge and existing ShadowChatClipboardModule; profile and notification extension
+present. SHA256 `957d031de37407baa8652aaea97a90ba1b30dbe260fb427953c5a69222c94436`.
+Build30 is superseded. Public App Store1.0/build26 remains READY_FOR_SALE;
+no public App Store release performed.
+
+Paired hosted web source25e86029 is published/verified on member and demo. All
+local/browser checks above passed on the final relevant source. Physical iPhone,
+native Simulator and authenticated production-member acceptance remain unverified;
+synthetic demo/browser lifecycle checks are distinct from OS suspension proof.
+
+iPhone acceptance: install1.0.1(31), cold launch; reopen after short pauses and
+several minutes, waiting long enough for the actual recovery loader to appear;
+repeat at least5 cycles. Confirm one continuous forward fill reaches100% and
+messages appear at their intended position immediately, without the transient
+bottom arrow/jump. Check normal send/live receive, saved history/unread/exact
+thread targets, and reduced motion. Preserve legitimate history navigation.
+
+Final receipt: `output/tasks/ios-loading-resume/revision3/release/build31-testflight-availability.json`.
+Resumable handoff: `output/tasks/ios-loading-resume/HANDOFF.md`.

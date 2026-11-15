@@ -456,3 +456,30 @@ November 1, 2026: Will & Kirk locked-cover countdown and branded badge passed
 iPhone/WebKit and Android/Chromium browser emulation. Physical installed-PWA,
 background/lock-screen behavior and the actual November 6 timed unlock remain
 unverified. See `output/playwright/will-kirk/scheduled-visual/` for browser proof.
+
+### Delivery closeout - November 15, 2026, 18:59 UTC
+
+**TestFlight1.0.1(31) is available** in ShadoChat Internal Beta. Apple readback
+confirms VALID / IN_BETA_TESTING, existing tester preserved, prior builds retained.
+EAS build `013f275a-01a9-46a0-8042-21351ec19d79` and submission
+`8f3069c0-7bc5-4bae-9ce5-cb82bae38b47` FINISHED. Apple build
+`958f0b9a-d609-44e3-82cc-2542c883f9c6`. Compiled IPA includes actual startup-work
+bridge and existing ShadowChatClipboardModule; profile and notification extension
+present. SHA256 `957d031de37407baa8652aaea97a90ba1b30dbe260fb427953c5a69222c94436`.
+Build30 is superseded. Public App Store1.0/build26 remains READY_FOR_SALE;
+no public App Store release performed.
+
+Paired hosted web source25e86029 is published/verified on member and demo. All
+local/browser checks above passed on the final relevant source. Physical iPhone,
+native Simulator and authenticated production-member acceptance remain unverified;
+synthetic demo/browser lifecycle checks are distinct from OS suspension proof.
+
+iPhone acceptance: install1.0.1(31), cold launch; reopen after short pauses and
+several minutes, waiting long enough for the actual recovery loader to appear;
+repeat at least5 cycles. Confirm one continuous forward fill reaches100% and
+messages appear at their intended position immediately, without the transient
+bottom arrow/jump. Check normal send/live receive, saved history/unread/exact
+thread targets, and reduced motion. Preserve legitimate history navigation.
+
+Final receipt: `output/tasks/ios-loading-resume/revision3/release/build31-testflight-availability.json`.
+Resumable handoff: `output/tasks/ios-loading-resume/HANDOFF.md`.
