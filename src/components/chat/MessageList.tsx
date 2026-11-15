@@ -41,6 +41,7 @@ interface MessageListProps {
   moderationScope?: ChannelBanScope
   scrollTestId?: string
   active?: boolean
+  onInitialPositionState?: (state: 'ready' | 'error') => void
   emptyState?: React.ReactNode
 }
 
@@ -128,6 +129,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   moderationScope = 'general_chat',
   scrollTestId = 'message-scroll',
   emptyState,
+  onInitialPositionState,
 }) => {
   const contextMessagesApi = useOptionalMessages()
   const messagesApi = (providedMessagesApi ?? contextMessagesApi) as GeneralChatMessagesApi | undefined
@@ -201,7 +203,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   const [cursorWindowError, setCursorWindowError] = useState(false)
   const [resolvedCursorWindowKey, setResolvedCursorWindowKey] = useState<string | null>(null)
   const [messageStackPresented, setMessageStackPresented] = useState(false)
-  const { cursor, loading: cursorLoading, markRead } = useReadCursor(readCursorSurface, readCursorScope, Boolean(profile?.id))
+  const { cursor, loading: cursorLoading, error: cursorError, markRead } = useReadCursor(readCursorSurface, readCursorScope, Boolean(profile?.id))
 
   const messageMap = useMemo(() => {
     const msgMap = new Map<string, Message>()
@@ -718,6 +720,16 @@ export const MessageList: React.FC<MessageListProps> = ({
       ? 'targetingDeepLink'
       : feedState)
   const hideMessageStackForInitialPosition = combinedMessages.length > 0 && !messageStackPresented && !initialPositionReady
+  useEffect(() => {
+    if (!active || !onInitialPositionState) return
+    if (cursorError || cursorWindowError || deepLinkStatus === 'targetUnavailable') {
+      onInitialPositionState('error'); return
+    }
+    if (!loading && !cursorLoading && !cursorWindowResolving && initialPositionReady
+      && (deepLinkStatus === 'none' || deepLinkStatus === 'settled')
+      && windowMode !== 'layoutSettling' && windowMode !== 'targetingDeepLink') onInitialPositionState('ready')
+  }, [active, onInitialPositionState, cursorError, cursorWindowError, deepLinkStatus, loading,
+    cursorLoading, cursorWindowResolving, initialPositionReady, windowMode])
 
   useEffect(() => {
     if (combinedMessages.length === 0) {

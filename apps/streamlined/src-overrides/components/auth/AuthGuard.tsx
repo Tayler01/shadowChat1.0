@@ -1,3 +1,5 @@
+import { useStartupAuth } from '../../../../../src/streamlined/loading/startupHooks';
+import { startupWork } from '../../../../../src/streamlined/loading/startupWork';
 import React, { lazy, Suspense, useEffect, useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { StreamlinedLoadingView } from '../../../../../src/streamlined/components/StreamlinedLoadingView';
@@ -6,7 +8,7 @@ import { SignInSettings } from '../../../../../src/streamlined/components/SignIn
 import { SHADOW_CIRCUIT_ENABLED } from '../../config/featureFlags';
 import { getAccountDeletionState, subscribeAccountDeletion } from '../../../../../src/lib/accountDeletionReceipt';
 
-const AccountDeletionRecovery = lazy(() => import('../../../../../src/components/auth/AccountDeletionRecovery'));
+const AccountDeletionRecovery = lazy(() => startupWork.module(() => import('../../../../../src/components/auth/AccountDeletionRecovery')));
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -14,6 +16,7 @@ interface AuthGuardProps {
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading, error } = useAuth();
+  useStartupAuth(loading, Boolean(user), error);
   const [deletion, setDeletion] = useState(getAccountDeletionState);
   useEffect(() => subscribeAccountDeletion(() => setDeletion(getAccountDeletionState())), []);
   const deletionRoute = new URLSearchParams(window.location.search).get('accountDeletion') === 'retry';

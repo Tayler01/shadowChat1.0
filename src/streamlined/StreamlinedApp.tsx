@@ -1,3 +1,5 @@
+import { StartupViewReady } from './loading/StartupLoadingScreen'
+import { startupWork } from './loading/startupWork'
 import { lazy, Suspense, useCallback, useEffect, useState, useTransition } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { AuthGuard } from '../../apps/streamlined/src-overrides/components/auth/AuthGuard'
@@ -26,15 +28,15 @@ import { markNotificationEventRead, clearNotificationEventFromSystemTray } from 
 import { requestAppBadgeRefresh } from '../lib/appBadge'
 import type { AppView } from '../types/navigation'
 
-const ChatView = lazy(() => import('../../apps/streamlined/src-overrides/components/chat/ChatView').then(m => ({ default: m.ChatView })))
-const DirectMessagesView = lazy(() => import('../../apps/streamlined/src-overrides/components/dms/DirectMessagesView').then(m => ({ default: m.DirectMessagesView })))
-const ShadowPin = lazy(() => import('../../apps/streamlined/src-overrides/features/shadow-pin/ShadowPin').then(m => ({ default: m.ShadowPin })))
-const Settings = lazy(() => import('./StreamlinedSettings').then(m => ({ default: m.StreamlinedSettings })))
-const AccountSettings = lazy(() => import('./StreamlinedSettings').then(m => ({ default: m.StreamlinedAccountSettings })))
-const Policies = lazy(() => import('./StreamlinedPolicies').then(m => ({ default: m.StreamlinedPolicies })))
-const MembershipGate = lazy(() => import('./StreamlinedMembershipGate').then(m => ({ default: m.StreamlinedMembershipGate })))
-const ActiveUsersView = lazy(() => import('../components/chat/ActiveUsersView').then(m => ({ default: m.ActiveUsersView })))
-const Search = lazy(() => import('../../apps/streamlined/src-overrides/features/discovery/UniversalDiscoveryDialog').then(m => ({ default: m.UniversalDiscoveryView })))
+const ChatView = lazy(() => startupWork.module(() => import('../../apps/streamlined/src-overrides/components/chat/ChatView').then(m => ({ default: m.ChatView }))))
+const DirectMessagesView = lazy(() => startupWork.module(() => import('../../apps/streamlined/src-overrides/components/dms/DirectMessagesView').then(m => ({ default: m.DirectMessagesView }))))
+const ShadowPin = lazy(() => startupWork.module(() => import('../../apps/streamlined/src-overrides/features/shadow-pin/ShadowPin').then(m => ({ default: m.ShadowPin }))))
+const Settings = lazy(() => startupWork.module(() => import('./StreamlinedSettings').then(m => ({ default: m.StreamlinedSettings }))))
+const AccountSettings = lazy(() => startupWork.module(() => import('./StreamlinedSettings').then(m => ({ default: m.StreamlinedAccountSettings }))))
+const Policies = lazy(() => startupWork.module(() => import('./StreamlinedPolicies').then(m => ({ default: m.StreamlinedPolicies }))))
+const MembershipGate = lazy(() => startupWork.module(() => import('./StreamlinedMembershipGate').then(m => ({ default: m.StreamlinedMembershipGate }))))
+const ActiveUsersView = lazy(() => startupWork.module(() => import('../components/chat/ActiveUsersView').then(m => ({ default: m.ActiveUsersView }))))
+const Search = lazy(() => startupWork.module(() => import('../../apps/streamlined/src-overrides/features/discovery/UniversalDiscoveryDialog').then(m => ({ default: m.UniversalDiscoveryView }))))
 
 type Mutation = { method: 'back' | 'back-two' } | { method: 'push' | 'replace'; url: URL; layer?: string | null } | null
 const desktopTabs = [{ view: 'chat', label: 'Group chat' }, { view: 'dms', label: 'Direct messages' }, { view: 'active-users', label: 'Active users' }, { view: 'pins', label: 'ShadowPin' }, { view: 'settings', label: 'Settings' }] as const
@@ -146,6 +148,7 @@ function StreamlinedShell() {
       </aside>
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <Suspense fallback={null}>
+          <StartupViewReady view={route.view} />
           {route.view === 'chat' && <ChatView currentView="chat" onViewChange={navigate} onSearch={search} initialMessageId={route.message ?? undefined} initialThreadId={route.thread ?? undefined} onThreadRoute={routeChat} />}
           {route.view === 'dms' && <DirectMessagesView currentView="dms" onViewChange={navigate} onToggleSidebar={() => navigate('chat')} initialConversation={route.conversation ?? undefined} initialMessageId={route.message ?? undefined} initialPanel={route.dmPanel} initialConnectionsSection={route.dmConnectionsSection} initialCircleId={route.dmCircle ?? undefined} onRoute={routeDM} onConnectionsRoute={routeCircles} />}
           {route.view === 'pins' && <ShadowPin currentView="pins" onViewChange={navigate} initialImageId={route.pin ?? undefined} initialCommentId={route.comment ?? undefined} initialPanel={route.pinPanel ?? undefined} initialFeedMode={route.pinFeed ?? undefined} initialCircleId={route.pinCircle ?? undefined} onPinRoute={routePin} onFeedModeChange={changeFeed} onCircleChange={changeCircle} />}

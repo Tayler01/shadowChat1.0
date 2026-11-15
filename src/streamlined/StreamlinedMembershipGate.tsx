@@ -1,3 +1,4 @@
+import { useStartupMembership } from './loading/startupHooks'
 import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../../apps/streamlined/src-overrides/hooks/useAuth'
@@ -19,6 +20,7 @@ interface MembershipCheckProps {
 
 function MembershipCheck({ userId, signOut, children, unacceptedContent }: MembershipCheckProps) {
   const [status, setStatus] = useState<'checking' | 'required' | 'accepted' | 'failed'>('checking')
+  useStartupMembership(status)
   const [retry, setRetry] = useState(0)
   const [saving, setSaving] = useState(false)
   const [age, setAge] = useState<'adult' | 'underage' | null>(null)

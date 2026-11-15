@@ -795,4 +795,20 @@ describe('MessageList mobile keyboard layout', () => {
       })
     }
   })
-})
+  it('reports startup readiness only after messages and initial scroll positioning settle', () => {
+    const onInitialPositionState = jest.fn()
+    mockUseMessages.mockReturnValue({ ...mockUseMessages(), loading: true })
+    const props = { onInitialPositionState }
+    const { rerender } = renderMessageList(props)
+    expect(onInitialPositionState).not.toHaveBeenCalled()
+    mockUseMessages.mockReturnValue({ ...mockUseMessages(), loading: false })
+    mockUnreadState.feedState = 'targetingFirstUnread'
+    rerender(messageListElement(props))
+    expect(onInitialPositionState).not.toHaveBeenCalled()
+    mockUnreadState.feedState = 'layoutSettling'
+    rerender(messageListElement(props))
+    expect(onInitialPositionState).not.toHaveBeenCalled()
+    mockUnreadState.feedState = 'followingLatest'
+    rerender(messageListElement(props))
+    expect(onInitialPositionState).toHaveBeenCalledWith('ready')
+  })})

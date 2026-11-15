@@ -1,3 +1,4 @@
+import { startupWork } from '../../../../../src/streamlined/loading/startupWork'
 import React, { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react'
 import { useMessages } from '../../hooks/useMessages'
 import { useAuth } from '../../hooks/useAuth'
@@ -38,6 +39,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onThreadRoute,
 }) => {
   const { user } = useAuth()
+  const reportStartupPosition = useCallback((state: 'ready' | 'error') => {
+    if (state === 'error') startupWork.fail(); else startupWork.finish('view')
+  }, [])
   const isDesktop = useIsDesktop()
   const { profile } = useAuth()
   const {
@@ -216,7 +220,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       </div>
 
       {/* Messages */}
-      <MessageList
+      <MessageList onInitialPositionState={reportStartupPosition}
         active={!activeThreadId}
         onReply={handleReply}
         onOpenThread={openThread}
@@ -272,7 +276,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
       {activeThreadId && (
         <Suspense fallback={null}>
-          <LazyGeneralChatThreadSheet
+          <LazyGeneralChatThreadSheet onInitialPositionState={reportStartupPosition}
             open
             threadId={activeThreadId}
             initialRootMessage={messages.find(message => message.id === activeThreadId) ?? null}

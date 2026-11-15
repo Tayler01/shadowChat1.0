@@ -32,3 +32,5 @@ html:is([data-comfort-text-scale='115'], [data-comfort-text-scale='130']) .strea
   .streamlined-loading--fullscreen .streamlined-loading__content { position: static; margin-top: 0; transform: none; }
 }
 html:has(#streamlined-document-startup), body:has(#streamlined-document-startup) { margin: 0; background: #0d0f10; font-family: system-ui, -apple-system, sans-serif; }
+
+html:is([data-comfort-motion='reduced'], [data-comfort-motion='none']) .streamlined-work-fill { transition: none !important; }

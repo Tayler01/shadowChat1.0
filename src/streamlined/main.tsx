@@ -1,3 +1,5 @@
+import { StartupLoadingScreen } from './loading/StartupLoadingScreen'
+import { startupWork } from './loading/startupWork'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AuthProvider } from '../../apps/streamlined/src-overrides/hooks/useAuth'
@@ -14,9 +16,11 @@ import StreamlinedApp from './StreamlinedApp'
 import '../index.css'
 import './streamlined.css'
 
+startupWork.finish('runtime')
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
+    <><StartupLoadingScreen /><AuthProvider>
       <NativeAppBridge />
       <BlockedUsersProvider>
         <PresenceRoot>
@@ -29,7 +33,7 @@ createRoot(document.getElementById('root')!).render(
           </ComfortPreferencesProvider>
         </PresenceRoot>
       </BlockedUsersProvider>
-    </AuthProvider>
+    </AuthProvider></>
   </StrictMode>,
 )
 

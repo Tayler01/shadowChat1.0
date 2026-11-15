@@ -37,11 +37,13 @@ export type GeneralChatThreadSheetProps = {
   onViewChange: (view: AppView) => void
   onClose: () => void
   initialRootMessage?: Message | null
+  onInitialPositionState?: (state: 'ready' | 'error') => void
   initialMessageId?: string | null
   messagesApi?: MessagesContextValue
 }
 
 export function GeneralChatThreadSheet({
+  onInitialPositionState,
   open,
   threadId,
   currentView,
@@ -146,6 +148,11 @@ export function GeneralChatThreadSheet({
   followingIntentRef.current = autoScroll
   useEffect(() => { setPositionPresented(false) }, [threadId, user?.id, initialMessageId])
   useEffect(() => { if (initialPositionReady) setPositionPresented(true) }, [initialPositionReady])
+  useEffect(() => {
+    if (!open || !onInitialPositionState) return
+    if (thread.error || cursorError) onInitialPositionState('error')
+    else if (initialPositionReady && positionPresented && !thread.loading && !cursorLoading) onInitialPositionState('ready')
+  }, [open, onInitialPositionState, thread.error, thread.loading, cursorError, cursorLoading, initialPositionReady, positionPresented])
   useEffect(() => { targetScrolledRef.current = null }, [open, threadId, positioningMessageId])
   useEffect(() => {
     if (!open || !positioningMessageId || feedState !== 'anchoredCatchup' || targetScrolledRef.current === positioningMessageId) return
